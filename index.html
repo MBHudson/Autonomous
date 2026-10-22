@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-build="143">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/svg+xml" href="ui/favicon.svg?v=296">
+  <title>Autonomous Loop Studio // Multi-Agent Interface</title>
+  <!-- Import map for the vendored three.js (3D topology). Must come before
+       any module script or modulepreload, or browsers ignore it. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./ui/vendor/three/three.module.min.js",
+        "three/addons/": "./ui/vendor/three/addons/"
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="ui/css/base.css?v=296">
+  <link rel="stylesheet" href="ui/css/layout.css?v=296">
+  <link rel="stylesheet" href="ui/css/chat.css?v=296">
+  <link rel="stylesheet" href="ui/css/topology.css?v=296">
+  <link rel="stylesheet" href="ui/css/modals.css?v=296">
+  <link rel="stylesheet" href="ui/css/components.css?v=296">
+  <link rel="stylesheet" href="ui/css/routingchart.css?v=296">
+  <link rel="stylesheet" href="ui/css/apilab.css?v=296">
+  <link rel="stylesheet" href="ui/css/brainlab.css?v=296">
+  <link rel="stylesheet" href="ui/css/codeblocks.css?v=296">
+
+  <!-- Preload critical modules -->
+  <link rel="modulepreload" href="ui/js/app.js?v=296">
+  <link rel="modulepreload" href="ui/js/store.js?v=296">
+  <link rel="modulepreload" href="ui/js/api.js?v=296">
+  <link rel="modulepreload" href="ui/js/components/chat.js?v=296">
+  <link rel="modulepreload" href="ui/js/components/sidebar.js?v=296">
+  <link rel="modulepreload" href="ui/js/components/topology.js?v=296">
+</head>
+<body data-theme="dark">
+  <!-- Loading screen (shown before any JS runs) -->
+  <div id="app-loader" class="app-loader">
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+    <div class="loader-text">Loading Autonomous Loop Studio…</div>
+  </div>
+
+  <!-- API lock banner: every own-API call that comes back 401 unhides this.
+       Without it a wrong/missing access token fails silently -- sessions stay
+       empty, the graph stays blank, agents won't fire -- and on a phone there
+       is no console to say why. Tapping it opens Config where the token lives. -->
+  <div class="api-locked-banner" id="apiLockedBanner" hidden>
+    <span class="api-locked-dot"></span>
+    <span>API locked (401) — tap here, open Config, check the Access token</span>
+  </div>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <button class="mobile-nav-btn" id="sidebarToggle" title="Setup"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"/></svg></button>
+        <div class="logo-dot"></div>
+        <div class="logo-text">
+          <span class="logo-line1">AUTONOMOUS</span>
+          <span class="logo-line2">Loop Studio</span>
+          <span class="app-credit">Made By: <a href="https://github.com/mbhudson/" target="_blank" rel="noopener noreferrer">MBHudson</a></span>
+        </div>
+      </div>
+      <div class="header-info">
+        <div class="header-stat">
+          <span>Agents:</span>
+          <span class="value" id="statAgents">0</span>
+        </div>
+        <div class="header-stat">
+          <span>Providers:</span>
+          <span class="value" id="statProviders">0</span>
+        </div>
+        <div class="header-stat">
+          <span>Sessions:</span>
+          <span class="value" id="statSessions">0</span>
+        </div>
+        <div class="header-stat">
+          <span>Uptime:</span>
+          <span class="value" id="statUptime">00:00:00</span>
+        </div>
+        <!-- Stacked pair: same .header-toggle styling as Terminal so they read
+             as one control, one above the other, instead of two differently
+             sized buttons fighting for the same strip of header. -->
+        <!--
+          Terminal and Fullscreen share the top row at equal width; Routing
+          Chart spans the full width underneath them. The buttons keep the exact
+          .header-toggle styling, so the only thing these wrappers add is the
+          arrangement -- equal columns in the row, one full-width button below.
+        -->
+        <div class="header-button-block">
+          <div class="header-toggle-row">
+            <button class="header-toggle" id="terminalToggle" title="Toggle terminal panel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 6.3l2 1.9-2 1.9M8.8 11h3"/></svg><span class="ht-label">Terminal</span></button>
+            <button class="header-toggle" id="fullscreenBtn" title="Fullscreen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 6V2.5h3.5M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg><span class="ht-label">Fullscreen</span></button>
+          </div>
+          <button class="header-toggle header-toggle-wide" id="rcOpenBtn" title="Open the routing chart (full screen)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 4.4l3.8 3.6L8 11.6l-3.8-3.6z"/><circle cx="8" cy="2.8" r="1.4" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8" r="1.4" fill="currentColor" stroke="none"/><circle cx="8" cy="13.2" r="1.4" fill="currentColor" stroke="none"/><circle cx="2.8" cy="8" r="1.4" fill="currentColor" stroke="none"/></svg><span class="ht-label">Routing Chart</span></button>
+        </div>
+        <button class="mobile-nav-btn" id="panelToggle" title="Network"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5" stroke-dasharray="2 1.5"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="2.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="2.9" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="13.1" cy="11" r="1.2" fill="currentColor" stroke="none"/><path d="M8 6.4V3.7M6.9 8.9l-2.8 1.4M9.1 8.9l2.8 1.4"/></svg></button>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-tab="sessions">Sessions</button>
+        <button class="nav-btn" data-tab="agents">Agents</button>
+        <button class="nav-btn" data-tab="providers">Providers</button>
+        <button class="nav-btn" data-tab="proxy">Proxy</button>
+        <button class="nav-btn" data-tab="config">Config</button>
+      </nav>
+      <div class="sidebar-body" id="sidebarBody">
+        <!-- Sidebar content rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="main-panel">
+      <button class="dialog-export-btn" id="dialogExportBtn" title="Export session">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 2v8M8 10L4.5 6.5M8 10l3.5-3.5M2.5 12.5h11"/>
+        </svg>
+      </button>
+      <div class="chat-messages" id="chatMessages">
+        <div class="empty" id="emptyState">
+          <div class="empty-icon">&#9670;</div>
+          <div>No messages yet. Start a conversation!</div>
+        </div>
+        <!-- Messages rendered by JS -->
+      </div>
+      <button class="clear-screen-btn" id="clearScreenBtn" title="Clear screen">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2.5 8a5.5 5.5 0 1 1 1.6 3.9M2.5 8V4.5M2.5 8h3.5"/>
+        </svg>
+      </button>
+      <div class="chat-input-area">
+        <div class="mic-col">
+          <button class="mic-btn" id="micBtn" title="Speech to text">&#127908;</button>
+          <span class="app-version" id="appVersion">v296</span>
+        <!-- Boot watchdog. Classic inline script on purpose: a MODULE that
+             fails to load fires its error on the <script> element, which does
+             not reach window.onerror -- so a missing or half-copied file left
+             the UI silently inert (tabs that do nothing, buttons that never
+             fire) with a completely empty console. This names the failure. -->
+        <script>
+          window.__appBooted = false;
+          setTimeout(function () {
+            if (window.__appBooted) return;
+            var el = document.createElement('div');
+            el.setAttribute('role', 'alert');
+            el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;'
+              + 'background:#5a0d0d;color:#ffd9d9;font:13px/1.5 monospace;padding:10px 14px;'
+              + 'border-bottom:2px solid #ff4757;white-space:pre-wrap';
+            el.textContent = 'The app failed to start: a JavaScript file did not load.\n'
+              + 'The folder is incomplete or out of date — delete it and copy a fresh one. '
+              + 'Press F12 for the file that failed.';
+            document.body.appendChild(el);
+          }, 6000);
+        </script>
+        </div>
+        <div class="chat-input-wrapper">
+          <textarea class="chat-input" id="inputField" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="1"></textarea>
+        </div>
+        <button class="stop-btn" id="stopBtn" title="Stop the agents (Esc)" hidden><svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1.5"/></svg></button>
+        <button class="send-btn" id="sendBtn" title="Send message">&#9654;</button>
+      </div>
+    </main>
+
+    <!-- Right panel -->
+    <aside class="right-panel" id="rightPanel">
+      <div class="right-panel-header">
+        <span>Topology</span>
+        <div class="topo-actions">
+          <button class="topo-btn" id="topoResetBtn" title="Reset the camera" hidden>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2"/><path d="M8 1.5v2.5M8 12v2.5M1.5 8H4M12 8h2.5"/></svg>
+          </button>
+          <button class="topo-btn topo-mode-btn" id="topoModeBtn" title="Switch view">2D</button>
+          <button class="topo-btn" id="topoExpandBtn" title="Expand the topology to the full window" aria-pressed="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9"/></svg>
+          </button>
+        </div>
+        <div class="topology-notifications" id="topoNotifications">
+          <button class="notif-bell" id="notifBell" aria-label="Notifications">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M8 2a4 4 0 0 1 4 4H4a4 4 0 0 1 4-4Z"/>
+              <path d="M8 14v-2"/>
+            </svg>
+            <span class="notif-badge" id="notifBadge" hidden>0</span>
+          </button>
+        </div>
+      </div>
+      <div class="right-panel-body">
+        <div class="topology-container" id="topologyContainer">
+          <div class="topology-svg" id="topoSvg"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification dropdown (viewport-fixed, outside sliding panels) -->
+  <div class="notif-dropdown" id="notifDropdown" hidden>
+    <div class="notif-header">
+      <span>Notifications</span>
+      <button class="notif-clear" id="notifClear">Clear</button>
+    </div>
+    <div class="notif-list" id="notifList"></div>
+  </div>
+
+  <!-- Thinking panel overlay -->
+  <div class="thinking-panel hidden" id="thinkingPanel">
+    <div class="panel-header">
+      <span>Thinking</span>
+      <button class="panel-close" id="thinkingClose">&times;</button>
+    </div>
+    <div class="panel-body" id="thinkingContent"></div>
+  </div>
+
+  <!-- Terminal panel overlay -->
+  <div class="terminal-panel hidden" id="terminalPanel">
+    <div class="panel-header">
+      <span>Terminal</span>
+      <button class="panel-close" id="terminalClose">&times;</button>
+    </div>
+    <div class="panel-body" id="terminalContent"></div>
+  </div>
+
+  <!-- Config modal -->
+  <div class="modal-bg" id="askModal">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="modal-title" id="askModalTitle">Ask agent</span>
+        <button class="modal-x" id="askModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Question</label>
+          <textarea class="form-textarea" id="askModalInput" rows="4" placeholder="Ask this agent something on its own. Nobody else is consulted."></textarea>
+          <div class="form-hint">Only this agent answers. The question and its reply are added to this chat.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="askModalCancel">Cancel</button>
+        <button class="btn btn-primary" id="askModalSend">Ask</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="configModal">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="modal-title">Configuration</span>
+        <button class="modal-x" id="configModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Theme</label>
+          <select class="form-select" id="cfgTheme">
+            <option value="dark">Dark</option>
+            <option value="matrix">Matrix</option>
+            <option value="cyberpunk">Cyberpunk</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Temperature</label>
+          <input type="range" class="form-input" id="cfgTemp" min="0" max="2" step="0.1" value="0.7">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Tokens</label>
+          <input type="number" class="form-input" id="cfgMaxTokens" value="16384" min="256" max="131072">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Memory (past turns)</label>
+          <input type="number" class="form-input" id="cfgHistoryTurns" value="5" min="0" max="50">
+          <div class="form-hint">How many earlier messages an agent is shown before your new one, plus the replies that followed (so 5 = up to 10 messages). 0 = every message is independent. Higher values cost more tokens per agent.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Speech <span class="form-hint-inline">read replies aloud</span></label>
+          <select class="form-select" id="cfgAudioEngine">
+            <option value="auto">Auto — use the provider above, fall back to built-in voices</option>
+            <option value="browser" selected>Built-in voices only (no API, works offline)</option>
+          </select>
+          <select class="form-select" id="cfgAudioProvider">
+            <option value="openai">OpenAI</option>
+            <option value="groq">Groq</option>
+          </select>
+          <div class="form-hint" id="cfgAudioEngineHint"></div>
+          <select class="form-select" id="cfgAudioVoice"></select>
+          <input type="range" class="form-input" id="cfgAudioSpeed" min="0.5" max="2" step="0.05" value="1">
+          <div class="form-hint">Speed <span id="cfgAudioSpeedVal">1.00</span>&times;</div>
+          <input type="range" class="form-input" id="cfgAudioPitch" min="0.5" max="1.6" step="0.05" value="1" style="margin-top:6px">
+          <div class="form-hint">Default pitch <span id="cfgAudioPitchVal">1.00</span> &mdash; higher reads as female, lower as male. Each agent can override this.</div>
+          <label class="form-label" style="margin-top:8px"><input type="checkbox" id="cfgAutoSpeak"> Speak every reply automatically</label>
+          <div class="form-hint">Off by default: a busy fan-out of five agents will read all five aloud, and speech is billed per character.</div>
+          <div id="cfgAudioStatus" class="form-hint"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sandbox <span class="form-hint-inline">internet + files for agents</span></label>
+          <textarea class="form-textarea" id="cfgSandboxRead" rows="2" placeholder="/var/www/site/myproject"></textarea>
+          <div class="form-hint">Directories agents may <b>read</b> — one absolute path per line. This is what powers <code>read_file</code>, <code>list_dir</code>, <code>glob_files</code> and <code>grep_code</code>. Leave empty to keep filesystem tools off.</div>
+          <textarea class="form-textarea" id="cfgSandboxWrite" rows="2" placeholder="/var/www/site/myproject/scratch"></textarea>
+          <div class="form-hint">Directories agents may <b>write</b> — one absolute path per line. Agents still ask you before each write. Keep this narrow, ideally a scratch folder you don't mind being overwritten.</div>
+          <input type="password" class="form-input" id="cfgSandboxToken" placeholder="(leave empty unless this install is publicly reachable)" autocomplete="off">
+          <div class="form-hint">Optional shared token. The API accepts cross-origin POSTs, so if anyone besides you can reach this URL, set <code>require_token</code> and a token in <code>storage/config.json</code>. This field holds the copy your browser sends.</div>
+          <div id="cfgSandboxStatus" class="form-hint"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cfgCancel">Cancel</button>
+        <button class="btn btn-primary" id="cfgSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toasts"></div>
+
+  <!-- Scripts -->
+  <script type="module" src="ui/js/app.js?v=296"></script>
+</body>
+</html>

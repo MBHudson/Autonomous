@@ -1,0 +1,48 @@
+# Router .htaccess - Enable routing for the router module
+
+RewriteEngine On
+
+# Never cache HTML entry points (JS/CSS already carry ?v= cache busters)
+<FilesMatch "index\.html$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate"
+</FilesMatch>
+
+# Redirect everything to index.php except existing files/directories
+# (never intercept API calls — api/ has its own front controller)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !/api/ [NC]
+RewriteRule ^(.*)$ public/index.php [L]
+
+
+# --- CORS: deliberately NOT enabled ---
+# This used to set `Access-Control-Allow-Origin: *`, which let any website on
+# the internet fetch this server and READ the response: every agent's
+# conversations, memory and config. The UI is served from this same origin and
+# never needed it. Removing it is the fix.
+#
+# If a separate front end ever needs to call this, set an explicit allowlist in
+# env instead: ROUTER_CORS_ORIGINS=https://your.other.host
+
+# Revalidate JS/CSS on every load.
+#
+# These files were served with no Cache-Control at all, so the browser applied
+# heuristic freshness and happily reused a month-old module after a deploy.
+# That is how the browser ended up running an old api.js (no .sandbox method)
+# against a new tools.js that called it. "no-cache" does NOT mean "don't cache"
+# -- it means revalidate first, which costs a cheap 304 and guarantees the
+# browser never pairs a new module with an old one.
+<FilesMatch "\.(js|css)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+</FilesMatch>
+
+# Cache control for API responses
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType application/json "access plus 0 minutes"
+</IfModule>
+
+# Security headers
+Header set X-Content-Type-Options "nosniff"
+Header set X-Frame-Options "DENY"
+Header set X-XSS-Protection "1; mode=block"

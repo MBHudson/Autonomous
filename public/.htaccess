@@ -1,0 +1,12 @@
+# Security - prevent direct access to sensitive files
+<FilesMatch "\.(env|config|json)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# CORS is deliberately NOT enabled here.
+#
+# This used to set `Access-Control-Allow-Origin: *`, which let any website on
+# the internet fetch this server and READ the response: every agent's
+# conversation, memory and config. The UI is same-origin and never needed it.
+# (Matches the root .htaccess, which dropped the same wildcard.)

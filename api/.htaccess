@@ -1,0 +1,10 @@
+# Router API - front controller routing
+RewriteEngine On
+# Route extensionless API paths to the front controller
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+# Block dotfiles only
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
