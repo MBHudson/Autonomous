@@ -1,0 +1,145 @@
+/* Base styles and CSS variables */
+:root {
+  --bg-primary: rgba(8, 12, 18, 0.97);
+  --bg-secondary: rgba(12, 18, 28, 0.95);
+  --bg-tertiary: rgba(18, 25, 40, 0.9);
+  --accent-cyan: #00e5ff;
+  --accent-purple: #a855f7;
+  --accent-green: #00ff88;
+  --accent-red: #ff4757;
+  --accent-orange: #ff9f43;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-dim: #64748b;
+  --border: rgba(0, 229, 255, 0.12);
+  --glow-cyan: 0 0 8px rgba(0, 229, 255, 0.4);
+  --glow-green: 0 0 8px rgba(0, 255, 136, 0.4);
+  --glow-purple: 0 0 8px rgba(168, 85, 247, 0.4);
+  --glow-red: 0 0 8px rgba(255, 71, 87, 0.4);
+  --glow-orange: 0 0 8px rgba(255, 159, 67, 0.4);
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 229, 255, 0.008) 2px,
+    rgba(0, 229, 255, 0.008) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Theme: Matrix */
+body.matrix {
+  --bg-primary: rgba(0, 8, 0, 0.97);
+  --bg-secondary: rgba(0, 15, 0, 0.95);
+  --bg-tertiary: rgba(0, 25, 0, 0.9);
+  --accent-cyan: #00ff41;
+  --accent-purple: #00cc33;
+  --accent-green: #00ff41;
+  --accent-red: #ff3333;
+  --accent-orange: #ffcc00;
+  --border: rgba(0, 255, 65, 0.12);
+  --glow-cyan: 0 0 8px rgba(0, 255, 65, 0.4);
+  --glow-green: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+/* Theme: Cyberpunk */
+body.cyberpunk {
+  --bg-primary: rgba(12, 0, 18, 0.97);
+  --bg-secondary: rgba(20, 0, 30, 0.95);
+  --bg-tertiary: rgba(30, 0, 45, 0.9);
+  --accent-cyan: #ff00ff;
+  --accent-purple: #ff6600;
+  --accent-green: #00ffcc;
+  --accent-red: #ff0066;
+  --accent-orange: #ffcc00;
+  --border: rgba(255, 0, 255, 0.12);
+  --glow-cyan: 0 0 8px rgba(255, 0, 255, 0.4);
+  --glow-purple: 0 0 8px rgba(255, 102, 0, 0.4);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ==================== LOADING SCREEN ==================== */
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.loader-bar {
+  width: 220px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loader-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+  border-radius: 2px;
+  animation: loadProgress 12s ease-out forwards;
+}
+
+@keyframes loadProgress {
+  0% { width: 0%; }
+  40% { width: 40%; }
+  70% { width: 75%; }
+  100% { width: 100%; }
+}
+
+.loader-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+/* Fade out when app is ready */
+.app-loaded .app-loader {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease-out;
+}
+
+/* Hide after transition to avoid blocking */
+.app-loaded .app-loader {
+  display: none;
+  /* The transition above handles the fade, this just ensures it's gone */
+}

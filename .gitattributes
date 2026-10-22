@@ -1,0 +1,9 @@
+# Keep launcher line endings right whatever core.autocrlf says:
+# bash refuses CRLF scripts, cmd mis-parses labels in LF batch files.
+*.sh   text eol=lf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Vendored / binary
+ui/vendor/** -diff
+tools/cacert.pem -diff

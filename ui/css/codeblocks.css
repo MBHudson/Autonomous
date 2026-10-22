@@ -1,0 +1,421 @@
+/* ============================================
+   CODEBLOCKS.CSS — code containers, markdown,
+   reasoning blocks, and message avatars
+   ============================================ */
+
+/* ---------- Message row: avatar + content ---------- */
+.message {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 0 10px;
+  align-items: start;
+}
+
+.message > .message-header,
+.message > .message-body,
+.message > .message-actions {
+  grid-column: 2;
+}
+
+.message-avatar {
+  grid-row: 1 / span 3;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+
+.message-avatar.avatar-loading {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.message-avatar img,
+.message-avatar .avatar-svg,
+.message-avatar .avatar-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.avatar-user {
+  background: var(--accent-cyan);
+  color: #060a10;
+  border: 1px solid var(--accent-cyan);
+}
+
+.avatar-agent {
+  background: rgba(0, 255, 136, 0.08);
+  color: var(--agent-color, var(--accent-green));
+  border: 1px solid color-mix(in srgb, var(--agent-color, #00ff88) 55%, transparent);
+}
+
+/* Robot eyes: still at rest, scanning while the agent is thinking/typing */
+.avatar-agent .avatar-svg .pupil {
+  transition: transform 0.18s ease;
+  transform: translateX(0);
+}
+
+.avatar-agent.thinking {
+  border-color: var(--agent-color, var(--accent-cyan));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--agent-color, #00ff88) 45%, transparent);
+}
+
+.avatar-agent.thinking .avatar-svg .pupil {
+  animation: eye-scan 2.1s ease-in-out infinite;
+}
+
+@keyframes eye-scan {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-agent.thinking .avatar-svg .pupil { animation: none; }
+  .code-block { animation: none; }
+}
+
+/* ---------- Reasoning block (model's printed thoughts) ---------- */
+.reasoning-block {
+  margin: 0 0 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent-purple);
+  border-radius: 7px;
+  overflow: hidden;
+  animation: msgIn 0.25s ease-out;
+}
+
+.reasoning-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-purple);
+  user-select: none;
+  list-style: none;
+}
+
+.reasoning-summary::-webkit-details-marker { display: none; }
+.reasoning-summary:hover { background: rgba(168, 85, 247, 0.07); }
+
+.reasoning-caret {
+  font-size: 8px;
+  transition: transform 0.18s ease;
+}
+
+.reasoning-block[open] .reasoning-caret { transform: rotate(90deg); }
+
+.reasoning-hint {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.reasoning-content {
+  padding: 9px 12px 11px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-top: 1px solid var(--border);
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+/* ---------- Streaming reply (painted as tokens arrive) ---------- */
+.message-streaming .stream-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  min-height: 1.2em;
+}
+
+/* A soft caret so an in-flight reply reads as still arriving. */
+.message-streaming .stream-text::after {
+  content: '\2588';
+  color: var(--accent-cyan);
+  animation: streamCaret 1s steps(2) infinite;
+  margin-left: 1px;
+}
+
+@keyframes streamCaret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-streaming .stream-text::after { animation: none; }
+}
+
+/* ---------- Markdown prose ---------- */
+.md-body {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+
+.md-body > *:first-child { margin-top: 0; }
+.md-body > *:last-child { margin-bottom: 0; }
+
+.md-body p { margin: 7px 0; }
+
+.md-body h3, .md-body h4, .md-body h5, .md-body h6 {
+  margin: 11px 0 5px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-cyan);
+}
+
+.md-body strong { color: #fff; font-weight: 700; }
+.md-body em { color: var(--text-primary); font-style: italic; }
+
+.md-body a {
+  color: var(--accent-cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.md-body a:hover { color: #fff; }
+
+.md-body ul, .md-body ol {
+  margin: 7px 0;
+  padding-left: 20px;
+}
+
+.md-body li { margin: 2px 0; }
+
+.md-body blockquote {
+  margin: 7px 0;
+  padding: 4px 0 4px 11px;
+  border-left: 2px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.md-body hr {
+  margin: 11px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.md-inline-code {
+  background: rgba(0, 229, 255, 0.09);
+  border: 1px solid rgba(0, 229, 255, 0.16);
+  color: var(--accent-cyan);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11.5px;
+}
+
+/* ---------- Code container ---------- */
+.code-block {
+  margin: 9px 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(4, 8, 14, 0.72);
+  overflow: hidden;
+  animation: msgIn 0.25s ease-out;
+  position: relative;
+}
+
+/* Thin accent bar keyed to the language */
+.code-block::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--code-accent), transparent 78%);
+  opacity: 0.55;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px 5px 10px;
+  background: rgba(255, 255, 255, 0.028);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Left: language identity */
+.code-lang {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.code-lang-logo {
+  width: 17px;
+  height: 17px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.code-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 17px;
+  border-radius: 4px;
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.code-lang-name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right: actions pinned to the top-right of the header */
+.code-block-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.code-block-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.code-block:hover .code-block-btn { opacity: 1; }
+
+.code-block-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.code-block-btn:hover {
+  color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.09);
+  border-color: rgba(0, 229, 255, 0.2);
+}
+
+.code-block-btn.is-done { color: var(--accent-green); }
+.code-block-btn.is-error { color: var(--accent-red); }
+
+.code-block-pre {
+  margin: 0;
+  padding: 11px 13px;
+  overflow-x: auto;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.code-block-pre::-webkit-scrollbar { height: 5px; width: 5px; }
+.code-block-pre::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.3);
+  border-radius: 3px;
+}
+.code-block-pre::-webkit-scrollbar-track { background: transparent; }
+
+.code-block-pre code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.62;
+  color: var(--text-primary);
+  white-space: pre;
+  display: block;
+  tab-size: 2;
+}
+
+/* ---------- Token colors: recolored to this app's neon palette ---------- */
+.code-block-pre .token.comment,
+.code-block-pre .token.prolog,
+.code-block-pre .token.doctype,
+.code-block-pre .token.cdata { color: #4d6b6b; font-style: italic; }
+
+.code-block-pre .token.punctuation { color: #7e94a8; }
+
+.code-block-pre .token.property,
+.code-block-pre .token.tag,
+.code-block-pre .token.constant,
+.code-block-pre .token.symbol,
+.code-block-pre .token.deleted { color: var(--accent-red); }
+
+.code-block-pre .token.boolean,
+.code-block-pre .token.number,
+.code-block-pre .token.unit { color: var(--accent-orange); }
+
+.code-block-pre .token.selector,
+.code-block-pre .token.attr-name,
+.code-block-pre .token.string,
+.code-block-pre .token.char,
+.code-block-pre .token.builtin,
+.code-block-pre .token.inserted { color: var(--accent-green); }
+
+.code-block-pre .token.operator,
+.code-block-pre .token.entity,
+.code-block-pre .token.url,
+.code-block-pre .language-css .token.string,
+.code-block-pre .style .token.string { color: #7dd3fc; }
+
+.code-block-pre .token.atrule,
+.code-block-pre .token.attr-value,
+.code-block-pre .token.keyword { color: var(--accent-purple); }
+
+.code-block-pre .token.function,
+.code-block-pre .token.class-name { color: var(--accent-cyan); }
+
+.code-block-pre .token.regex,
+.code-block-pre .token.important,
+.code-block-pre .token.variable { color: var(--accent-orange); }
+
+.code-block-pre .token.important,
+.code-block-pre .token.bold { font-weight: 700; }
+.code-block-pre .token.italic { font-style: italic; }
+
+.code-block-pre .token.namespace { opacity: 0.7; }
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 640px) {
+  .message { grid-template-columns: 22px minmax(0, 1fr); gap: 0 8px; }
+  .message-avatar { width: 22px; height: 22px; border-radius: 6px; }
+  .md-body { font-size: 12px; }
+  .code-block-pre { padding: 9px 10px; }
+  .code-block-pre code { font-size: 10.5px; }
+  .code-lang-name { font-size: 9px; letter-spacing: 0.05em; }
+  .code-lang-logo { width: 15px; height: 15px; }
+  .reasoning-content { font-size: 11px; max-height: 260px; }
+}

@@ -1,0 +1,8 @@
+# Deny all access to storage
+Deny from all
+
+# But allow access to files within if needed
+<Files "*.json">
+    Order Deny,Allow
+    Deny from all
+</Files>

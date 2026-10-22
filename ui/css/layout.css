@@ -1,0 +1,569 @@
+/* Layout styles */
+.app {
+  display: grid;
+  /* Right column is the topology; width is user-resizable (topoPanel.js). */
+  grid-template-columns: 260px minmax(0, 1fr) var(--topo-w, 420px);
+  grid-template-rows: 56px minmax(0, 1fr);
+  /* Fixed to the viewport: tracks URL-bar show/hide and zoom correctly
+     where vh/dvh units and JS measuring both fail. */
+  position: fixed;
+  inset: 0;
+  gap: 1px;
+  background: var(--border);
+}
+
+/* Fullscreen: fixed positioning already fills the screen; just dodge the camera cutout */
+.app:fullscreen .header,
+.app:-webkit-full-screen .header {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
+}
+
+/* Header */
+.header {
+  grid-column: 1 / -1;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.logo {
+  display: flex;
+  /* Top-aligned, not centered: the name sits above the credit line, and
+     centring the row against that two-line block dropped the pulsing dot
+     level with "Studio" instead of "Router". */
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-shadow: var(--glow-cyan);
+  letter-spacing: 2px;
+}
+
+.logo-dot {
+  width: 10px;
+  height: 10px;
+  /* Sit on the cap-height of the first line (16px * 1.15 = 18.4px tall)
+     rather than the middle of the whole two-line stack. */
+  margin-top: 4px;
+  flex: 0 0 auto;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  box-shadow: var(--glow-cyan);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.app-version {
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  font-weight: 400;
+  white-space: nowrap;
+  /* baseline alignment against the name, so no magic offset is needed */
+  align-self: baseline;
+}
+
+/* Name stacked over the credit line. align-items keeps the dot and the
+   version badge vertically centred against the two-line block. */
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.15;
+  min-width: 0;      /* let the credit ellipsis instead of forcing overflow */
+}
+
+/* Stacked wordmark: heavy AUTONOMOUS over a smaller serif-italic Loop
+   Studio in dimmed cyan, credit underneath. Serif is a system face -- no
+   webfont to install, drag-and-drop safe. */
+.logo-line1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-shadow: var(--glow-cyan);
+  letter-spacing: 2px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.logo-line2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 11.5px;
+  letter-spacing: 2.5px;
+  color: var(--accent-cyan);
+  opacity: 0.68;
+  line-height: 1.1;
+  white-space: nowrap;
+  /* Centered under AUTONOMOUS: the column sizes to the widest line, so
+     centering this one sits it in the middle. */
+  text-align: center;
+}
+
+.app-credit {
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.4px;
+  text-transform: none;
+  color: var(--text-dim);
+  text-shadow: none;
+  /* Sits on its own line under the title, and is always narrower than that
+     title row, so this never actually truncates. Kept as a safety net for
+     extreme zoom or a very long translation. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.app-credit a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-dim);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.app-credit a:hover,
+.app-credit a:focus-visible {
+  color: var(--accent-cyan);
+  border-bottom-color: var(--accent-cyan);
+}
+
+/* The credit line is always shown, at every width. It used to be hidden below
+   420px to save room, which quietly dropped "Made By: MBHudson" out of the
+   header on a narrow window. Space is made for it elsewhere instead. */
+
+/* There are two panel buttons and they share this class: the gear inside
+   .logo (left) and the network icon inside .header-info (right).
+
+   .logo is top-aligned and two lines tall now, so without this the left
+   button rides up beside the name while the right one, centred inside
+   .header, sits lower — the two drifted apart. align-self puts the left
+   button back on the same centring the right one gets, because .logo is the
+   tallest child and so sets the header's height. */
+.logo .mobile-nav-btn {
+  align-self: center;
+}
+
+.logo .logo-dot {
+  align-self: flex-start;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 1;
+}
+
+.header-info::-webkit-scrollbar {
+  display: none;
+}
+
+.header-info > * {
+  flex-shrink: 0;
+}
+
+.header-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-stat .value {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+}
+
+.status-badge .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: var(--glow-green);
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.header-toggle {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-toggle:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+/* Icon glyphs inside the header toggles are a mobile affordance (narrow
+   screens cannot fit three text buttons plus the panel toggle); desktop
+   keeps the text labels, so the glyphs stay hidden there. */
+.header-toggle svg {
+  display: none;
+}
+
+/* Header button block: Terminal + Fullscreen side by side on the top row at
+   equal width, Routing Chart spanning both underneath. The buttons themselves
+   keep the exact .header-toggle styling, so there is no second style to drift
+   out of step -- these wrappers only arrange them. */
+.header-button-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.header-toggle-row {
+  display: flex;
+  gap: 3px;
+}
+
+/* Equal columns: without this the row sizes to its content and "Terminal"
+   ends up wider than "Fullscreen". */
+.header-toggle-row .header-toggle {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.header-toggle-wide {
+  width: 100%;
+  text-align: center;
+}
+
+/* Sidebar */
+.sidebar {
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-nav {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  color: var(--accent-cyan);
+}
+
+.nav-btn.active {
+  color: var(--accent-cyan);
+  border-bottom-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.04);
+}
+
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.sidebar-body::-webkit-scrollbar {
+  width: 3px;
+}
+
+.sidebar-body::-webkit-scrollbar-thumb {
+  background: var(--accent-cyan);
+  border-radius: 2px;
+}
+
+/* Mobile nav buttons (base: hidden on desktop).
+   NOTE: keep this ABOVE the @media block — same-specificity rules later
+   in the file would override the media query's display:inline-flex. */
+.mobile-nav-btn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent-cyan);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 3px 9px;
+  line-height: 1.4;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-nav-btn:hover {
+  box-shadow: var(--glow-cyan);
+}
+
+.mobile-nav-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Footer */
+.footer {
+  grid-column: 1 / -1;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.footer-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.footer-val {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 56px minmax(0, 1fr);
+  }
+
+  .sidebar,
+  .right-panel {
+    position: fixed !important;
+    top: 56px;
+    bottom: 0;
+    width: min(340px, 88vw) !important;
+    z-index: 500;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar {
+    left: 0;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .right-panel {
+    right: 0;
+    transform: translateX(100%);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar.open {
+    transform: translateX(0) !important;
+  }
+
+  .right-panel.open {
+    transform: translateX(0) !important;
+  }
+
+  /* Mobile nav buttons: hidden on desktop */
+  .mobile-nav-btn {
+    display: inline-flex;
+  }
+
+  /* Condense header on small screens */
+  .header-info .header-stat {
+    display: none;
+  }
+
+  .header-info {
+    gap: 6px;
+  }
+
+  /* Icon rail: the three text buttons cannot fit on a phone next to the
+     panel toggle -- they pushed it off-screen, leaving a clipped button.
+     The wrappers dissolve (display:contents) so all four controls line up in
+     one ordered row: routing, terminal, fullscreen, right panel. Labels hide,
+     glyphs show, and the rail keeps the header's 10px edge padding on both
+     sides, symmetric with the left panel button. */
+  .header-button-block,
+  .header-toggle-row {
+    display: contents;
+  }
+  #rcOpenBtn { order: 1; }
+  #terminalToggle { order: 2; }
+  #fullscreenBtn { order: 3; }
+  #panelToggle { order: 4; }
+  .header-info .header-toggle {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    min-width: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .header-toggle-wide {
+    width: 34px;
+  }
+  .header-toggle .ht-label {
+    display: none;
+  }
+  .header-toggle svg {
+    display: block;
+    width: 17px;
+    height: 17px;
+  }
+  /* The full new name is long: tighten all three lines on phones so the
+     icon rail keeps its room. Desktop keeps the wide letterspaced title. */
+  .logo-line1 {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  .logo-line2 {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .app-credit {
+    font-size: 7px;
+  }
+
+  .logo {
+    font-size: 14px;
+    gap: 7px;
+    /* The logo yields width before the panel buttons do: without this the
+       title pushed .header-info into its own overflow and the Terminal and
+       network icons were the first things clipped on a narrow phone. */
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .header {
+    padding: 0 10px;
+  }
+
+  /* Full-width chat, comfortable touch targets */
+  .chat-input-area {
+    padding: 8px 10px;
+  }
+
+  /* Footer: scroll instead of clip */
+  .footer {
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 12px;
+  }
+
+  .footer::-webkit-scrollbar {
+    display: none;
+  }
+
+  .footer,
+  .footer-stats {
+    white-space: nowrap;
+  }
+
+  .msg {
+    max-width: 92%;
+  }
+
+  /* Grid children must be allowed to shrink or they overflow the viewport */
+  .main-panel,
+  .sidebar-body,
+  .chat-input-area,
+  .chat-input-wrapper,
+  .chat-input {
+    min-width: 0;
+  }
+
+  .thinking-panel,
+  .terminal-panel {
+    left: 8px;
+    right: 8px;
+  }
+}
+
+/* API lock banner: fixed strip shown on any 401 from our own API, so a
+   wrong or missing access token announces itself instead of leaving empty
+   sessions, a blank graph and dead agents with no explanation. Hidden again
+   by the first successful call. */
+.api-locked-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(80, 8, 8, 0.96);
+  border-bottom: 1px solid var(--accent-red);
+  color: #ffd7d7;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+}
+.api-locked-banner[hidden] {
+  display: none;
+}
+.api-locked-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  box-shadow: var(--glow-red);
+  animation: blink 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* (mobile-nav-btn base lives above the media query on purpose — see note there) */
