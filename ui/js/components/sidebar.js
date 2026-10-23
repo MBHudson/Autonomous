@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=304';
-import { K } from '../storage.js?v=304';
-import { persistence } from '../persistence.js?v=304';
-import { api } from '../api.js?v=304';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=304';
-import { TOOL_REGISTRY } from '../tools.js?v=304';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=304';
-import { snapshot } from '../rateGovernor.js?v=304';
+import { store } from '../store.js?v=305';
+import { K } from '../storage.js?v=305';
+import { persistence } from '../persistence.js?v=305';
+import { api } from '../api.js?v=305';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=305';
+import { TOOL_REGISTRY } from '../tools.js?v=305';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=305';
+import { snapshot } from '../rateGovernor.js?v=305';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
