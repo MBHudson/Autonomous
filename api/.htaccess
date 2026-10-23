@@ -1,5 +1,18 @@
 # Router API - front controller routing
 RewriteEngine On
+
+# Pass Authorization to PHP under CGI/FastCGI (Apache + PHP-FPM).
+#
+# Apache hands Authorization to mod_php, but NOT to FastCGI/CGI: PHP-FPM
+# receives an empty HTTP_AUTHORIZATION. The MCP server therefore answered
+# "missing bearer token" to every client even though the client sent one.
+# CGIPassAuth is the native Apache 2.4.13+ switch; the rewrite is a fallback
+# for hosts that ignore CGIPassAuth. Both are harmless under mod_php, where
+# the header is already present.
+CGIPassAuth On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Route extensionless API paths to the front controller
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
