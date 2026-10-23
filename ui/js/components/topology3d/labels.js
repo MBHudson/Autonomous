@@ -7,8 +7,8 @@
 // the label is moved with a transform (no layout thrash).
 
 import * as THREE from 'three';
-import { esc } from '../../utils.js?v=298';
-import { fmtMs, latencyTier } from '../../latency.js?v=298';
+import { esc } from '../../utils.js?v=299';
+import { fmtMs, latencyTier } from '../../latency.js?v=299';
 
 const _v = new THREE.Vector3();
 

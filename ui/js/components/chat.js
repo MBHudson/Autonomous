@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=298';
-import { K as STORAGE_K } from '../storage.js?v=298';
+import { store } from '../store.js?v=299';
+import { K as STORAGE_K } from '../storage.js?v=299';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,23 +12,24 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=298';
-import { persistence } from '../persistence.js?v=298';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget } from '../utils.js?v=298';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=298';
-import { toolProtocolFor, contextLimitFor } from '../toolProtocol.js?v=298';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS } from '../tools.js?v=298';
-import { usageFor } from '../rateGovernor.js?v=298';
-import { trace } from '../trace.js?v=298';
-import { latency } from '../latency.js?v=298';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=298';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=298';
-import { SlashCommands } from '../slashCommands.js?v=298';
-import { parseRoute, routingHelp } from '../routing.js?v=298';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=298';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=298';
-import { MessageRenderer } from './message.js?v=298';
-import { createAvatar } from './avatar.js?v=298';
+import { api, errText } from '../api.js?v=299';
+import { persistence } from '../persistence.js?v=299';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=299';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=299';
+import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=299';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=299';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=299';
+import { usageFor } from '../rateGovernor.js?v=299';
+import { trace } from '../trace.js?v=299';
+import { latency } from '../latency.js?v=299';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=299';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=299';
+import { SlashCommands } from '../slashCommands.js?v=299';
+import { parseRoute, routingHelp } from '../routing.js?v=299';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=299';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=299';
+import { MessageRenderer } from './message.js?v=299';
+import { createAvatar } from './avatar.js?v=299';
 
 /**
  * How long an agent may keep working on a single task.
@@ -41,7 +42,7 @@ import { createAvatar } from './avatar.js?v=298';
 const PERSISTENCE_MAX_STEPS = 12;          // tool calls per turn, all rounds
 const PERSISTENCE_WALL_CLOCK_MS = 20 * 60 * 1000;
 const FINAL_SUMMARY_MS = 90 * 1000;         // grace period for the closing summary
-const AGENT_FILES_BUDGET = 260000;          // characters of attached reference text
+const AGENT_FILES_BUDGET = 260000;          // absolute character ceiling for attached files
 
 /**
  * Is this a rate-limit refusal? Checked by status first (the relay now
@@ -1284,10 +1285,12 @@ _makeLiveNode(agent) {
       // a steering message could land. Without this loop, anything typed while
       // the agent was thinking sat in the queue and was never seen -- shown in
       // the transcript, so it looked delivered, and simply did nothing.
-      const convo = messages();
+      const inputBudget = inputBudgetFor(agent);
+      let convo = messages();
       let res = null;
       for (let pass = 0; pass <= MAX_STEER_STEPS; pass++) {
         if (pass > 0 && !this._drainSteer(convo)) break;
+        convo = compactMessages(convo, inputBudget);
         // Same retry policy as the tool path. This branch used to call the
         // relay directly, so one rate-limit refusal killed an agent that had
         // tools switched off, with no retry at all.
@@ -1317,11 +1320,43 @@ _makeLiveNode(agent) {
     // Tool-enabled: stream the first step, then keep the text we already have
     // and continue the loop on the server.
     let working = messages();
+    const inputBudget = inputBudgetFor(agent);
+    const sandboxRoot = sandboxRootFor(agent);
+
+    // Native tool calling is used where the API family supports it. The model
+    // still gets the same tools, but as schemas instead of a JSON/XML protocol
+    // it has to imitate. If a provider rejects the request, the first step
+    // falls back to the prompt dialect without losing the turn.
+    const baseSpec = specFor(working);
+    const family = detectFamily({
+      provider: agent.provider, endpoint: baseSpec.endpoint, model: agent.model,
+    });
+    let nativeMode = NATIVE_FAMILIES.has(family) && agent.nativeTools !== false;
+    const describeTool = name => TOOL_REGISTRY[name]?.describe || name;
+    const nativeDefinitions = () => nativeToolDefs(
+      enabled.map(name => ({ name, description: describeTool(name) })),
+      family,
+    );
+    const requestFor = messagesForCall => {
+      const spec = specFor(messagesForCall);
+      if (!nativeMode) return spec;
+      const tools = nativeDefinitions();
+      if (!tools.length) return spec;
+      const out = { ...spec, tools };
+      if (family === 'google') {
+        out.tool_config = { functionCallingConfig: { mode: 'AUTO' } };
+      } else {
+        const choice = nativeToolChoice(family);
+        if (choice) out.tool_choice = choice;
+      }
+      return out;
+    };
+
     // Teach the model the protocol BEFORE anything else, appended to whatever
     // system message the caller already produced (which may carry the agent's
     // own prompt and its memory block).
-    const sandboxRoot = sandboxRootFor(agent);
-    const instructions = toolInstructions(enabled, sandboxRoot, toolProtocolFor(agent));
+    let instructions = toolInstructions(enabled, sandboxRoot,
+      nativeMode ? 'native-api' : toolProtocolFor(agent));
     if (instructions) {
       // Prepend, never overwrite index 0. A messages array with no system
       // message starts with the oldest history turn, and overwriting that
@@ -1379,9 +1414,13 @@ _makeLiveNode(agent) {
         }
       }
 
+      // The live tool transcript is the part that grows without bound. Compact
+      // it against the same input budget the history already respects.
+      working = compactMessages(working, inputBudget);
+
       let res;
       try {
-        res = await relayWithRetry(specFor(working), {
+        res = await relayWithRetry(requestFor(working), {
           signal,
           // Retried on every step, not just later ones: the first call of a
           // turn is the long generation and the one most likely to overrun the
@@ -1398,6 +1437,32 @@ _makeLiveNode(agent) {
           }),
         });
       } catch (err) {
+        // A provider that does not accept native tool schemas rejects the
+        // request before doing any work. Retry the same step in the prompt
+        // dialect rather than failing the turn. Only the first step is retried:
+        // later failures are real work, not a capability probe.
+        if (nativeMode && step === 0 && err?.name !== 'AbortError'
+            && (Number(err?.status) === 400 || Number(err?.status) === 422)) {
+          nativeMode = false;
+          const promptInstructions = toolInstructions(enabled, sandboxRoot, toolProtocolFor(agent));
+          const sysIdx = working.findIndex(m => m && m.role === 'system');
+          if (sysIdx !== -1) {
+            const old = String(working[sysIdx].content || '');
+            working[sysIdx] = {
+              ...working[sysIdx],
+              content: old.includes(instructions)
+                ? old.replace(instructions, promptInstructions)
+                : `${old}${promptInstructions}`,
+            };
+          }
+          instructions = promptInstructions;
+          step--;   // the fallback retry is not a tool step
+          store.emit('toast', {
+            message: `${agent.name}: native tools unavailable — using the prompt protocol`,
+            type: 'info',
+          });
+          continue;
+        }
         // Out of retries. Say so plainly instead of returning an empty reply,
         // which used to look like the agent had finished with nothing to say.
         // errText, not String(err.message): a message that is itself an object
@@ -1431,8 +1496,18 @@ _makeLiveNode(agent) {
       // that one carries over between steps, so reusing it would re-find the
       // same JSON on every subsequent round and call the same tool over and
       // over until the budget ran out.
-      const call = parseToolCall(chunk, res && res.reasoning);
-      if (!call) {
+      const nativeCalls = Array.isArray(res?.toolCalls)
+        ? res.toolCalls.filter(c => c && c.name)
+        : [];
+      const calls = nativeCalls.map(c => {
+        const { arg, note } = nativeToolArgs(c.name, c.arguments);
+        return { tool: c.name, arg, note, native: true };
+      });
+      if (!calls.length) {
+        const call = parseToolCall(chunk, res && res.reasoning);
+        if (call) calls.push(call);
+      }
+      if (!calls.length) {
         // Narration rescue. With tools offered, a model sometimes SAYS it will
         // use one ("I'll use the remember tool") instead of emitting the call —
         // typically when a global pre-prompt tells it to reply only in text.
@@ -1450,9 +1525,13 @@ _makeLiveNode(agent) {
             { role: 'assistant', content: chunk },
             {
               role: 'user',
-              content: 'That reply contained no tool call. If you meant to use a tool, send it '
-                + 'now as a single JSON object: {"tool":"NAME","arg":...} and nothing else. '
-                + 'If no tool is needed, just answer the user.',
+              content: nativeMode
+                ? 'That reply contained no tool call. If you meant to use a tool, call it '
+                  + 'now through the provided tool interface. If no tool is needed, just '
+                  + 'answer the user.'
+                : 'That reply contained no tool call. If you meant to use a tool, send it '
+                  + 'now as a single JSON object: {"tool":"NAME","arg":...} and nothing else. '
+                  + 'If no tool is needed, just answer the user.',
             },
           ]);
           store.emit('toast', {
@@ -1506,39 +1585,59 @@ _makeLiveNode(agent) {
         };
       }
 
-      // Paint the tool request briefly, then the result.
+      // Paint the tool request(s) briefly, then run them. Native responses can
+      // carry several independent calls; prompt-protocol responses carry one.
       if (liveNode) {
         const el = liveNode.querySelector('.stream-text');
-        if (el) el.textContent = `${painted}${chunk}\n▸ running ${call.tool}…`;
+        if (el) el.textContent = `${painted}${chunk}\n▸ running ${calls.map(c => c.tool).join(', ')}…`;
       }
-      const result = await runTool(call.tool, call.arg, call.note, {
-        agentId: agent.id, sessionId: this.currentSessionId,
-        sandboxRoot,
-        // Carries who has already spoken in this reply, so ask_agent can
-        // refuse to close a loop.
-        chain: (commsCtx && commsCtx.chain) || [agent.id],
-      });
-      this._recordToolCall(agent.id, call.tool);
-      store.emit('toast', { message: `${agent.name}: ${call.tool} → ${asText(result).slice(0, 40)}`, type: 'info' });
 
-      // An autonomous agent declares its goal met with a tool, not a phrase.
-      // Ending the turn here turns the summary into that agent's reply, which
-      // is what lands in the transcript.
-      if (call.tool === 'declare_goal_complete') {
-        const summary = String(call.arg && call.arg.summary ? call.arg.summary : result).trim();
-        const msg = summary || 'Goal declared complete.';
+      const exchanges = [];
+      let completedSummary = null;
+      for (let ci = 0; ci < calls.length; ci++) {
+        const call = calls[ci];
+        const result = await runTool(call.tool, call.arg, call.note, {
+          agentId: agent.id, sessionId: this.currentSessionId,
+          sandboxRoot,
+          // Carries who has already spoken in this reply, so ask_agent can
+          // refuse to close a loop.
+          chain: (commsCtx && commsCtx.chain) || [agent.id],
+        });
+        this._recordToolCall(agent.id, call.tool);
+        store.emit('toast', { message: `${agent.name}: ${call.tool} → ${asText(result).slice(0, 40)}`, type: 'info' });
+        if (call.tool === 'todo_write') refreshTodoBlock(working);
+
+        // An autonomous agent declares its goal met with a tool, not a phrase.
+        // Ending the turn here turns the summary into that agent's reply, which
+        // is what lands in the transcript.
+        if (call.tool === 'declare_goal_complete') {
+          completedSummary = String(
+            call.arg && call.arg.summary ? call.arg.summary : (call.note || result),
+          ).trim();
+          break;
+        }
+
+        // Native calls often have no prose alongside them. Give the model a
+        // short assistant turn so the following TOOL_RESULT has something to
+        // attach to; otherwise the message list starts with a user result.
+        const assistantText = (ci === 0 && chunk) ? chunk : `[called ${call.tool}]`;
+        exchanges.push({ role: 'assistant', content: assistantText });
+        exchanges.push({
+          role: 'user',
+          content: `TOOL_RESULT: ${asText(result)}\nNow answer the user plainly.`,
+        });
+      }
+
+      if (completedSummary !== null) {
+        const msg = completedSummary || 'Goal declared complete.';
         return {
           content: msg, text: msg, sections: null, reasoning: reasoning || null,
           steps: step + 1, exhausted: true, completed: true, transcript,
         };
       }
 
-      const exchange = [
-        { role: 'assistant', content: chunk },
-        { role: 'user', content: `TOOL_RESULT: ${asText(result)}\nNow answer the user plainly.` },
-      ];
-      working = working.concat(exchange);
-      transcript.push(...exchange);
+      working = working.concat(exchanges);
+      transcript.push(...exchanges);
       painted = (painted || '') + chunk + '\n';
 
       // Out of budget, but the person may have steered while this step was in
@@ -2419,9 +2518,25 @@ function budgetBlockFor(agent, endpoint, apiKey) {
  *  untouched and returns the moment the override is switched off). Brain Lab
  *  profiles marked ALWAYS APPEND are added last and cannot be replaced by the
  *  global override. */
+/** Input-token budget for one request, given the model window and output ask. */
+const inputBudgetFor = agent => contextInputBudget(
+  contextLimitFor(agent?.model),
+  settingFor(agent, 'maxTokens') ?? 4096,
+);
+
+/**
+ * Attached reference files, capped against the model's real input window.
+ *
+ * The old 260k-character ceiling was independent of the model: a 32k-token
+ * agent could receive 65k tokens of files before the conversation even
+ * started. Files now get at most half of the input budget, with the absolute
+ * ceiling retained for very large windows.
+ */
 const filesBlockFor = agent => {
   const files = Array.isArray(agent?.files) ? agent.files : [];
   if (!files.length) return '';
+  const maxChars = Math.min(AGENT_FILES_BUDGET,
+    Math.max(8000, Math.floor(inputBudgetFor(agent) * 0.5 * 2.5)));
   let used = 0;
   const parts = [];
   for (const file of files) {
@@ -2429,21 +2544,52 @@ const filesBlockFor = agent => {
     if (!text) continue;
     const name = String(file?.name || 'file').replace(/\s+/g, ' ').slice(0, 120);
     const header = `--- ${name} ---`;
-    if (used + header.length + text.length > AGENT_FILES_BUDGET) {
+    const room = maxChars - used;
+    if (room <= header.length + 200) {
       parts.push('[...attached files truncated...]');
       break;
     }
-    parts.push(header, text);
-    used += header.length + text.length + 2;
+    const body = text.length > room - header.length - 2
+      ? compactText(text, room - header.length - 2)
+      : text;
+    parts.push(header, body);
+    used += header.length + body.length + 2;
   }
   if (!parts.length) return '';
   return `\n\n<agent-files>\n${parts.join('\n')}\n</agent-files>`;
 };
 
+/**
+ * The plan the agent wrote with todo_write. It is re-injected on every call
+ * because the original tool result is exactly the kind of old exchange the
+ * context assembler compacts first; without this the plan survives in
+ * localStorage but disappears from the model's view halfway through a task.
+ */
+const todosBlockFor = () => {
+  const todos = store.get('ui.todos');
+  if (!Array.isArray(todos) || !todos.length) return '';
+  const mark = { pending: '[ ]', in_progress: '[~]', completed: '[x]' };
+  const lines = todos.slice(0, 50).map((t, i) => {
+    const status = mark[t?.status] ? t.status : 'pending';
+    return `${mark[status]} ${i + 1}. ${String(t?.content || '').slice(0, 300)}`;
+  }).filter(Boolean);
+  if (!lines.length) return '';
+  return `\n\n<current-plan>\n${lines.join('\n')}\n</current-plan>`;
+};
+
+/** Re-inject the plan after todo_write, so it survives the same long turn. */
+const refreshTodoBlock = messages => {
+  const idx = messages.findIndex(m => m && m.role === 'system');
+  if (idx === -1) return;
+  const base = String(messages[idx].content || '')
+    .replace(/\n\n<current-plan>[\s\S]*?<\/current-plan>/, '');
+  messages[idx] = { ...messages[idx], content: `${base}${todosBlockFor()}` };
+};
+
 const systemPromptFor = agent => {
   const pre = globalPrePromptFor();
   const base = pre || agent.systemPrompt || '';
-  const append = [alwaysAppendFor(agent), filesBlockFor(agent)].filter(Boolean).join('\n\n');
+  const append = [alwaysAppendFor(agent), filesBlockFor(agent), todosBlockFor()].filter(Boolean).join('\n\n');
   return append ? `${base}${base ? '\n\n' : ''}${append}` : base;
 };
 

@@ -246,7 +246,7 @@ class Harness {
                 ];
                 $system = self::systemFrom($messages);
                 if ($system !== '') { $body['system'] = $system; }
-                return $body;
+                return self::withTools($body, $spec);
 
             case 'google':
                 $conv = $messages ? self::toGoogleContents($messages) : [];
@@ -261,26 +261,51 @@ class Harness {
                 if ($system !== '') {
                     $body['systemInstruction'] = ['parts' => [['text' => $system]]];
                 }
-                return $body;
+                return self::withTools($body, $spec);
 
             case 'ollama':
                 // Native chat API keeps the messages array; the older generate
                 // API takes a single `prompt`.
                 if ($messages) {
-                    return ['model' => $model, 'messages' => $messages, 'stream' => (bool)$stream];
+                    return self::withTools([
+                        'model' => $model, 'messages' => $messages, 'stream' => (bool)$stream,
+                    ], $spec);
                 }
-                return ['model' => $model, 'prompt' => $prompt, 'stream' => (bool)$stream];
+                return self::withTools([
+                    'model' => $model, 'prompt' => $prompt, 'stream' => (bool)$stream,
+                ], $spec);
 
             case 'openrouter':
             default:
-                return [
+                return self::withTools([
                     'model' => $model,
                     'messages' => $messages ?: [['role' => 'user', 'content' => $prompt]],
                     'temperature' => $temperature,
                     'max_tokens' => $maxTokens,
                     'stream' => (bool)$stream,
-                ];
+                ], $spec);
         }
+    }
+
+    /**
+     * Attach native tool definitions and the provider's selection mode.
+     *
+     * These are built client-side because the tool registry lives in the
+     * browser, but they must be placed in the provider-specific body here:
+     * Anthropic wants `input_schema`, Google wants `functionDeclarations`, and
+     * OpenAI-compatible APIs want `type:function`.
+     */
+    private static function withTools(array $body, array $spec) {
+        if (!empty($spec['tools']) && is_array($spec['tools'])) {
+            $body['tools'] = $spec['tools'];
+        }
+        if (array_key_exists('tool_choice', $spec) && $spec['tool_choice'] !== null) {
+            $body['tool_choice'] = $spec['tool_choice'];
+        }
+        if (!empty($spec['tool_config']) && is_array($spec['tool_config'])) {
+            $body['toolConfig'] = $spec['tool_config'];
+        }
+        return $body;
     }
 
     /**

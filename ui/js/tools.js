@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=298';
-import { asText, compactText } from './utils.js?v=298';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=298';
-import { settingFor } from './agentConfig.js?v=298';
-import { trace } from './trace.js?v=298';
+import { store } from './store.js?v=299';
+import { asText, compactText } from './utils.js?v=299';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=299';
+import { settingFor } from './agentConfig.js?v=299';
+import { trace } from './trace.js?v=299';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -891,7 +891,7 @@ function writeNotes(notes) {
 export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   const names = enabledTools.filter(t => TOOL_REGISTRY[t]);
   if (!names.length) return '';
-  const mode = ['json', 'anthropic', 'native', 'plain'].includes(protocol) ? protocol : 'json';
+  const mode = ['json', 'anthropic', 'native', 'native-api', 'plain'].includes(protocol) ? protocol : 'json';
 
   const jsonExample = t => {
     const def = TOOL_REGISTRY[t];
@@ -1022,7 +1022,7 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   const notes = [];
   if (names.includes('exec')) {
     notes.push(
-      'exec takes argv as a JSON ARRAY of strings: {"tool":"exec","arg":{"argv":["ls","-la"]}}. '
+      'exec takes argv as an ARRAY of strings, one entry per argument. '
       + 'Each flag is its own array entry, so ["grep","-rn","x","."] is four entries, never one string.'
     );
     notes.push(
@@ -1073,7 +1073,7 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   }
   if (names.includes('git')) {
     notes.push(
-      'git takes args as an ARRAY: {"tool":"git","arg":{"args":["status"]}}. Read-only subcommands '
+      'git takes args as an ARRAY of strings, e.g. ["status"]. Read-only subcommands '
       + '(status, diff, log, show, blame) run at once; add/commit/checkout and other writes ask the '
       + 'operator first. Start with ["status"], and never commit or push unless the user asked.'
     );
@@ -1097,8 +1097,9 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   }
   if (names.includes('mcp_call')) {
     notes.push(
-      'mcp_call runs a tool on a connected MCP server: {"tool":"mcp_call","arg":{"server":"NAME","tool":"TOOL","arguments":{...}}}. '
-      + 'Call mcp_list first to see the servers and their tool names; pass only the arguments the tool names.'
+      'mcp_call runs a tool on a connected MCP server; pass the server, the tool name and its '
+      + 'arguments object. Call mcp_list first to see the servers and their tool names; pass only '
+      + 'the arguments the tool names.'
     );
   }
   if (names.includes('multi_edit')) {
@@ -1140,6 +1141,21 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       `You are working in "${sandboxRoot}". Relative paths in the file tools are resolved `
       + 'inside it, and nothing outside it can be reached. Call list_dir with no path '
       + 'to see the directory you are rooted at.'
+    );
+  }
+
+  // Native API tools are supplied as schemas by the caller, so the model must
+  // not be taught a competing JSON/XML syntax. The notes above still matter
+  // (argv arrays, exact edits, the sandbox root).
+  if (mode === 'native-api') {
+    return (
+      '\n\nTOOL USE\n'
+      + 'Tools are provided directly by the API. Call them through the native tool interface; '
+      + 'do not print JSON, XML, <|tool_call|> tags, or a "tool" object in your reply.\n'
+      + 'You may call several independent tools in one turn. Read each result before deciding '
+      + 'what to do next, and do not call a tool that is not in the provided list.\n'
+      + 'When no tool is needed, answer the user in plain prose.\n'
+      + (notes.length ? '\n' + notes.join('\n') : '')
     );
   }
 

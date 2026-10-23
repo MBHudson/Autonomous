@@ -179,6 +179,9 @@ class ModelManager {
             'prompt' => $promptFallback,
             'temperature' => $spec['temperature'] ?? 0.7,
             'max_tokens' => $maxTokens,
+            'tools' => $spec['tools'] ?? null,
+            'tool_choice' => $spec['tool_choice'] ?? null,
+            'tool_config' => $spec['tool_config'] ?? null,
         ], true);
         foreach (Harness::streamOptions($family, (string)($spec['provider'] ?? '')) as $k => $v) {
             $payload[$k] = $v;
