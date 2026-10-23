@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=301';
-import { K as STORAGE_K } from '../storage.js?v=301';
+import { store } from '../store.js?v=302';
+import { K as STORAGE_K } from '../storage.js?v=302';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,24 +12,24 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=301';
-import { persistence } from '../persistence.js?v=301';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=301';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=301';
-import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=301';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=301';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=301';
-import { usageFor } from '../rateGovernor.js?v=301';
-import { trace } from '../trace.js?v=301';
-import { latency } from '../latency.js?v=301';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=301';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=301';
-import { SlashCommands } from '../slashCommands.js?v=301';
-import { parseRoute, routingHelp } from '../routing.js?v=301';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=301';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=301';
-import { MessageRenderer, renderToolCalls } from './message.js?v=301';
-import { createAvatar } from './avatar.js?v=301';
+import { api, errText } from '../api.js?v=302';
+import { persistence } from '../persistence.js?v=302';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=302';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=302';
+import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=302';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=302';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=302';
+import { usageFor } from '../rateGovernor.js?v=302';
+import { trace } from '../trace.js?v=302';
+import { latency } from '../latency.js?v=302';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=302';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=302';
+import { SlashCommands } from '../slashCommands.js?v=302';
+import { parseRoute, routingHelp } from '../routing.js?v=302';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=302';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=302';
+import { MessageRenderer, renderToolCalls } from './message.js?v=302';
+import { createAvatar } from './avatar.js?v=302';
 
 /**
  * How long an agent may keep working on a single task.
@@ -236,6 +236,12 @@ export class Chat {
      */
     this._mailbox = new Map();
     this._busy = new Set();
+    // Nested ask_agent calls only. _busy also holds every agent in the current
+    // user fan-out, so using it here refused every ask to a sibling agent with
+    // "already answering another agent" -- the inter-agent traffic that used to
+    // work stopped working. Nested asks get their own set; _busy still guards
+    // the always-on scheduler.
+    this._nestedBusy = new Set();
     /**
      * Agent IDs that already replied to the current user turn. Prevents the
      * same agent from answering twice when the always-on scheduler re-fires
@@ -610,6 +616,7 @@ export class Chat {
       this._mailbox.clear();
     }
     this._busy.clear();
+    this._nestedBusy.clear();
     this._turnResponded.clear();
 
     try {
@@ -1780,12 +1787,12 @@ _makeLiveNode(agent) {
         + 'so asking them again would loop forever. Answer from what you have, '
         + 'or ask someone outside that chain.';
     }
-    if (this._busy.has(targetId)) {
+    if (this._nestedBusy.has(targetId)) {
       return `error: ${target.name} is already answering another agent right now. `
         + 'Try again after this turn.';
     }
 
-    this._busy.add(targetId);
+    this._nestedBusy.add(targetId);
     store.emit('agent:status', { agentId: targetId, status: 'thinking' });
     // Draw the ask itself, so the map shows who is talking to whom rather
     // than only the fan-out from the user.
@@ -1819,7 +1826,7 @@ _makeLiveNode(agent) {
         : (err?.message || asText(err));
       return `error: ${target.name} could not answer — ${why}`;
     } finally {
-      this._busy.delete(targetId);
+      this._nestedBusy.delete(targetId);
       // And the answer travelling back, so each exchange is a line each way.
       store.emit('flow:speak', { from: targetId, to: ctx?.agentId });
       store.emit('agent:status', { agentId: targetId, status: 'active' });
@@ -2414,7 +2421,7 @@ _makeLiveNode(agent) {
     const text = String(question || '').trim();
     if (!text) return;
     // Already answering someone else: say so rather than running two turns.
-    if (this.aborter || this._busy.has(agentId)) {
+    if (this.aborter || this._busy.has(agentId) || this._nestedBusy.has(agentId)) {
       store.emit('toast', {
         message: `${agent.name} is already answering — wait for that to finish`,
         type: 'info',

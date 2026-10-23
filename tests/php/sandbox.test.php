@@ -331,6 +331,18 @@ ok(($dr['exit'] === 0) && strpos($dr['stdout'], 'test.txt') !== false, 'exec dir
 $tp = Sandbox::execCommand(['type', 'test.txt'], ['cwd' => $writeDir]);
 ok(($tp['exit'] === 0) && trim($tp['stdout']) === 'hello write', 'exec type reads a file');
 
+// 38e. exec without an explicit cwd defaults to an allowed root, not appDir
+$norm = fn($p) => rtrim(str_replace('\\', '/', (string)$p), '/');
+$pc = Sandbox::execCommand(['pwd']);
+$pcOut = $norm(trim($pc['stdout'] ?? ''));
+ok(($pc['exit'] === 0) && ($pcOut === $norm($readOnly) || $pcOut === $norm($writeDir)),
+    'exec defaults cwd to an allowed root');
+
+// 38f. list_dir on a file path answers with that entry, not "not a directory"
+$lf = Sandbox::listDir('test.txt', 200, $writeDir);
+ok(isset($lf['entries'][0]) && $lf['entries'][0]['name'] === 'test.txt'
+    && $lf['entries'][0]['type'] === 'file', 'list_dir reports a file path');
+
 // 41. apply_patch: add + update in one envelope
 $patch = "*** Begin Patch\n"
     . "*** Add File: patched.txt\n"

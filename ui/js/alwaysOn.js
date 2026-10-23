@@ -13,9 +13,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=301';
-import { persistence } from './persistence.js?v=301';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=301';
+import { store } from './store.js?v=302';
+import { persistence } from './persistence.js?v=302';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=302';
 
 export class AlwaysOn {
   /**
@@ -213,7 +213,8 @@ export class AlwaysOn {
 
     // Last chance to stand down. Between the guard in tick() and here sits
     // bookkeeping, which is enough time for a user turn to start.
-    if (this.chat.aborter || this.chat._busy.has(agent.id)) {
+    if (this.chat.aborter || this.chat._busy.has(agent.id)
+        || this.chat._nestedBusy?.has(agent.id)) {
       this._note(agent, 'skipped - the user is mid-turn');
       this.running.delete(agent.id);
       store.emit('alwaysOn:running', { agentId: agent.id, running: false });
@@ -237,6 +238,7 @@ export class AlwaysOn {
       this.chat._addMessage?.({
         role: 'agent', content: text, agentId: agent.id,
         timestamp: Date.now(), autonomous: true,
+        toolCalls: (reply && reply.toolCalls) || null,
       });
 
       if (reply && reply.completed) {

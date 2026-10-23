@@ -1,8 +1,32 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v301**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v302**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v302 — routing/comms + sandbox fixes
+
+- **Inter-agent asks work again during a normal turn.** `_busy` now holds every
+  agent in the user fan-out (added in v300 to stop always-on duplicate replies),
+  but `_askAgentSync` was still using it as its "already answering" guard, so
+  every `ask_agent`/`tell_agent` to a sibling agent returned "already answering
+  another agent right now". Nested asks use a separate `_nestedBusy` set;
+  `_busy` still guards the always-on scheduler and direct asks.
+- **Exec no longer starts outside the jail.** With configured roots that do not
+  include the app folder (the normal deployed case), `execCommand()` defaulted
+  its working directory to the app dir, so every relative argument looked like
+  an escape and `cat local-IPs.txt` / `grep ... src` were refused with "outside
+  the allowed directories". The default cwd is now the first allowed root, and a
+  caller-supplied cwd may be a read-only root (writing is not required to run).
+- **`list_dir` answers a file path.** Asking `list_dir` about a file returned
+  "not a directory", which reads as "the file is missing"; it now returns that
+  single entry.
+- **Tool calls survive routing runs and reach the ghost transcript.** Routing
+  node replies keep their `toolCalls`, and the routing screen's ghost transcript
+  prints each tool call (name, argument preview, status, first line of result),
+  live and after the turn finishes.
 
 ---
 
