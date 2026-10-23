@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=297';
-import { K } from '../storage.js?v=297';
-import { persistence } from '../persistence.js?v=297';
-import { api } from '../api.js?v=297';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=297';
-import { TOOL_REGISTRY } from '../tools.js?v=297';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=297';
-import { snapshot } from '../rateGovernor.js?v=297';
+import { store } from '../store.js?v=298';
+import { K } from '../storage.js?v=298';
+import { persistence } from '../persistence.js?v=298';
+import { api } from '../api.js?v=298';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=298';
+import { TOOL_REGISTRY } from '../tools.js?v=298';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=298';
+import { snapshot } from '../rateGovernor.js?v=298';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -2264,6 +2264,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       ...s,
       args: Array.isArray(s.args) ? s.args.join(' ') : (s.args || ''),
       headersText: Object.entries(s.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'),
+      envText: Object.entries(s.env || {}).map(([k, v]) => `${k}=${v}`).join('\n'),
     }));
   }
 
@@ -2279,13 +2280,25 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     return out;
   }
 
+  _parseEnvText(text) {
+    const out = {};
+    String(text || '').split('\n').forEach(line => {
+      const i = line.indexOf('=');
+      if (i <= 0) return;
+      const k = line.slice(0, i).trim();
+      const v = line.slice(i + 1).trim();
+      if (k) out[k] = v;
+    });
+    return out;
+  }
+
   /**
    * MCP servers: operator-configured, stored server-side in config.json.
    * Rendered from a local cache; the server stays the source of truth.
    */
   _initMcpSection() {
     document.getElementById('sbMcpAdd')?.addEventListener('click', () => {
-      this._mcpServers = [...(this._mcpServers || []), { id: '', transport: 'stdio', command: '', args: '', url: '' }];
+      this._mcpServers = [...(this._mcpServers || []), { id: '', transport: 'stdio', command: '', args: '', url: '', envText: '' }];
       this._renderMcp();
     });
     document.getElementById('sbMcpSave')?.addEventListener('click', () => this._saveMcpServers());
@@ -2318,6 +2331,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         </div>
         <input class="form-input" data-mcp="command" value="${escAttr(s.command || '')}" placeholder="command (stdio), e.g. npx" style="margin-top:6px">
         <input class="form-input" data-mcp="args" value="${escAttr(s.args || '')}" placeholder="args, space-separated (stdio)" style="margin-top:6px">
+        <textarea class="form-textarea" data-mcp="envText" rows="2" placeholder="env (stdio), one per line:&#10;GITHUB_TOKEN=…" style="margin-top:6px">${esc(s.envText || '')}</textarea>
         <input class="form-input" data-mcp="url" value="${escAttr(s.url || '')}" placeholder="https://… (http)" style="margin-top:6px">
         <textarea class="form-textarea" data-mcp="headersText" rows="2" placeholder="headers (http), one per line:&#10;Authorization: Bearer TOKEN" style="margin-top:6px">${esc(s.headersText || '')}</textarea>
       </div>`).join('');
@@ -2349,6 +2363,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           transport: s.transport === 'http' ? 'http' : 'stdio',
           command: String(s.command || '').trim(),
           args: String(s.args || '').trim() ? String(s.args).trim().split(/\s+/) : [],
+          env: this._parseEnvText(s.envText),
           url: String(s.url || '').trim(),
           headers: this._parseHeadersText(s.headersText),
         }));

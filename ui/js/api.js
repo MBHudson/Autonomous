@@ -2,9 +2,9 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=297';
-import { acquire, note429 } from './rateGovernor.js?v=297';
-import { latency } from './latency.js?v=297';
+import { store } from './store.js?v=298';
+import { acquire, note429 } from './rateGovernor.js?v=298';
+import { latency } from './latency.js?v=298';
 
 latency.bindStore(store);
 

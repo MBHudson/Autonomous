@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=297';
-import { asText } from './utils.js?v=297';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=297';
-import { settingFor } from './agentConfig.js?v=297';
-import { trace } from './trace.js?v=297';
+import { store } from './store.js?v=298';
+import { asText, compactText } from './utils.js?v=298';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=298';
+import { settingFor } from './agentConfig.js?v=298';
+import { trace } from './trace.js?v=298';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -39,6 +39,12 @@ const MAX_CUSTOM_TOOL_DESCRIPTION = 300;
 const MAX_CUSTOM_TOOL_INSTRUCTIONS = 4000;
 const MAX_CUSTOM_TOOL_ARG = 120;
 const MAX_CUSTOM_TOOL_RESULT = 12000;
+/**
+ * Ceiling for any single tool result fed back to the model. Custom tools had
+ * one; built-in and MCP tools did not, so one huge file read or command log
+ * could consume the entire context window before the next step.
+ */
+const MAX_TOOL_OUTPUT_CHARS = 16000;
 const CUSTOM_TOOL_NAMES = new Set();
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const RESERVED_TOOL_NAMES = new Set(Object.getOwnPropertyNames(Object.prototype));
@@ -410,10 +416,7 @@ export function loadCustomTools() {
           agentName: agent?.name || '',
           sessionId: ctx?.sessionId || null,
         });
-        const text = asText(result === undefined ? 'ok' : result);
-        return text.length > MAX_CUSTOM_TOOL_RESULT
-          ? `${text.slice(0, MAX_CUSTOM_TOOL_RESULT)}\n[truncated]`
-          : text;
+        return compactText(asText(result === undefined ? 'ok' : result), MAX_CUSTOM_TOOL_RESULT);
       },
     };
     CUSTOM_TOOL_NAMES.add(tool.name);
@@ -1310,7 +1313,7 @@ export async function runTool(name, arg, noteName, ctx) {
     // JSON, never "[object Object]".
     const out = asText(await def.run(arg, noteName, ctx));
     try { trace('tool', { ...who(), tool: name, ms: Date.now() - t0, ok: true }); } catch { /* best-effort */ }
-    return out;
+    return compactText(out, MAX_TOOL_OUTPUT_CHARS);
   } catch (err) {
     try {
       trace('tool', { ...who(), tool: name, ms: Date.now() - t0, ok: false,

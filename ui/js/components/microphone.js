@@ -2,7 +2,7 @@
 // MICROPHONE.JS — Speech-to-text
 // ============================================
 
-import { store } from '../store.js?v=297';
+import { store } from '../store.js?v=298';
 
 export class Microphone {
   constructor() {

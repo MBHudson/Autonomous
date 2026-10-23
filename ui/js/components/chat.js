@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=297';
-import { K as STORAGE_K } from '../storage.js?v=297';
+import { store } from '../store.js?v=298';
+import { K as STORAGE_K } from '../storage.js?v=298';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,23 +12,23 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=297';
-import { persistence } from '../persistence.js?v=297';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText } from '../utils.js?v=297';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=297';
-import { toolProtocolFor } from '../toolProtocol.js?v=297';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS } from '../tools.js?v=297';
-import { usageFor } from '../rateGovernor.js?v=297';
-import { trace } from '../trace.js?v=297';
-import { latency } from '../latency.js?v=297';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=297';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=297';
-import { SlashCommands } from '../slashCommands.js?v=297';
-import { parseRoute, routingHelp } from '../routing.js?v=297';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=297';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=297';
-import { MessageRenderer } from './message.js?v=297';
-import { createAvatar } from './avatar.js?v=297';
+import { api, errText } from '../api.js?v=298';
+import { persistence } from '../persistence.js?v=298';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget } from '../utils.js?v=298';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=298';
+import { toolProtocolFor, contextLimitFor } from '../toolProtocol.js?v=298';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS } from '../tools.js?v=298';
+import { usageFor } from '../rateGovernor.js?v=298';
+import { trace } from '../trace.js?v=298';
+import { latency } from '../latency.js?v=298';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=298';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=298';
+import { SlashCommands } from '../slashCommands.js?v=298';
+import { parseRoute, routingHelp } from '../routing.js?v=298';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=298';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=298';
+import { MessageRenderer } from './message.js?v=298';
+import { createAvatar } from './avatar.js?v=298';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1118,13 +1118,19 @@ _makeLiveNode(agent) {
     }
     picked.reverse();
 
-    // Trim oldest first until the whole history fits the budget.
+    // Budget against the model's real context window when we know it. A 128k
+    // model should not replay history as if it had 6k tokens.
+    const budget = historyCharBudget(agent ? contextLimitFor(agent.model) : null);
     let total = picked.reduce((s, m) => s + m.content.length, 0);
-    while (picked.length > 2 && total > HISTORY_CHAR_BUDGET) {
+    while (picked.length > 2 && total > budget) {
       const dropped = picked.shift();
       total -= dropped.content.length;
     }
-    return picked.map(({ role, content }) => ({ role, content: trimForContext(content) }));
+    // Scale the per-message ceiling with the total. The old fixed 4k cap made
+    // the larger budget useless: one long file or reply was cut no matter how
+    // much context the model actually had.
+    const perMessage = Math.max(4000, Math.min(24000, Math.floor(budget / 3)));
+    return picked.map(({ role, content }) => ({ role, content: trimForContext(content, perMessage) }));
   }
 
   /** Full message list to send: history + system prompt + the new message. */
@@ -2326,14 +2332,14 @@ _makeLiveNode(agent) {
   }
 }
 
-  /** Rough character ceiling for replayed history, so one huge message can't blow up. */
-const HISTORY_CHAR_BUDGET = 24000;
-
 /** Keep the head and tail of an over-long past message; the middle is usually filler. */
-function trimForContext(text) {
+function trimForContext(text, maxChars = 4000) {
   const s = String(text ?? '');
-  if (s.length <= 4000) return s;
-  return s.slice(0, 3000) + '\n…[earlier part trimmed]…\n' + s.slice(-800);
+  const cap = Math.max(1000, Number(maxChars) || 4000);
+  if (s.length <= cap) return s;
+  const tail = Math.min(2000, Math.floor(cap * 0.25));
+  const head = Math.max(800, cap - tail - 40);
+  return s.slice(0, head) + '\n…[earlier part trimmed]…\n' + s.slice(-tail);
 }
 
 /**

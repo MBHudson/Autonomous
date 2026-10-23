@@ -15,4 +15,5 @@ export {
   detectFamily,
   harnessFor,
   describeHarness,
-} from './harness.js?v=297';
+  contextLimitFor,
+} from './harness.js?v=298';
