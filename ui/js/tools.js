@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=299';
-import { asText, compactText } from './utils.js?v=299';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=299';
-import { settingFor } from './agentConfig.js?v=299';
-import { trace } from './trace.js?v=299';
+import { store } from './store.js?v=300';
+import { asText, compactText } from './utils.js?v=300';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=300';
+import { settingFor } from './agentConfig.js?v=300';
+import { trace } from './trace.js?v=300';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1032,9 +1032,19 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     );
     notes.push(
       'Anything the sandbox refuses comes back as an error string telling you why. Read it and '
-      + 'adjust — do not retry the identical call, and do not try to work around a refusal with '
+      + 'adjust �?" do not retry the identical call, and do not try to work around a refusal with '
       + 'a different tool. A command may also wait for the operator to approve it.'
     );
+    const win = typeof navigator !== 'undefined'
+      && /Windows/i.test(String(navigator.userAgent || ''));
+    if (win) {
+      notes.push(
+        'This sandbox is on Windows. echo, pwd, type, where, dir, mkdir and sleep are handled '
+        + 'internally; ls, cat, head, tail, wc, grep, sed and awk work when Git for Windows is '
+        + 'installed. Use real .exe programs (ipconfig, findstr, tasklist) and pass the exact '
+        + 'argv, never PowerShell/cmd syntax. npm.cmd and other .cmd/.bat shims are not run.'
+      );
+    }
   }
   if (names.includes('web_search') || names.includes('fetch_url')) {
     notes.push(
