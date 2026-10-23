@@ -582,7 +582,7 @@ export class Topology3D extends TopologyGraph {
         b.group.position.x, b.group.position.y, b.group.position.z], i * 6);
       const working = a.working || b.working;
       const dim = this._focusKeep && !(this._focusKeep.has(l.from) && this._focusKeep.has(l.to)) ? 0.12 : 1;
-      const k = l.w * (working ? 1.8 : 1) * dim;
+      const k = l.w * (working ? 1.8 : 1.2) * dim;
       c.copy(a.color).multiplyScalar(k);
       col.set([c.r, c.g, c.b], i * 6);
       c.copy(b.color).multiplyScalar(k);

@@ -51,7 +51,7 @@ const FRAG = /* glsl */`
     // Marching dashes: features move toward t = 1 (the receiver) over time.
     float d = fract(t * uDash - uTime * uSpeed * uDash * 0.45);
     float dash = smoothstep(0.0, 0.06, d) * (1.0 - smoothstep(uDuty, uDuty + 0.06, d));
-    float body = mix(0.28, 1.0, dash * uLive + (1.0 - uLive) * 0.5);
+    float body = mix(0.28, 1.0, dash * uLive + (1.0 - uLive) * 0.6);
     // Bright travelling head, shared with the comet sprite.
     float head = exp(-pow((t - uHead) * 16.0, 2.0)) * uLive;
     // Taper both ends so the beam emerges from / sinks into the spheres.
@@ -172,7 +172,7 @@ export class Beam {
   tick(dt, t, reduced) {
     const phase = this.flow.phase;
     const live = phase === 'active';
-    const target = phase === 'fading' ? 0 : (live ? 1 : 0.45);
+    const target = phase === 'fading' ? 0 : (live ? 1 : 0.54);
     this.opacity += (target - this.opacity) * Math.min(1, dt * (phase === 'fading' ? 5 : 6));
     const radiusTarget = live ? 0.34 : 0.18;
     this.radius += (radiusTarget - this.radius) * Math.min(1, dt * 5);
