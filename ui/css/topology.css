@@ -120,14 +120,13 @@
   50% { transform: translateY(-4px); }
 }
 
-/* Message-flow overlay: dotted lines streaming toward the target */
+/* Message-flow overlay: dotted lines streaming toward the target.
+   The dash march itself is driven by each line's own <animate> element in
+   topology.js, so the speed and direction always match the traffic. A CSS
+   animation here fought that one for the same attribute and made the dots
+   stutter or freeze, so there deliberately is none. */
 .flow-line {
   fill: none;
-  animation: flowDash 0.9s linear infinite;
-}
-
-@keyframes flowDash {
-  to { stroke-dashoffset: -16; }
 }
 
 .topo-edge {

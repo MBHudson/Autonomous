@@ -6,7 +6,7 @@
 // agent output can never inject markup into the dialog. Fenced code is handled
 // by the caller (CodeBlock) and never reaches here.
 
-import { esc } from './utils.js?v=303';
+import { esc } from './utils.js?v=304';
 
 /**
  * Render markdown-ish prose into an element.

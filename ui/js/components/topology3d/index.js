@@ -15,16 +15,16 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=303';
-import { store } from '../../store.js?v=303';
-import { k, K } from '../../storage.js?v=303';
-import { latency } from '../../latency.js?v=303';
-import { SceneCore, webglAvailable } from './scene.js?v=303';
-import { ForceLayout } from './layout.js?v=303';
-import { NodeView, Nebula } from './nodes.js?v=303';
-import { Beam } from './beams.js?v=303';
-import { LabelLayer } from './labels.js?v=303';
-import { PopupCard } from './popup.js?v=303';
+import { TopologyGraph } from '../topology.js?v=304';
+import { store } from '../../store.js?v=304';
+import { k, K } from '../../storage.js?v=304';
+import { latency } from '../../latency.js?v=304';
+import { SceneCore, webglAvailable } from './scene.js?v=304';
+import { ForceLayout } from './layout.js?v=304';
+import { NodeView, Nebula } from './nodes.js?v=304';
+import { Beam } from './beams.js?v=304';
+import { LabelLayer } from './labels.js?v=304';
+import { PopupCard } from './popup.js?v=304';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
@@ -344,7 +344,15 @@ export class Topology3D extends TopologyGraph {
       const vFrom = this.views.get(f.from);
       const vTo = this.views.get(f.to);
       if (!vFrom || !vTo) return; // endpoint not charted; retried next sync
-      beam = new Beam(f, vFrom.color, vTo.color);
+      // Traffic between the user and a model keeps the model's own color in
+      // both directions; only agent-to-agent hops blend sender into receiver.
+      const modelView = [vFrom, vTo].find(v => v.type === 'agent');
+      const talksToUser = (vFrom.type === 'user') !== (vTo.type === 'user');
+      let blend = f.kind === 'delegate' || f.kind === 'agent' || f.kind === 'tell';
+      let cFrom = vFrom.color;
+      let cTo = blend ? vTo.color : vFrom.color;
+      if (talksToUser && modelView) { cFrom = modelView.color; cTo = modelView.color; blend = false; }
+      beam = new Beam(f, cFrom, cTo, blend);
       beam.onArrive = () => this.views.get(f.to)?.pulse(0.35);
       this.beamLayer.add(beam.group);
       this.beams.set(f.id, beam);
