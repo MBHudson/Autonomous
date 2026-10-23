@@ -34,11 +34,11 @@
 // path would be a second implementation to keep in step, and this is the kind
 // of UI where the two inevitably diverge.
 
-import { store, APP_VERSION } from '../store.js?v=301';
-import { persistence } from '../persistence.js?v=301';
-import { SlashCommands, COMMANDS } from '../slashCommands.js?v=301';
-import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=301';
-import { updateNodeClock } from '../agentClock.js?v=301';
+import { store, APP_VERSION } from '../store.js?v=302';
+import { persistence } from '../persistence.js?v=302';
+import { SlashCommands, COMMANDS } from '../slashCommands.js?v=302';
+import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=302';
+import { updateNodeClock } from '../agentClock.js?v=302';
 
 // Node kinds. 'agent' is the only one that calls a model; the rest are
 // structure -- which is how a fan-out can exist without any agent pretending
@@ -170,7 +170,7 @@ export class RoutingChart {
     // Include active streaming text from liveNodes if present and not yet finalized
     if (this.chat?._liveNodes && this.chat._liveNodes.size > 0) {
       for (const [agentId, node] of this.chat._liveNodes.entries()) {
-        if (node && node.isConnected && node.text) {
+        if (node && node.isConnected && (node.text || (node.toolCalls && node.toolCalls.length))) {
           const alreadyFinal = chatList.some(
             m => m.role === 'agent' && m.agentId === agentId && m.content === node.text
           );
@@ -179,6 +179,7 @@ export class RoutingChart {
               role: 'agent',
               agentId: agentId,
               content: node.text,
+              toolCalls: node.toolCalls || null,
               timestamp: Date.now(),
               streaming: true,
             });
@@ -186,6 +187,34 @@ export class RoutingChart {
         }
       }
     }
+
+    // Tool calls are part of what the agent is doing, so the ghost shows them
+    // too: tool name, argument preview, status, and the first line of the
+    // result. Without this the boxes in the chat vanished from the routing
+    // screen the moment a turn finished.
+    const toolGhostText = (calls) => {
+      if (!Array.isArray(calls) || !calls.length) return '';
+      return calls.map(c => {
+        const arg = c && c.arg;
+        let preview = '';
+        if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+          const pick = arg.path ?? arg.file ?? arg.query ?? arg.url ?? arg.name
+            ?? arg.pattern ?? arg.command;
+          preview = Array.isArray(pick) ? pick.join(' ') : (pick ?? '');
+          if (!preview && Array.isArray(arg.argv)) preview = arg.argv.join(' ');
+        } else if (typeof arg === 'string') {
+          preview = arg;
+        }
+        preview = String(preview || '').replace(/\s+/g, ' ').trim().slice(0, 70);
+        const ms = c && c.ms !== undefined && c.ms !== null && Number.isFinite(Number(c.ms))
+          ? ` ${Math.round(Number(c.ms))}ms` : '';
+        let line = `\u2192 ${(c && c.tool) || 'tool'}${preview ? ' ' + preview : ''}`
+          + ` [${(c && c.status) || 'running'}${ms}]`;
+        const result = String((c && c.result) || '').replace(/\s+/g, ' ').trim();
+        if (result) line += `\n  ${result.slice(0, 180)}${result.length > 180 ? '\u2026' : ''}`;
+        return line;
+      }).join('\n');
+    };
 
     // Strip markdown code fences (```lang and ```) so raw code box tags are hidden,
     // while preserving all code lines, columns, indentation, and newlines intact.
@@ -199,7 +228,8 @@ export class RoutingChart {
     const sig = JSON.stringify([
       g.color, g.size, g.opacity, chatList.length,
       chatList[chatList.length - 1]?.timestamp,
-      chatList[chatList.length - 1]?.content?.slice(0, 40)
+      chatList[chatList.length - 1]?.content?.slice(0, 40),
+      chatList.map(m => (m.toolCalls || []).map(c => `${c.tool}:${c.status}`).join(',')).join('|'),
     ]);
     if (sig === this._ghostSig) return;
     this._ghostSig = sig;
@@ -227,7 +257,9 @@ export class RoutingChart {
       const timeStr = formatTime(m.timestamp || Date.now());
       meta.textContent = `${nameFor(m)} ${dateStr} ${timeStr} `;
       line.appendChild(meta);
-      line.appendChild(document.createTextNode(cleanContent(m.content)));
+      const body = [cleanContent(m.content), toolGhostText(m.toolCalls)]
+        .filter(Boolean).join('\n');
+      line.appendChild(document.createTextNode(body));
       frag.appendChild(line);
     }
     el.textContent = '';
@@ -2903,6 +2935,7 @@ export class RoutingChart {
         role: 'agent',
         content: text || `(${this._nodeName(node)} returned nothing)`,
         agentId: agent.id,
+        toolCalls: (res && res.toolCalls) || (live && live.toolCalls) || null,
         timestamp: Date.now(),
       };
       if (live && live.isConnected) this.chat._replaceLiveNode(live, msg);
@@ -2924,6 +2957,7 @@ export class RoutingChart {
           role: 'agent',
           content: partial || 'Stopped by user.',
           agentId: agent.id,
+          toolCalls: (live && live.toolCalls) || null,
           timestamp: Date.now(),
         };
         if (live && live.isConnected) this.chat._replaceLiveNode(live, msg);
@@ -2934,6 +2968,7 @@ export class RoutingChart {
         role: 'agent',
         content: 'Error: ' + (err.message || 'Unknown error'),
         agentId: agent.id,
+        toolCalls: (live && live.toolCalls) || null,
         timestamp: Date.now(),
       };
       if (live && live.isConnected) this.chat._replaceLiveNode(live, msg);

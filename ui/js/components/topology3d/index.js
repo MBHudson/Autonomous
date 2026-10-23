@@ -15,16 +15,16 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=301';
-import { store } from '../../store.js?v=301';
-import { k, K } from '../../storage.js?v=301';
-import { latency } from '../../latency.js?v=301';
-import { SceneCore, webglAvailable } from './scene.js?v=301';
-import { ForceLayout } from './layout.js?v=301';
-import { NodeView, Nebula } from './nodes.js?v=301';
-import { Beam } from './beams.js?v=301';
-import { LabelLayer } from './labels.js?v=301';
-import { PopupCard } from './popup.js?v=301';
+import { TopologyGraph } from '../topology.js?v=302';
+import { store } from '../../store.js?v=302';
+import { k, K } from '../../storage.js?v=302';
+import { latency } from '../../latency.js?v=302';
+import { SceneCore, webglAvailable } from './scene.js?v=302';
+import { ForceLayout } from './layout.js?v=302';
+import { NodeView, Nebula } from './nodes.js?v=302';
+import { Beam } from './beams.js?v=302';
+import { LabelLayer } from './labels.js?v=302';
+import { PopupCard } from './popup.js?v=302';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;

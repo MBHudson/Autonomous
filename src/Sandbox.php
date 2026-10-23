@@ -566,10 +566,19 @@ class Sandbox {
 
         // The working directory is jailed exactly like a file path. Without
         // this, `find /` or `cat /etc/shadow` works from any directory.
-        $cwd = self::appDir() ?: '/tmp';
+        //
+        // Default to an ALLOWED root, not appDir(): when the configured roots
+        // do not include the app folder (the normal case for a deployed agent
+        // sandbox), appDir was outside the jail, so every relative argument
+        // looked like an escape and `cat local-IPs.txt` was refused with
+        // "outside the allowed directories". Exec may run in a read-only root;
+        // writing is not required to list or read.
+        $execRoots = array_values(array_unique(array_merge(self::readRoots(), self::writeRoots())));
+        $defaultCwd = $execRoots ? $execRoots[0] : (self::appDir() ?: sys_get_temp_dir());
+        $cwd = $defaultCwd;
         if (!empty($opts['cwd'])) {
             try {
-                $cwd = self::jail($opts['cwd'], self::writeRoots(), 'exec cwd');
+                $cwd = self::jail($opts['cwd'], $execRoots ?: [self::appDir() ?: sys_get_temp_dir()], 'exec cwd');
             } catch (\RuntimeException $e) {
                 return ['ok' => false, 'exit' => -1, 'stdout' => '', 'stderr' => $e->getMessage(),
                     'truncated' => false, 'timed_out' => false, 'ms' => 0];
@@ -594,7 +603,7 @@ class Sandbox {
                     . implode(', ', self::readRoots()) . ').',
                 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
-        if (!is_dir($cwd)) { $cwd = self::appDir() ?: sys_get_temp_dir(); }
+        if (!is_dir($cwd)) { $cwd = $defaultCwd; }
 
         $timeout = isset($opts['timeout'])
             ? max(1, min(600, (int)$opts['timeout'])) : $cfg['exec_timeout'];
@@ -2711,7 +2720,28 @@ class Sandbox {
             ];
         }
         $full = self::jail($path, $roots, 'list_dir');
-        if (!is_dir($full)) { throw new \RuntimeException("list_dir: not a directory: $full"); }
+        // Report writability for the directory that was actually listed, not
+        // for "any root somewhere": a read-only root must not answer true just
+        // because a different allowlisted root is writable.
+        $writable = array_map(function ($r) { return rtrim($r, '/'); }, self::writeRoots());
+        $canWrite = false;
+        foreach ($writable as $w) {
+            if ($full === $w || strpos($full, $w . '/') === 0) { $canWrite = true; break; }
+        }
+        // A model that asks list_dir about a FILE ("can you see local-IPs.txt?")
+        // used to get "not a directory", which reads as "the file is missing".
+        // Listing the single entry answers the actual question.
+        if (!is_dir($full)) {
+            if (is_file($full)) {
+                return [
+                    'path' => $full,
+                    'entries' => [self::entryInfo($full, basename($full))],
+                    'skipped' => 0,
+                    'writable' => $canWrite,
+                ];
+            }
+            throw new \RuntimeException("list_dir: not a directory: $full");
+        }
 
         $limit = max(1, min(2000, (int)$limit));
         $entries = @scandir($full);
@@ -2729,14 +2759,6 @@ class Sandbox {
             if ($a['type'] !== $b['type']) { return $a['type'] === 'dir' ? -1 : 1; }
             return strcmp($a['name'], $b['name']);
         });
-        // Report writability for the directory that was actually listed, not
-        // for "any root somewhere": a read-only root must not answer true just
-        // because a different allowlisted root is writable.
-        $writable = array_map(function ($r) { return rtrim($r, '/'); }, self::writeRoots());
-        $canWrite = false;
-        foreach ($writable as $w) {
-            if ($full === $w || strpos($full, $w . '/') === 0) { $canWrite = true; break; }
-        }
         return [
             'path' => $full, 'entries' => $out, 'skipped' => $skipped,
             'writable' => $canWrite,
