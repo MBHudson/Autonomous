@@ -59,6 +59,9 @@ $cfg = [
         'require_token' => false,
         'token' => '',
         'code_enabled' => true,   // exercised by the run_code tests below
+        'exec_enabled' => true,   // exercised by the exec tests below
+        'exec_allow' => [],       // empty means the built-in defaults
+        'exec_timeout' => 10,
     ],
 ];
 
@@ -304,6 +307,29 @@ try {
 } catch (\RuntimeException $e) {
     echo "  SKIP: git not installed\n";
 }
+
+// 38a. exec: an allowlisted builtin runs; no shell is involved
+$ec = Sandbox::execCommand(['echo', 'hello', 'world'], ['cwd' => $writeDir]);
+ok(($ec['exit'] === 0) && trim($ec['stdout']) === 'hello world', 'exec echo runs');
+$ec2 = Sandbox::execCommand(['echo', 'a', ';', 'echo', 'b'], ['cwd' => $writeDir]);
+ok(trim($ec2['stdout']) === 'a ; echo b', 'exec treats shell metacharacters as text');
+
+// 38b. exec: pwd reports a working directory and exits cleanly
+$pw = Sandbox::execCommand(['pwd'], ['cwd' => $writeDir]);
+ok(($pw['exit'] === 0) && trim($pw['stdout']) !== '', 'exec pwd reports cwd');
+
+// 38c. exec: type resolves an executable without a shell on Windows
+if (DIRECTORY_SEPARATOR === '\\') {
+    $wh = Sandbox::execCommand(['type', 'cmd'], ['cwd' => $writeDir]);
+    ok(($wh['exit'] === 0) && stripos($wh['stdout'], 'cmd') !== false,
+        'exec type resolves cmd on Windows');
+}
+
+// 38d. exec: dir/type work on Windows without cmd.exe
+$dr = Sandbox::execCommand(['dir'], ['cwd' => $writeDir]);
+ok(($dr['exit'] === 0) && strpos($dr['stdout'], 'test.txt') !== false, 'exec dir lists cwd');
+$tp = Sandbox::execCommand(['type', 'test.txt'], ['cwd' => $writeDir]);
+ok(($tp['exit'] === 0) && trim($tp['stdout']) === 'hello write', 'exec type reads a file');
 
 // 41. apply_patch: add + update in one envelope
 $patch = "*** Begin Patch\n"

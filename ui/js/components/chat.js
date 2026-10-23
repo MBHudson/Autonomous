@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=299';
-import { K as STORAGE_K } from '../storage.js?v=299';
+import { store } from '../store.js?v=300';
+import { K as STORAGE_K } from '../storage.js?v=300';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,24 +12,24 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=299';
-import { persistence } from '../persistence.js?v=299';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=299';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=299';
-import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=299';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=299';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=299';
-import { usageFor } from '../rateGovernor.js?v=299';
-import { trace } from '../trace.js?v=299';
-import { latency } from '../latency.js?v=299';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=299';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=299';
-import { SlashCommands } from '../slashCommands.js?v=299';
-import { parseRoute, routingHelp } from '../routing.js?v=299';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=299';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=299';
-import { MessageRenderer } from './message.js?v=299';
-import { createAvatar } from './avatar.js?v=299';
+import { api, errText } from '../api.js?v=300';
+import { persistence } from '../persistence.js?v=300';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=300';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=300';
+import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=300';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=300';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=300';
+import { usageFor } from '../rateGovernor.js?v=300';
+import { trace } from '../trace.js?v=300';
+import { latency } from '../latency.js?v=300';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=300';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=300';
+import { SlashCommands } from '../slashCommands.js?v=300';
+import { parseRoute, routingHelp } from '../routing.js?v=300';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=300';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=300';
+import { MessageRenderer } from './message.js?v=300';
+import { createAvatar } from './avatar.js?v=300';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2331,20 +2331,37 @@ _makeLiveNode(agent) {
 
     store.emit('agent:status', { agentId: agent.id, status: 'thinking' });
     this.aborter = new AbortController();
+    this._busy.add(agent.id);
+    const live = this._makeLiveNode(agent);
     try {
       const reply = await this._callAgent(
-        text, agent, this.aborter.signal, this._makeLiveNode(agent), null, { direct: true },
+        text, agent, this.aborter.signal, live, null, { direct: true },
       );
-      this._addMessage({
+      const agentMsg = {
         role: 'agent', content: (reply && reply.content) || '', agentId: agent.id,
-        timestamp: Date.now(),
-      });
+        reasoning: (reply && reply.reasoning) || null, timestamp: Date.now(),
+      };
+      // The live node already holds the streamed text. Appending the final
+      // message on top of it was the double reply: once while streaming, once
+      // when it landed. Swap the placeholder instead, exactly as the main
+      // send path does.
+      if (live && live.isConnected) this._replaceLiveNode(live, agentMsg);
+      else this._addMessage(agentMsg);
+      this._recordAgentUse(agent.id);
     } catch (err) {
-      const why = err && err.name === 'AbortError' ? 'cancelled' : (err?.message || String(err));
-      this._addMessage({
-        role: 'agent', content: `Could not answer: ${why}`, agentId: null, timestamp: Date.now(),
-      });
+      const stopped = err && err.name === 'AbortError';
+      const why = stopped ? 'cancelled' : (err?.message || String(err));
+      const errorMsg = {
+        role: 'agent',
+        content: stopped ? (live?.text || 'Stopped by user.') : `Could not answer: ${why}`,
+        agentId: agent.id,
+        reasoning: (live && live.reasoning) || null,
+        timestamp: Date.now(),
+      };
+      if (live && live.isConnected) this._replaceLiveNode(live, errorMsg);
+      else this._addMessage(errorMsg);
     } finally {
+      this._busy.delete(agent.id);
       this.aborter = null;
       // Idle, not active: a direct ask is a one-shot, and nothing keeps
       // working afterwards. Leaving 'active' lit the agent's indicator until

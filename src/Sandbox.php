@@ -309,6 +309,11 @@ class Sandbox {
             // looking allowlisted. echo/sleep/base64 are coreutils like the
             // rest here, resolved against the safe PATH like everything else.
             'echo', 'sleep', 'base64',
+            // Windows-native equivalents. dir/where/more are cmd builtins (or
+            // have no Unix twin), while findstr/ipconfig/tasklist are .exe
+            // programs shipped with Windows. They are harmless on POSIX hosts
+            // where these names simply do not resolve.
+            'dir', 'where', 'more', 'findstr', 'ipconfig', 'tasklist',
             // find / env / xargs are intentionally ABSENT: they are permanently on
             // exec_deny, and listing them here would advertise commands that can
             // never run.
@@ -589,12 +594,22 @@ class Sandbox {
                     . implode(', ', self::readRoots()) . ').',
                 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
-        if (!is_dir($cwd)) { $cwd = self::appDir() ?: '/tmp'; }
+        if (!is_dir($cwd)) { $cwd = self::appDir() ?: sys_get_temp_dir(); }
 
         $timeout = isset($opts['timeout'])
             ? max(1, min(600, (int)$opts['timeout'])) : $cfg['exec_timeout'];
         $maxBytes = isset($opts['max_bytes'])
             ? max(1024, min(2000000, (int)$opts['max_bytes'])) : $cfg['exec_max_bytes'];
+
+        // Windows shell builtins should stay Windows-shaped. Git for Windows
+        // ships pwd.exe/which.exe/echo.exe, but pwd prints an MSYS path such as
+        // /c/Users/... and which prints /c/Windows/..., which the model cannot
+        // use as a Windows path. Prefer the PHP implementations for these.
+        if (self::isWindows()
+            && in_array($program, ['echo', 'pwd', 'which', 'where', 'type', 'dir', 'mkdir', 'sleep', 'more'], true)) {
+            $builtin = self::runBuiltin($argv, $cwd, $opts, $timeout, $maxBytes);
+            if ($builtin !== null) { return $builtin; }
+        }
 
         // Resolve the program against a PATH of known-good directories, and
         // confirm it is a real executable file. `exec_allow` matches on NAME,
@@ -602,22 +617,24 @@ class Sandbox {
         // grep with something else.
         $resolved = self::resolveProgram($program);
         if ($resolved === null) {
+            // Windows has no echo.exe/type.exe/pwd.exe; they are shell builtins.
+            // Handle the harmless ones here rather than starting cmd.exe.
+            $builtin = self::runBuiltin($argv, $cwd, $opts, $timeout, $maxBytes);
+            if ($builtin !== null) { return $builtin; }
             return ['ok' => false, 'exit' => -1, 'stdout' => '',
-                'stderr' => "Command \"$program\" is not installed or not executable on this host.",
+                'stderr' => "Command \"$program\" is not installed or not executable on this host."
+                    . (self::isWindows()
+                        ? ' On Windows, install Git for Windows (for ls, cat, grep, sed, awk) '
+                          . 'or use a Windows .exe. Shell built-ins echo, pwd, type, which and '
+                          . 'sleep are handled internally.'
+                        : ''),
                 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
         $argv[0] = $resolved;
 
         // A deliberately small environment. Inheriting the web server's
         // environment would hand the agent anything the master process has.
-        $env = [
-            'PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-            'HOME' => $cwd,
-            'LANG' => 'C.UTF-8',
-            'TERM' => 'dumb',
-            // Stop curl/nmap from trying to be clever with a terminal.
-            'NO_COLOR' => '1',
-        ];
+        $env = self::execEnvironment($cwd);
 
         // Route the command's own network traffic through the selected proxy.
         // curl, wget, nmap and friends all read these, so without them an
@@ -740,6 +757,9 @@ class Sandbox {
             'find' => 1, 'grep' => 2, 'egrep' => 2, 'fgrep' => 2, 'rg' => 2,
             'sed' => 1, 'awk' => 1, 'tar' => 1, 'zcat' => 1, 'gunzip' => 1,
             'gzip' => 1, 'unzip' => 1, 'dd' => 1,
+            // Windows spellings of the same operations, plus mkdir/type/more
+            // which are cmd builtins with no .exe of their own.
+            'dir' => 1, 'type' => 1, 'more' => 1, 'mkdir' => 1, 'base64' => 1,
         ];
         return $pathsFrom[$program] ?? null;
     }
@@ -758,7 +778,10 @@ class Sandbox {
             if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $a)) { continue; }
             if (strpbrk($a, '*?[') !== false) { continue; }
 
-            $candidate = $a[0] === '/' ? $a : $cwd . '/' . $a;
+            $isAbsolute = $a[0] === '/'
+                || (bool)preg_match('#^[A-Za-z]:[\\\\/]#', $a)
+                || strpos($a, '\\\\') === 0;
+            $candidate = $isAbsolute ? $a : $cwd . '/' . $a;
             $resolved = self::resolveExisting($candidate);
             if ($resolved === null) { continue; }   // does not exist: nothing to read
 
@@ -960,10 +983,111 @@ class Sandbox {
         return $out;
     }
 
-    /** Find $program in the safe PATH and require it to be a regular file. */
+    /**
+     * Is this sandbox on Windows?
+     *
+     * Usually DIRECTORY_SEPARATOR is enough. Some PHP builds (MSYS/Cygwin)
+     * report "/" even when the configured roots are Windows paths, so the
+     * roots are checked too. The answer decides PATH/PATHEXT handling and
+     * which shell builtins must be emulated.
+     */
+    private static function isWindows() {
+        static $win = null;
+        if ($win !== null) { return $win; }
+        if (DIRECTORY_SEPARATOR === '\\') { return $win = true; }
+        foreach (array_merge(self::readRoots(), self::writeRoots()) as $root) {
+            if (preg_match('#^[A-Za-z]:/#', str_replace('\\', '/', (string)$root))) {
+                return $win = true;
+            }
+        }
+        return $win = false;
+    }
+
+    /**
+     * Directories searched for an allowlisted program.
+     *
+     * POSIX deliberately uses a fixed PATH, not the web server's, so a writable
+     * directory earlier in PATH cannot shadow `grep`. Windows has no such
+     * convention: Git for Windows, System32 and per-machine tools each live in
+     * their own directory, so the machine PATH is the only useful source.
+     * Standard admin-owned locations are appended for services (Apache) whose
+     * environment is stripped down to almost nothing.
+     */
+    private static function programDirs() {
+        if (!self::isWindows()) {
+            return ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bin', '/sbin', '/bin'];
+        }
+        $dirs = [];
+        $path = (string)getenv('PATH');
+        if ($path !== '') {
+            foreach (explode(';', $path) as $dir) {
+                $dir = trim(trim($dir), '"');
+                if ($dir !== '') { $dirs[] = $dir; }
+            }
+        }
+        $sysRoot = (string)(getenv('SystemRoot') ?: getenv('windir') ?: 'C:\\Windows');
+        $programFiles = (string)(getenv('ProgramFiles') ?: 'C:\\Program Files');
+        $programFilesX86 = (string)(getenv('ProgramFiles(x86)') ?: '');
+        $localAppData = (string)(getenv('LOCALAPPDATA') ?: '');
+        $dirs = array_merge($dirs, [
+            $sysRoot . '\\System32',
+            $sysRoot . '\\System32\\Wbem',
+            $sysRoot . '\\System32\\WindowsPowerShell\\v1.0',
+            $sysRoot . '\\System32\\OpenSSH',
+            $sysRoot,
+            // Git for Windows ships the POSIX tools the default allowlist names
+            // (ls, cat, grep, sed, awk). Apache services rarely inherit the
+            // user PATH that points at them.
+            $programFiles . '\\Git\\usr\\bin',
+            $programFiles . '\\Git\\bin',
+        ]);
+        if ($programFilesX86 !== '') {
+            $dirs[] = $programFilesX86 . '\\Git\\usr\\bin';
+            $dirs[] = $programFilesX86 . '\\Git\\bin';
+        }
+        if ($localAppData !== '') {
+            $dirs[] = $localAppData . '\\Programs\\Git\\usr\\bin';
+            $dirs[] = $localAppData . '\\Programs\\Git\\bin';
+        }
+        $dirs[] = 'C:\\msys64\\usr\\bin';
+        $seen = [];
+        $out = [];
+        foreach ($dirs as $dir) {
+            $key = strtolower(rtrim($dir, '\\/'));
+            if ($key === '' || isset($seen[$key])) { continue; }
+            $seen[$key] = true;
+            $out[] = rtrim($dir, '\\/');
+        }
+        return $out;
+    }
+
+    /**
+     * Find $program and require it to be a regular executable file.
+     *
+     * Windows is extension-driven and uses `;` in PATH/PATHEXT. Only `.exe`
+     * and `.com` are accepted: `.cmd`/`.bat` need cmd.exe to interpret them,
+     * which is exactly the shell this worker is designed not to have.
+     */
     private static function resolveProgram($program) {
-        if (strpos($program, '/') !== false) { return null; }  // no paths from the caller
-        foreach (explode(':', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') as $dir) {
+        if (strpbrk($program, self::isWindows() ? '/\\' : '/') !== false) {
+            return null;  // no paths from the caller
+        }
+
+        if (self::isWindows()) {
+            $hasExt = (bool)preg_match('/\.[^\\\\\/]+$/', $program);
+            foreach (self::programDirs() as $dir) {
+                $base = $dir . '\\' . $program;
+                $candidates = $hasExt ? [$base] : [$base . '.exe', $base . '.com'];
+                foreach ($candidates as $candidate) {
+                    if (!is_file($candidate)) { continue; }
+                    $target = realpath($candidate);
+                    if ($target !== false && is_file($target)) { return $target; }
+                }
+            }
+            return null;
+        }
+
+        foreach (self::programDirs() as $dir) {
             $candidate = $dir . '/' . $program;
             if (!is_file($candidate) || !is_executable($candidate)) { continue; }
 
@@ -985,6 +1109,513 @@ class Sandbox {
             return $target;
         }
         return null;
+    }
+
+    /**
+     * The child environment. POSIX keeps the deliberately tiny PATH from
+     * before; Windows needs SystemRoot, ComSpec and a real PATH or even a
+     * resolved .exe can fail to load its DLLs.
+     */
+    private static function execEnvironment($cwd) {
+        if (!self::isWindows()) {
+            return [
+                'PATH' => implode(':', self::programDirs()),
+                'HOME' => $cwd,
+                'LANG' => 'C.UTF-8',
+                'TERM' => 'dumb',
+                // Stop curl/nmap from trying to be clever with a terminal.
+                'NO_COLOR' => '1',
+            ];
+        }
+
+        $sysRoot = (string)(getenv('SystemRoot') ?: getenv('windir') ?: 'C:\\Windows');
+        $env = [
+            'PATH' => implode(';', self::programDirs()),
+            'HOME' => $cwd,
+            'USERPROFILE' => (string)(getenv('USERPROFILE') ?: $cwd),
+            'SystemRoot' => $sysRoot,
+            'windir' => $sysRoot,
+            'SystemDrive' => (string)(getenv('SystemDrive') ?: substr($sysRoot, 0, 2)),
+            'ComSpec' => (string)(getenv('ComSpec') ?: $sysRoot . '\\System32\\cmd.exe'),
+            'PATHEXT' => (string)(getenv('PATHEXT') ?: '.COM;.EXE;.BAT;.CMD'),
+            'TEMP' => (string)(getenv('TEMP') ?: sys_get_temp_dir()),
+            'TMP' => (string)(getenv('TMP') ?: sys_get_temp_dir()),
+            'APPDATA' => (string)(getenv('APPDATA') ?: ''),
+            'LOCALAPPDATA' => (string)(getenv('LOCALAPPDATA') ?: ''),
+            'ProgramData' => (string)(getenv('ProgramData') ?: ''),
+            'ProgramFiles' => (string)(getenv('ProgramFiles') ?: ''),
+            'ProgramFiles(x86)' => (string)(getenv('ProgramFiles(x86)') ?: ''),
+            'PROCESSOR_ARCHITECTURE' => (string)(getenv('PROCESSOR_ARCHITECTURE') ?: ''),
+            'NO_COLOR' => '1',
+        ];
+        return array_filter($env, fn($v) => $v !== '');
+    }
+
+    /**
+     * Windows command builtins, implemented in PHP.
+     *
+     * `echo`, `type`, `pwd` and friends are not .exe files, so a no-shell
+     * executor cannot find them. Emulating the harmless ones keeps a model's
+     * routine probe (`exec ["echo","hello"]`) working without introducing
+     * cmd.exe or a shell parser. Returns null for anything not handled here,
+     * which then follows the normal "not installed" path.
+     */
+    private static function runBuiltin($argv, $cwd, $opts, $timeout, $maxBytes) {
+        $program = strtolower(basename((string)$argv[0]));
+        $args = array_slice($argv, 1);
+        $t0 = microtime(true);
+        $stdout = '';
+        $stderr = '';
+        $exit = 0;
+
+        switch ($program) {
+            case 'echo':
+                $newline = true;
+                if (isset($args[0]) && $args[0] === '-n') {
+                    $newline = false;
+                    array_shift($args);
+                }
+                $stdout = implode(' ', $args) . ($newline ? PHP_EOL : '');
+                break;
+
+            case 'pwd':
+                $stdout = $cwd . PHP_EOL;
+                break;
+
+            case 'which':
+            case 'where':
+                foreach ($args as $want) {
+                    if ($want === '' || $want[0] === '-') { continue; }
+                    $found = self::resolveProgram($want);
+                    if ($found === null) {
+                        $stderr .= "\"$want\" not found on PATH." . PHP_EOL;
+                        $exit = 1;
+                    } else {
+                        $stdout .= $found . PHP_EOL;
+                    }
+                }
+                if ($stdout === '' && $stderr === '') {
+                    $stderr = "usage: $program <command>" . PHP_EOL;
+                    $exit = 1;
+                }
+                break;
+
+            case 'type':
+                $want = (string)($args[0] ?? '');
+                if ($want === '') {
+                    $stderr = "usage: type <file-or-command>" . PHP_EOL;
+                    $exit = 1;
+                    break;
+                }
+                $file = self::builtinPath($want, $cwd);
+                if (is_file($file)) {
+                    [$stdout, $stderr, $exit] = self::builtinRead([$want], $cwd, $opts);
+                } else {
+                    $found = self::resolveProgram($want);
+                    if ($found === null) {
+                        $stderr = "\"$want\" not found as a file or on PATH." . PHP_EOL;
+                        $exit = 1;
+                    } else {
+                        $stdout = $found . PHP_EOL;
+                    }
+                }
+                break;
+
+            case 'cat':
+            case 'more':
+                [$stdout, $stderr, $exit] = self::builtinRead($args, $cwd, $opts);
+                break;
+
+            case 'dir':
+            case 'ls':
+                [$stdout, $stderr, $exit] = self::builtinList($args, $cwd);
+                break;
+
+            case 'mkdir':
+                $parents = false;
+                $targets = [];
+                foreach ($args as $a) {
+                    if ($a === '-p' || $a === '-pv') { $parents = true; continue; }
+                    if ($a !== '' && $a[0] === '-') { continue; }
+                    $targets[] = $a;
+                }
+                if (!$targets) {
+                    $stderr = "usage: mkdir [-p] <directory>" . PHP_EOL;
+                    $exit = 1;
+                    break;
+                }
+                foreach ($targets as $target) {
+                    $path = self::builtinPath($target, $cwd);
+                    if (is_dir($path)) { continue; }
+                    if (!@mkdir($path, 0777, $parents)) {
+                        $stderr .= "mkdir: cannot create \"$target\"" . PHP_EOL;
+                        $exit = 1;
+                    }
+                }
+                break;
+
+            case 'head':
+            case 'tail':
+                [$stdout, $stderr, $exit] = self::builtinLines($args, $cwd, $opts, $program === 'tail');
+                break;
+
+            case 'wc':
+                [$stdout, $stderr, $exit] = self::builtinWc($args, $cwd, $opts);
+                break;
+
+            case 'base64':
+                [$stdout, $stderr, $exit] = self::builtinBase64($args, $cwd, $opts);
+                break;
+
+            case 'md5sum':
+            case 'sha256sum':
+                [$stdout, $stderr, $exit] = self::builtinHash($args, $cwd, $program === 'md5sum' ? 'md5' : 'sha256');
+                break;
+
+            case 'realpath':
+            case 'basename':
+            case 'dirname':
+                $want = (string)($args[0] ?? '');
+                if ($want === '') {
+                    $stderr = "usage: $program <path>" . PHP_EOL;
+                    $exit = 1;
+                    break;
+                }
+                if ($program === 'realpath') {
+                    $real = realpath(self::builtinPath($want, $cwd));
+                    if ($real === false) {
+                        $stderr = "realpath: $want: no such file or directory" . PHP_EOL;
+                        $exit = 1;
+                    } else {
+                        $stdout = str_replace('\\', '/', $real) . PHP_EOL;
+                    }
+                } elseif ($program === 'basename') {
+                    $stdout = basename($want) . PHP_EOL;
+                } else {
+                    $stdout = dirname($want) . PHP_EOL;
+                }
+                break;
+
+            case 'sleep':
+                $seconds = max(0.0, (float)($args[0] ?? 0));
+                $seconds = min($seconds, (float)$timeout);
+                usleep((int)round($seconds * 1000000));
+                break;
+
+            case 'uname':
+                $flag = (string)($args[0] ?? '-s');
+                if ($flag === '-a') { $stdout = php_uname() . PHP_EOL; }
+                elseif ($flag === '-m') { $stdout = php_uname('m') . PHP_EOL; }
+                elseif ($flag === '-n') { $stdout = php_uname('n') . PHP_EOL; }
+                else { $stdout = PHP_OS . PHP_EOL; }
+                break;
+
+            case 'id':
+                $stdout = 'uid=' . get_current_user() . PHP_EOL;
+                break;
+
+            case 'printenv':
+                $want = (string)($args[0] ?? '');
+                if ($want !== '') {
+                    $v = getenv($want);
+                    if ($v === false) { $exit = 1; } else { $stdout = $v . PHP_EOL; }
+                } else {
+                    foreach ((array)getenv() as $k => $v) {
+                        $stdout .= "$k=$v" . PHP_EOL;
+                    }
+                }
+                break;
+
+            default:
+                return null;
+        }
+
+        $truncated = false;
+        if (strlen($stdout) > $maxBytes) {
+            $stdout = substr($stdout, 0, $maxBytes);
+            $truncated = true;
+        }
+        if (strlen($stderr) > 65536) { $stderr = substr($stderr, 0, 65536); }
+        $ms = (int)round((microtime(true) - $t0) * 1000);
+        self::audit($program, $argv, $cwd, $exit, $ms);
+        return [
+            'ok' => $exit === 0,
+            'exit' => $exit,
+            'stdout' => $stdout,
+            'stderr' => $stderr,
+            'truncated' => $truncated,
+            'timed_out' => false,
+            'ms' => $ms,
+        ];
+    }
+
+    /** Resolve a command argument against the jailed working directory. */
+    private static function builtinPath($arg, $cwd) {
+        $arg = str_replace('\\', '/', (string)$arg);
+        if ($arg === '') { return ''; }
+        if ($arg[0] === '/' || preg_match('#^[A-Za-z]:/#', $arg)) { return $arg; }
+        return rtrim(str_replace('\\', '/', (string)$cwd), '/') . '/' . $arg;
+    }
+
+    /** cat/more/type: read files, or stdin when the argument is "-". */
+    private static function builtinRead($args, $cwd, $opts) {
+        $number = false;
+        $nonBlank = false;
+        $files = [];
+        foreach ($args as $a) {
+            if ($a === '-') { $files[] = '-'; continue; }
+            if ($a !== '' && $a[0] === '-') {
+                if (strpos($a, 'b') !== false) { $nonBlank = true; $number = true; }
+                elseif (strpos($a, 'n') !== false) { $number = true; }
+                continue;
+            }
+            $files[] = $a;
+        }
+        if (!$files) { $files = ['-']; }
+
+        $out = '';
+        $err = '';
+        $exit = 0;
+        foreach ($files as $name) {
+            if ($name === '-') {
+                $data = (string)($opts['stdin'] ?? '');
+            } else {
+                $path = self::builtinPath($name, $cwd);
+                $data = @file_get_contents($path);
+                if ($data === false) {
+                    $err .= "cat: $name: no such file or directory" . PHP_EOL;
+                    $exit = 1;
+                    continue;
+                }
+            }
+            if ($number) {
+                $lines = preg_split('/\r\n|\r|\n/', $data);
+                $n = 0;
+                foreach ($lines as $line) {
+                    if ($nonBlank && trim($line) === '') { $out .= $line . PHP_EOL; continue; }
+                    $n++;
+                    $out .= sprintf("%6d\t%s\n", $n, $line);
+                }
+            } else {
+                $out .= $data;
+                if ($data !== '' && substr($data, -1) !== "\n") { $out .= PHP_EOL; }
+            }
+        }
+        return [$out, $err, $exit];
+    }
+
+    /** ls/dir: a small, flag-tolerant directory listing. */
+    private static function builtinList($args, $cwd) {
+        $all = false;
+        $long = false;
+        $targets = [];
+        foreach ($args as $a) {
+            if ($a !== '' && $a[0] === '-') {
+                if (strpos($a, 'a') !== false) { $all = true; }
+                if (strpos($a, 'l') !== false) { $long = true; }
+                continue;
+            }
+            $targets[] = $a;
+        }
+        if (!$targets) { $targets = ['.']; }
+
+        $out = '';
+        $err = '';
+        $exit = 0;
+        foreach ($targets as $target) {
+            $path = self::builtinPath($target, $cwd);
+            if (!is_dir($path)) {
+                if (is_file($path)) {
+                    if (count($targets) > 1) { $out .= "$target:" . PHP_EOL; }
+                    if ($long) {
+                        $out .= sprintf("%s %10d %s\n", '-', (int)@filesize($path), basename($path));
+                    } else {
+                        $out .= basename($path) . PHP_EOL;
+                    }
+                    if (count($targets) > 1) { $out .= PHP_EOL; }
+                    continue;
+                }
+                $err .= "ls: cannot access '$target': no such file or directory" . PHP_EOL;
+                $exit = 1;
+                continue;
+            }
+            $names = @scandir($path);
+            if ($names === false) {
+                $err .= "ls: cannot read '$target'" . PHP_EOL;
+                $exit = 1;
+                continue;
+            }
+            sort($names);
+            if (!$all) {
+                $names = array_values(array_filter($names, fn($n) => $n !== '.' && $n !== '..'));
+            }
+            if (count($targets) > 1) { $out .= "$target:" . PHP_EOL; }
+            foreach ($names as $name) {
+                if ($long) {
+                    $full = rtrim($path, '/') . '/' . $name;
+                    $size = is_dir($full) ? 0 : (int)@filesize($full);
+                    $out .= sprintf("%s %10d %s\n", is_dir($full) ? 'd' : '-', $size, $name);
+                } else {
+                    $out .= $name . PHP_EOL;
+                }
+            }
+            if (count($targets) > 1) { $out .= PHP_EOL; }
+        }
+        return [$out, $err, $exit];
+    }
+
+    /** head/tail: first or last N lines (default 10). */
+    private static function builtinLines($args, $cwd, $opts, $tail) {
+        $count = 10;
+        $files = [];
+        for ($i = 0; $i < count($args); $i++) {
+            $a = (string)$args[$i];
+            if ($a === '-n' && isset($args[$i + 1])) { $count = max(0, (int)$args[++$i]); continue; }
+            if (preg_match('/^-(\d+)$/', $a, $m)) { $count = (int)$m[1]; continue; }
+            if ($a !== '' && $a[0] === '-') { continue; }
+            $files[] = $a;
+        }
+        if (!$files) { $files = ['-']; }
+
+        $out = '';
+        $err = '';
+        $exit = 0;
+        foreach ($files as $name) {
+            if ($name === '-') {
+                $data = (string)($opts['stdin'] ?? '');
+            } else {
+                $data = @file_get_contents(self::builtinPath($name, $cwd));
+                if ($data === false) {
+                    $err .= "$name: no such file or directory" . PHP_EOL;
+                    $exit = 1;
+                    continue;
+                }
+            }
+            $lines = preg_split('/\r\n|\r|\n/', rtrim($data, "\r\n"));
+            $slice = $tail ? array_slice($lines, -$count) : array_slice($lines, 0, $count);
+            $out .= implode(PHP_EOL, $slice);
+            if ($slice) { $out .= PHP_EOL; }
+        }
+        return [$out, $err, $exit];
+    }
+
+    /** wc: lines, words and bytes. */
+    private static function builtinWc($args, $cwd, $opts) {
+        $show = ['l' => false, 'w' => false, 'c' => false];
+        $files = [];
+        foreach ($args as $a) {
+            if ($a !== '' && $a[0] === '-') {
+                foreach (str_split(substr($a, 1)) as $f) {
+                    if (isset($show[$f])) { $show[$f] = true; }
+                }
+                continue;
+            }
+            $files[] = $a;
+        }
+        if (!$show['l'] && !$show['w'] && !$show['c']) {
+            $show = ['l' => true, 'w' => true, 'c' => true];
+        }
+        if (!$files) { $files = ['-']; }
+
+        $out = '';
+        $err = '';
+        $exit = 0;
+        $total = ['l' => 0, 'w' => 0, 'c' => 0];
+        foreach ($files as $name) {
+            if ($name === '-') {
+                $data = (string)($opts['stdin'] ?? '');
+            } else {
+                $data = @file_get_contents(self::builtinPath($name, $cwd));
+                if ($data === false) {
+                    $err .= "wc: $name: no such file or directory" . PHP_EOL;
+                    $exit = 1;
+                    continue;
+                }
+            }
+            $counts = [
+                'l' => substr_count($data, "\n"),
+                'w' => count(preg_split('/\s+/', trim($data), -1, PREG_SPLIT_NO_EMPTY)),
+                'c' => strlen($data),
+            ];
+            foreach ($counts as $k => $v) { $total[$k] += $v; }
+            $parts = [];
+            foreach ($show as $k => $on) { if ($on) { $parts[] = $counts[$k]; } }
+            $out .= implode(' ', $parts) . ($name === '-' ? '' : ' ' . $name) . PHP_EOL;
+        }
+        if (count($files) > 1) {
+            $parts = [];
+            foreach ($show as $k => $on) { if ($on) { $parts[] = $total[$k]; } }
+            $out .= implode(' ', $parts) . ' total' . PHP_EOL;
+        }
+        return [$out, $err, $exit];
+    }
+
+    /** base64: encode or decode files/stdin. */
+    private static function builtinBase64($args, $cwd, $opts) {
+        $decode = false;
+        $wrap = 76;
+        $files = [];
+        for ($i = 0; $i < count($args); $i++) {
+            $a = (string)$args[$i];
+            if ($a === '-d' || $a === '--decode') { $decode = true; continue; }
+            if ($a === '-w' && isset($args[$i + 1])) { $wrap = max(0, (int)$args[++$i]); continue; }
+            if ($a !== '' && $a[0] === '-') { continue; }
+            $files[] = $a;
+        }
+        if (!$files) { $files = ['-']; }
+
+        $out = '';
+        $err = '';
+        $exit = 0;
+        foreach ($files as $name) {
+            if ($name === '-') {
+                $data = (string)($opts['stdin'] ?? '');
+            } else {
+                $data = @file_get_contents(self::builtinPath($name, $cwd));
+                if ($data === false) {
+                    $err .= "base64: $name: no such file or directory" . PHP_EOL;
+                    $exit = 1;
+                    continue;
+                }
+            }
+            if ($decode) {
+                $raw = base64_decode(preg_replace('/\s+/', '', $data), true);
+                if ($raw === false) {
+                    $err .= "base64: invalid input" . PHP_EOL;
+                    $exit = 1;
+                    continue;
+                }
+                $out .= $raw;
+            } else {
+                $encoded = base64_encode($data);
+                $out .= $wrap > 0 ? chunk_split($encoded, $wrap, PHP_EOL) : $encoded . PHP_EOL;
+            }
+        }
+        return [$out, $err, $exit];
+    }
+
+    /** md5sum/sha256sum, without spawning a process. */
+    private static function builtinHash($args, $cwd, $algo) {
+        $out = '';
+        $err = '';
+        $exit = 0;
+        $any = false;
+        foreach ($args as $name) {
+            if ($name === '' || $name[0] === '-') { continue; }
+            $any = true;
+            $hash = @hash_file($algo, self::builtinPath($name, $cwd));
+            if ($hash === false) {
+                $err .= "$algo" . "sum: $name: no such file or directory" . PHP_EOL;
+                $exit = 1;
+                continue;
+            }
+            $out .= $hash . '  ' . $name . PHP_EOL;
+        }
+        if (!$any) {
+            $err = "usage: {$algo}sum <file>" . PHP_EOL;
+            $exit = 1;
+        }
+        return [$out, $err, $exit];
     }
 
     /** Append one line per run to storage/exec.log. */

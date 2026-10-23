@@ -1,8 +1,33 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v299**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v300**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v300 — direct-ask double reply + Windows exec
+
+- **Ask button no longer answers twice.** `askAgentDirectly()` streamed into a
+  live node and then appended the finished reply as a second message. It now
+  swaps the live node for the final message (and preserves a partial answer when
+  stopped), matching the main send path. It also marks the agent busy for the
+  duration of the direct ask so an autonomous tick cannot start the same agent
+  in parallel.
+- **Exec works on Windows.** `Sandbox::execCommand()` now detects a Windows
+  sandbox (including MSYS builds with Windows roots), resolves `.exe`/`.com`
+  from PATH, System32 and Git for Windows (per-machine and per-user installs),
+  and passes a Windows child environment (`SystemRoot`, `ComSpec`, `PATHEXT`).
+  It no longer tries to run `.cmd`/`.bat` shims through a shell.
+- **Windows builtins without cmd.exe.** `echo`, `pwd`, `type`, `where`, `dir`,
+  `mkdir`, `sleep` and the common file/text tools (`cat`, `more`, `head`, `tail`,
+  `wc`, `base64`, `md5sum`, `sha256sum`, `realpath`, `basename`, `dirname`,
+  `uname`, `id`, `printenv`) are implemented in PHP when no `.exe` exists, so
+  commands like `exec ["echo","hello"]` work instead of reporting the program
+  is not installed. `dir`, `where`, `more`, `findstr`, `ipconfig` and `tasklist`
+  were added to the default allowlist, and exec's prompt now explains the
+  Windows rules.
+- Expanded the sandbox tests with echo, metacharacter, pwd, type and dir cases.
 
 ---
 
