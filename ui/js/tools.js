@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=302';
-import { asText, compactText } from './utils.js?v=302';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=302';
-import { settingFor } from './agentConfig.js?v=302';
-import { trace } from './trace.js?v=302';
+import { store } from './store.js?v=303';
+import { asText, compactText } from './utils.js?v=303';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=303';
+import { settingFor } from './agentConfig.js?v=303';
+import { trace } from './trace.js?v=303';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -862,13 +862,26 @@ export function bindSandboxTools(api) {
     // immediately instead of waiting for the next poll.
     if (res && res.pending) {
       try { store.emit('exec:pending', { id: res.pending, argv }); } catch { /* no store */ }
+      return `pending approval (${res.pending}): ${res.stderr || 'waiting for the operator to approve this command'}`;
+    }
+    // The server answers errors as { error } on some routes. Printing
+    // "[exit undefined, undefinedms]" told the model nothing, so it retried
+    // the identical command until one happened to answer -- the four identical
+    // nmap calls. Name the error instead.
+    if (res && res.error) return `error: ${res.error}`;
+    if (!res || typeof res !== 'object') {
+      return `error: exec returned no result${res === undefined ? '' : ` (${JSON.stringify(res)})`}`;
     }
     const parts = [];
     if (res.stdout) parts.push(res.stdout.trimEnd());
     if (res.stderr) parts.push('[stderr] ' + res.stderr.trim());
     if (!parts.length) parts.push('(no output)');
     if (res.truncated) parts.push('[output truncated]');
-    parts.push(`[exit ${res.exit}, ${res.ms}ms]`);
+    if (res.exit === undefined || res.ms === undefined) {
+      parts.push(`[incomplete result: ${JSON.stringify(res).slice(0, 300)}]`);
+    } else {
+      parts.push(`[exit ${res.exit}, ${res.ms}ms]`);
+    }
     return parts.join('\n');
   };
 }
@@ -1388,6 +1401,8 @@ function _parseToolCall(text) {
   // completely and the markup used to reach the transcript verbatim.
   const invoke = parseInvokeToolCall(raw);
   if (invoke) return invoke;
+  const fnTag = parseFunctionTagToolCall(raw);
+  if (fnTag) return fnTag;
   return parseNativeToolCall(raw);
 }
 
@@ -1491,6 +1506,40 @@ function decodeXml(s) {
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&');
+}
+
+/**
+ * `<function=read_file><parameter=path>...</parameter></function>`.
+ *
+ * A bare-tag dialect some Nemotron/Qwen templates emit. It has no `name=`
+ * attribute, so neither the JSON nor the invoke parser matches, and the whole
+ * call reached the transcript as text (and was treated as the final answer).
+ */
+function parseFunctionTagToolCall(text) {
+  const src = normaliseNative(text);
+  const hit = /<\s*function\s*(?:=\s*|name\s*=\s*["']?)([A-Za-z_][A-Za-z0-9_-]*)\s*["']?\s*>([\s\S]*?)<\s*\/\s*function\s*>/i.exec(src);
+  if (!hit) return null;
+  const name = hit[1].trim();
+  if (!Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name)) return null;
+  const body = hit[2];
+  const arg = {};
+  const paramRe = /<\s*parameter\s*(?:=\s*|name\s*=\s*["']?)([A-Za-z_][A-Za-z0-9_-]*)\s*["']?\s*>([\s\S]*?)<\s*\/\s*parameter\s*>/gi;
+  let m;
+  while ((m = paramRe.exec(body)) !== null) {
+    arg[m[1].trim()] = coerceArg(decodeXml(m[2].trim()));
+  }
+  if (!Object.keys(arg).length) {
+    const inner = extractJsonObject(body);
+    if (inner) {
+      try {
+        const parsed = JSON.parse(inner);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return { tool: name, arg: parsed };
+        }
+      } catch { /* fall through to no-arg call */ }
+    }
+  }
+  return { tool: name, arg: Object.keys(arg).length ? arg : undefined };
 }
 
 /**
