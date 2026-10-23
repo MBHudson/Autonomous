@@ -15,7 +15,8 @@
 // Servers are OPERATOR-configured in storage/config.json under
 // "mcp": { "servers": [ … ] }. Nothing a model says can add or change one —
 // the same rule as exec: a model may call what the operator set up, not
-// define new capability for itself.
+// define new capability for itself. A stdio server may also carry an "env"
+// map for tokens and paths that must not leak into the rest of the process.
 //
 // Every call is stateless on purpose: the handshake runs, the request runs,
 // the process exits. Simpler and safer than a long-lived daemon, at the cost
@@ -60,7 +61,25 @@ class Mcp {
         $command = trim((string)($s['command'] ?? ''));
         if ($command === '') { return null; }
         $args = array_values(array_filter(array_map('strval', (array)($s['args'] ?? [])), fn($a) => $a !== ''));
-        return ['id' => $id, 'transport' => 'stdio', 'command' => $command, 'args' => $args];
+        return [
+            'id' => $id,
+            'transport' => 'stdio',
+            'command' => $command,
+            'args' => $args,
+            'env' => self::envPairs($s['env'] ?? null),
+        ];
+    }
+
+    /** Normalise an operator-supplied env map into string key/value pairs. */
+    private static function envPairs($raw) {
+        if (!is_array($raw)) { return []; }
+        $out = [];
+        foreach ($raw as $k => $v) {
+            $k = trim((string)$k);
+            if ($k === '' || strpbrk($k, "=\0") !== false) { continue; }
+            $out[$k] = (string)$v;
+        }
+        return $out;
     }
 
     public static function server($id) {
@@ -159,12 +178,8 @@ class Mcp {
 
     private static function rpcStdio(array $server, $method, $params) {
         $cmd = $server['command'];
-        $exec = array_merge([$cmd], $server['args'] ?? []);
-        $env = [
-            'PATH' => '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-            'HOME' => getenv('HOME') ?: sys_get_temp_dir(),
-            'LANG' => 'C.UTF-8',
-        ];
+        $env = self::stdioEnv($server);
+        $exec = self::stdioExec($server, $env);
         $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = @proc_open($exec, $descriptors, $pipes, null, $env);
         if (!is_resource($proc)) {
@@ -213,6 +228,110 @@ class Mcp {
         return is_array($resp['result'] ?? null) ? $resp['result'] : [];
     }
 
+    /**
+     * Environment for a stdio server.
+     *
+     * The old list was Linux-only: PATH was hardcoded and USERPROFILE,
+     * ComSpec, APPDATA and TEMP were dropped. On Windows that meant npx/node
+     * could not be found even when installed. Inherit the process environment,
+     * add the usual Node locations, then let the operator override individual
+     * keys through the server's "env" map.
+     */
+    private static function stdioEnv(array $server) {
+        $env = [];
+        $all = getenv();
+        if (is_array($all)) {
+            foreach ($all as $k => $v) {
+                if (is_string($k) && $k !== '') { $env[$k] = (string)$v; }
+            }
+        }
+
+        if (DIRECTORY_SEPARATOR === '\\') {
+            foreach (['SystemRoot', 'windir', 'ComSpec', 'PATHEXT', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP'] as $k) {
+                if (empty($env[$k]) && getenv($k) !== false) { $env[$k] = (string)getenv($k); }
+            }
+            if (empty($env['PATHEXT'])) { $env['PATHEXT'] = '.COM;.EXE;.BAT;.CMD'; }
+            $path = (string)($env['PATH'] ?? getenv('PATH') ?: '');
+            $npmDir = trim((string)($env['APPDATA'] ?? ''));
+            $extras = [
+                $npmDir !== '' ? $npmDir . '\\npm' : '',
+                'C:\\Program Files\\nodejs',
+                'C:\\Program Files (x86)\\nodejs',
+            ];
+            foreach ($extras as $dir) {
+                if ($dir !== '' && stripos($path, $dir) === false) { $path .= ';' . $dir; }
+            }
+            $env['PATH'] = trim($path, ';');
+        } else {
+            $env['PATH'] = ($env['PATH'] ?? '') ?: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+            $env['HOME'] = ($env['HOME'] ?? '') ?: sys_get_temp_dir();
+            $env['LANG'] = ($env['LANG'] ?? '') ?: 'C.UTF-8';
+        }
+
+        foreach (($server['env'] ?? []) as $k => $v) {
+            $k = trim((string)$k);
+            if ($k !== '' && strpbrk($k, "=\0") === false) { $env[$k] = (string)$v; }
+        }
+        return $env;
+    }
+
+    /**
+     * Build the argv for a stdio server.
+     *
+     * Windows CreateProcess cannot execute a .cmd/.bat directly, and bare
+     * names like "npx" resolve to npx.cmd. Resolve against PATH/PATHEXT and
+     * route batch files through cmd.exe. POSIX keeps the simple argv form.
+     */
+    private static function stdioExec(array $server, array $env) {
+        $cmd = trim((string)$server['command'], " \t\"'");
+        $args = array_values(array_map('strval', $server['args'] ?? []));
+        if (DIRECTORY_SEPARATOR !== '\\') {
+            return array_merge([$cmd], $args);
+        }
+
+        $resolved = self::resolveWindowsCommand($cmd, $env);
+        if (preg_match('/\.(cmd|bat)$/i', $resolved)) {
+            $comspec = (string)($env['ComSpec'] ?? getenv('ComSpec') ?: 'cmd.exe');
+            return array_merge([$comspec, '/d', '/s', '/c', $resolved], $args);
+        }
+        return array_merge([$resolved], $args);
+    }
+
+    private static function resolveWindowsCommand($cmd, array $env) {
+        $cmd = trim((string)$cmd);
+        if ($cmd === '') { return $cmd; }
+
+        $exts = array_values(array_filter(array_map('trim', explode(';', (string)($env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD')))));
+        if (!$exts) { $exts = ['.COM', '.EXE', '.BAT', '.CMD']; }
+        $exts = array_map(fn($e) => ($e !== '' && $e[0] !== '.') ? '.' . $e : $e, $exts);
+        $hasExt = (bool)preg_match('/\.[^\\\\\/]+$/', $cmd);
+
+        $try = function ($base) use ($exts, $hasExt) {
+            if ($hasExt) { return is_file($base) ? $base : null; }
+            // Prefer an executable extension over an extensionless shim:
+            // Node installs both "npx" (a shell script) and "npx.cmd", and
+            // CreateProcess can only start the latter.
+            foreach ($exts as $ext) {
+                if (is_file($base . $ext)) { return $base . $ext; }
+            }
+            return is_file($base) ? $base : null;
+        };
+
+        if (preg_match('#^[A-Za-z]:[\\\\/]#', $cmd) || strpos($cmd, '\\\\') === 0 || strpos($cmd, '/') !== false) {
+            $found = $try($cmd);
+            return $found ?: $cmd;
+        }
+
+        foreach (explode(';', (string)($env['PATH'] ?? '')) as $dir) {
+            $dir = trim(trim($dir), '"');
+            $dir = rtrim($dir, '\\/');
+            if ($dir === '') { continue; }
+            $found = $try($dir . '\\' . $cmd);
+            if ($found !== null) { return $found; }
+        }
+        return $cmd;
+    }
+
     /** Read stdin lines until a JSON-RPC response with the given id appears. */
     private static function readFor($pipe, $wantId) {
         $deadline = microtime(true) + 25;
@@ -232,19 +351,73 @@ class Mcp {
         return null;
     }
 
+    /**
+     * JSON-RPC over streamable HTTP.
+     *
+     * Most servers in the wild are stateless and answer a bare tools/list.
+     * Session-based servers require initialize + Mcp-Session-Id first, so try
+     * the direct call and only perform the handshake when the server says it
+     * needs one. That keeps the stateless path at one POST.
+     */
     private static function rpcHttp(array $server, $method, $params) {
         $url = $server['url'];
         if (!preg_match('#^https?://#i', $url)) { throw new \RuntimeException('mcp: url must be http(s)'); }
+
+        $first = self::httpPost($server, $method, $params, null, false);
+        if ($first['ok']) { return $first['result']; }
+
+        if ($method !== 'initialize' && self::needsHandshake($first)) {
+            $init = self::httpPost($server, 'initialize', [
+                'protocolVersion' => self::PROTOCOL,
+                'capabilities' => new \stdClass(),
+                'clientInfo' => ['name' => self::CLIENT, 'version' => self::VERSION],
+            ], null, false);
+
+            if ($init['ok']) {
+                $session = $init['session'];
+                self::httpPost($server, 'notifications/initialized', new \stdClass(), $session, true);
+                $second = self::httpPost($server, $method, $params, $session, false);
+                if ($second['ok']) { return $second['result']; }
+                $first = $second;
+            } else {
+                $first = $init;
+            }
+        }
+
+        throw new \RuntimeException($first['error'] ?: ('mcp: server returned no JSON-RPC (HTTP ' . $first['code'] . ')'));
+    }
+
+    /** A server that rejected the direct call because it wants a session. */
+    private static function needsHandshake(array $res) {
+        if (in_array((int)($res['code'] ?? 0), [400, 404, 409, 428], true)) { return true; }
+        $e = strtolower((string)($res['error'] ?? ''));
+        return strpos($e, 'session') !== false
+            || strpos($e, 'initialize') !== false
+            || strpos($e, 'initialized') !== false;
+    }
+
+    /**
+     * One HTTP POST. Returns a result record rather than throwing, because the
+     * caller needs the status/error to decide whether a handshake is worth it.
+     */
+    private static function httpPost(array $server, $method, $params, $session, $notification) {
         $headers = ['Content-Type: application/json', 'Accept: application/json, text/event-stream'];
+        if ($session) {
+            $headers[] = 'Mcp-Session-Id: ' . $session;
+            $headers[] = 'MCP-Protocol-Version: ' . self::PROTOCOL;
+        }
         foreach (($server['headers'] ?? []) as $k => $v) {
             $k = trim((string)$k);
             if ($k === '' || strpos($k, "\n") !== false) { continue; }
             $headers[] = $k . ': ' . str_replace(["\r", "\n"], '', (string)$v);
         }
-        $body = json_encode([
-            'jsonrpc' => '2.0', 'id' => 1, 'method' => $method, 'params' => $params ?: new \stdClass(),
-        ]);
-        $ch = curl_init($url);
+
+        $msg = ['jsonrpc' => '2.0', 'method' => $method, 'params' => $params ?: new \stdClass()];
+        if (!$notification) { $msg['id'] = 1; }
+        $body = json_encode($msg);
+
+        $gotSession = '';
+        $ch = curl_init($server['url']);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
@@ -252,26 +425,46 @@ class Mcp {
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, $line) use (&$gotSession) {
+            $trim = trim($line);
+            if (stripos($trim, 'Mcp-Session-Id:') === 0) {
+                $gotSession = trim(substr($trim, strlen('Mcp-Session-Id:')));
+            }
+            return strlen($line);
+        });
         $raw = curl_exec($ch);
         $err = curl_error($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if ($raw === false) { throw new \RuntimeException('mcp: ' . ($err ?: 'request failed')); }
+
+        if ($raw === false) {
+            return ['ok' => false, 'code' => $code, 'session' => $gotSession,
+                'error' => 'mcp: ' . ($err ?: 'request failed')];
+        }
+        if ($notification && trim((string)$raw) === '') {
+            return ['ok' => true, 'code' => $code, 'session' => $gotSession, 'result' => []];
+        }
+
         $data = json_decode($raw, true);
         // The streamable transport may answer with SSE; pull the first data: JSON line.
         if (!is_array($data) && strpos($raw, 'data:') !== false) {
             foreach (explode("\n", $raw) as $line) {
-                if (strpos(trim($line), 'data:') === 0) {
-                    $d = json_decode(trim(substr(trim($line), 5)), true);
-                    if (is_array($d)) { $data = $d; break; }
-                }
+                $line = trim($line);
+                if (strpos($line, 'data:') !== 0) { continue; }
+                $d = json_decode(trim(substr($line, 5)), true);
+                if (is_array($d)) { $data = $d; break; }
             }
         }
         if (!is_array($data)) {
-            throw new \RuntimeException('mcp: server returned no JSON-RPC (HTTP ' . $code . ')');
+            return ['ok' => false, 'code' => $code, 'session' => $gotSession,
+                'error' => 'mcp: server returned no JSON-RPC (HTTP ' . $code . ')'];
         }
-        if (isset($data['error'])) { throw new \RuntimeException('mcp: ' . self::errText($data['error'])); }
-        return is_array($data['result'] ?? null) ? $data['result'] : [];
+        if (isset($data['error'])) {
+            return ['ok' => false, 'code' => $code, 'session' => $gotSession,
+                'error' => 'mcp: ' . self::errText($data['error'])];
+        }
+        return ['ok' => true, 'code' => $code, 'session' => $gotSession,
+            'result' => is_array($data['result'] ?? null) ? $data['result'] : []];
     }
 
     private static function errText($e) {

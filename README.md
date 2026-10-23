@@ -180,6 +180,8 @@ Two recent hardenings so memory can't look "off":
 - If a model **narrates** a tool call ("I'll use the remember tool") instead of emitting it, the loop **re-prompts once** to actually send it.
 - Memory syncs across devices but **unions** by id — a sync can never silently drop a note that exists only in your browser.
 
+Replayed history is budgeted against the model's real context window instead of a fixed 24k characters, and oversized tool output keeps its head and tail rather than being cut mid-result.
+
 ---
 
 ## 🔐 Security model
@@ -199,11 +201,14 @@ Two recent hardenings so memory can't look "off":
 // storage/config.json
 "mcp": { "servers": [
   { "id": "files", "transport": "stdio",
-    "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/srv"] },
+    "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/srv"],
+    "env": { "GITHUB_TOKEN": "…" } },
   { "id": "internal", "transport": "http", "url": "https://mcp.example.com",
     "headers": { "Authorization": "Bearer …" } }
 ]}
 ```
+
+On Windows, stdio servers inherit the process environment (including `PATH`, `ComSpec`, `APPDATA`, `TEMP` and the usual Node install directories), so `npx`/`node` work without a manual PATH. `env` overrides individual keys. HTTP servers that require a session get `initialize` + `Mcp-Session-Id` automatically when the first call says it needs one; stateless servers still use a single POST.
 
 ---
 

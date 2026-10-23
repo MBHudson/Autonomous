@@ -6,6 +6,58 @@
 export const DEFAULT_HISTORY_TURNS = 5;
 
 /**
+ * Rough token estimate for budgeting. Deliberately conservative: prose is
+ * usually ~4 chars/token, but code and JSON tokenize denser, and non-ASCII
+ * text is closer to one token per character. Underestimating the budget is
+ * safer than overflowing the provider's context window.
+ */
+export function estimateTokens(text) {
+  const s = String(text ?? '');
+  if (!s) return 0;
+  let nonAscii = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 0x7f) nonAscii++;
+  }
+  const ascii = s.length - nonAscii;
+  return Math.ceil(ascii / 4 + nonAscii);
+}
+
+/**
+ * Character budget for replayed history, given a model's context window.
+ *
+ * The old fixed 24k ceiling made a 128k-token model behave like a 6k-token
+ * one. Reserve room for the output and the system prompt, then convert the
+ * remainder to characters at 2.5 chars/token. Unknown models keep the old
+ * conservative budget.
+ */
+export function historyCharBudget(contextLimit) {
+  const limit = Number(contextLimit);
+  if (!Number.isFinite(limit) || limit <= 0) return 24000;
+  // Keep a fixed reserve for the output, system prompt, memory and tool
+  // instructions. Without it a 128k window can still overflow once a large
+  // agent prompt is prepended to a maximal history.
+  const usable = Math.max(4096, limit - 32768);
+  return Math.max(24000, Math.min(160000, Math.floor(usable * 2.5)));
+}
+
+/**
+ * Keep the head and tail of an oversized value. Tool output is often a long
+ * file or command log where both ends matter and the middle is filler; cutting
+ * only the tail loses the error or the final diff.
+ */
+export function compactText(text, maxChars = 12000) {
+  const s = String(text ?? '');
+  const cap = Math.max(256, Number(maxChars) || 12000);
+  if (s.length <= cap) return s;
+  const tail = Math.min(2000, Math.floor(cap * 0.2));
+  const head = Math.max(128, cap - tail - 80);
+  const omitted = Math.max(0, s.length - head - tail);
+  return s.slice(0, head)
+    + `\n…[${omitted} chars omitted]…\n`
+    + s.slice(-tail);
+}
+
+/**
  * Human-facing agent reference, e.g. "#K7M4QX".
  *
  * Deliberately excludes 0/O and 1/I so a code read off a screen or spoken
