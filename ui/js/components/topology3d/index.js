@@ -457,6 +457,7 @@ export class Topology3D extends TopologyGraph {
     this._selectedId = id;
     if (!this.ready3d) return;
     if (id) {
+      this.ask?.closePrompt();   // switching nodes abandons the previous prompt
       this.popup.open(id);
       this.core.holdRotate = true;
       this.core.controls.autoRotate = false;
