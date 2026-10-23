@@ -249,7 +249,9 @@ class Persistence {
       alwaysOnIntervalSec: 30,
       // Seconds to hold off on an autonomous tick after the user sends a turn.
       // Stops the agent appearing to answer the same message twice.
-      alwaysOnGraceSec: 20,
+      // 3 seconds is enough to let the user turn settle before the scheduler
+      // takes over again; the chat layer also deduplicates responses per turn.
+      alwaysOnGraceSec: 3,
       alwaysOnMaxIterations: 0,
       alwaysOnMaxMinutes: 0,
       alwaysOnRunHidden: false,

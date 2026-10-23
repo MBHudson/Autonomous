@@ -1,5 +1,4 @@
-# Autonomous Loop Studio
-
+# 🧠 Autonomous Loop Studio
 
 > A self-hosted, multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
 

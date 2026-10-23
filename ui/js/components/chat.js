@@ -207,6 +207,12 @@ export class Chat {
      */
     this._mailbox = new Map();
     this._busy = new Set();
+    /**
+     * Agent IDs that already replied to the current user turn. Prevents the
+     * same agent from answering twice when the always-on scheduler re-fires
+     * immediately after the user turn ends (the "double response" bug).
+     */
+    this._turnResponded = new Set();
 
     // One call per tool run() is all the wiring the comms tools need; the
     // bridge below owns the roster and can start another agent.
@@ -575,6 +581,7 @@ export class Chat {
       this._mailbox.clear();
     }
     this._busy.clear();
+    this._turnResponded.clear();
 
     try {
       const activeAgents = route.agents;
@@ -638,9 +645,10 @@ export class Chat {
           store.emit('flow:delegate', { from: coord.id, to: agent.id });
         }
       });
+      // Parallel fan-out: all agents dispatch at the same time so turns run
+      // concurrently. The _turnResponded dedup below stops any agent from
+      // answering twice if the scheduler re-fires after this turn ends.
       const results = await Promise.all(
-        // Deduplicate by agent ID to prevent any accidental duplicate entries
-        // from causing the same agent to be invoked multiple times.
         uniqueAgents.map(agent => this._callAgent(text, agent, this.aborter.signal, this._makeLiveNode(agent), pending).then(
           value => {
             this._busy.delete(agent.id);
@@ -659,6 +667,11 @@ export class Chat {
 
       results.forEach((result, i) => {
         const agent = uniqueAgents[i];
+        // A given agent only answers once per user turn. The always-on
+        // scheduler can re-fire the instant this turn ends; this guard stops
+        // it from answering the same message a second time.
+        if (this._turnResponded.has(agent.id)) return;
+        this._turnResponded.add(agent.id);
         const live = this._liveNodes.get(agent.id);
         if (result.status === 'fulfilled' && result.value) {
           const agentMsg = {
