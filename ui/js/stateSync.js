@@ -26,10 +26,10 @@
 // browser loads a second copy of persistence.js (one module per distinct URL)
 // and the singleton this file hooks would not be the one the UI edits -- so
 // edits would never reach the server.
-import { persistence } from './persistence.js?v=300';
-import { store } from './store.js?v=300';
-import { api } from './api.js?v=300';
-import { K } from './storage.js?v=300';
+import { persistence } from './persistence.js?v=301';
+import { store } from './store.js?v=301';
+import { api } from './api.js?v=301';
+import { K } from './storage.js?v=301';
 
 /** Slots mirrored to the server. Order is irrelevant; keys must match. */
 const SLOTS = ['agents', 'providers', 'conversations', 'metrics', 'settings', 'pipelines'];
