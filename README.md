@@ -37,6 +37,10 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
 | 🎨 **Themes** | Dark, Matrix, Cyberpunk |
+| 🖼️ **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
+| 🎙️ **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
+| ⌨️ **Slash commands** | `/CODE`, `/ROLE`, `/NAME`, `/ALL`, `/?` — address agents from the composer |
+| 💾 **Export / import** | Take a session out, or back up and restore the whole state |
 | 📱 **Mobile-first** | Built for the phone in your pocket |
 
 ---
@@ -112,6 +116,37 @@ Draw the flow instead of describing it.
 
 ---
 
+## 🖼️ Images & vision
+
+Drop an image into the composer and a vision-capable agent can see it. 👁️🖼️
+
+- 📎 **Paste, drop or pick** — the bytes **never touch the server**. They become an in-memory `data:` URL and ride in the request's `image_url` field: 🚫 no upload endpoint, 🚫 no file on disk.
+- 🛡️ **Safe by construction** — only 🖼️ PNG / 📷 JPEG / 🎞️ WebP / 🎬 GIF are accepted, all inert when sniffed, which keeps the polyglot *"image that is also a script"* family out.
+- 🤖 **Per-agent** — only models that actually support vision get the attachment; everyone else is unaffected.
+
+---
+
+## 🎙️ Voice & audio
+
+Talk to the team, and let them talk back. 🗣️🔊
+
+- 🎤 **Speech to text** — the mic button turns your voice into a message in the composer.
+- 🔊 **Speak replies** — a speaker button reads any reply aloud; flip **Speak every reply automatically** to hear them all.
+- 🧰 **Two engines** — use your provider's TTS, or the browser's 🏠 built-in voices (works offline, no API, no key). Pick the engine, provider and voice.
+- ⏩ **Speed** and 🎚️ **pitch** — tune playback; pitch reads higher as female, lower as male. 🤖 **Each agent can override the pitch**, so a whole roster can sound distinct.
+
+---
+
+## ⌨️ Slash commands
+
+Type `/` in the composer for a palette of everything you can address. ⌨️✨
+
+- 🎯 **Target an agent** — `/CODE`, `/ROLE`, `/NAME` or `/ALL` sends your next message to one agent, a role, or the whole team.
+- 🧭 **App commands** — the palette also lists the app's own commands, and never suggests one that wouldn't work here.
+- ❓ **`/?`** — a quick reference, right in the input box.
+
+---
+
 ## 🛠️ Tools agents can use
 
 Tick tools per agent in the editor. They're grouped:
@@ -183,6 +218,12 @@ The whole loop as a living map. Every activated agent and provider becomes a glo
 
 ---
 
+## 💭 Thinking & reasoning
+
+Some models show their work. 💭🧩 When a provider streams a reasoning trace, the **thinking panel** opens and shows it live, so you can watch the model deliberate before the answer lands — handy for debugging a stubborn prompt without cluttering the reply.
+
+---
+
 ## 🧠 Memory
 
 Agents keep **private notes** and share a small **collective** every agent reads. Tools: `remember` (private), `share` (collective), `recall`, `adopt`. Notes are injected as **recollection, not instructions**, and are fully editable/deletable in Brain Lab.
@@ -193,6 +234,16 @@ Two recent hardenings so memory can't look "off":
 - Memory syncs across devices but **unions** by id — a sync can never silently drop a note that exists only in your browser.
 
 Replayed history is budgeted against the model's real context window instead of a fixed 24k characters, and oversized tool output keeps its head and tail rather than being cut mid-result.
+
+---
+
+## 💾 Export & import
+
+Take your work with you. 📦
+
+- 📤 **Export a session** — download one conversation from the transcript, or `GET /export/{id}`.
+- 🗄️ **Back up everything** — `GET /backup` grabs the whole state as a single file.
+- 📥 **Import** — `POST /import` restores it on this machine, or another.
 
 ---
 
@@ -347,6 +398,6 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 ## 📜 License
 
-MIT — use it however you want, commercial or personal. 💙
+**AGPL v3** — free to use, modify and self-host. If you run a modified version as a network service, the AGPL asks you to share your changes back. See [`LICENSE`](LICENSE). 💙
 
 Made by [MBHudson](https://github.com/mbhudson/)
