@@ -15,6 +15,7 @@ rem  is still available as start-php.bat.
 rem
 rem  Optional:  start.bat 8090      another port
 rem             start.bat -Stop     stop Apache
+rem             start.bat -Token    show the access token and wait
 rem             start.bat -Check    report status only
 rem             start.bat -PhpServer  built-in server (legacy, single-threaded)
 setlocal
@@ -31,5 +32,11 @@ if not exist "start.ps1" (
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1" %*
 set "RC=%errorlevel%"
-if not "%RC%"=="0" pause
+if not "%RC%"=="0" (
+  pause
+  exit /b %RC%
+)
+rem Double-clicked with no arguments: keep the window open so the URL and any
+rem first-run token can actually be read and copied.
+if "%~1"=="" pause
 exit /b %RC%
