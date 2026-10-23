@@ -1,8 +1,29 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v304**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v305**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v305 — topology traffic lines: model colour, dots that keep flowing
+
+- **Traffic between You and a model is drawn in that model's colour, both
+  directions.** A request used to be painted in the user's red because the line
+  took the sender's colour, so the model only looked like itself on the reply.
+  Agent-to-agent hops keep the sender → receiver gradient. Applied in both the
+  SVG chart and the 3D beams.
+- **The marching dots no longer stop at the "settle".** They used to freeze the
+  moment an active line was demoted to the faint history record. They now march
+  for the whole life of the line; only the final fade stops the motion (3D lowers
+  the dash contrast instead of flattening to a solid line).
+- **Removed a CSS animation that fought the per-line `stroke-dashoffset`
+  animation**, which made the dots stutter or freeze.
+- **Requests wait for the model.** An inbound request used to settle on a flat 6s
+  timer, so a slow model saw its line fade while still generating. It now holds
+  until `flow:respond` / `flow:fail`, capped at 120s; settle timers no longer
+  fade a line that was refreshed back to active.
+- Cache-buster tags aligned to `APP_VERSION` (303 → 305).
 
 ---
 
