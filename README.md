@@ -1,4 +1,7 @@
 # 🧠 Autonomous Loop Studio
+
+> ## A self-hosted, multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
+
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![No build step](https://img.shields.io/badge/build-none_needed-brightgreen)
@@ -8,7 +11,6 @@
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 ![Android](https://img.shields.io/badge/Android-coming_soon_to_Play_Store-3DDC84?logo=android&logoColor=white)
 
-> ## A self-hosted, multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
 
 
 ![Main screen](screenshots/mainscreen01.png)
