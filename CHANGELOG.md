@@ -1,8 +1,22 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v302**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v303**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v303 — exec results + bare-tag tool calls
+
+- **`exec` no longer reports `[exit undefined, undefinedms]`.** When the server
+  answered with `{ error }`, a pending approval, or a partial body, the tool
+  printed meaningless placeholders and the model retried the identical command
+  (four identical `nmap` calls). `exec` now surfaces the real error, names a
+  pending approval, and includes the raw result when the shape is unexpected.
+- **Bare `<function=name><parameter=key>` tool calls are parsed.** Some
+  Nemotron/Qwen templates emit that dialect instead of `<invoke name=...>` or
+  `<|tool_call|>`; it leaked into the reply as text and was treated as the final
+  answer. It now runs as a real tool call.
 
 ---
 

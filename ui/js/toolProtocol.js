@@ -16,4 +16,4 @@ export {
   harnessFor,
   describeHarness,
   contextLimitFor,
-} from './harness.js?v=302';
+} from './harness.js?v=303';
