@@ -1,7 +1,7 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v303**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v304**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
 
 ---
