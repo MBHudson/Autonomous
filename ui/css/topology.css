@@ -832,7 +832,13 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
 .t3d-agent-name { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t3d-agent-row .t3d-ping { background: none; border: 0; }
 .t3d-empty { font-size: 9px; color: var(--text-dim); font-style: italic; }
-.t3d-pop-foot { padding-top: 8px; text-align: right; }
+.t3d-pop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+}
 .t3d-link {
   background: none;
   border: 1px solid var(--border);
@@ -843,3 +849,129 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
   cursor: pointer;
 }
 .t3d-link:hover { border-color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); }
+
+/* ---- Inline "ask this model" dock (node card → prompt → reply) ---- */
+
+.t3d-ask {
+  margin-right: auto;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 5px;
+  color: var(--accent-cyan);
+  font: 10px var(--font-mono);
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.t3d-ask:hover { background: rgba(0, 229, 255, 0.24); }
+
+/* Prompt box, docked under the card. */
+.t3d-ask-prompt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 290px;
+  max-width: calc(100% - 16px);
+  z-index: 45;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(7, 11, 19, 0.94);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px) saturate(1.2);
+}
+.t3d-ask-prompt[hidden] { display: none; }
+.t3d-ask-in { animation: t3dPopIn 0.18s ease-out; }
+.t3d-ask-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font: 12px/1.4 inherit;
+  outline: none;
+}
+.t3d-ask-input:focus { border-color: var(--accent-cyan); }
+.t3d-ask-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.t3d-ask-voice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font: 10px var(--font-mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.t3d-ask-voice.on {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.1);
+}
+.t3d-ask-send {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent-cyan);
+  color: #04070c;
+  font-size: 13px;
+  cursor: pointer;
+}
+.t3d-ask-send:hover { filter: brightness(1.12); }
+.t3d-ask-send.busy { opacity: 0.5; cursor: progress; }
+
+/* Semi-transparent reply, pinned to a top corner. */
+.t3d-ask-reply {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 330px;
+  max-width: calc(100% - 24px);
+  max-height: 48%;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--c, var(--accent-cyan));
+  border-radius: 12px;
+  background: rgba(7, 11, 19, 0.62);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px) saturate(1.2);
+}
+.t3d-ask-reply[hidden] { display: none; }
+.t3d-ask-reply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.t3d-ask-reply-who {
+  font: 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c, var(--accent-cyan));
+}
+.t3d-ask-reply-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  color: var(--text-primary);
+  font: 12.5px/1.5 inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.t3d-ask-reply-body.thinking { color: var(--text-dim); font-style: italic; }
+.t3d-ask-reply-body.error { color: var(--danger, #ff4757); }

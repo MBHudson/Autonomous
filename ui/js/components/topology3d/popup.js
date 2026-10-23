@@ -2,9 +2,9 @@
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=305';
-import { esc } from '../../utils.js?v=305';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=305';
+import { store } from '../../store.js?v=306';
+import { esc } from '../../utils.js?v=306';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=306';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',
@@ -100,6 +100,7 @@ export class PopupCard {
       if (!btn) return;
       const act = btn.dataset.act;
       if (act === 'close') this.close();
+      else if (act === 'ask') this.ctx.onAsk?.(this.nodeId);
       else if (act === 'report') {
         const n = this.ctx.nodeById(this.nodeId);
         if (n?.type === 'agent') store.emit('metrics:showAgent', n.id);
@@ -240,7 +241,10 @@ export class PopupCard {
           : '<div class="t3d-empty">No tool calls yet</div>'}
       </div>
       ${this._recentBlock(n.id)}
-      <div class="t3d-pop-foot"><button class="t3d-link" data-act="report">Full token report →</button></div>`;
+      <div class="t3d-pop-foot">
+        <button class="t3d-ask" data-act="ask" title="Ask this model directly — nobody else is consulted">ASK</button>
+        <button class="t3d-link" data-act="report">Full token report →</button>
+      </div>`;
   }
 
   _provider(n, color) {
@@ -330,7 +334,9 @@ export class PopupCard {
     if (left < pad) left = Math.max(pad, Math.min(w - cw - pad, x - cw / 2));
     let top = y - ch * 0.3;
     top = Math.max(pad, Math.min(h - ch - pad, top));
-    this.el.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+    // Remember where we landed so the inline ask box can dock just below us.
+    this._rect = { left: Math.round(left), top: Math.round(top), w: cw, h: ch };
+    this.el.style.transform = `translate3d(${this._rect.left}px, ${this._rect.top}px, 0)`;
   }
 
   dispose() { clearInterval(this._timer); this.el.remove(); }

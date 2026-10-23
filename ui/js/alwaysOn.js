@@ -13,9 +13,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=305';
-import { persistence } from './persistence.js?v=305';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=305';
+import { store } from './store.js?v=306';
+import { persistence } from './persistence.js?v=306';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=306';
 
 export class AlwaysOn {
   /**

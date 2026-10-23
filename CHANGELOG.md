@@ -1,8 +1,29 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v305**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v306**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v306 — ask a model from its node card on the 3D graph
+
+- **The 3D node card gained an `ASK` button** (bottom-left of the footer). It
+  opens a small prompt box docked just under the card, with a play-button send
+  (the same ▶ as the main composer) and a **Voice** toggle, default **on**, for
+  read-aloud. That toggle is its own preference — deliberately separate from the
+  main Config default of off.
+- **The answer appears in the graph**, in a semi-transparent floating box pinned
+  to the top corner with the most room; it flips left/right as the node is
+  orbited. Raw text only (no markdown, code or tool cards) and an × to close.
+- **The exchange is isolated**: it never enters the transcript and never fans
+  out, so the map's little chat can't disturb the main conversation. It does
+  still emit the normal flow events, so the traffic animates on the graph
+  exactly as a composer prompt would — unlike the agent-list Ask, which stays
+  silent on the map.
+- New module `ui/js/components/topology3d/ask.js` (the dock); `askAgentInline()`
+  in chat.js; wiring in app.js, popup.js and topology3d/index.js; styles in
+  topology.css.
 
 ---
 
