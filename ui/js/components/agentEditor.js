@@ -13,7 +13,7 @@ import { api } from '../api.js?v=303';
 import * as memory from '../memory.js?v=303';
 
 /** Toast wording per recognized snippet language. */
-const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK' };
+const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
 
 const COLORS = [
   '#00e5ff', '#a855f7', '#00ff88', '#ff4757', '#ff9f43',
@@ -277,6 +277,10 @@ export class AgentEditor {
             <label class="form-label">Custom Curl Template (optional)</label>
             <textarea class="form-textarea" id="agentCurlTemplate" rows="8" placeholder="curl $ENDPOINT-VARIABLE -H &quot;Authorization: Bearer $GENERATED-API-KEY-VARIABLE&quot; -d '{... &quot;$USER-PROMPT-VARIABLE&quot; ... $TEMP ...}'">${agent ? esc(agent.curlTemplate || '') : ''}</textarea>
             <div class="form-hint">$ENDPOINT-VARIABLE · $GENERATED-API-KEY-VARIABLE · $USER-PROMPT-VARIABLE · $TEMP · $MAX-TOKENS · $SYSTEM-PROMPT (agent's system prompt, else default) — substituted at send time, run via server relay</div>
+            <div class="toggle-row">
+              <span class="toggle-label">Auto-detect from pasted curl / shell / JSON <span class="form-hint-inline">off = you write the $VARIABLEs yourself</span></span>
+              <div class="toggle ${agent ? (agent.curlTemplateAuto !== false ? 'active' : '') : 'active'}" id="agentCurlAuto"><div class="toggle-knob"></div></div>
+            </div>
           </div>
           <div class="toggle-row">
             <span class="toggle-label">Active</span>
@@ -339,6 +343,9 @@ export class AgentEditor {
     document.getElementById('agentActive').addEventListener('click', function() {
       this.classList.toggle('active');
     });
+    document.getElementById('agentCurlAuto')?.addEventListener('click', function() {
+      this.classList.toggle('active');
+    });
 
     // Paste (or drop, or type) a curl command into the template box → auto-fill
     // the boxes (endpoint, key, model, system prompt, temp, max tokens) and
@@ -347,6 +354,7 @@ export class AgentEditor {
     const tplBox = document.getElementById('agentCurlTemplate');
     let fillTimer = null;
     const scheduleAutoFill = (immediate) => {
+      if (!this._curlAutoEnabled()) return;
       clearTimeout(fillTimer);
       fillTimer = setTimeout(() => this._autoFillFromCurl(), immediate ? 0 : 400);
     };
@@ -449,19 +457,25 @@ export class AgentEditor {
    * and rewrite the template with $VARIABLEs. All four input languages share
    * this one code path once normalized.
    */
-  _autoFillFromCurl() {
-    const tplEl = document.getElementById('agentCurlTemplate');
+    _autoFillFromCurl() {
+      if (!this._curlAutoEnabled()) return;
+      const tplEl = document.getElementById('agentCurlTemplate');
     if (!tplEl) return;
     const raw = tplEl.value || '';
     const kind = snippetKind(raw);
-    // A shell snippet starts with `invoke_url='…'`, and a Python/Node one
-    // contains no curl at all — so detect, don't assume.
-    if (!kind) return;
+    // A raw JSON payload (no curl) is still a JSON API call - give it a
+    // template so the user only has to add $ENDPOINT-VARIABLE.
+    if (!kind && /^\s*[{\[]/.test(raw)) kind = 'json';
+
     let parsed;
-    try {
-      parsed = kind === 'curl' ? parseCurl(raw) : parseSnippet(raw);
-    } catch {
-      return; // not parseable — leave it alone
+    if (kind === 'json') {
+      parsed = { url: '', method: 'POST', headers: { 'Content-Type': 'application/json' }, data: raw };
+    } else {
+      try {
+        parsed = kind === 'curl' ? parseCurl(raw) : parseSnippet(raw);
+      } catch {
+        return; // not parseable - leave it alone
+      }
     }
 
     // Endpoint box
@@ -585,6 +599,12 @@ export class AgentEditor {
     } else if (parsed.url || bearer) {
       store.emit('toast', { message: 'Endpoint/key filled — add $VARIABLEs to the template', type: 'success' });
     }
+  }
+
+  /** Auto-fill only runs when the user has not switched it off. */
+  _curlAutoEnabled() {
+    const el = document.getElementById('agentCurlAuto');
+    return !el || el.classList.contains('active');
   }
 
   /** Find the largest string leaf in an object (best prompt candidate). */
@@ -746,6 +766,7 @@ export class AgentEditor {
     const endpoint = document.getElementById('agentEndpoint').value.trim();
     const keyOverride = document.getElementById('agentKeyOverride').value.trim();
     const curlTemplate = document.getElementById('agentCurlTemplate').value.trim();
+    const curlTemplateAuto = document.getElementById('agentCurlAuto').classList.contains('active');
 
     // Custom model names are stored onto the provider's model list
     // so they keep showing up as suggestions.
@@ -769,7 +790,7 @@ export class AgentEditor {
       const idx = agents.findIndex(a => a.id === this.editingId);
       if (idx >= 0) {
         // The code is a permanent handle: renaming must never change it.
-        agents[idx] = { ...agents[idx], code: agentCode(agents[idx]), name, role, provider, model, color, systemPrompt, temperature, maxTokens, active, endpoint, keyOverride, curlTemplate, tools, memory: memoryOn, voice, pitch, label, alwaysOn, alwaysOnGoal };
+        agents[idx] = { ...agents[idx], code: agentCode(agents[idx]), name, role, provider, model, color, systemPrompt, temperature, maxTokens, active, endpoint, keyOverride, curlTemplate, curlTemplateAuto, tools, memory: memoryOn, voice, pitch, label, alwaysOn, alwaysOnGoal };
       }
       store.emit('toast', { message: 'Agent updated', type: 'success' });
     } else {
@@ -789,6 +810,7 @@ export class AgentEditor {
         endpoint,
         keyOverride,
         curlTemplate,
+        curlTemplateAuto,
         tools,
         memory: memoryOn,
         voice,

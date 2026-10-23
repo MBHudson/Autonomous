@@ -164,6 +164,37 @@ export function renderToolCalls(calls, opts = {}) {
   return box;
 }
 
+/**
+ * Plain-text form of a message for the copy button. The reply is what the
+ * user asked to keep, and the tool-call boxes are part of it -- copying only
+ * msg.content silently dropped every argument and result.
+ */
+export function messageToText(msg) {
+  if (!msg) return '';
+  const parts = [];
+  const content = asText(msg.content).trim();
+  if (content) parts.push(content);
+
+  const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+  if (calls.length) {
+    const lines = calls.map(call => {
+      const name = (call && call.tool) || 'tool';
+      const status = (call && call.status) || 'done';
+      let block = `--- tool: ${name} [${status}] ---`;
+      const arg = toolValueText(call && call.arg).trim();
+      const result = toolValueText(call && call.result).trim();
+      if (arg) block += `\nArguments:\n${arg}`;
+      if (result) block += `\nResult:\n${result}`;
+      return block;
+    });
+    parts.push(lines.join('\n\n'));
+  }
+
+  const reasoning = asText(msg.reasoning).trim();
+  if (reasoning && reasoning !== content) parts.push(`--- reasoning ---\n${reasoning}`);
+  return parts.join('\n\n');
+}
+
 export class MessageRenderer {
   /**
    * Render a message element
@@ -336,7 +367,7 @@ export class MessageRenderer {
     copyBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>';
     copyBtn.title = 'Copy message';
     copyBtn.addEventListener('click', async () => {
-      const text = msg.content || '';
+      const text = messageToText(msg);
       const success = await copyToClipboard(text);
       if (success) {
         copyBtn.style.color = 'var(--accent-green)';
