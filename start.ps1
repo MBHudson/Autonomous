@@ -15,6 +15,7 @@
 #   start.bat -Port 8090    move Apache to another port (reconfigures once)
 #   start.bat -Stop         stop Apache
 #   start.bat -Check        report status and exit without starting
+#   start.bat -Token        print the access token and wait so it can be copied
 #   start.bat -PhpServer    run the built-in server instead (legacy)
 
 [CmdletBinding()]
@@ -22,6 +23,7 @@ param(
     [int]$Port = 0,
     [string]$XamppDir = 'C:\xampp',
     [switch]$Stop,
+    [switch]$Token,
     [switch]$PhpServer,
     [switch]$Check
 )
@@ -48,6 +50,42 @@ $httpd  = Join-Path $XamppDir 'apache\bin\httpd.exe'
 $phpExe = Join-Path $XamppDir 'php\php.exe'
 $conf   = Join-Path $XamppDir 'apache\conf\httpd.conf'
 $log    = Join-Path $XamppDir 'apache\logs\error.log'
+
+function Read-AccessToken {
+    $cfgPath = Join-Path $AppDir 'storage\config.json'
+    if (-not (Test-Path -LiteralPath $cfgPath)) { return '' }
+    try {
+        $cfg = Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json
+        if ($cfg.sandbox -and $cfg.sandbox.token) { return [string]$cfg.sandbox.token }
+    } catch { }
+    return ''
+}
+
+if ($Token) {
+    $accessToken = Read-AccessToken
+    if (-not $accessToken -and (Test-Path -LiteralPath $phpExe)) {
+        Push-Location $AppDir
+        try {
+            $out = (& $phpExe serve.php --ensure-token 2>$null) -join "`n"
+            $m = [regex]::Match($out, '(?m)^TOKEN=(.+?)\s*$')
+            if ($m.Success -and $m.Groups[1].Value -ne 'exists') {
+                $accessToken = $m.Groups[1].Value
+            }
+        } finally { Pop-Location }
+    }
+    Write-Host ""
+    if ($accessToken) {
+        Write-Host "  Access token (paste into Config -> Access token):" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "    $accessToken" -ForegroundColor White
+        Write-Host ""
+    } else {
+        Write-Host "  No access token yet. Run start.bat once to create one." -ForegroundColor Yellow
+        Write-Host ""
+    }
+    Read-Host "Press Enter to close"
+    exit 0
+}
 
 if ($PhpServer) {
     Write-Step "Starting PHP's built-in server (single-threaded legacy mode)"
@@ -166,14 +204,19 @@ if ($LASTEXITCODE -ne 0) {
     $preflight | ForEach-Object { Write-Host "    $_" }
     Fail "Preflight failed. If a PHP extension is missing, run setup-xampp.bat -Repair."
 }
-$tokenOut = & $phpExe serve.php --ensure-token 2>$null
-if ($tokenOut -and ($tokenOut -notmatch 'TOKEN=exists')) {
-    $token = ($tokenOut | Where-Object { $_ -match '^TOKEN=' } | Select-Object -First 1) -replace '^TOKEN=', ''
-    if ($token) {
-        Write-Host ""
-        Write-Host "    FIRST RUN - paste this into Config -> Access token in the app:" -ForegroundColor Yellow
-        Write-Host "      $token" -ForegroundColor White
-        Write-Host ""
+$tokenOut = ((& $phpExe serve.php --ensure-token 2>$null) -join "`n").Trim()
+$newToken = ''
+$m = [regex]::Match($tokenOut, '(?m)^TOKEN=(.+?)\s*$')
+if ($m.Success -and $m.Groups[1].Value -ne 'exists') { $newToken = $m.Groups[1].Value }
+if ($newToken) {
+    Write-Host ""
+    Write-Host "    FIRST RUN - paste this into Config -> Access token in the app:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "      $newToken" -ForegroundColor White
+    Write-Host ""
+    if (-not $Check -and [Environment]::UserInteractive) {
+        # Keep the window open: the whole point is to let the user copy it.
+        Read-Host "Press Enter after copying the token"
     }
 }
 
