@@ -15,4 +15,4 @@ export {
   detectFamily,
   harnessFor,
   describeHarness,
-} from './harness.js?v=296';
+} from './harness.js?v=297';

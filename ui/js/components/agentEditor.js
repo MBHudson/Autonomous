@@ -2,15 +2,15 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=296';
-import { persistence } from '../persistence.js?v=296';
-import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=296';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=296';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=296';
-import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=296';
-import { audio } from '../audio.js?v=296';
-import { api } from '../api.js?v=296';
-import * as memory from '../memory.js?v=296';
+import { store } from '../store.js?v=297';
+import { persistence } from '../persistence.js?v=297';
+import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=297';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=297';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=297';
+import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=297';
+import { audio } from '../audio.js?v=297';
+import { api } from '../api.js?v=297';
+import * as memory from '../memory.js?v=297';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK' };
@@ -192,6 +192,13 @@ export class AgentEditor {
                 </label>`;
                 }).join('')}
             </div>
+            <div class="tool-actions" style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <label class="tool-option" style="font-size:11px; margin:0; display:flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="agentToolsSelectAll">
+                <span>Select all</span>
+              </label>
+              <button type="button" class="btn btn-ghost btn-sm" id="agentToolsApplyAll">Apply All to Agents</button>
+            </div>
             <div class="form-hint" id="toolHint">None selected = plain replies.</div>
           </div>
 
@@ -351,6 +358,58 @@ export class AgentEditor {
     this._fillAgentVoices(agent);
     this._initPitch(agent);
     document.getElementById('agentApplyGoalAll')?.addEventListener('click', () => this._applyGoalToAll());
+
+    // Select all / deselect all tool checkboxes for this agent
+    document.getElementById('agentToolsSelectAll')?.addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      document.getElementById('agentTools')?.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = checked;
+      });
+    });
+
+    // Copy the currently selected tools to every agent
+    document.getElementById('agentToolsApplyAll')?.addEventListener('click', () => {
+      const deniedNow = this._deniedTools();
+      const tools = [...(document.getElementById('agentTools')?.querySelectorAll('input:checked') || [])]
+        .map(i => i.value).filter(t => !deniedNow.includes(t));
+
+      if (!tools.length) {
+        store.emit('toast', { message: 'Select at least one tool first', type: 'error' });
+        return;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <span class="modal-title">Apply tools to all agents?</span>
+            <button class="modal-close" id="toolsAllClose">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div>Apply these <b>${tools.length}</b> tool(s) to all agents?</div>
+            <div class="form-hint" style="margin-top:8px">${tools.map(t => `<code>${esc(t)}</code>`).join(', ')}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" id="toolsAllCancel">Cancel</button>
+            <button class="btn btn-primary" id="toolsAllYes">Apply to All</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.querySelector('#toolsAllClose')?.addEventListener('click', close);
+      overlay.querySelector('#toolsAllCancel')?.addEventListener('click', close);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      overlay.querySelector('#toolsAllYes')?.addEventListener('click', () => {
+        const updated = (store.get('agents') || []).map(a => ({ ...a, tools }));
+        store.set('agents', updated);
+        persistence.set('agents', updated);
+        store.emit('agents:changed');
+        store.emit('toast', { message: `Tools applied to ${updated.length} agent(s)`, type: 'success' });
+        close();
+      });
+    });
+
     document.getElementById('agentSave').addEventListener('click', () => this._save());
 
     // Delete
