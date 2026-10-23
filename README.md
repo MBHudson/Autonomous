@@ -55,8 +55,9 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 ## 🚀 Quick start
 
 ### 🪟 Windows — one click
-- **`setup-xampp.bat`** — downloads + installs XAMPP (Apache + PHP only, no MySQL), links this folder into `htdocs\router`, starts Apache and opens the app. Best when several agents run at once.
-- **`start.bat`** — no Apache needed; uses PHP's built-in server and installs PHP with winget if it's missing. Fine for one agent at a time (Windows PHP serves one request at a time).
+- **`start.bat`** — the one-click launcher. First run installs XAMPP (Apache + PHP only, no MySQL), links this folder into `htdocs\router`, configures Apache, creates the access token, starts it and opens the app. Later runs just start Apache. Use this when several agents run at once: Apache is multi-threaded.
+- **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
+- **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
 
 ### 🐧 Linux / macOS
 ```bash
@@ -66,7 +67,7 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 ### 🔑 First run
 The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
 
-The app then opens at `http://127.0.0.1:8080/`. Nothing ships with keys — add your own providers in the **Providers** tab.
+On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/macOS it opens at `http://127.0.0.1:8080/`. Nothing ships with keys — add your own providers in the **Providers** tab.
 
 ---
 
@@ -321,7 +322,7 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 - **Every request returns 401** → the **Access token** isn't pasted on this device. The token is per-device; paste it in **Config → Access token**.
 - **Phone shows an empty UI or immortal 401s** → a **split-brain** load. Deploy the **whole `ui/` folder** (never single files) and hard-refresh — mixing module versions gives each its own store.
 - **Agents "won't use tools"** → check for a **global pre-prompt** that says "reply with ONLY text / N words" — it fights the tool protocol. The tool instructions now override it and the loop re-prompts once, but turning it off is cleanest.
-- **A model returns nothing / "NetworkError"** → on Windows PHP's built-in server is single-threaded; use `setup-xampp.bat` (Apache) for parallel agents, or run fewer at once.
+- **A model returns nothing / "NetworkError"** → on Windows PHP's built-in server is single-threaded; use `start.bat` (Apache) for parallel agents, or `start-php.bat` for one at a time.
 - **Local models not connecting** → make sure Ollama/LM Studio is running and reachable (Ollama `:11434`, LM Studio `:1234`).
 
 ---
