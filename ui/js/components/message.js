@@ -2,12 +2,167 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=300';
-import { renderMarkdown } from '../markdown.js?v=300';
-import { CodeBlock, splitFences } from './codeBlock.js?v=300';
-import { createAvatar } from './avatar.js?v=300';
-import { store } from '../store.js?v=300';
-import { audio, AudioController } from '../audio.js?v=300';
+import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=301';
+import { renderMarkdown } from '../markdown.js?v=301';
+import { CodeBlock, splitFences } from './codeBlock.js?v=301';
+import { createAvatar } from './avatar.js?v=301';
+import { store } from '../store.js?v=301';
+import { audio, AudioController } from '../audio.js?v=301';
+
+const TOOL_DISPLAY_LIMIT = 8000;
+
+function toolValueText(value, limit = TOOL_DISPLAY_LIMIT) {
+  if (value === undefined || value === null) return '';
+  let text;
+  if (typeof value === 'string') {
+    text = value;
+  } else {
+    try {
+      text = JSON.stringify(value, null, 2);
+    } catch {
+      text = String(value);
+    }
+  }
+  text = String(text || '');
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}\n\u2026 (${text.length - limit} more characters)`;
+}
+
+function toolPreview(arg) {
+  if (arg === undefined || arg === null) return '';
+  let text;
+  if (typeof arg === 'string') {
+    text = arg;
+  } else if (Array.isArray(arg)) {
+    text = arg.join(' ');
+  } else {
+    const pick = arg.path ?? arg.file ?? arg.query ?? arg.pattern ?? arg.url
+      ?? arg.name ?? arg.server ?? arg.tool ?? arg.command;
+    if (pick !== undefined && pick !== null) {
+      text = Array.isArray(pick) ? pick.join(' ') : String(pick);
+    } else if (Array.isArray(arg.argv)) {
+      text = arg.argv.join(' ');
+    } else {
+      try {
+        text = JSON.stringify(arg);
+      } catch {
+        text = String(arg);
+      }
+    }
+  }
+  text = String(text || '').replace(/\s+/g, ' ').trim();
+  return text.length > 100 ? `${text.slice(0, 99)}\u2026` : text;
+}
+
+function toolStatus(call) {
+  const key = call && call.status ? String(call.status) : (call && call.result ? 'ok' : 'running');
+  const meta = {
+    running: { icon: '\u25CC', label: 'running' },
+    pending: { icon: '\u23F8', label: 'approval' },
+    ok: { icon: '\u2713', label: 'done' },
+    error: { icon: '\u2715', label: 'error' },
+  }[key] || { icon: '\u2022', label: key };
+  const ms = call && call.ms !== undefined && call.ms !== null && Number.isFinite(Number(call.ms))
+    ? ` ${Math.round(Number(call.ms))}ms` : '';
+  return { key, ...meta, ms };
+}
+
+function renderToolCall(call, opts) {
+  const status = toolStatus(call);
+  const open = opts.open === true || status.key === 'running'
+    || status.key === 'pending' || status.key === 'error';
+
+  const details = document.createElement('details');
+  details.className = 'tool-call';
+  details.dataset.status = status.key;
+  details.open = open;
+
+  const summary = document.createElement('summary');
+  summary.className = 'tool-call-summary';
+
+  const caret = document.createElement('span');
+  caret.className = 'tool-call-caret';
+  caret.textContent = '\u25B6';
+  summary.appendChild(caret);
+
+  const icon = document.createElement('span');
+  icon.className = 'tool-call-icon';
+  icon.textContent = status.icon;
+  summary.appendChild(icon);
+
+  const name = document.createElement('span');
+  name.className = 'tool-call-name';
+  name.textContent = call && call.tool ? String(call.tool) : 'tool';
+  summary.appendChild(name);
+
+  const preview = toolPreview(call && call.arg);
+  if (preview) {
+    const arg = document.createElement('span');
+    arg.className = 'tool-call-arg';
+    arg.textContent = preview;
+    arg.title = preview;
+    summary.appendChild(arg);
+  }
+
+  const meta = document.createElement('span');
+  meta.className = 'tool-call-status';
+  meta.textContent = `${status.label}${status.ms}`;
+  summary.appendChild(meta);
+
+  details.appendChild(summary);
+
+  const body = document.createElement('div');
+  body.className = 'tool-call-body';
+
+  const argText = toolValueText(call && call.arg);
+  if (argText) {
+    const label = document.createElement('div');
+    label.className = 'tool-call-label';
+    label.textContent = 'Arguments';
+    const pre = document.createElement('pre');
+    pre.className = 'tool-call-value';
+    pre.textContent = argText;
+    body.appendChild(label);
+    body.appendChild(pre);
+  }
+
+  const resultText = toolValueText(call && call.result);
+  if (resultText) {
+    const label = document.createElement('div');
+    label.className = 'tool-call-label';
+    label.textContent = 'Result';
+    const pre = document.createElement('pre');
+    pre.className = 'tool-call-value';
+    pre.textContent = resultText;
+    body.appendChild(label);
+    body.appendChild(pre);
+  } else if (status.label === 'running') {
+    const wait = document.createElement('div');
+    wait.className = 'tool-call-wait';
+    wait.textContent = 'Waiting for the result\u2026';
+    body.appendChild(wait);
+  } else if (status.label === 'approval') {
+    const wait = document.createElement('div');
+    wait.className = 'tool-call-wait';
+    wait.textContent = 'Waiting for your approval.';
+    body.appendChild(wait);
+  }
+
+  if (body.childNodes.length) details.appendChild(body);
+  return details;
+}
+
+export function renderToolCalls(calls, opts = {}) {
+  if (!Array.isArray(calls) || !calls.length) return null;
+  const box = document.createElement('div');
+  box.className = 'tool-calls';
+  const head = document.createElement('div');
+  head.className = 'tool-calls-head';
+  head.textContent = `${calls.length} tool call${calls.length === 1 ? '' : 's'}`;
+  box.appendChild(head);
+  calls.forEach(call => box.appendChild(renderToolCall(call, opts)));
+  return box;
+}
 
 export class MessageRenderer {
   /**
@@ -102,6 +257,9 @@ export class MessageRenderer {
     const isEcho = !rNorm || !cNorm || rNorm === cNorm
       || rNorm.includes(cNorm) || cNorm.includes(rNorm);
     if (!isEcho) body.appendChild(this._renderReasoning(reasoningText));
+
+    const toolCalls = renderToolCalls(msg.toolCalls);
+    if (toolCalls) body.appendChild(toolCalls);
 
     // Attached images.
     //

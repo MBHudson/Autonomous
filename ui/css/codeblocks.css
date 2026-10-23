@@ -137,6 +137,140 @@
   overflow-y: auto;
 }
 
+/* ---------- Tool calls ---------- */
+.tool-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+
+.tool-calls-head {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.tool-call {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent-cyan);
+  border-radius: 6px;
+  overflow: hidden;
+  animation: msgIn 0.2s ease-out;
+}
+
+.tool-call[data-status="ok"] { border-left-color: var(--accent-green); }
+.tool-call[data-status="error"] { border-left-color: var(--accent-red); }
+.tool-call[data-status="pending"] { border-left-color: var(--accent-orange); }
+
+.tool-call-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  cursor: pointer;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  list-style: none;
+  user-select: none;
+}
+
+.tool-call-summary::-webkit-details-marker { display: none; }
+.tool-call-summary:hover { background: rgba(0, 229, 255, 0.05); }
+
+.tool-call-caret {
+  flex: 0 0 auto;
+  font-size: 8px;
+  color: var(--text-dim);
+  transition: transform 0.18s ease;
+}
+
+.tool-call[open] .tool-call-caret { transform: rotate(90deg); }
+
+.tool-call-icon {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+  color: var(--accent-cyan);
+}
+
+.tool-call[data-status="ok"] .tool-call-icon { color: var(--accent-green); }
+.tool-call[data-status="error"] .tool-call-icon { color: var(--accent-red); }
+.tool-call[data-status="pending"] .tool-call-icon { color: var(--accent-orange); }
+
+.tool-call-name {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.tool-call-arg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+
+.tool-call-status {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.tool-call[data-status="ok"] .tool-call-status { color: var(--accent-green); }
+.tool-call[data-status="error"] .tool-call-status { color: var(--accent-red); }
+.tool-call[data-status="pending"] .tool-call-status { color: var(--accent-orange); }
+
+.tool-call-body {
+  padding: 8px 10px 9px;
+  border-top: 1px solid var(--border);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.tool-call-label {
+  margin: 7px 0 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.tool-call-label:first-child { margin-top: 0; }
+
+.tool-call-value {
+  margin: 0;
+  padding: 7px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.tool-call-wait {
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
 /* ---------- Streaming reply (painted as tokens arrive) ---------- */
 .message-streaming .stream-text {
   white-space: pre-wrap;

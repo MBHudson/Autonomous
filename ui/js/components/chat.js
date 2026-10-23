@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=300';
-import { K as STORAGE_K } from '../storage.js?v=300';
+import { store } from '../store.js?v=301';
+import { K as STORAGE_K } from '../storage.js?v=301';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,24 +12,24 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=300';
-import { persistence } from '../persistence.js?v=300';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=300';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=300';
-import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=300';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=300';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=300';
-import { usageFor } from '../rateGovernor.js?v=300';
-import { trace } from '../trace.js?v=300';
-import { latency } from '../latency.js?v=300';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=300';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=300';
-import { SlashCommands } from '../slashCommands.js?v=300';
-import { parseRoute, routingHelp } from '../routing.js?v=300';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=300';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=300';
-import { MessageRenderer } from './message.js?v=300';
-import { createAvatar } from './avatar.js?v=300';
+import { api, errText } from '../api.js?v=301';
+import { persistence } from '../persistence.js?v=301';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=301';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=301';
+import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=301';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=301';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=301';
+import { usageFor } from '../rateGovernor.js?v=301';
+import { trace } from '../trace.js?v=301';
+import { latency } from '../latency.js?v=301';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=301';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=301';
+import { SlashCommands } from '../slashCommands.js?v=301';
+import { parseRoute, routingHelp } from '../routing.js?v=301';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=301';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=301';
+import { MessageRenderer, renderToolCalls } from './message.js?v=301';
+import { createAvatar } from './avatar.js?v=301';
 
 /**
  * How long an agent may keep working on a single task.
@@ -43,6 +43,34 @@ const PERSISTENCE_MAX_STEPS = 12;          // tool calls per turn, all rounds
 const PERSISTENCE_WALL_CLOCK_MS = 20 * 60 * 1000;
 const FINAL_SUMMARY_MS = 90 * 1000;         // grace period for the closing summary
 const AGENT_FILES_BUDGET = 260000;          // absolute character ceiling for attached files
+const TOOL_RECORD_CHARS = 8000;             // per-call UI copy, not the model transcript
+
+function toolArgForUi(arg) {
+  if (arg === undefined) return null;
+  let text;
+  try {
+    text = typeof arg === 'string' ? arg : JSON.stringify(arg);
+  } catch {
+    text = String(arg);
+  }
+  if (String(text || '').length <= 4000) return arg;
+  return { _truncated: true, preview: String(text).slice(0, 4000) };
+}
+
+function toolResultForUi(result) {
+  const text = asText(result);
+  if (text.length <= TOOL_RECORD_CHARS) return text;
+  return `${text.slice(0, TOOL_RECORD_CHARS)}\n\u2026 (${text.length - TOOL_RECORD_CHARS} more characters)`;
+}
+
+function toolResultStatus(text) {
+  const t = String(text || '').trim();
+  if (/^waiting for your approval|^pending approval/i.test(t)) return 'pending';
+  if (/^(error|denied|refused)\b|^could not |^timed out/i.test(t)) return 'error';
+  const exit = /\[exit (-?\d+)/i.exec(t);
+  if (exit && Number(exit[1]) !== 0) return 'error';
+  return 'ok';
+}
 
 /**
  * Is this a rate-limit refusal? Checked by status first (the relay now
@@ -683,6 +711,7 @@ export class Chat {
             content: result.value.content ?? result.value.text,
             agentId: agent.id,
             reasoning: result.value.reasoning || null,
+            toolCalls: result.value.toolCalls || (live && live.toolCalls) || null,
             timestamp: Date.now()
           };
           // If a streaming node was already on screen, swap it for the fully
@@ -705,6 +734,7 @@ export class Chat {
               ? (partialText || 'Stopped by user.')
               : 'Error: ' + (result.reason?.message || 'Unknown error'),
             reasoning: partialReason || null,
+            toolCalls: (live && live.toolCalls) || null,
             agentId: agent.id,
             timestamp: Date.now()
           };
@@ -831,6 +861,7 @@ export class Chat {
         content: m.content,
         agentId: m.agentId || null,
         reasoning: m.reasoning || null,
+        toolCalls: m.toolCalls || m.tool_calls || null,
         timestamp: m.timestamp || Date.now(),
       });
       container.appendChild(el);
@@ -876,6 +907,7 @@ export class Chat {
           response: result.value.content,
           reasoning: result.value.reasoning || null,
           usage: result.value.usage || null,
+          tool_calls: result.value.toolCalls || null,
         };
       }
       return {
@@ -900,6 +932,7 @@ export class Chat {
             content: r.response || r.error || '',
             agentId: r.model_id,
             reasoning: r.reasoning || null,
+            toolCalls: r.tool_calls || null,
             timestamp: Date.now(),
           });
         });
@@ -941,12 +974,18 @@ _makeLiveNode(agent) {
     node.classList.add('message-streaming');
     node.dataset.agentId = agent.id;
     const body = node.querySelector('.message-body');
+    const toolBox = document.createElement('div');
+    toolBox.className = 'tool-calls-slot';
+    toolBox.hidden = true;
+    body.appendChild(toolBox);
     const textEl = document.createElement('div');
     textEl.className = 'message-content stream-text';
     body.appendChild(textEl);
     document.getElementById('chatMessages').appendChild(node);
     node.text = '';
     node.reasoning = '';
+    node.toolCalls = [];
+    node.toolBox = toolBox;
     // Reasoning gets its own live block so a thinking model's thoughts appear
     // as they stream instead of arriving all at once at the end.
     const rDetails = document.createElement('details');
@@ -1026,6 +1065,21 @@ _makeLiveNode(agent) {
     node.reasoning = whole;
     if (node.reasonBlock) node.reasonBlock.style.display = '';
     if (node.reasonEl) node.reasonEl.textContent = whole;
+    this._scrollToBottom();
+  }
+
+  /** Paint the tool calls a live turn has made so far. */
+  _paintToolCalls(node, calls) {
+    if (!node) return;
+    node.toolCalls = Array.isArray(calls) ? calls : [];
+    const box = node.toolBox;
+    if (!box) return;
+    box.innerHTML = '';
+    box.hidden = !node.toolCalls.length;
+    if (node.toolCalls.length) {
+      const rendered = renderToolCalls(node.toolCalls);
+      if (rendered) box.appendChild(rendered);
+    }
     this._scrollToBottom();
   }
 
@@ -1194,11 +1248,14 @@ _makeLiveNode(agent) {
     let used = 0;
     let rounds = 0;
     let last = null;
+    // Shared by every round so the tool panel shows the whole task, not just
+    // the last round's calls.
+    const toolLog = [];
 
     while (true) {
       rounds++;
       last = await this._toolLoop({
-        agent, signal, liveNode, commsCtx, specFor,
+        agent, signal, liveNode, commsCtx, specFor, toolLog,
         messages: () => (carried.length
           ? [...messages(), ...carried]
           : messages()),
@@ -1230,7 +1287,7 @@ _makeLiveNode(agent) {
         });
         // One last chance to say what got done, with the reason in view.
         last = await this._toolLoop({
-          agent, signal, liveNode, commsCtx, specFor,
+          agent, signal, liveNode, commsCtx, specFor, toolLog,
           messages: () => [...messages(), ...carried],
           remainingSteps: 1,
           deadline: Date.now() + FINAL_SUMMARY_MS,
@@ -1267,7 +1324,8 @@ _makeLiveNode(agent) {
    * @param {number}   o.deadline        absolute ms after which to stop calling
    */
   async _toolLoop({ agent, signal, liveNode, commsCtx, messages, specFor,
-    remainingSteps, deadline, forceSummarise }) {
+    remainingSteps, deadline, forceSummarise, toolLog }) {
+    const log = Array.isArray(toolLog) ? toolLog : [];
     // Memory tools ride along unless the agent has memory explicitly switched off.
     // An agent with no tools array at all predates the "everything on by
     // default" change, so it gets the same set a new agent would. An explicit
@@ -1314,6 +1372,7 @@ _makeLiveNode(agent) {
         content: res.content, text: res.content, sections: null,
         reasoning: res.reasoning || null,
         usage: res.usage || null,
+        toolCalls: log.slice(),
       };
     }
 
@@ -1476,6 +1535,7 @@ _makeLiveNode(agent) {
           text: `${prefix}I could not finish: the model request failed (${why}).`,
           sections: null, reasoning: reasoning || null,
           steps: step, exhausted: true, failed: true, transcript,
+          toolCalls: log.slice(),
         };
       }
 
@@ -1577,32 +1637,60 @@ _makeLiveNode(agent) {
           return {
             content: msg, text: msg, sections: null, reasoning: reasoning || null,
             steps: step, exhausted: true, failed: true, transcript,
+            toolCalls: log.slice(),
           };
         }
         return {
           content: chunk, text: chunk, sections: null, reasoning: reasoning || null,
           steps: step, exhausted: false, transcript,
+          toolCalls: log.slice(),
         };
       }
 
-      // Paint the tool request(s) briefly, then run them. Native responses can
-      // carry several independent calls; prompt-protocol responses carry one.
+      // Show the tool request(s) as real entries, then run them. Native
+      // responses can carry several independent calls; prompt-protocol
+      // responses carry one. All calls are painted before the first await so
+      // a slow tool cannot hide its siblings.
       if (liveNode) {
         const el = liveNode.querySelector('.stream-text');
-        if (el) el.textContent = `${painted}${chunk}\n▸ running ${calls.map(c => c.tool).join(', ')}…`;
+        if (el) el.textContent = `${painted}${chunk}`.trimEnd();
       }
+      const records = calls.map(call => ({
+        tool: call.tool,
+        arg: toolArgForUi(call.arg),
+        note: call.note || '',
+        status: 'running',
+        started: Date.now(),
+      }));
+      log.push(...records);
+      this._paintToolCalls(liveNode, log);
 
       const exchanges = [];
       let completedSummary = null;
       for (let ci = 0; ci < calls.length; ci++) {
         const call = calls[ci];
-        const result = await runTool(call.tool, call.arg, call.note, {
-          agentId: agent.id, sessionId: this.currentSessionId,
-          sandboxRoot,
-          // Carries who has already spoken in this reply, so ask_agent can
-          // refuse to close a loop.
-          chain: (commsCtx && commsCtx.chain) || [agent.id],
-        });
+        const record = records[ci];
+        let result;
+        try {
+          result = await runTool(call.tool, call.arg, call.note, {
+            agentId: agent.id, sessionId: this.currentSessionId,
+            sandboxRoot,
+            // Carries who has already spoken in this reply, so ask_agent can
+            // refuse to close a loop.
+            chain: (commsCtx && commsCtx.chain) || [agent.id],
+          });
+        } catch (err) {
+          record.status = 'error';
+          record.ms = Date.now() - record.started;
+          record.result = `Error: ${err && err.message ? err.message : String(err)}`;
+          this._paintToolCalls(liveNode, log);
+          throw err;
+        }
+        record.status = toolResultStatus(asText(result));
+        record.ms = Date.now() - record.started;
+        record.result = toolResultForUi(result);
+        this._paintToolCalls(liveNode, log);
+
         this._recordToolCall(agent.id, call.tool);
         store.emit('toast', { message: `${agent.name}: ${call.tool} → ${asText(result).slice(0, 40)}`, type: 'info' });
         if (call.tool === 'todo_write') refreshTodoBlock(working);
@@ -1614,6 +1702,11 @@ _makeLiveNode(agent) {
           completedSummary = String(
             call.arg && call.arg.summary ? call.arg.summary : (call.note || result),
           ).trim();
+          records.slice(ci + 1).forEach(skipped => {
+            skipped.status = 'error';
+            skipped.result = 'Skipped after the agent declared its goal complete.';
+          });
+          this._paintToolCalls(liveNode, log);
           break;
         }
 
@@ -1633,6 +1726,7 @@ _makeLiveNode(agent) {
         return {
           content: msg, text: msg, sections: null, reasoning: reasoning || null,
           steps: step + 1, exhausted: true, completed: true, transcript,
+          toolCalls: log.slice(),
         };
       }
 
@@ -1652,12 +1746,14 @@ _makeLiveNode(agent) {
         return {
           content: text, text, sections: null, reasoning: reasoning || null,
           steps: step + 1, exhausted: true, transcript,
+          toolCalls: log.slice(),
         };
       }
     }
     return {
       content: text, text, sections: null, reasoning: reasoning || null,
       steps: budget, exhausted: true, transcript,
+      toolCalls: log.slice(),
     };
   }
 
@@ -1789,7 +1885,8 @@ _makeLiveNode(agent) {
       try {
         const streamed = await this._runWithTools(
           prompt, agent, provider, effectiveKey, signal, liveNode, attachments, commsCtx);
-        if (streamed && (streamed.content || streamed.reasoning)) {
+        if (streamed && (streamed.content || streamed.reasoning
+          || (streamed.toolCalls && streamed.toolCalls.length))) {
           return {
             content: streamed.content,
             text: streamed.content,
@@ -1799,6 +1896,7 @@ _makeLiveNode(agent) {
             // deliberately stopped. Rebuilding the object here used to drop it,
             // which meant declaring the goal met never ended the run.
             completed: streamed.completed === true,
+            toolCalls: streamed.toolCalls || [],
           };
         }
       } catch (e) {
@@ -2223,12 +2321,14 @@ _makeLiveNode(agent) {
           messages: () => body.messages.map(m => ({ ...m })),
           specFor,
         });
-        if (streamed && (streamed.content || streamed.reasoning)) {
+        if (streamed && (streamed.content || streamed.reasoning
+          || (streamed.toolCalls && streamed.toolCalls.length))) {
           return {
             content: streamed.content,
             text: streamed.content,
             sections: null,
             reasoning: streamed.reasoning || null,
+            toolCalls: streamed.toolCalls || [],
           };
         }
       } catch (e) {
@@ -2339,7 +2439,9 @@ _makeLiveNode(agent) {
       );
       const agentMsg = {
         role: 'agent', content: (reply && reply.content) || '', agentId: agent.id,
-        reasoning: (reply && reply.reasoning) || null, timestamp: Date.now(),
+        reasoning: (reply && reply.reasoning) || null,
+        toolCalls: (reply && reply.toolCalls) || (live && live.toolCalls) || null,
+        timestamp: Date.now(),
       };
       // The live node already holds the streamed text. Appending the final
       // message on top of it was the double reply: once while streaming, once
@@ -2356,6 +2458,7 @@ _makeLiveNode(agent) {
         content: stopped ? (live?.text || 'Stopped by user.') : `Could not answer: ${why}`,
         agentId: agent.id,
         reasoning: (live && live.reasoning) || null,
+        toolCalls: (live && live.toolCalls) || null,
         timestamp: Date.now(),
       };
       if (live && live.isConnected) this._replaceLiveNode(live, errorMsg);

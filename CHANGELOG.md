@@ -1,8 +1,24 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v300**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v301**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v301 — visible tool calls
+
+- **Tool calls are now real transcript entries.** Each call is a collapsible
+  block in the message: tool name, a one-line argument preview, running/done/
+  error/approval status, duration, and expandable arguments + result. Live turns
+  paint the same blocks while they work, then the final message keeps them, so a
+  tool request no longer appears as a bare `▸ running read_file…` line that
+  vanishes or replaces the reply.
+- Tool calls survive a reload: they are stored on the local conversation message
+  and in session dialogs as `tool_calls`, and restored by both the chat loader
+  and the sidebar's dialog conversion.
+- Calls that are skipped because an agent declares its goal complete are marked
+  as skipped rather than left spinning as "running" forever.
 
 ---
 

@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=300';
-import { K } from '../storage.js?v=300';
-import { persistence } from '../persistence.js?v=300';
-import { api } from '../api.js?v=300';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=300';
-import { TOOL_REGISTRY } from '../tools.js?v=300';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=300';
-import { snapshot } from '../rateGovernor.js?v=300';
+import { store } from '../store.js?v=301';
+import { K } from '../storage.js?v=301';
+import { persistence } from '../persistence.js?v=301';
+import { api } from '../api.js?v=301';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=301';
+import { TOOL_REGISTRY } from '../tools.js?v=301';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=301';
+import { snapshot } from '../rateGovernor.js?v=301';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -359,6 +359,7 @@ export class Sidebar {
             content: resp.response || resp.error || 'No response',
             agentId: resp.model_id,
             reasoning: resp.reasoning || null,
+            toolCalls: resp.tool_calls || resp.toolCalls || null,
             timestamp: (dialog.timestamp + (i * 0.001)) * 1000,
           });
         });
