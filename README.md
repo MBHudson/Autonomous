@@ -1,6 +1,6 @@
 # 🧠 Autonomous Loop Studio
 
-> ## A self-hosted, multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
+> ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
