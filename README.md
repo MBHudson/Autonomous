@@ -55,7 +55,7 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
  🧵**Autonomous's implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
  Apache serves many requests at once (a pool of worker processes and threads), so a
  whole team of agents really does run in parallel. 
- **Autonomous ships the workaround instead:** **with one click** installs XAMPP
+ **Autonomous ships the workaround!:** **with one click** installs XAMPP
  (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
  app's `.htaccess` needs, links the folder and starts a genuinely concurrent
  server — **zero configuration, no database, nothing to hand-tune**. That is the
