@@ -2,9 +2,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=298';
-import { acquire, note429 } from './rateGovernor.js?v=298';
-import { latency } from './latency.js?v=298';
+import { store } from './store.js?v=299';
+import { acquire, note429 } from './rateGovernor.js?v=299';
+import { latency } from './latency.js?v=299';
+import { detectFamily } from './harness.js?v=299';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=299';
 
 latency.bindStore(store);
 
@@ -532,6 +534,11 @@ class ApiClient {
     // structured frame wins. Without this a 429 ("wait") and a 401 ("the key
     // is wrong") were the same anonymous string.
     const streamMeta = {};
+    // Native tool calls arrive on their own stream frames, not in content.
+    // Accumulate them even when no tools were requested; the state stays empty
+    // and the caller simply sees toolCalls: [].
+    const family = detectFamily(spec);
+    const nativeState = createNativeCallState();
 
     const handleLine = line => {
       const trimmed = line.trim();
@@ -575,6 +582,8 @@ class ApiClient {
         if (Number.isFinite(raMs) && raMs >= 0) streamMeta.retryAfterMs = raMs;
         return;
       }
+
+      ingestNativeDelta(nativeState, obj, family);
 
       // finish_reason is the difference between "the model had nothing to say"
       // and "the model ran out of tokens mid-thought". Without it both look
@@ -707,6 +716,7 @@ class ApiClient {
     return {
       content, reasoning, usage, finishReason,
       reasoningOnly: !sawDelta && !!reasoning,
+      toolCalls: nativeCalls(nativeState),
     };
   }
 

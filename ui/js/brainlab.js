@@ -1,16 +1,16 @@
-import { store } from './store.js?v=298';
-import { persistence } from './persistence.js?v=298';
-import { esc, escAttr, agentCode } from './utils.js?v=298';
-import * as memory from './memory.js?v=298';
+import { store } from './store.js?v=299';
+import { persistence } from './persistence.js?v=299';
+import { esc, escAttr, agentCode } from './utils.js?v=299';
+import * as memory from './memory.js?v=299';
 import {
   profiles, newProfileId, alwaysAppendFor,
   settingFor, isLocked, lockSetting, unlockSetting, setSetting, sandboxRootFor,
-} from './agentConfig.js?v=298';
+} from './agentConfig.js?v=299';
 import {
   customToolDefs, defaultTools, loadCustomTools, validateCustomTool,
-} from './tools.js?v=298';
-import { SandboxFiles } from './sandboxFiles.js?v=298';
-import { TOOL_PROTOCOLS, toolProtocolFor, protocolLabel, protocolHint, harnessFor } from './toolProtocol.js?v=298';
+} from './tools.js?v=299';
+import { SandboxFiles } from './sandboxFiles.js?v=299';
+import { TOOL_PROTOCOLS, toolProtocolFor, protocolLabel, protocolHint, harnessFor } from './toolProtocol.js?v=299';
 
 const ZOOM_KEY = 'als.brainLab.zoom.v1';
 const ZOOM_STEPS = [130, 160, 190, 225, 270, 320];

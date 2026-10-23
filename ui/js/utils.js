@@ -58,6 +58,148 @@ export function compactText(text, maxChars = 12000) {
 }
 
 /**
+ * Text inside a message content value. OpenAI-style content is either a plain
+ * string or an array of parts; tool results and history are strings, but the
+ * live user turn may carry text + image parts.
+ */
+export function contentText(content) {
+  if (content == null) return '';
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return String(content);
+  let out = '';
+  for (const part of content) {
+    if (typeof part === 'string') out += part;
+    else if (part && typeof part === 'object' && typeof part.text === 'string') out += part.text;
+  }
+  return out;
+}
+
+/**
+ * Token estimate for one content value. Images are charged a flat,
+ * conservative amount because their real cost depends on the provider and the
+ * resolution; pretending they are free is how a vision turn overflows.
+ */
+export function estimateContentTokens(content) {
+  if (typeof content === 'string') return estimateTokens(content);
+  if (!Array.isArray(content)) return estimateTokens(contentText(content));
+  let tokens = 0;
+  for (const part of content) {
+    if (typeof part === 'string') { tokens += estimateTokens(part); continue; }
+    if (!part || typeof part !== 'object') continue;
+    if (typeof part.text === 'string') { tokens += estimateTokens(part.text); continue; }
+    if (part.type === 'image_url' || part.type === 'image' || part.type === 'input_image') {
+      tokens += 1500;
+    } else if (part.type === 'tool_result') {
+      tokens += estimateContentTokens(part.content);
+    }
+  }
+  return tokens;
+}
+
+/** Token estimate for a whole message list, including per-message overhead. */
+export function estimateMessagesTokens(messages) {
+  if (!Array.isArray(messages)) return 0;
+  let tokens = 0;
+  for (const m of messages) {
+    if (!m || typeof m !== 'object') continue;
+    tokens += 4 + estimateContentTokens(m.content);
+    if (m.tool_calls) tokens += estimateTokens(JSON.stringify(m.tool_calls));
+  }
+  return tokens;
+}
+
+/**
+ * Input-token budget for one request: the model window minus the requested
+ * output and a safety margin for the provider's own framing. Unknown windows
+ * get a conservative 32k assumption.
+ */
+export function contextInputBudget(contextLimit, maxTokens) {
+  const limit = Number(contextLimit);
+  const out = Number(maxTokens);
+  if (!Number.isFinite(limit) || limit <= 0) return 16000;
+  const reserve = Math.max(1024, Math.min(Number.isFinite(out) && out > 0 ? out : 4096,
+    Math.floor(limit * 0.5)));
+  return Math.max(4096, Math.floor(limit - reserve - 2048));
+}
+
+/**
+ * Keep a live prompt inside a model's window.
+ *
+ * Replayed history already has a budget, but a tool-using turn grows in the
+ * other direction: every tool exchange is appended to the live message list and
+ * is never reconsidered. On a long task that silently walks past the window
+ * even when the history itself is small.
+ *
+ * Strategy, in order:
+ *   1. shrink old assistant + TOOL_RESULT pairs, keeping their head and tail;
+ *   2. drop the oldest non-system history turns;
+ *   3. as a last resort, shrink an oversized system message.
+ *
+ * The newest four messages and every system message are preserved as long as
+ * possible. Returns a new array; the caller's transcript is untouched.
+ */
+export function compactMessages(messages, maxTokens) {
+  const cap = Math.max(2048, Number(maxTokens) || 16000);
+  if (!Array.isArray(messages) || !messages.length) return messages;
+  const out = messages.map(m => (m && typeof m === 'object' ? { ...m } : m));
+  const total = () => estimateMessagesTokens(out);
+  if (total() <= cap) return out;
+
+  const textOf = m => contentText(m && m.content);
+  const isToolResult = m => !!m && m.role === 'user' && textOf(m).startsWith('TOOL_RESULT:');
+  const tailStart = Math.max(0, out.length - 4);
+
+  // 1. Compact old tool exchanges. Leave the last two exchanges intact: the
+  // model needs the result it is currently reasoning about in full.
+  for (let i = 0; i < out.length - 1 && total() > cap; i++) {
+    if (i >= tailStart) break;
+    const a = out[i];
+    const r = out[i + 1];
+    if (!a || a.role !== 'assistant' || !isToolResult(r)) continue;
+    const before = estimateMessagesTokens([a, r]);
+    const aText = compactText(textOf(a), 800) || '[tool call]';
+    const rText = textOf(r);
+    const nextR = rText.startsWith('TOOL_RESULT:')
+      ? `TOOL_RESULT: ${compactText(rText.slice('TOOL_RESULT:'.length).trim(), 1400)}`
+      : `TOOL_RESULT: ${compactText(rText, 1400)}`;
+    const next = [
+      { ...a, content: aText },
+      { ...r, content: nextR },
+    ];
+    const after = estimateMessagesTokens(next);
+    if (after >= before) continue;
+    out.splice(i, 2, ...next);
+  }
+
+  // 2. Drop the oldest non-system turns, but never the current user turn or
+  // the last few messages that carry the immediate context.
+  while (total() > cap) {
+    const keepFrom = Math.max(0, out.length - 4);
+    let drop = -1;
+    for (let i = 0; i < keepFrom; i++) {
+      if (!out[i] || out[i].role === 'system') continue;
+      drop = i;
+      break;
+    }
+    if (drop === -1) break;
+    out.splice(drop, 1);
+  }
+
+  // 3. A huge agent prompt/attached-file block can still dominate. Shrink it
+  // only after the conversation has been reduced.
+  if (total() > cap) {
+    const allowedChars = Math.max(2000, Math.floor(cap * 0.5 * 4));
+    for (let i = 0; i < out.length; i++) {
+      const m = out[i];
+      if (!m || m.role !== 'system') continue;
+      const text = textOf(m);
+      if (text.length > allowedChars) out[i] = { ...m, content: compactText(text, allowedChars) };
+    }
+  }
+  return out;
+}
+
+/**
  * Human-facing agent reference, e.g. "#K7M4QX".
  *
  * Deliberately excludes 0/O and 1/I so a code read off a screen or spoken

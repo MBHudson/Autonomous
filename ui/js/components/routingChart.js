@@ -34,11 +34,11 @@
 // path would be a second implementation to keep in step, and this is the kind
 // of UI where the two inevitably diverge.
 
-import { store, APP_VERSION } from '../store.js?v=298';
-import { persistence } from '../persistence.js?v=298';
-import { SlashCommands, COMMANDS } from '../slashCommands.js?v=298';
-import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=298';
-import { updateNodeClock } from '../agentClock.js?v=298';
+import { store, APP_VERSION } from '../store.js?v=299';
+import { persistence } from '../persistence.js?v=299';
+import { SlashCommands, COMMANDS } from '../slashCommands.js?v=299';
+import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=299';
+import { updateNodeClock } from '../agentClock.js?v=299';
 
 // Node kinds. 'agent' is the only one that calls a model; the rest are
 // structure -- which is how a fan-out can exist without any agent pretending

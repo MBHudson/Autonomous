@@ -66,6 +66,25 @@ $or = Harness::payload('openrouter', ['model' => 'm', 'prompt' => 'P', 'temperat
 ok($or['model'] === 'm' && $or['messages'][0]['content'] === 'P' && $or['temperature'] === 0.3 && $or['max_tokens'] === 10,
     'openai-compatible payload: messages + temperature + max_tokens');
 
+// Native tools are built client-side but must survive into the provider body.
+$tools = [['type' => 'function', 'function' => ['name' => 'echo']]];
+$orTools = Harness::payload('openrouter', [
+    'model' => 'm', 'prompt' => 'P', 'tools' => $tools, 'tool_choice' => 'auto',
+]);
+ok($orTools['tools'] === $tools, 'openai-compatible payload carries native tools');
+ok($orTools['tool_choice'] === 'auto', 'openai-compatible payload carries tool_choice');
+$anTools = Harness::payload('anthropic', [
+    'model' => 'claude', 'prompt' => 'P', 'tools' => $tools, 'tool_choice' => ['type' => 'auto'],
+]);
+ok($anTools['tools'] === $tools, 'anthropic payload carries native tools');
+ok($anTools['tool_choice'] === ['type' => 'auto'], 'anthropic payload carries its tool_choice shape');
+$goTools = Harness::payload('google', [
+    'model' => 'gemini', 'prompt' => 'P', 'tools' => [['functionDeclarations' => []]],
+    'tool_config' => ['functionCallingConfig' => ['mode' => 'AUTO']],
+]);
+ok(isset($goTools['tools'][0]['functionDeclarations']), 'google payload carries functionDeclarations');
+ok($goTools['toolConfig']['functionCallingConfig']['mode'] === 'AUTO', 'google payload carries toolConfig');
+
 $an = Harness::payload('anthropic', [
     'model' => 'claude', 'messages' => [
         ['role' => 'system', 'content' => 'SYS'],
