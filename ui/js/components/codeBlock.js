@@ -12,9 +12,9 @@
 //
 // Logo is the local SVG when we have one, otherwise a colored letter badge.
 
-import { copyToClipboard, downloadFile } from '../utils.js?v=303';
-import { metaFor, extFor, logoFor, detectLang, highlightElement } from '../langs.js?v=303';
-import { highlightSyntax } from '../utils.js?v=303';
+import { copyToClipboard, downloadFile } from '../utils.js?v=304';
+import { metaFor, extFor, logoFor, detectLang, highlightElement } from '../langs.js?v=304';
+import { highlightSyntax } from '../utils.js?v=304';
 
 const ICON_COPY = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/></svg>';
 const ICON_DOWNLOAD = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v7.5M8 9.5 5 6.5M8 9.5l3-3M2.5 13.5h11"/></svg>';

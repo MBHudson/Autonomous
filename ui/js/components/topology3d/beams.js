@@ -12,7 +12,7 @@
 // and agent-to-agent traffic blend from the sender's color to the receiver's.
 
 import * as THREE from 'three';
-import { glowTexture } from './nodes.js?v=303';
+import { glowTexture } from './nodes.js?v=304';
 
 const SEGMENTS = 56;
 const RADIAL = 6;
@@ -51,7 +51,11 @@ const FRAG = /* glsl */`
     // Marching dashes: features move toward t = 1 (the receiver) over time.
     float d = fract(t * uDash - uTime * uSpeed * uDash * 0.45);
     float dash = smoothstep(0.0, 0.06, d) * (1.0 - smoothstep(uDuty, uDuty + 0.06, d));
-    float body = mix(0.28, 1.0, dash * uLive + (1.0 - uLive) * 0.6);
+    // The dashes keep marching for the whole life of the beam. Once it settles
+    // to a "this happened" record they just drop to a lower contrast instead of
+    // flattening into a solid line, which looked like the motion had died.
+    float dashAmt = mix(0.5, 1.0, uLive);
+    float body = mix(0.16, 1.0, dash * dashAmt);
     // Bright travelling head, shared with the comet sprite.
     float head = exp(-pow((t - uHead) * 16.0, 2.0)) * uLive;
     // Taper both ends so the beam emerges from / sinks into the spheres.
@@ -75,8 +79,9 @@ export class Beam {
    * @param {object} flow   {id, from, to, kind, phase}
    * @param {THREE.Color} cFrom sender color
    * @param {THREE.Color} cTo   receiver color
+   * @param {boolean} [blendOverride] force blend (agent↔agent) on/off
    */
-  constructor(flow, cFrom, cTo) {
+  constructor(flow, cFrom, cTo, blendOverride) {
     this.flow = flow;
     this.id = flow.id;
     this.kind = flow.kind || 'message';
@@ -88,7 +93,9 @@ export class Beam {
     this._lastKey = '';
     this.onArrive = null;
 
-    const blend = this.kind === 'delegate' || this.kind === 'agent' || this.kind === 'tell';
+    // Callers may pre-resolve whether the two colors blend (agent-to-agent) or
+    // the beam is a solid model color (user <-> model). Fall back to the kind.
+    const blend = blendOverride ?? (this.kind === 'delegate' || this.kind === 'agent' || this.kind === 'tell');
     const style = KIND_STYLE[this.kind] || KIND_STYLE.message;
     this.colorA = cFrom.clone();
     this.colorB = blend ? cTo.clone() : cFrom.clone();

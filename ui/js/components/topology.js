@@ -2,14 +2,19 @@
 // TOPOLOGY.JS — SVG network graph
 // ============================================
 
-import { store } from '../store.js?v=303';
-import { api } from '../api.js?v=303';
-import { esc, agentCode } from '../utils.js?v=303';
+import { store } from '../store.js?v=304';
+import { api } from '../api.js?v=304';
+import { esc, agentCode } from '../utils.js?v=304';
 
 // How long a hop stays bright while in flight, and how long it then lingers as
 // a faint record of the exchange before it fades out and is dropped.
 const TRAFFIC_HOLD_MS = 6000;
 const RESPONSE_HOLD_MS = 9000;
+// Inbound traffic (You → a model) stays lit for as long as the model is
+// actually generating. A fixed short window meant the line went quiet while a
+// slow model was still working, so the animation "stopped too soon". The
+// response/failure event normally demotes it long before this safety cap.
+const INBOUND_HOLD_MS = 120000;
 
 /** Past sessions charted around their agent. Beyond this they only add clutter. */
 const MAX_CHARTED_SESSIONS = 6;
@@ -522,7 +527,7 @@ export class TopologyGraph {
     return (node && node.color) || '#00e5ff';
   }
 
-  _flowAdd({ from, to, kind } = {}) {
+  _flowAdd({ from, to, kind, holdMs } = {}) {
     if (!from || !to) return;
     // A repeated hop on a pair we already recorded just refreshes that line
     // instead of stacking a duplicate on top of it.
@@ -531,6 +536,7 @@ export class TopologyGraph {
     if (existing) {
       existing.phase = 'active';
       existing.stamp = Date.now();
+      if (holdMs) existing.holdMs = holdMs;
       clearTimeout(existing._timer);
       this._renderFlows();
       this._scheduleSettle(existing);
@@ -538,6 +544,14 @@ export class TopologyGraph {
     }
     const flow = { id: ++this._flowSeq, from, to, kind: kind || 'message',
       phase: 'active', stamp: Date.now() };
+    // A request aimed at a model holds until that model answers (or the safety
+    // cap trips), so the dots keep flowing for the whole request rather than
+    // only 6s. One-way agent-to-agent messages keep the short default.
+    const requestKind = !kind || kind === 'message' || kind === 'delegate';
+    if (!holdMs && requestKind && this.nodes.some(n => n.id === to && n.type === 'agent')) {
+      holdMs = INBOUND_HOLD_MS;
+    }
+    if (holdMs) flow.holdMs = holdMs;
     this.flows.push(flow);
     // Traffic lines linger, so the ring buffer has to be roomier than before.
     while (this.flows.length > 24) this.flows.shift();
@@ -554,18 +568,27 @@ export class TopologyGraph {
   _scheduleSettle(flow) {
     clearTimeout(flow._timer);
     flow._timer = setTimeout(() => {
-      if (this.flows.indexOf(flow) === -1) return;
+      if (this.flows.indexOf(flow) === -1 || flow.phase !== 'active') return;
       flow.phase = 'traffic';
       this._renderFlows();
-      flow._timer = setTimeout(() => {
-        if (this.flows.indexOf(flow) === -1) return;
-        flow.phase = 'fading';
+      this._settleRecord(flow);
+    }, flow.holdMs || TRAFFIC_HOLD_MS);
+  }
+
+  /** From the settled "traffic" phase: linger, fade, drop. */
+  _settleRecord(flow) {
+    clearTimeout(flow._timer);
+    flow._timer = setTimeout(() => {
+      // A line refreshed back to 'active' must not be faded by a timer left
+      // over from its previous life.
+      if (this.flows.indexOf(flow) === -1 || flow.phase !== 'traffic') return;
+      flow.phase = 'fading';
+      this._renderFlows();
+      setTimeout(() => {
+        if (flow.phase !== 'fading') return;
+        this.flows = this.flows.filter(f => f !== flow);
         this._renderFlows();
-        setTimeout(() => {
-          this.flows = this.flows.filter(f => f !== flow);
-          this._renderFlows();
-        }, 1000);
-      }, TRAFFIC_HOLD_MS);
+      }, 1000);
     }, TRAFFIC_HOLD_MS);
   }
 
@@ -663,26 +686,10 @@ export class TopologyGraph {
     if (!agentId) return;
     // Fade the inbound prompt + delegation lines into this agent...
     this._flowFadeTo(agentId);
-    // ...while the reply line flows back toward the user
-    const flow = this._flowAdd({ from: agentId, to: 'user', kind: 'response' });
-    if (!flow) return;
-    // The reply is the payload; let it sit bright a moment longer than an
-    // inbound hop so you can actually see the answer travel.
-    clearTimeout(flow._timer);
-    flow._timer = setTimeout(() => {
-      if (this.flows.indexOf(flow) === -1) return;
-      flow.phase = 'traffic';
-      this._renderFlows();
-      flow._timer = setTimeout(() => {
-        if (this.flows.indexOf(flow) === -1) return;
-        flow.phase = 'fading';
-        this._renderFlows();
-        setTimeout(() => {
-          this.flows = this.flows.filter(f => f !== flow);
-          this._renderFlows();
-        }, 1000);
-      }, TRAFFIC_HOLD_MS);
-    }, RESPONSE_HOLD_MS);
+    // ...while the reply line flows back toward the user. The reply is the
+    // payload; let it sit bright a moment longer than an inbound hop so you can
+    // actually see the answer travel.
+    this._flowAdd({ from: agentId, to: 'user', kind: 'response', holdMs: RESPONSE_HOLD_MS });
   }
 
   _flowFadeTo(agentId) {
@@ -693,16 +700,7 @@ export class TopologyGraph {
       // become a traffic record should keep its history.
       if (f.to === agentId && f.phase === 'active') {
         f.phase = 'traffic';
-        clearTimeout(f._timer);
-        f._timer = setTimeout(() => {
-          if (this.flows.indexOf(f) === -1) return;
-          f.phase = 'fading';
-          this._renderFlows();
-          setTimeout(() => {
-            this.flows = this.flows.filter(x => x !== f);
-            this._renderFlows();
-          }, 1000);
-        }, TRAFFIC_HOLD_MS);
+        this._settleRecord(f);
         touched = true;
       }
     });
@@ -736,8 +734,17 @@ export class TopologyGraph {
       const isAgent = f.kind === 'agent' || f.kind === 'tell';
       const isTraffic = f.phase === 'traffic';
 
-      // Active hops are solid and animated; the settled record is thin, dotted
-      // and dim so it reads as history rather than live traffic.
+      // Every line that carries traffic between the user and a model is painted
+      // in the model's own color (the one the operator picked), whichever way
+      // the traffic flows. Only agent-to-agent hops blend sender into receiver.
+      const modelNode = [fromNode, toNode].find(n => n && n.type === 'agent');
+      const talksToUser = (fromNode?.type === 'user') !== (toNode?.type === 'user');
+      const solidModel = talksToUser && modelNode;
+      const useGradient = !solidModel && (isDelegate || isAgent);
+      const baseColor = solidModel ? modelNode.color : cFrom;
+
+      // Active hops are solid and animated; the settled record is thin and dim
+      // so it reads as history rather than live traffic.
       //
       // Everything live is drawn at the same weight. Coordinator dispatch used
       // to be the odd one out (thinner, dimmer) even though a busy admin
@@ -749,28 +756,30 @@ export class TopologyGraph {
       const dash = isTraffic ? '1 6' : (isDelegate ? '2 6' : (isAgent ? '9 6' : '6 7'));
       const opacity = isTraffic ? 0.34 : 1;
 
-      if (isDelegate || isAgent) {
+      if (useGradient) {
         const gid = `fg-${f.id}`;
         defs += `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">`
           + `<stop offset="0" stop-color="${cFrom}"/><stop offset="1" stop-color="${cTo}"/></linearGradient>`;
       }
-      const stroke = (isDelegate || isAgent) ? `url(#fg-${f.id})` : cFrom;
+      const stroke = useGradient ? `url(#fg-${f.id})` : baseColor;
       const mid = `fm-${f.id}`;
       // Settled arrows shrink so the live ones stay legible on top.
       const markerSize = isTraffic ? 5 : 8;
       defs += `<marker id="${mid}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${markerSize}" markerHeight="${markerSize}" orient="auto-start-reverse">`
-        + `<path d="M0,0 L10,5 L0,10 z" fill="${isDelegate || isAgent ? cTo : cFrom}"/></marker>`;
+        + `<path d="M0,0 L10,5 L0,10 z" fill="${useGradient ? cTo : baseColor}"/></marker>`;
 
-      // Fading out: one second to nothing.
+      // Marching dashes travelling FROM the sender TOWARD the receiver are what
+      // make the direction readable at a glance -- a plain line with an
+      // arrowhead is easy to misread when several cross. They run for the whole
+      // life of the line (active AND the settled record); only the final fade
+      // stops the motion, and it animates opacity instead.
       let extra = '';
       if (f.phase === 'fading') {
         extra = `<animate attributeName="opacity" values="${opacity};0" dur="1s" fill="freeze"/>`;
-      } else if (!isTraffic) {
-        // Marching dashes travelling FROM the sender TOWARD the receiver. This
-        // is what makes the direction readable at a glance — a plain line with
-        // an arrowhead is easy to misread when several cross.
+      } else {
+        const dur = isTraffic ? '1.6s' : (isAgent ? '1.1s' : (isDelegate ? '1.4s' : '0.9s'));
         extra = `<animate attributeName="stroke-dashoffset" from="${dashTotal(dash)}" to="0" `
-          + `dur="${isAgent ? '1.1s' : (isDelegate ? '1.4s' : '0.9s')}" repeatCount="indefinite"/>`;
+          + `dur="${dur}" repeatCount="indefinite"/>`;
       }
       lines += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" `
         + `class="flow-line" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="${dash}" `
