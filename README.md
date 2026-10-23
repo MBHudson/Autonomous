@@ -52,21 +52,23 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 - **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
 - **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
 
-> 🧵 **Apache is not single-threaded — and that is exactly the point.** Apache
-> serves many requests at once (a pool of worker processes and threads), so a
-> whole team of agents really does run in parallel. PHP's own built-in server is
-> the opposite: `php -S` is a single process, so one streamed model reply holds
-> the only slot for its entire duration while every other agent — and the
-> browser's own state polling — queues behind it until the fetch dies with
-> `NetworkError`. Windows PHP cannot fork, and the usual local Windows PHP setups
+ 🧵 <h3>Autonomous's implementation of Apache / PHP is not single-threaded — and that is exactly the point.</h3>
+ Apache serves many requests at once (a pool of worker processes and threads), so a
+ whole team of agents really does run in parallel. 
+ **Autonomous ships the workaround instead:** **with one click** installs XAMPP
+ (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
+ app's `.htaccess` needs, links the folder and starts a genuinely concurrent
+ server — **zero configuration, no database, nothing to hand-tune**. That is the
+ mold this project breaks: a multithreaded local server, deployed in one click.
+ (`start-php.bat` remains for the rare machine where Apache cannot run; it is the
+ slow single-threaded fallback.)
+> * *PHP's own built-in server is the opposite: `php -S` is a single process,
+> so one streamed model reply holds the only slot for its entire duration while
+> every other agent — and the browser's own state polling — queues behind it until
+> the fetch dies with `NetworkError`. Windows PHP cannot fork, and the usual
+> local Windows PHP setups
 > either accept that limit or expect you to install and hand-edit Apache/FPM
-> yourself. Loop Studio ships the workaround instead: **one click** installs XAMPP
-> (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
-> app's `.htaccess` needs, links the folder and starts a genuinely concurrent
-> server — **zero configuration, no database, nothing to hand-tune**. That is the
-> mold this project breaks: a multithreaded local server, deployed in one click.
-> (`start-php.bat` remains for the rare machine where Apache cannot run; it is the
-> slow single-threaded fallback.)
+> yourself. * *
 
 ### 🐧 Linux / macOS
 ```bash
