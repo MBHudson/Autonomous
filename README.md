@@ -41,28 +41,6 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 
 ---
 
-## 📸 Screenshots
-
-**Main screen — agents, chat, network panel**
-![Main screen](screenshots/mainscreen.png)
-
-**🧠 Brain Lab — every agent setting, card and lock in one place**
-![Brain Lab](screenshots/Brain-Lab.png)
-
-**🧪 API Lab — curl ⇄ request ⇄ 10 languages**
-![API Lab](screenshots/API-Lab.png)
-
-**🔌 MCP — the client (connect out) and the server (let friends in)**
-![MCP](screenshots/MCP.png)
-
-**🔀 Routing chart — three workflows with loops and fan-out**
-![Routing chart](screenshots/routing-three-workfows.png)
-
-**⏱️ Throttle, 📊 token budget, 📈 metrics and the per-agent clock**
-![Throttle and metrics](screenshots/throttle-token-metrics-clock.png)
-
----
-
 ## 🚀 Quick start
 
 ### 🪟 Windows — one click
@@ -114,15 +92,23 @@ Opened from the 🧪 icon in the Agents-tab header.
 
 ## 🔀 Routing chart
 
-![Routing chart](screenshots/routing-three-workfows.png)
+Draw the flow instead of describing it.
 
-Draw the flow instead of describing it:
+**Nodes** — agent, parallel, merge, checkpoint, delay, loop, end.
 
-- **Nodes**: agent, parallel, merge, checkpoint, **delay**, loop, end.
-- **Loops** with per-lap state, **checkpoints** that pause for review, **delays** (wait a duration or until a wall-clock time) that hold only their own branch.
-- **Parallel fan-out** runs every ready node concurrently; the scheduler handles it.
-- **Live run state** on the edges (marching + glow while running, settle when done), a faint **ghost transcript** of the chat behind the canvas, and an **align-to-grid** snap (off by default).
-- A **notification bell** for run errors/warnings, with its own list.
+![Routing chart — three workflows with loops and fan-out](screenshots/routing-three-workfows.png)
+
+**Loops** carry per-lap state, and **parallel fan-out** runs every ready node concurrently — the scheduler handles it.
+
+![A loop feeding a parallel group](screenshots/routeing-loop.png)
+
+**Checkpoints** pause the run for review before it continues downstream.
+
+![A checkpoint waiting for review](screenshots/checkpoint.png)
+
+**Delays** wait a duration or until a wall-clock time, and hold only their own branch.
+
+**Live run state** shows on the edges (marching + glow while running, settle when done), with a faint **ghost transcript** of the chat behind the canvas and an **align-to-grid** snap (off by default). A **notification bell** lists run errors/warnings.
 
 ---
 
@@ -179,6 +165,21 @@ A 40-requests-per-minute key dies when 16 chart nodes fire at once. The pacer co
 
 - **Agent cards** show a live line: `⚡ tokens/budget · N req · up 2h · 40/min` — with a tooltip of in/out tokens, billed calls, output cap, context window and last call. Set a **token budget** (Config → Limits) and it shows `used/limit (%)`.
 - **🔎 Run trace** (Config → TRACE) is a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals.
+
+---
+
+## 🕸️ Network & topology
+
+![The live network graph — agents, providers and traffic](screenshots/mainscreen.png)
+
+The whole loop as a living map. Every activated agent and provider becomes a glowing node, and each exchange paints a dotted line whose dots travel the way the traffic actually moved.
+
+- 🧑 **You** — the red node at the heart of the graph, with a live card: 📨 prompts sent, 💬 replies, 🤖 agents online, ⚙️ working now, 🪙 session tokens and 📡 fleet average ping.
+- 🤖 **Agent nodes** — one per activated agent, ringed in its own colour, showing its role, model, ⚙️ tool calls and ⬡ token spend, with 💧 ripple rings while it works.
+- 🟣 **Provider nebulas** — each provider breathes as a soft cloud, with its agents orbiting inside.
+- 🧵 **Traffic lines** — dotted and colour-matched to the model, with dots marching the direction the message actually travelled: ➡️ toward **You** for a reply, ⬅️ from **You** for a request.
+- 🕹️ **Controls** — drag to orbit, scroll to zoom, right-drag to pan, click a node for its 📊 metrics, and switch 🧊 3D / 🗺️ 2D or go fullscreen.
+- 🔔 **Notifications** — a bell keeps a running list of run errors and warnings so nothing scrolls past unnoticed.
 
 ---
 
