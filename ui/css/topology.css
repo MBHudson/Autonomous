@@ -134,12 +134,12 @@
   stroke-width: 1;
   fill: none;
   stroke-dasharray: 4, 4;
-  opacity: 0.35;
+  opacity: 0.455;
 }
 
 /* Motion only while a prompt is flowing (see flow overlay) */
 .topo-edge.live {
-  opacity: 0.6;
+  opacity: 0.78;
   animation: dashMove 5s linear infinite;
 }
 

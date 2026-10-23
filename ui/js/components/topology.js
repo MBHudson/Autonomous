@@ -316,14 +316,14 @@ export class TopologyGraph {
       const mr = 0.6 + ((i * 13) % 10) / 10 * 0.9;
       const mc = moteColors[i % moteColors.length];
       const tw = 2.5 + ((i * 7) % 50) / 10;
-      svg += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${mr.toFixed(1)}" fill="${mc}" opacity="0.35">`
-        + `<animate attributeName="opacity" values="0.12;0.6;0.12" dur="${tw.toFixed(1)}s" begin="${((i * 0.37) % tw).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+      svg += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${mr.toFixed(1)}" fill="${mc}" opacity="0.175">`
+        + `<animate attributeName="opacity" values="0.06;0.3;0.06" dur="${tw.toFixed(1)}s" begin="${((i * 0.37) % tw).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
     }
     for (let i = 0; i < 7; i++) {
       const dx = ((i * 149) % 1000) / 1000 * width;
       const dy = ((i * 263) % 1000) / 1000 * height;
       const dd = 16 + ((i * 11) % 14);
-      svg += `<g opacity="0.5"><circle cx="0" cy="0" r="1.6" fill="#00e5ff">`
+      svg += `<g opacity="0.25"><circle cx="0" cy="0" r="1.6" fill="#00e5ff">`
         + `<animateMotion dur="${dd}s" repeatCount="indefinite" path="M${dx.toFixed(0)},${dy.toFixed(0)} q${(20 + i * 6)},${(-14 - i * 3)} ${(i % 2 ? -30 : 34)},${(i % 2 ? 18 : -22)}"/>`
         + `</circle></g>`;
     }
@@ -352,9 +352,9 @@ export class TopologyGraph {
       const pNode = this.nodes.find(n => n.id === pid);
       const pColor = (pNode && pNode.color) || '#00ff88';
       svg += `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" `
-        + `fill="${pColor}" fill-opacity="0.05" stroke="${pColor}" stroke-opacity="0.25" stroke-width="1" stroke-dasharray="3 6" class="topo-nebula">`
+        + `fill="${pColor}" fill-opacity="0.025" stroke="${pColor}" stroke-opacity="0.125" stroke-width="1" stroke-dasharray="3 6" class="topo-nebula">`
         + `<animate attributeName="rx" values="${rx.toFixed(1)};${(rx + 5).toFixed(1)};${rx.toFixed(1)}" dur="6s" repeatCount="indefinite"/>`
-        + `<animate attributeName="fill-opacity" values="0.05;0.09;0.05" dur="6s" repeatCount="indefinite"/>`
+        + `<animate attributeName="fill-opacity" values="0.025;0.045;0.025" dur="6s" repeatCount="indefinite"/>`
         + `</ellipse>`;
     });
 
