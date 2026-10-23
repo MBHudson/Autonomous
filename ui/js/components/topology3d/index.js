@@ -15,16 +15,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=305';
-import { store } from '../../store.js?v=305';
-import { k, K } from '../../storage.js?v=305';
-import { latency } from '../../latency.js?v=305';
-import { SceneCore, webglAvailable } from './scene.js?v=305';
-import { ForceLayout } from './layout.js?v=305';
-import { NodeView, Nebula } from './nodes.js?v=305';
-import { Beam } from './beams.js?v=305';
-import { LabelLayer } from './labels.js?v=305';
-import { PopupCard } from './popup.js?v=305';
+import { TopologyGraph } from '../topology.js?v=306';
+import { store } from '../../store.js?v=306';
+import { k, K } from '../../storage.js?v=306';
+import { latency } from '../../latency.js?v=306';
+import { SceneCore, webglAvailable } from './scene.js?v=306';
+import { ForceLayout } from './layout.js?v=306';
+import { NodeView, Nebula } from './nodes.js?v=306';
+import { Beam } from './beams.js?v=306';
+import { LabelLayer } from './labels.js?v=306';
+import { PopupCard } from './popup.js?v=306';
+import { AskDock } from './ask.js?v=306';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
@@ -80,6 +81,8 @@ export class Topology3D extends TopologyGraph {
       this._historyPush({ from: null, to: d.to, kind: 'fail' });
       this.views.get(d.to)?.fail();
     });
+    // The app answers an inline ASK through the store; hand it to the dock.
+    store.on('agent:ask-inline:reply', (d) => this.ask?.settle(d));
     store.on('latency:changed', () => this._queueInfoRefresh());
     store.on('metrics:changed', (d) => { if (d?.sessionId) this.sessionId = d.sessionId; this._queueInfoRefresh(); });
 
@@ -114,6 +117,15 @@ export class Topology3D extends TopologyGraph {
         history: () => this.history,
         sessionId: () => this.sessionId,
         onClose: () => this._select(null, true),
+        // The card's ASK button drops the inline prompt just under it.
+        onAsk: (id) => this.ask?.openPrompt(id),
+      });
+
+      // Inline "ask this model" dock: its own prompt box plus the floating
+      // reply box. The exchange goes through the store so the topology keeps
+      // no chat reference and the traffic still animates the map.
+      this.ask = new AskDock(this.root, {
+        onSend: (agentId, question) => store.emit('agent:ask-inline', { agentId, question }),
       });
 
       const hint = document.createElement('div');
@@ -451,6 +463,7 @@ export class Topology3D extends TopologyGraph {
       this._focusCamera(id);
     } else {
       if (!fromPopup) this.popup.close();
+      this.ask?.closePrompt();
       this.core.holdRotate = false;
     }
     this._applyFocus();
@@ -572,7 +585,17 @@ export class Topology3D extends TopologyGraph {
         const sy = (-_v.y * 0.5 + 0.5) * h;
         const rad = Math.abs((_v2.x * 0.5 + 0.5) * w - sx);
         this.popup.place(sx, sy, w, h, rad);
+        // Dock the inline ask prompt just under the card.
+        this.ask?.placePrompt(this.popup._rect, w, h);
       }
+    }
+    // The reply box survives the card closing: keep it in whichever top corner
+    // has the most room for the node that was asked, flipping as it is orbited.
+    if (this.ask?.replyOpen) {
+      const rv = this.views.get(this.ask.replyAgentId);
+      let rvx = null;
+      if (rv) { _v.copy(rv.group.position).project(cam); rvx = (_v.x * 0.5 + 0.5) * w; }
+      this.ask.placeReply(rvx, w);
     }
   }
 
@@ -660,6 +683,7 @@ export class Topology3D extends TopologyGraph {
     this.nebulas.forEach(n => n.dispose());
     this.labels?.dispose();
     this.popup?.dispose();
+    this.ask?.dispose();
     this.core?.dispose();
   }
 }

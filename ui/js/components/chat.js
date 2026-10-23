@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=305';
-import { K as STORAGE_K } from '../storage.js?v=305';
+import { store } from '../store.js?v=306';
+import { K as STORAGE_K } from '../storage.js?v=306';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,24 +12,24 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=305';
-import { persistence } from '../persistence.js?v=305';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=305';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=305';
-import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=305';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=305';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=305';
-import { usageFor } from '../rateGovernor.js?v=305';
-import { trace } from '../trace.js?v=305';
-import { latency } from '../latency.js?v=305';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=305';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=305';
-import { SlashCommands } from '../slashCommands.js?v=305';
-import { parseRoute, routingHelp } from '../routing.js?v=305';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=305';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=305';
-import { MessageRenderer, renderToolCalls } from './message.js?v=305';
-import { createAvatar } from './avatar.js?v=305';
+import { api, errText } from '../api.js?v=306';
+import { persistence } from '../persistence.js?v=306';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=306';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=306';
+import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=306';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=306';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=306';
+import { usageFor } from '../rateGovernor.js?v=306';
+import { trace } from '../trace.js?v=306';
+import { latency } from '../latency.js?v=306';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=306';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=306';
+import { SlashCommands } from '../slashCommands.js?v=306';
+import { parseRoute, routingHelp } from '../routing.js?v=306';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=306';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=306';
+import { MessageRenderer, renderToolCalls } from './message.js?v=306';
+import { createAvatar } from './avatar.js?v=306';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2476,6 +2476,50 @@ _makeLiveNode(agent) {
       // Idle, not active: a direct ask is a one-shot, and nothing keeps
       // working afterwards. Leaving 'active' lit the agent's indicator until
       // something else happened to clear it.
+      store.emit('agent:status', { agentId: agent.id, status: 'idle' });
+    }
+  }
+
+  /**
+   * Ask one agent from the topology's inline ASK box.
+   *
+   * Deliberately isolated: the exchange never touches the transcript, never
+   * fans out, and never becomes part of the session, so the map's little chat
+   * cannot disturb the main conversation. The difference from a plain
+   * askAgentDirectly is the traffic: every hop is announced with the same flow
+   * events a normal prompt uses, so the graph lights up and animates the
+   * request and reply exactly as it would for a turn sent from the composer.
+   *
+   * @returns {Promise<{text?: string, error?: string}>}
+   */
+  async askAgentInline(agentId, question) {
+    const agent = (store.get('agents') || []).find(a => a.id === agentId);
+    if (!agent) return { error: 'That agent no longer exists.' };
+    const text = String(question || '').trim();
+    if (!text) return { error: '' };
+    if (this._busy.has(agentId) || this._nestedBusy.has(agentId)) {
+      return { error: `${agent.name} is already answering — wait for that to finish.` };
+    }
+    // A question is a user turn: hold autonomous ticks off so the same agent
+    // does not also answer a scheduled prompt on top of this one.
+    try { this.alwaysOn?.noteUserTurn(); } catch { /* scheduler not ready */ }
+
+    this._busy.add(agent.id);
+    const ctrl = new AbortController();
+    store.emit('agent:status', { agentId: agent.id, status: 'thinking' });
+    store.emit('flow:start', { from: 'user', to: agent.id });
+    try {
+      // No live node and no attachments: the reply is only ever rendered in
+      // the topology's floating box, never as a transcript bubble.
+      const reply = await this._callAgent(text, agent, ctrl.signal, null, null, { direct: true, inline: true });
+      store.emit('flow:respond', { from: agent.id });
+      return { text: (reply && reply.content) || '' };
+    } catch (err) {
+      const stopped = err && err.name === 'AbortError';
+      store.emit('flow:fail', { to: agent.id });
+      return { error: stopped ? 'cancelled' : (err?.message || String(err)) };
+    } finally {
+      this._busy.delete(agent.id);
       store.emit('agent:status', { agentId: agent.id, status: 'idle' });
     }
   }
