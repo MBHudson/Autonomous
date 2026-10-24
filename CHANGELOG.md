@@ -1,8 +1,34 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v312**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v313**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v313 — the built-in Browser screen (Chrome/Edge over CDP)
+
+- **A real browser, no packages.** New `src/Cdp.php` is a hand-rolled WebSocket +
+  DevTools Protocol client (the framing this needs, including reassembling big
+  screenshot frames), and `src/Browser.php` detects, launches and drives an
+  installed **Chrome or Edge**. Verified end-to-end: launch → navigate →
+  screenshot → read the DOM → close.
+- **Its own screen**, opened from a new **Browser** item in the apps notch: an
+  address bar, Go/Reload, **Live** auto-refresh, a headless tick-box, and the
+  page screenshotted into an image you can **click** (coordinates map straight to
+  CDP). A side rail types text, presses Enter, and reads the page's visible text.
+- **Agents can drive the same page** with `browser_open` / `browser_click` /
+  `browser_type` / `browser_read` / `browser_wait` (click by CSS selector or x,y;
+  type into a selector, optionally pressing Enter). The operator can watch.
+- **Logins stick.** The profile is persistent (`storage/browser-profile`), so you
+  log into an account once — headless or in a visible window you can take over —
+  and both you and the agents reuse it.
+- **Off by default and gated server-side** (Config → Labs → Browser writes
+  `browser.enabled` to the config, and every route returns 403 until it is on).
+  Only http/https pages may be opened; the cloud-metadata addresses are refused.
+- New `src/Cdp.php`, `src/Browser.php`, `ui/js/components/browserView.js`,
+  `api/index.php` route, `api.js` methods, `tools.js` tools, apps-notch item,
+  Config → Labs toggle, styles.
 
 ---
 

@@ -2,11 +2,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=312';
-import { acquire, note429 } from './rateGovernor.js?v=312';
-import { latency } from './latency.js?v=312';
-import { detectFamily } from './harness.js?v=312';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=312';
+import { store } from './store.js?v=313';
+import { acquire, note429 } from './rateGovernor.js?v=313';
+import { latency } from './latency.js?v=313';
+import { detectFamily } from './harness.js?v=313';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=313';
 
 latency.bindStore(store);
 
@@ -367,6 +367,18 @@ class ApiClient {
   mcpServerConfig() { return this.request('GET', '/mcp-server/config'); }
   mcpServerSave(config) { return this.request('POST', '/mcp-server/config', config || {}); }
   mcpActivity() { return this.request('GET', '/mcp-server/activity'); }
+
+  // --- Browser (Config → Labs → Browser). Server-side gate: 403 when off. ---
+  browserStatus() { return this.request('GET', '/browser/status'); }
+  browserLaunch(headless) { return this.request('POST', '/browser/launch', { headless: !!headless }); }
+  browserStop() { return this.request('POST', '/browser/stop', {}); }
+  browserNavigate(url) { return this.request('POST', '/browser/navigate', { url }); }
+  browserScreenshot() { return this.request('POST', '/browser/screenshot', {}); }
+  browserClick(x, y) { return this.request('POST', '/browser/click', { x, y }); }
+  browserType(text) { return this.request('POST', '/browser/type', { text }); }
+  browserKey(key) { return this.request('POST', '/browser/key', { key }); }
+  browserEval(expression) { return this.request('POST', '/browser/eval', { expression }); }
+  browserRead() { return this.request('POST', '/browser/read', {}); }
 
   // --- Audio: speech synthesis and transcription, proxied server-side ---
 

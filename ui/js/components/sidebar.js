@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=312';
-import { K } from '../storage.js?v=312';
-import { persistence } from '../persistence.js?v=312';
-import { api } from '../api.js?v=312';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=312';
-import { TOOL_REGISTRY } from '../tools.js?v=312';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=312';
-import { snapshot } from '../rateGovernor.js?v=312';
+import { store } from '../store.js?v=313';
+import { K } from '../storage.js?v=313';
+import { persistence } from '../persistence.js?v=313';
+import { api } from '../api.js?v=313';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=313';
+import { TOOL_REGISTRY } from '../tools.js?v=313';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=313';
+import { snapshot } from '../rateGovernor.js?v=313';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1476,6 +1476,11 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <div class="toggle ${settings.apiPool ? 'active' : ''}" id="sbApiPool"><div class="toggle-knob"></div></div>
         </div>
         <div class="form-hint">When on, a provider's pool of extra keys (Provider editor → API pool) is used, rotating after the number of requests you set; a key that 429s is rested. Off = the single provider key, exactly as before.</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Browser <span class="form-hint-inline">a real Chrome/Edge you watch</span></span>
+          <div class="toggle" id="sbBrowser"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-hint">Drives an installed Chrome or Edge over the DevTools Protocol — no packages. Off by default. Agents reach it with the <code>browser_*</code> tools; you can watch the window and take over, and the login profile persists. (Stored server-side; needs Chrome or Edge installed.)</div>
         <div class="form-hint" id="sbLabsStatus"></div>
       `)}
 
@@ -1715,6 +1720,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbDynTools', (val) => store.set('settings.dynamicTools', val));
     this._initToggle('sbDialectMemo', (val) => store.set('settings.toolDialectMemo', val));
     this._initToggle('sbApiPool', (val) => store.set('settings.apiPool', val));
+    this._initBrowserToggle();
     this._loadLabsStatus();
 
     this._initToggle('sbAutoScroll', (val) => store.set('settings.autoScroll', val));
@@ -2982,7 +2988,34 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     }
   }
 
-  /** One-line summary for Config → Labs: server OS + how much was detected. */
+  /**
+   * Config → Labs: the Browser gate. It lives in the SERVER config (enforced
+   * with a 403 in the API), not in client settings — so it is read and written
+   * through /config like the other security-relevant switches.
+   */
+  _initBrowserToggle() {
+    const el = document.getElementById('sbBrowser');
+    if (!el) return;
+    el.addEventListener('click', async () => {
+      el.classList.toggle('active');
+      const on = el.classList.contains('active');
+      try {
+        await this._patchServerConfig((cfg) => { cfg.browser = { enabled: on }; });
+        store.emit('toast', { message: on ? 'Browser enabled' : 'Browser disabled', type: on ? 'success' : 'info' });
+      } catch (e) {
+        el.classList.toggle('active');   // revert the visual on a failed save
+        store.emit('toast', { message: `Not saved: ${e.message}`, type: 'error' });
+      }
+    });
+    api.getConfig()
+      .then((cfg) => {
+        const on = !!(cfg && cfg.browser && cfg.browser.enabled);
+        document.getElementById('sbBrowser')?.classList.toggle('active', on);
+      })
+      .catch(() => { /* leave it as rendered */ });
+  }
+
+  /** Config → Labs: server OS + how much was detected. */
   async _loadLabsStatus() {
     const el = document.getElementById('sbLabsStatus');
     if (!el) return;

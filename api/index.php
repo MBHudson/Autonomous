@@ -50,6 +50,7 @@ use Src\Audio;
 use Src\Sandbox;
 use Src\Mcp;
 use Src\McpServer;
+use Src\Browser;
 use Src\SessionManager;
 use Src\TopologyGraph;
 
@@ -152,7 +153,7 @@ $body = json_decode(file_get_contents('php://input'), true);
 // call then dies with a fatal error AFTER the stream headers went out, which
 // the browser could only report as "the model returned an empty response".
 // Say what is actually wrong instead.
-$needsNet = ['llm', 'audio', 'sandbox', 'diag', 'lab', 'proxy-ping', 'proxy-ping-all', 'mcp', 'catalog'];
+$needsNet = ['llm', 'audio', 'sandbox', 'diag', 'lab', 'proxy-ping', 'proxy-ping-all', 'mcp', 'catalog', 'browser'];
 if (in_array($segments[0] ?? '', $needsNet, true) && !function_exists('curl_init')) {
     http_response_code(503);
     echo json_encode([
@@ -230,6 +231,9 @@ try {
             break;
         case 'mcp-server':
             handleMcpServer($method, $segments, $body, $_SERVER);
+            break;
+        case 'browser':
+            handleBrowser($method, $segments, $body);
             break;
         case 'exec':
             handleExec($method, $segments, $body);
@@ -707,8 +711,65 @@ function handleMcpServer($method, $segments, $body, $server) {
     // A 202 notification returns an empty body, which is what the spec expects.
 }
 
-function handleMcp($method, $segments, $body) {
-    $action = $segments[1] ?? '';
+/**
+ * Browser screen: drive an installed Chrome/Edge over the DevTools Protocol.
+ *
+ * Off unless Config → Labs → Browser is on (stored as browser.enabled in
+ * config.json, so the gate is server-side, not just a hidden button). The
+ * route is behind the web token like every other non-MCP route.
+ */
+function handleBrowser($method, $segments, $body) {
+    $cfg = Config::loadConfig();
+    $enabled = !empty($cfg['browser']['enabled']);
+    $action = $segments[1] ?? 'status';
+    try {
+        if ($action === 'status') {
+            echo json_encode(['success' => true, 'enabled' => $enabled] + Browser::status());
+            return;
+        }
+        if (!$enabled) {
+            http_response_code(403);
+            echo json_encode(['error' => 'The browser is switched off — turn it on in Config → Labs → Browser.']);
+            return;
+        }
+        switch ($action) {
+            case 'launch':
+                $headless = array_key_exists('headless', $body) ? (bool)$body['headless'] : true;
+                echo json_encode(['success' => true] + Browser::launch($headless));
+                return;
+            case 'stop':
+                echo json_encode(['success' => true] + Browser::stop());
+                return;
+            case 'navigate':
+                echo json_encode(['success' => true] + Browser::navigate($body['url'] ?? ''));
+                return;
+            case 'screenshot':
+                echo json_encode(['success' => true] + Browser::screenshot());
+                return;
+            case 'click':
+                echo json_encode(['success' => true] + Browser::click($body['x'] ?? 0, $body['y'] ?? 0));
+                return;
+            case 'type':
+                echo json_encode(['success' => true] + Browser::typeText($body['text'] ?? ''));
+                return;
+            case 'key':
+                echo json_encode(['success' => true] + Browser::pressKey($body['key'] ?? 'Enter'));
+                return;
+            case 'eval':
+                echo json_encode(['success' => true] + Browser::evaluate((string)($body['expression'] ?? '')));
+                return;
+            case 'read':
+                echo json_encode(['success' => true] + Browser::readText());
+                return;
+        }
+        echo json_encode(['error' => 'unknown browser action']);
+    } catch (\Throwable $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+}
+
+function handleMcp($method, $segments, $body) {    $action = $segments[1] ?? '';
     try {
         if ($action === 'servers') {
             if ($method === 'POST' || $method === 'PUT') {

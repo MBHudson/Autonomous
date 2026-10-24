@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=312';
-import { asText, compactText } from './utils.js?v=312';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=312';
-import { settingFor } from './agentConfig.js?v=312';
-import { trace } from './trace.js?v=312';
+import { store } from './store.js?v=313';
+import { asText, compactText } from './utils.js?v=313';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=313';
+import { settingFor } from './agentConfig.js?v=313';
+import { trace } from './trace.js?v=313';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -314,6 +314,40 @@ export const TOOL_REGISTRY = {
     describe: 'Call a tool on a connected MCP server',
     needsApproval: true,
     run: () => 'mcp tools are not bound yet',
+  },
+
+  // --- Browser: the built-in Chrome/Edge screen (Config → Labs → Browser) ---
+  // These drive the SAME page the operator sees in the Browser screen, so an
+  // agent can log in (with the operator watching) and then act.
+  browser_open: {
+    label: 'browser_open',
+    arg: '{"url":"https://…"}',
+    describe: 'Open a URL in the built-in browser (starts it if needed)',
+    run: () => 'browser tools are not bound yet',
+  },
+  browser_click: {
+    label: 'browser_click',
+    arg: '{"selector":"#login"} or {"x":120,"y":340}',
+    describe: 'Click an element by CSS selector, or at x,y',
+    run: () => 'browser tools are not bound yet',
+  },
+  browser_type: {
+    label: 'browser_type',
+    arg: '{"selector":"#email","text":"…","enter":true}',
+    describe: 'Focus an element (selector optional) and type text; "enter":true presses Enter after',
+    needsApproval: true,
+    run: () => 'browser tools are not bound yet',
+  },
+  browser_read: {
+    label: 'browser_read',
+    describe: 'Read the visible text of the current page',
+    run: () => 'browser tools are not bound yet',
+  },
+  browser_wait: {
+    label: 'browser_wait',
+    arg: '{"ms":1500}',
+    describe: 'Wait a number of milliseconds for the page to settle',
+    run: () => 'browser tools are not bound yet',
   },
 
   // --- Always-on agents ---
@@ -817,6 +851,63 @@ export function bindSandboxTools(api) {
         at: Date.now(), args, result: out, agentId: from || null,
       });
     }
+  };
+
+  // Browser: the built-in Chrome/Edge screen. Gated server-side (403 when the
+  // Labs toggle is off), so a refusal arrives as a readable error string.
+  TOOL_REGISTRY.browser_open.run = async (arg) => {
+    const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : { url: typeof arg === 'string' ? arg : '' };
+    const url = String(a.url || a.href || '').trim();
+    if (!url) return 'error: browser_open needs a "url"';
+    const st = await api.browserStatus();
+    if (!st.enabled) return 'error: the browser is switched off (Config → Labs → Browser)';
+    if (!st.available) return 'error: no Chrome or Edge is installed on this machine';
+    if (!st.running) await api.browserLaunch(true);
+    const info = await api.browserNavigate(url);
+    return `Opened ${info.url || url}${info.title ? ` — ${info.title}` : ''}`;
+  };
+
+  TOOL_REGISTRY.browser_click.run = async (arg) => {
+    const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : (typeof arg === 'string' ? { selector: arg } : {});
+    if (a.selector) {
+      const expr = `(() => { const el = document.querySelector(${JSON.stringify(String(a.selector))}); `
+        + `if (!el) return ''; el.scrollIntoView({block:'center'}); const r = el.getBoundingClientRect(); `
+        + `return JSON.stringify({x:r.left+r.width/2, y:r.top+r.height/2}); })()`;
+      const res = await api.browserEval(expr);
+      if (!res || !res.result) return `error: no element matches ${a.selector}`;
+      const c = JSON.parse(res.result);
+      await api.browserClick(c.x, c.y);
+      return `Clicked ${a.selector}`;
+    }
+    const x = Number(a.x), y = Number(a.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return 'error: browser_click needs a "selector", or numeric "x" and "y"';
+    await api.browserClick(x, y);
+    return `Clicked (${x}, ${y})`;
+  };
+
+  TOOL_REGISTRY.browser_type.run = async (arg) => {
+    const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : { text: String(arg ?? '') };
+    const text = String(a.text ?? a.value ?? '');
+    if (!text) return 'error: browser_type needs "text"';
+    if (a.selector) {
+      await api.browserEval(`(() => { const el = document.querySelector(${JSON.stringify(String(a.selector))}); if (el) el.focus(); return !!el; })()`);
+    }
+    await api.browserType(text);
+    if (a.enter) await api.browserKey('Enter');
+    return `Typed ${text.length} character(s)${a.enter ? ' and pressed Enter' : ''}`;
+  };
+
+  TOOL_REGISTRY.browser_read.run = async () => {
+    const res = await api.browserRead();
+    const t = String((res && res.text) || '').trim();
+    return t ? t.slice(0, 8000) : '(the page has no visible text)';
+  };
+
+  TOOL_REGISTRY.browser_wait.run = async (arg) => {
+    const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : { ms: arg };
+    const ms = Math.max(0, Math.min(30000, parseInt(a.ms, 10) || 1000));
+    await new Promise((r) => setTimeout(r, ms));
+    return `Waited ${ms}ms`;
   };
 
   TOOL_REGISTRY.multi_edit.run = async (arg, _note, ctx) => {
