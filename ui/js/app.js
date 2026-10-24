@@ -2,16 +2,16 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=308';
-import { K } from './storage.js?v=308';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=308';
-import { startStateSync } from './stateSync.js?v=308';
-import { api } from './api.js?v=308';
-import { themeManager } from './themes.js?v=308';
-import { Sidebar } from './components/sidebar.js?v=308';
-import { Chat } from './components/chat.js?v=308';
-import { TopologyGraph } from './components/topology.js?v=308';
-import { initTopoPanel } from './components/topoPanel.js?v=308';
+import { store, APP_VERSION } from './store.js?v=309';
+import { K } from './storage.js?v=309';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=309';
+import { startStateSync } from './stateSync.js?v=309';
+import { api } from './api.js?v=309';
+import { themeManager } from './themes.js?v=309';
+import { Sidebar } from './components/sidebar.js?v=309';
+import { Chat } from './components/chat.js?v=309';
+import { TopologyGraph } from './components/topology.js?v=309';
+import { initTopoPanel } from './components/topoPanel.js?v=309';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -20,31 +20,31 @@ import { initTopoPanel } from './components/topoPanel.js?v=308';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=308')
+  return import('./components/topology3d/index.js?v=309')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=308';
-import { AgentEditor } from './components/agentEditor.js?v=308';
-import { ProviderEditor } from './components/providerEditor.js?v=308';
-import { Microphone } from './components/microphone.js?v=308';
-import { ConfigPanel } from './components/configPanel.js?v=308';
-import { ExportPanel } from './components/export.js?v=308';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=308';
-import { TerminalPanel } from './components/terminalPanel.js?v=308';
-import { MetricsPanel } from './components/metricsPanel.js?v=308';
-import { TracePanel } from './components/tracePanel.js?v=308';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=308';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=308';
-import { initApprovals } from './approvals.js?v=308';
-import * as memory from './memory.js?v=308';
-import { audio } from './audio.js?v=308';
-import { AlwaysOn } from './alwaysOn.js?v=308';
-import { ApiLab } from './apiLab.js?v=308';
-import { BrainLab } from './brainlab.js?v=308';
+import { RoutingChart } from './components/routingChart.js?v=309';
+import { AgentEditor } from './components/agentEditor.js?v=309';
+import { ProviderEditor } from './components/providerEditor.js?v=309';
+import { Microphone } from './components/microphone.js?v=309';
+import { ConfigPanel } from './components/configPanel.js?v=309';
+import { ExportPanel } from './components/export.js?v=309';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=309';
+import { TerminalPanel } from './components/terminalPanel.js?v=309';
+import { MetricsPanel } from './components/metricsPanel.js?v=309';
+import { TracePanel } from './components/tracePanel.js?v=309';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=309';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=309';
+import { initApprovals } from './approvals.js?v=309';
+import * as memory from './memory.js?v=309';
+import { audio } from './audio.js?v=309';
+import { AlwaysOn } from './alwaysOn.js?v=309';
+import { ApiLab } from './apiLab.js?v=309';
+import { BrainLab } from './brainlab.js?v=309';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -313,9 +313,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Exposed for the probe harness in chart-probe.mjs, which drives the real UI
   // to check the canvas actually works rather than inferring it from the code.
   window.__rc = routingChart;
-  // Header button opens it. Kept next to topology so both graph affordances
-  // live together, and Esc / the header button are the two ways out.
-  document.getElementById('rcOpenBtn')?.addEventListener('click', () => routingChart.toggle());
+  // The apps notch under the header is the one home for Brain Lab, API Lab and
+  // the Routing Chart. Bound here because app.js owns all three instances. The
+  // menu closes on an outside click, on Esc, and when any item is chosen.
+  const appsTab = document.getElementById('appsTab');
+  const appsMenu = document.getElementById('appsMenu');
+  const closeApps = () => {
+    if (appsMenu) appsMenu.hidden = true;
+    appsTab?.setAttribute('aria-expanded', 'false');
+  };
+  appsTab?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!appsMenu) return;
+    const willShow = appsMenu.hidden;
+    appsMenu.hidden = !willShow;
+    appsTab.setAttribute('aria-expanded', String(willShow));
+  });
+  document.addEventListener('click', (e) => {
+    if (!appsMenu || appsMenu.hidden) return;
+    if (appsMenu.contains(e.target) || appsTab?.contains(e.target)) return;
+    closeApps();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeApps(); });
+  const openApp = (id, fn) => document.getElementById(id)?.addEventListener('click', () => { closeApps(); fn(); });
+  openApp('appsBrainLab', () => brainLab.toggle());
+  // Main-screen API Lab: apiLab.show() opens it full-window (see show()).
+  openApp('appsApiLab', () => apiLab.toggle());
+  openApp('appsRouting', () => routingChart.toggle());
   safeInit('agentEditor', () => agentEditor.init());
   safeInit('providerEditor', () => providerEditor.init());
   safeInit('microphone', () => microphone.init());

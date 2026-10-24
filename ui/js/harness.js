@@ -22,7 +22,7 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=308';
+} from './harness.data.js?v=309';
 
 export { API_FAMILIES };
 

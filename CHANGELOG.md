@@ -1,8 +1,23 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v308**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v309**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v309 — an apps notch under the header; API Lab opens fullscreen
+
+- **New "apps" pull-tab** centred just under the header, dipping a little into the
+  chat area. A `\___/` notch with two stacked lines (top longer), sized for a
+  thumb. Tapping it drops a small menu.
+- **Brain Lab, API Lab and the Routing Chart moved into it** — out of the
+  Agents-tab header (the two icons) and out of the header rail (the routing
+  button), so a phone no longer has to hunt for them. The menu closes on an
+  outside tap, on Esc, and when an item is chosen.
+- **The API Lab now opens fullscreen from the main screen** (`show()` forces the
+  full size unless it is embedded in Brain Lab); the HALF button still shrinks it
+  for the session.
 
 ---
 
