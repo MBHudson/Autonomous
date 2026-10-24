@@ -10,7 +10,6 @@
 ![macOS](https://img.shields.io/badge/macOS-double_click_to_run-000000?logo=apple&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 ![Android](https://img.shields.io/badge/Android-coming_soon_to_Play_Store-3DDC84?logo=android&logoColor=white)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/MBHudson/Autonomous)
 
 
 ![Main screen](screenshots/mainscreen01.png)
