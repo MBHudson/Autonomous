@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=316';
-import { asText, compactText } from './utils.js?v=316';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=316';
-import { settingFor } from './agentConfig.js?v=316';
-import { trace } from './trace.js?v=316';
+import { store } from './store.js?v=317';
+import { asText, compactText } from './utils.js?v=317';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=317';
+import { settingFor } from './agentConfig.js?v=317';
+import { trace } from './trace.js?v=317';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -322,31 +322,34 @@ export const TOOL_REGISTRY = {
   browser_open: {
     label: 'browser_open',
     arg: '{"url":"https://…"}',
-    describe: 'Open a URL in the built-in browser (starts it if needed)',
+    describe: 'Drive the built-in browser — a REAL Chrome/Edge the operator can watch. Open a URL to start; '
+      + 'no Playwright/Selenium/extension needed. Call this first.',
     run: () => 'browser tools are not bound yet',
   },
   browser_click: {
     label: 'browser_click',
     arg: '{"selector":"#login"} or {"x":120,"y":340}',
-    describe: 'Click an element by CSS selector, or at x,y',
+    describe: 'In the built-in browser, click an element (CSS selector) or a point (x,y).',
     run: () => 'browser tools are not bound yet',
   },
   browser_type: {
     label: 'browser_type',
     arg: '{"selector":"#email","text":"…","enter":true}',
-    describe: 'Focus an element (selector optional) and type text; "enter":true presses Enter after',
+    describe: 'In the built-in browser, type into the focused field (focus a CSS selector first if given); '
+      + '"enter":true presses Enter to submit.',
     needsApproval: true,
     run: () => 'browser tools are not bound yet',
   },
   browser_read: {
     label: 'browser_read',
-    describe: 'Read the visible text of the current page',
+    describe: 'In the built-in browser, read the visible text of the current page. '
+      + 'Use it after every action to see what happened.',
     run: () => 'browser tools are not bound yet',
   },
   browser_wait: {
     label: 'browser_wait',
     arg: '{"ms":1500}',
-    describe: 'Wait a number of milliseconds for the page to settle',
+    describe: 'In the built-in browser, wait N milliseconds for the page to settle.',
     run: () => 'browser tools are not bound yet',
   },
 
@@ -1062,6 +1065,21 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     if (t === 'mcp_list') {
       return '{"tool":"mcp_list","arg":{}}';
     }
+    if (t === 'browser_open') {
+      return '{"tool":"browser_open","arg":{"url":"https://example.com"}}';
+    }
+    if (t === 'browser_click') {
+      return '{"tool":"browser_click","arg":{"selector":"#submit"}}';
+    }
+    if (t === 'browser_type') {
+      return '{"tool":"browser_type","arg":{"selector":"#email","text":"me@example.com","enter":true}}';
+    }
+    if (t === 'browser_read') {
+      return '{"tool":"browser_read","arg":{}}';
+    }
+    if (t === 'browser_wait') {
+      return '{"tool":"browser_wait","arg":{"ms":1500}}';
+    }
     if (t === 'multi_edit') {
       return '{"tool":"multi_edit","arg":{"edits":[{"path":"src/app.js","old_string":"...","new_string":"..."}]}}';
     }
@@ -1115,6 +1133,18 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       params.push('<parameter name="arguments">{"path":"/tmp/x"}</parameter>');
     } else if (t === 'mcp_list') {
       params.push('<parameter name="server">files</parameter>');
+    } else if (t === 'browser_open') {
+      params.push('<parameter name="url">https://example.com</parameter>');
+    } else if (t === 'browser_click') {
+      params.push('<parameter name="selector">#submit</parameter>');
+    } else if (t === 'browser_type') {
+      params.push('<parameter name="selector">#email</parameter>');
+      params.push('<parameter name="text">me@example.com</parameter>');
+      params.push('<parameter name="enter">true</parameter>');
+    } else if (t === 'browser_read') {
+      // no parameters
+    } else if (t === 'browser_wait') {
+      params.push('<parameter name="ms">1500</parameter>');
     } else if (t === 'multi_edit') {
       params.push('<parameter name="edits">[{"path":"src/app.js","old_string":"...","new_string":"..."}]</parameter>');
     } else if (t === 'git_commit') {
@@ -1173,6 +1203,15 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
         + 'argv, never PowerShell/cmd syntax. npm.cmd and other .cmd/.bat shims are not run.'
       );
     }
+  }
+  if (names.some(t => String(t).startsWith('browser_'))) {
+    notes.push(
+      'You CAN automate a browser. The built-in browser (browser_open / browser_click / browser_type / '
+      + 'browser_read / browser_wait) drives a REAL Chrome/Edge window the operator can watch — you do NOT '
+      + 'need Playwright, Selenium, Puppeteer or a browser extension, and you should never tell the user you '
+      + 'lack browser access. Workflow: browser_open a URL, browser_read to see the page, browser_click / '
+      + 'browser_type to act (target fields with a CSS selector), then browser_read again to check the result.'
+    );
   }
   if (names.includes('web_search') || names.includes('fetch_url')) {
     notes.push(
