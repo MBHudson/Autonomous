@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOLOGY3D / LABELS.JS — HTML name + ping labels pinned to 3D nodes
 // ============================================
@@ -7,8 +15,8 @@
 // the label is moved with a transform (no layout thrash).
 
 import * as THREE from 'three';
-import { esc } from '../../utils.js?v=318';
-import { fmtMs, latencyTier } from '../../latency.js?v=318';
+import { esc } from '../../utils.js?v=319';
+import { fmtMs, latencyTier } from '../../latency.js?v=319';
 
 const _v = new THREE.Vector3();
 

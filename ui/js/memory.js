@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // MEMORY.JS — private notes, and a shared collective
 // ============================================
@@ -40,8 +48,8 @@
 // the server as storage; it rides along inside the prompt to the provider you
 // already call.
 
-import { K } from './storage.js?v=318';
-import { asText } from './utils.js?v=318';
+import { K } from './storage.js?v=319';
+import { asText } from './utils.js?v=319';
 
 export const COLLECTIVE = '__collective__';
 

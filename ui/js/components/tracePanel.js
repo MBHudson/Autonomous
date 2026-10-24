@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TRACEPANEL.JS — the run-trace viewer
 // ============================================
@@ -5,9 +13,9 @@
 // A flat, newest-first timeline of model turns and tool calls with timing,
 // token cost and success, plus totals. Opened from Config → TRACE.
 
-import { store } from '../store.js?v=318';
-import { esc } from '../utils.js?v=318';
-import { recent, clear, stats } from '../trace.js?v=318';
+import { store } from '../store.js?v=319';
+import { esc } from '../utils.js?v=319';
+import { recent, clear, stats } from '../trace.js?v=319';
 
 function fmtTime(t) {
   try { return new Date(t).toLocaleTimeString([], { hour12: false }); } catch { return ''; }

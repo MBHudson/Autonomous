@@ -1,13 +1,21 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // CONFIGPANEL.JS — Settings modal
 // ============================================
 
-import { store } from '../store.js?v=318';
-import { persistence } from '../persistence.js?v=318';
-import { themeManager } from '../themes.js?v=318';
-import { DEFAULT_HISTORY_TURNS } from '../utils.js?v=318';
-import { api } from '../api.js?v=318';
-import { audio } from '../audio.js?v=318';
+import { store } from '../store.js?v=319';
+import { persistence } from '../persistence.js?v=319';
+import { themeManager } from '../themes.js?v=319';
+import { DEFAULT_HISTORY_TURNS } from '../utils.js?v=319';
+import { api } from '../api.js?v=319';
+import { audio } from '../audio.js?v=319';
 
 export class ConfigPanel {
   constructor() {

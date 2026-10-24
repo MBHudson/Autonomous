@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOLOGY3D / BEAMS.JS — animated, directed message beams
 // ============================================
@@ -12,7 +20,7 @@
 // and agent-to-agent traffic blend from the sender's color to the receiver's.
 
 import * as THREE from 'three';
-import { glowTexture } from './nodes.js?v=318';
+import { glowTexture } from './nodes.js?v=319';
 
 const SEGMENTS = 56;
 const RADIAL = 6;

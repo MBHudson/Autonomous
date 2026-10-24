@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // ROUTING.JS — "/CODE ..." and "/ROLE ..." addressing
 // ============================================
@@ -23,7 +31,7 @@
 // falling back to "everyone" -- quietly answering with four agents when you
 // addressed one is worse than telling you the code was wrong.
 
-import { agentCode } from './utils.js?v=318';
+import { agentCode } from './utils.js?v=319';
 
 /** Roles that address the whole group regardless of their spelling. */
 const ALL_WORDS = new Set(['all', 'every', 'everyone', 'any']);

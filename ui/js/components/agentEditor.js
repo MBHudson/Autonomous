@@ -1,16 +1,24 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=318';
-import { persistence } from '../persistence.js?v=318';
-import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=318';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=318';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=318';
-import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=318';
-import { audio } from '../audio.js?v=318';
-import { api } from '../api.js?v=318';
-import * as memory from '../memory.js?v=318';
+import { store } from '../store.js?v=319';
+import { persistence } from '../persistence.js?v=319';
+import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=319';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=319';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=319';
+import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=319';
+import { audio } from '../audio.js?v=319';
+import { api } from '../api.js?v=319';
+import * as memory from '../memory.js?v=319';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };

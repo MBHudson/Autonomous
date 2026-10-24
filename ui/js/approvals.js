@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // APPROVALS.JS — server-side command approvals, anywhere
 // ============================================
@@ -16,9 +24,9 @@
 // Errors back off instead of spamming: a copy with no token (or no server)
 // would otherwise toast every few seconds forever.
 
-import { api } from './api.js?v=318';
-import { store } from './store.js?v=318';
-import { askServerApproval } from './approveDialog.js?v=318';
+import { api } from './api.js?v=319';
+import { store } from './store.js?v=319';
+import { askServerApproval } from './approveDialog.js?v=319';
 
 const POLL_MS = 6000;
 const MAX_BACKOFF_MS = 60000;

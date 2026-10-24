@@ -1,13 +1,21 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=318';
-import { renderMarkdown } from '../markdown.js?v=318';
-import { CodeBlock, splitFences } from './codeBlock.js?v=318';
-import { createAvatar } from './avatar.js?v=318';
-import { store } from '../store.js?v=318';
-import { audio, AudioController } from '../audio.js?v=318';
+import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=319';
+import { renderMarkdown } from '../markdown.js?v=319';
+import { CodeBlock, splitFences } from './codeBlock.js?v=319';
+import { createAvatar } from './avatar.js?v=319';
+import { store } from '../store.js?v=319';
+import { audio, AudioController } from '../audio.js?v=319';
 
 const TOOL_DISPLAY_LIMIT = 8000;
 

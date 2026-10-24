@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOOL-PROTOCOL.JS — public surface for the tool-call dialect
 // ============================================
@@ -18,4 +26,4 @@ export {
   contextLimitFor,
   learnedDialect,
   rememberDialect,
-} from './harness.js?v=318';
+} from './harness.js?v=319';

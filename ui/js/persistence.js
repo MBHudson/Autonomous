@@ -1,10 +1,18 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // PERSISTENCE.JS — localStorage abstraction layer
 // ============================================
 
-import { store } from './store.js?v=318';
-import { deepClone, makeAgentCode } from './utils.js?v=318';
-import { K, initStorage } from './storage.js?v=318';
+import { store } from './store.js?v=319';
+import { deepClone, makeAgentCode } from './utils.js?v=319';
+import { K, initStorage } from './storage.js?v=319';
 
 // Storage keys are namespaced per app directory so several copies served from
 // one host cannot overwrite each other's settings. See ui/js/storage.js.

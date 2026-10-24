@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // HARNESS.JS — one registry: which API each provider speaks, and which
 // tool-call dialect each model answers best
@@ -22,9 +30,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=318';
-import { store } from './store.js?v=318';
-import { persistence } from './persistence.js?v=318';
+} from './harness.data.js?v=319';
+import { store } from './store.js?v=319';
+import { persistence } from './persistence.js?v=319';
 
 export { API_FAMILIES };
 

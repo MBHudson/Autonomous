@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOPANEL.JS — resizable / expandable topology panel
 // ============================================
@@ -6,7 +14,7 @@
 // The width lives in a CSS variable (--topo-w) that the app grid reads, and is
 // remembered per app copy.
 
-import { k } from '../storage.js?v=318';
+import { k } from '../storage.js?v=319';
 
 const WIDTH_KEY = k('topoWidth');
 const MIN_W = 300;

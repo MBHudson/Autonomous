@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOLOGY3D / ASK.JS — inline "ask this model" dock
 // ============================================
@@ -13,9 +21,9 @@
 // and it is isolated from the main transcript. The traffic still shows on the
 // graph because chat.askAgentInline emits the normal flow events.
 
-import { store } from '../../store.js?v=318';
-import { audio } from '../../audio.js?v=318';
-import { k } from '../../storage.js?v=318';
+import { store } from '../../store.js?v=319';
+import { audio } from '../../audio.js?v=319';
+import { k } from '../../storage.js?v=319';
 
 const VOICE_KEY = k('topoAskVoice');
 const PAD = 12;

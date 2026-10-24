@@ -1,17 +1,25 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=318';
-import { K } from './storage.js?v=318';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=318';
-import { startStateSync } from './stateSync.js?v=318';
-import { api } from './api.js?v=318';
-import { themeManager } from './themes.js?v=318';
-import { Sidebar } from './components/sidebar.js?v=318';
-import { Chat } from './components/chat.js?v=318';
-import { TopologyGraph } from './components/topology.js?v=318';
-import { initTopoPanel } from './components/topoPanel.js?v=318';
+import { store, APP_VERSION } from './store.js?v=319';
+import { K } from './storage.js?v=319';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=319';
+import { startStateSync } from './stateSync.js?v=319';
+import { api } from './api.js?v=319';
+import { themeManager } from './themes.js?v=319';
+import { Sidebar } from './components/sidebar.js?v=319';
+import { Chat } from './components/chat.js?v=319';
+import { TopologyGraph } from './components/topology.js?v=319';
+import { initTopoPanel } from './components/topoPanel.js?v=319';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -20,32 +28,32 @@ import { initTopoPanel } from './components/topoPanel.js?v=318';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=318')
+  return import('./components/topology3d/index.js?v=319')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=318';
-import { AgentEditor } from './components/agentEditor.js?v=318';
-import { ProviderEditor } from './components/providerEditor.js?v=318';
-import { Microphone } from './components/microphone.js?v=318';
-import { ConfigPanel } from './components/configPanel.js?v=318';
-import { ExportPanel } from './components/export.js?v=318';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=318';
-import { TerminalPanel } from './components/terminalPanel.js?v=318';
-import { MetricsPanel } from './components/metricsPanel.js?v=318';
-import { TracePanel } from './components/tracePanel.js?v=318';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=318';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=318';
-import { initApprovals } from './approvals.js?v=318';
-import * as memory from './memory.js?v=318';
-import { audio } from './audio.js?v=318';
-import { AlwaysOn } from './alwaysOn.js?v=318';
-import { ApiLab } from './apiLab.js?v=318';
-import { BrainLab } from './brainlab.js?v=318';
-import { BrowserView } from './components/browserView.js?v=318';
+import { RoutingChart } from './components/routingChart.js?v=319';
+import { AgentEditor } from './components/agentEditor.js?v=319';
+import { ProviderEditor } from './components/providerEditor.js?v=319';
+import { Microphone } from './components/microphone.js?v=319';
+import { ConfigPanel } from './components/configPanel.js?v=319';
+import { ExportPanel } from './components/export.js?v=319';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=319';
+import { TerminalPanel } from './components/terminalPanel.js?v=319';
+import { MetricsPanel } from './components/metricsPanel.js?v=319';
+import { TracePanel } from './components/tracePanel.js?v=319';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=319';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=319';
+import { initApprovals } from './approvals.js?v=319';
+import * as memory from './memory.js?v=319';
+import { audio } from './audio.js?v=319';
+import { AlwaysOn } from './alwaysOn.js?v=319';
+import { ApiLab } from './apiLab.js?v=319';
+import { BrainLab } from './brainlab.js?v=319';
+import { BrowserView } from './components/browserView.js?v=319';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
