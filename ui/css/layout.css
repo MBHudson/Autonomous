@@ -59,18 +59,6 @@
   animation: pulse 2s ease-in-out infinite;
 }
 
-/* The desktop brand mark (main.png, transparent). The small blinking dot
-   below is kept as the MOBILE fallback only — see the media query. */
-.logo-mark {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 auto;
-  align-self: flex-start;
-  margin-top: 1px;
-  object-fit: contain;
-}
-.logo-dot { display: none; }
-
 .app-version {
   font-size: 9px;
   color: var(--text-dim);
@@ -652,7 +640,4 @@
   /* Touch target stays comfortably tappable on a phone. */
   .apps-menu { min-width: 200px; }
   .apps-item { padding: 12px 12px; font-size: 12px; }
-  /* Mobile keeps the small blinking dot; the brand mark is desktop-only. */
-  .logo-mark { display: none; }
-  .logo-dot { display: block; }
 }
