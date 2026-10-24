@@ -1563,3 +1563,15 @@ body.agent-reordering .agent-editor:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-secondary);
 }
+
+/* Provider editor: API pool rows (label + key + remove). */
+.pool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.pool-row .form-input { flex: 1 1 auto; min-width: 0; }
+.pool-row [data-pool="label"] { flex: 0 0 34%; }
+.pool-row [data-pool-remove] { flex: 0 0 auto; padding: 4px 9px; }
+

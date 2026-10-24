@@ -2,16 +2,16 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=310';
-import { K } from './storage.js?v=310';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=310';
-import { startStateSync } from './stateSync.js?v=310';
-import { api } from './api.js?v=310';
-import { themeManager } from './themes.js?v=310';
-import { Sidebar } from './components/sidebar.js?v=310';
-import { Chat } from './components/chat.js?v=310';
-import { TopologyGraph } from './components/topology.js?v=310';
-import { initTopoPanel } from './components/topoPanel.js?v=310';
+import { store, APP_VERSION } from './store.js?v=311';
+import { K } from './storage.js?v=311';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=311';
+import { startStateSync } from './stateSync.js?v=311';
+import { api } from './api.js?v=311';
+import { themeManager } from './themes.js?v=311';
+import { Sidebar } from './components/sidebar.js?v=311';
+import { Chat } from './components/chat.js?v=311';
+import { TopologyGraph } from './components/topology.js?v=311';
+import { initTopoPanel } from './components/topoPanel.js?v=311';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -20,31 +20,31 @@ import { initTopoPanel } from './components/topoPanel.js?v=310';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=310')
+  return import('./components/topology3d/index.js?v=311')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=310';
-import { AgentEditor } from './components/agentEditor.js?v=310';
-import { ProviderEditor } from './components/providerEditor.js?v=310';
-import { Microphone } from './components/microphone.js?v=310';
-import { ConfigPanel } from './components/configPanel.js?v=310';
-import { ExportPanel } from './components/export.js?v=310';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=310';
-import { TerminalPanel } from './components/terminalPanel.js?v=310';
-import { MetricsPanel } from './components/metricsPanel.js?v=310';
-import { TracePanel } from './components/tracePanel.js?v=310';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=310';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=310';
-import { initApprovals } from './approvals.js?v=310';
-import * as memory from './memory.js?v=310';
-import { audio } from './audio.js?v=310';
-import { AlwaysOn } from './alwaysOn.js?v=310';
-import { ApiLab } from './apiLab.js?v=310';
-import { BrainLab } from './brainlab.js?v=310';
+import { RoutingChart } from './components/routingChart.js?v=311';
+import { AgentEditor } from './components/agentEditor.js?v=311';
+import { ProviderEditor } from './components/providerEditor.js?v=311';
+import { Microphone } from './components/microphone.js?v=311';
+import { ConfigPanel } from './components/configPanel.js?v=311';
+import { ExportPanel } from './components/export.js?v=311';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=311';
+import { TerminalPanel } from './components/terminalPanel.js?v=311';
+import { MetricsPanel } from './components/metricsPanel.js?v=311';
+import { TracePanel } from './components/tracePanel.js?v=311';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=311';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=311';
+import { initApprovals } from './approvals.js?v=311';
+import * as memory from './memory.js?v=311';
+import { audio } from './audio.js?v=311';
+import { AlwaysOn } from './alwaysOn.js?v=311';
+import { ApiLab } from './apiLab.js?v=311';
+import { BrainLab } from './brainlab.js?v=311';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
