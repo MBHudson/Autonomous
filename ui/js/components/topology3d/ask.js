@@ -13,12 +13,20 @@
 // and it is isolated from the main transcript. The traffic still shows on the
 // graph because chat.askAgentInline emits the normal flow events.
 
-import { store } from '../../store.js?v=306';
-import { audio } from '../../audio.js?v=306';
-import { k } from '../../storage.js?v=306';
+import { store } from '../../store.js?v=307';
+import { audio } from '../../audio.js?v=307';
+import { k } from '../../storage.js?v=307';
 
 const VOICE_KEY = k('topoAskVoice');
 const PAD = 12;
+
+/** Render a tool argument verbatim: strings as-is, objects pretty-printed. */
+function toolArgText(arg) {
+  if (arg === undefined || arg === null || arg === '') return '';
+  if (typeof arg === 'string') return arg;
+  if (arg && arg._truncated) return `${arg.preview || ''}\n… (truncated)`;
+  try { return JSON.stringify(arg, null, 2); } catch { return String(arg); }
+}
 
 export class AskDock {
   /**
@@ -121,42 +129,70 @@ export class AskDock {
     this.input.value = '';
     // Show the reply box right away as a "thinking" placeholder, so the answer
     // has somewhere obvious to land.
-    this._showReply(agentId, null, null, true);
+    this._showReply(agentId, {}, true);
     this.ctx.onSend?.(agentId, text);
   }
 
   /** Called by the topology when the store reports the answer. */
-  settle({ agentId, text, error } = {}) {
+  settle({ agentId, text, error, toolCalls, reasoning } = {}) {
     this.pending = false;
     this.sendBtn?.classList.remove('busy');
     if (agentId && this.agentId && agentId !== this.agentId) return; // stale ask
     const id = agentId || this.agentId;
     this._replyAgentId = id;
-    this._showReply(id, text, error, false);
+    this._showReply(id, { text, error, toolCalls, reasoning }, false);
     if (!error && text && this.voiceOn) {
       const agent = (store.get('agents') || []).find(a => a.id === id) || {};
       // An agent muted in its own settings stays silent here too.
       if (agent.voice !== 'off' && agent.muteVoice !== true) {
         try {
-          // Per-agent voice/pitch are honoured; a missing choice falls back to
-          // the configured engine (cloud or the browser's own voices).
+          // Only the closing answer is read aloud -- never the tool dumps.
           audio.speak(text, { voice: agent.voice, pitch: agent.pitch });
         } catch { /* a failed read-aloud must never break the reply */ }
       }
     }
   }
 
-  _showReply(agentId, text, error, thinking) {
+  _showReply(agentId, detail = {}, thinking) {
     const agent = (store.get('agents') || []).find(a => a.id === agentId) || {};
     const color = agent.color || '#00e5ff';
     this.replyEl.hidden = false;
     this.replyEl.style.setProperty('--c', color);
     this.whoEl.textContent = agent.name || 'Model';
+    const err = !thinking && detail.error;
     this.bodyEl.classList.toggle('thinking', !!thinking);
-    this.bodyEl.classList.toggle('error', !thinking && !!error);
+    this.bodyEl.classList.toggle('error', !!err);
     if (thinking) this.bodyEl.textContent = 'Thinking…';
-    else if (error) this.bodyEl.textContent = error;
-    else this.bodyEl.textContent = String(text || '').trim() || '(empty reply)';
+    else if (err) this.bodyEl.textContent = detail.error;
+    else this.bodyEl.textContent = this._compose(detail);
+    // Always show the newest content.
+    this.bodyEl.scrollTop = this.bodyEl.scrollHeight;
+  }
+
+  /**
+   * Everything the model did, as raw text: reasoning (if any), then each tool
+   * call with its arguments and its output, then the closing answer. No boxes,
+   * no collapsing -- verbose on purpose.
+   */
+  _compose({ text, toolCalls, reasoning } = {}) {
+    const parts = [];
+    const reason = String(reasoning || '').trim();
+    if (reason) parts.push(reason, '');
+    const calls = Array.isArray(toolCalls) ? toolCalls : [];
+    calls.forEach((c) => {
+      const name = (c && c.tool) || 'tool';
+      parts.push(`── tool: ${name} ──`);
+      const arg = toolArgText(c && c.arg);
+      if (arg) parts.push(`args: ${arg}`);
+      const status = (c && c.status) || 'done';
+      const ms = (c && c.ms != null) ? ` (${c.ms}ms)` : '';
+      const out = String((c && c.result) != null ? c.result : '').trimEnd();
+      parts.push(`result [${status}]${ms}:`, out || '(no output)', '');
+    });
+    const answer = String(text || '').trim();
+    if (answer) parts.push(answer);
+    if (!parts.length) return '(empty reply)';
+    return parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   closeReply() { this.replyEl.hidden = true; }

@@ -1,8 +1,24 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v306**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v307**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v307 — the graph's inline reply now shows the real tool work
+
+- **Tool calls are shown verbatim in the topology's floating reply box** — each
+  call's name, its arguments (pretty-printed), its status and duration, and the
+  full tool output — followed by the model's closing answer. Reasoning, when the
+  provider streams it, is shown first. Everything is raw text, verbose on
+  purpose: no boxes, no collapsing, no "tool called" placeholder.
+- `askAgentInline()` now returns `toolCalls` and `reasoning` alongside the text;
+  `ask.js` composes them. The reply body scrolls (`min-height:0` + a styled
+  scrollbar) once the content is taller than the box, and the view auto-scrolls
+  to the newest content.
+- Only the closing answer is read aloud by the Voice toggle — never the tool
+  dumps.
 
 ---
 

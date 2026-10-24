@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=306';
-import { K as STORAGE_K } from '../storage.js?v=306';
+import { store } from '../store.js?v=307';
+import { K as STORAGE_K } from '../storage.js?v=307';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,24 +12,24 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=306';
-import { persistence } from '../persistence.js?v=306';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=306';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=306';
-import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=306';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=306';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=306';
-import { usageFor } from '../rateGovernor.js?v=306';
-import { trace } from '../trace.js?v=306';
-import { latency } from '../latency.js?v=306';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=306';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=306';
-import { SlashCommands } from '../slashCommands.js?v=306';
-import { parseRoute, routingHelp } from '../routing.js?v=306';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=306';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=306';
-import { MessageRenderer, renderToolCalls } from './message.js?v=306';
-import { createAvatar } from './avatar.js?v=306';
+import { api, errText } from '../api.js?v=307';
+import { persistence } from '../persistence.js?v=307';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=307';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=307';
+import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=307';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=307';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=307';
+import { usageFor } from '../rateGovernor.js?v=307';
+import { trace } from '../trace.js?v=307';
+import { latency } from '../latency.js?v=307';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=307';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=307';
+import { SlashCommands } from '../slashCommands.js?v=307';
+import { parseRoute, routingHelp } from '../routing.js?v=307';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=307';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=307';
+import { MessageRenderer, renderToolCalls } from './message.js?v=307';
+import { createAvatar } from './avatar.js?v=307';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2513,7 +2513,14 @@ _makeLiveNode(agent) {
       // the topology's floating box, never as a transcript bubble.
       const reply = await this._callAgent(text, agent, ctrl.signal, null, null, { direct: true, inline: true });
       store.emit('flow:respond', { from: agent.id });
-      return { text: (reply && reply.content) || '' };
+      // Hand back the whole run, not just the closing sentence: every tool call
+      // with its arguments and its output, plus any reasoning, so the graph's
+      // box can show the actual work as raw text.
+      return {
+        text: (reply && reply.content) || '',
+        reasoning: (reply && reply.reasoning) || null,
+        toolCalls: (reply && reply.toolCalls) || [],
+      };
     } catch (err) {
       const stopped = err && err.name === 'AbortError';
       store.emit('flow:fail', { to: agent.id });
