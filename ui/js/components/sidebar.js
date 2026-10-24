@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=308';
-import { K } from '../storage.js?v=308';
-import { persistence } from '../persistence.js?v=308';
-import { api } from '../api.js?v=308';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=308';
-import { TOOL_REGISTRY } from '../tools.js?v=308';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=308';
-import { snapshot } from '../rateGovernor.js?v=308';
+import { store } from '../store.js?v=309';
+import { K } from '../storage.js?v=309';
+import { persistence } from '../persistence.js?v=309';
+import { api } from '../api.js?v=309';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=309';
+import { TOOL_REGISTRY } from '../tools.js?v=309';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=309';
+import { snapshot } from '../rateGovernor.js?v=309';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -380,8 +380,6 @@ export class Sidebar {
       <span class="sidebar-section-title">${activeCount} active</span>
       <span class="preprompt-wrap">
         <button class="agent-menu-btn preprompt-btn${preActive ? ' armed' : ''}" id="prePromptBtn" title="Global pre-prompt override${preActive ? ' (ON)' : ' (off)'}">§</button>
-        <button class="agent-menu-btn" id="apiLabBtn" title="API Lab — convert a curl to any language, send it, read the answer">⌬</button>
-        <button class="agent-menu-btn brainlab-btn" id="brainLabBtn" title="Brain Lab — every agent setting, cards and per-agent locks in one place"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true" width="14" height="14"><path d="M6 2.6A2.3 2.3 0 0 0 3.7 4.9c-1 .5-1.6 1.4-1.6 2.5 0 .7.3 1.4.8 1.9-.3.4-.5.9-.5 1.4 0 1.3 1 2.4 2.3 2.6.2.7.8 1.2 1.5 1.2.5 0 .9-.2 1.2-.6V3.2c-.3-.4-.8-.6-1.4-.6Z"/><path d="M10 2.6a2.3 2.3 0 0 1 2.3 2.3c1 .5 1.6 1.4 1.6 2.5 0 .7-.3 1.4-.8 1.9.3.4.5.9.5 1.4 0 1.3-1 2.4-2.3 2.6-.2.7-.8 1.2-1.5 1.2-.5 0-.9-.2-1.2-.6V3.2c.3-.4.8-.6 1.4-.6Z"/></svg></button>
         <div class="agent-menu" id="prePromptMenu" style="display:none">
           <button class="agent-menu-item" data-pre-action="edit">Edit</button>
           <button class="agent-menu-item ${preActive ? 'danger' : 'go'}" data-pre-action="toggle">${preActive ? 'Deactivate' : 'Activate'}</button>
@@ -527,16 +525,8 @@ export class Sidebar {
       this.bodyEl.querySelectorAll('.agent-menu').forEach(m => m.style.display = 'none');
       menu.style.display = isOpen ? 'none' : 'block';
     });
-    // The API Lab lives in its own drawer, so this only has to ask for it.
-    // Rendered per Agents-tab pass, hence the fresh node each time.
-    document.getElementById('apiLabBtn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.apiLab?.toggle();
-    });
-    document.getElementById('brainLabBtn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.brainLab?.toggle();
-    });
+    // API Lab and Brain Lab now live in the apps notch under the header, so the
+    // sidebar no longer carries their buttons.
     document.querySelectorAll('#prePromptMenu [data-pre-action]').forEach(item => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
