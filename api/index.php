@@ -1058,7 +1058,7 @@ function handleState($method, $segments, $body) {
         return;
     }
 
-    if ($method === 'PUT') {
+    if ($method === 'PUT' || $method === 'POST') {
         $incoming = $body['state'] ?? null;
         if (!is_array($incoming)) {
             echo json_encode(['error' => 'PUT with a {state: {...}} body required']);
@@ -1123,6 +1123,7 @@ function handleConfig($method, $segments, $body) {
             echo json_encode(Config::loadConfig());
             break;
         case 'PUT':
+        case 'POST':
             if ($body) {
                 Config::saveConfig($body);
                 echo json_encode(['success' => true]);
