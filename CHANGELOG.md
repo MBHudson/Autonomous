@@ -9,8 +9,20 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v320**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v321**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v321 — Browser: Live stays on
+
+- The **Live** auto-refresh is now a **sticky preference** (persisted in
+  localStorage), not a per-visit toggle. Leaving the Browser screen no longer
+  switches it off, and the poll keeps running **while the app tab is visible** —
+  so coming back to the screen (or an agent acting on the page) is never stale.
+  It still pauses when the browser isn't running or the whole tab is hidden.
+- `browserView.js`: `_live` preference + a single `_syncLive()` that reconciles
+  the toggle, the running state and tab visibility; `hide()` no longer stops it.
 
 ---
 
