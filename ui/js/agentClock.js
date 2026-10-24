@@ -26,10 +26,10 @@
 // Metrics start at zero on an install that has never recorded a call, so a new
 // clock reads "no usage yet" until the agent actually calls.
 
-import { store } from './store.js?v=323';
-import { usageFor, limitsFor } from './rateGovernor.js?v=323';
-import { settingFor } from './agentConfig.js?v=323';
-import { contextLimitFor } from './harness.js?v=323';
+import { store } from './store.js?v=324';
+import { usageFor, limitsFor } from './rateGovernor.js?v=324';
+import { settingFor } from './agentConfig.js?v=324';
+import { contextLimitFor } from './harness.js?v=324';
 
 export { contextLimitFor };
 
