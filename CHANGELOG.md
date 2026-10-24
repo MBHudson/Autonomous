@@ -9,8 +9,21 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v321**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v322**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v322 — Browser: Live-in-background is now a toggle
+
+- The "keep Live polling while the Browser screen is hidden" behaviour from
+  v321 is now **Config → Labs → "Keep Live running when hidden"** (default ON),
+  so you can flip it either way:
+  - **On** — Live keeps refreshing while you're on other screens; never stale.
+  - **Off** — Live pauses when you leave the Browser screen and resumes on return.
+  - The Live on/off choice itself stays a separate, remembered preference.
+- `store.js` setting `browserLiveBackground`; `browserView._syncLive()` honours
+  it (and re-syncs when the toggle changes).
 
 ---
 

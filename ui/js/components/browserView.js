@@ -19,10 +19,10 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=321';
-import { api } from '../api.js?v=321';
-import { esc } from '../utils.js?v=321';
-import { k } from '../storage.js?v=321';
+import { store } from '../store.js?v=322';
+import { api } from '../api.js?v=322';
+import { esc } from '../utils.js?v=322';
+import { k } from '../storage.js?v=322';
 
 /** Live auto-refresh is a sticky preference, not a per-visit toggle. */
 const LIVE_KEY = k('browserLive');
@@ -106,6 +106,7 @@ export class BrowserView {
     // Live keeps running while the app tab is visible, even when this screen
     // is not — so returning to it (or an agent acting) shows the current page.
     document.addEventListener('visibilitychange', () => this._syncLive());
+    store.subscribe('settings.browserLiveBackground', () => this._syncLive());
     this._syncLive();
     this.refreshStatus();
   }
@@ -224,12 +225,18 @@ export class BrowserView {
    * running state, and tab visibility. The poll keeps going while the app tab
    * is visible even if this screen is hidden, so it "stays live".
    */
+  /** Config → Labs → "Keep Live running when hidden". */
+  _bgLive() { return (store.get('settings') || {}).browserLiveBackground !== false; }
+
   _syncLive() {
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
     this.el?.querySelector('#bsLive')?.classList.toggle('active', this._live);
-    if (!this._live || !this.status.running || document.hidden) return;
+    const want = this._live && this.status.running && !document.hidden
+      && (this.open || this._bgLive());
+    if (!want) return;
     this._timer = setInterval(() => {
       if (!this._live || !this.status.running || document.hidden) return;
+      if (!this.open && !this._bgLive()) return;
       if (!this._shotBusy) this.shot();
     }, 2000);
   }

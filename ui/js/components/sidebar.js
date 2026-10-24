@@ -10,16 +10,16 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=321';
-import { K } from '../storage.js?v=321';
-import { persistence } from '../persistence.js?v=321';
-import { api } from '../api.js?v=321';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=321';
-import { TOOL_REGISTRY } from '../tools.js?v=321';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=321';
-import { snapshot } from '../rateGovernor.js?v=321';
-import { resetBrowserEnabled } from '../toolManifest.js?v=321';
-import { perf } from '../perf.js?v=321';
+import { store } from '../store.js?v=322';
+import { K } from '../storage.js?v=322';
+import { persistence } from '../persistence.js?v=322';
+import { api } from '../api.js?v=322';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=322';
+import { TOOL_REGISTRY } from '../tools.js?v=322';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=322';
+import { snapshot } from '../rateGovernor.js?v=322';
+import { resetBrowserEnabled } from '../toolManifest.js?v=322';
+import { perf } from '../perf.js?v=322';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1492,6 +1492,11 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <div class="toggle" id="sbBrowser"><div class="toggle-knob"></div></div>
         </div>
         <div class="form-hint">Drives an installed Chrome or Edge over the DevTools Protocol — no packages. Off by default. Agents reach it with the <code>browser_*</code> tools; you can watch the window and take over, and the login profile persists. (Stored server-side; needs Chrome or Edge installed.)</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Keep Live running when hidden <span class="form-hint-inline">browser screen</span></span>
+          <div class="toggle ${settings.browserLiveBackground !== false ? 'active' : ''}" id="sbLiveBg"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-hint">On: the Browser's Live view keeps refreshing while you are on other screens, so it is never stale when you return. Off: Live pauses when you leave the Browser screen and resumes when you come back. Either way the Live on/off choice itself is remembered.</div>
         <div class="form-hint" id="sbLabsStatus"></div>
       `)}
 
@@ -1760,6 +1765,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbDynTools', (val) => store.set('settings.dynamicTools', val));
     this._initToggle('sbDialectMemo', (val) => store.set('settings.toolDialectMemo', val));
     this._initToggle('sbApiPool', (val) => store.set('settings.apiPool', val));
+    this._initToggle('sbLiveBg', (val) => store.set('settings.browserLiveBackground', val));
     this._initBrowserToggle();
     this._loadLabsStatus();
 
