@@ -9,8 +9,18 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v323**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v324**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v324 — installers: the copyright header no longer runs on screen
+
+- `start.bat`, `start-php.bat` and `setup-xampp.bat` had the copyright notice
+  **above** `@echo off`, so cmd echoed the `REM` lines as they scrolled past —
+  it looked like the notice was being run as commands. `@echo off` is now line 1
+  and the notice stays as `REM` comments (silent). The `.sh` and `.ps1`
+  installers already use `#`, which never executes.
 
 ---
 
