@@ -15,17 +15,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=307';
-import { store } from '../../store.js?v=307';
-import { k, K } from '../../storage.js?v=307';
-import { latency } from '../../latency.js?v=307';
-import { SceneCore, webglAvailable } from './scene.js?v=307';
-import { ForceLayout } from './layout.js?v=307';
-import { NodeView, Nebula } from './nodes.js?v=307';
-import { Beam } from './beams.js?v=307';
-import { LabelLayer } from './labels.js?v=307';
-import { PopupCard } from './popup.js?v=307';
-import { AskDock } from './ask.js?v=307';
+import { TopologyGraph } from '../topology.js?v=308';
+import { store } from '../../store.js?v=308';
+import { k, K } from '../../storage.js?v=308';
+import { latency } from '../../latency.js?v=308';
+import { SceneCore, webglAvailable } from './scene.js?v=308';
+import { ForceLayout } from './layout.js?v=308';
+import { NodeView, Nebula } from './nodes.js?v=308';
+import { Beam } from './beams.js?v=308';
+import { LabelLayer } from './labels.js?v=308';
+import { PopupCard } from './popup.js?v=308';
+import { AskDock } from './ask.js?v=308';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
@@ -119,6 +119,13 @@ export class Topology3D extends TopologyGraph {
         onClose: () => this._select(null, true),
         // The card's ASK button drops the inline prompt just under it.
         onAsk: (id) => this.ask?.openPrompt(id),
+        // MCP data for the server / friend cards.
+        mcpStatus: () => this._mcpStatus,
+        mcpLog: () => this._mcpLog,
+        mcpServers: () => this._mcpServers,
+        mcpFriends: () => this._mcpFriends,
+        mcpEnabled: () => this._mcpEnabled,
+        onProbeMcp: () => this._probeMcp().then(() => this.popup?.refresh()),
       });
 
       // Inline "ask this model" dock: its own prompt box plus the floating
@@ -337,6 +344,10 @@ export class Topology3D extends TopologyGraph {
       const pid = `provider_${n.providerId}`;
       if (this.views.has(pid)) this.links.push({ from: n.id, to: pid, w: 0.5 });
       this.links.push({ from: 'user', to: n.id, w: 0.2 });
+    });
+    // MCP servers (out) and friends (in) hang off You.
+    this.nodes.forEach(n => {
+      if (n.type === 'mcp' || n.type === 'mcpclient') this.links.push({ from: 'user', to: n.id, w: 0.25 });
     });
     this._linksDirty = true;
 

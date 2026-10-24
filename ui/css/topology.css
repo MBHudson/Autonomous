@@ -988,3 +988,41 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
 }
 .t3d-ask-reply-body.thinking { color: var(--text-dim); font-style: italic; }
 .t3d-ask-reply-body.error { color: var(--danger, #ff4757); }
+
+/* ---- MCP card: tabs + inline Access / Permissions editors ---- */
+.t3d-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.t3d-tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font: 10px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.t3d-tab:hover { color: var(--text-primary); }
+.t3d-tab.on { color: var(--c, var(--accent-cyan)); border-bottom-color: var(--c, var(--accent-cyan)); }
+
+.mcp-editor { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+.mcp-editor .form-label { margin-top: 6px; }
+.mcp-editor .form-input,
+.mcp-editor .form-textarea,
+.mcp-editor .form-select { font-size: 11px; }
+.mcp-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.mcp-edit-actions .btn { padding: 5px 10px; }
+.mcp-toggles { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 2px; }
+.mcp-toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+.mcp-scopes { display: flex; flex-direction: column; gap: 4px; }
+.mcp-scopes .tool-option { display: flex; align-items: center; gap: 6px; }
+.mcp-interps { display: flex; flex-direction: column; gap: 6px; }
+.mcp-interps .interp-row { display: flex; align-items: center; gap: 8px; }
+.mcp-interps .interp-row .tool-name { width: 62px; font: 10px var(--font-mono); color: var(--text-primary); }
+.mcp-interps .interp-row .form-select { width: 108px; }
+.mcp-interps .interp-row .tool-desc { flex: 1; font-size: 9px; color: var(--text-dim); }

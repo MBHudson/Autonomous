@@ -2,11 +2,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=307';
-import { acquire, note429 } from './rateGovernor.js?v=307';
-import { latency } from './latency.js?v=307';
-import { detectFamily } from './harness.js?v=307';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=307';
+import { store } from './store.js?v=308';
+import { acquire, note429 } from './rateGovernor.js?v=308';
+import { latency } from './latency.js?v=308';
+import { detectFamily } from './harness.js?v=308';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=308';
 
 latency.bindStore(store);
 
@@ -366,6 +366,7 @@ class ApiClient {
   // --- MCP server (this app AS a server friends can connect to) ---
   mcpServerConfig() { return this.request('GET', '/mcp-server/config'); }
   mcpServerSave(config) { return this.request('POST', '/mcp-server/config', config || {}); }
+  mcpActivity() { return this.request('GET', '/mcp-server/activity'); }
 
   // --- Audio: speech synthesis and transcription, proxied server-side ---
 

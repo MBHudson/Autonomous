@@ -687,6 +687,13 @@ function handleMcpServer($method, $segments, $body, $server) {
         return;
     }
 
+    // Recent calls FRIENDS have made into us (reads storage/mcp.log). Operator
+    // only: this route is not the RPC endpoint, so it stays web-token gated.
+    if ($action === 'activity') {
+        echo json_encode(['success' => true, 'entries' => McpServer::activity(80)]);
+        return;
+    }
+
     if ($method !== 'POST') {
         http_response_code(405);
         echo json_encode(['error' => 'POST required (JSON-RPC)']);

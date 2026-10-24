@@ -1,8 +1,35 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v307**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v308**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v308 — MCP on the graph: nodes, traffic, and editable access
+
+- **MCP servers you call (out) and friends' clients connected to you (in) are
+  now nodes** on the topology — amber for a server, sky for a friend — with the
+  same clickable cards as everything else. Outgoing calls animate agent → server
+  → agent live (the tool layer emits the flow events); incoming friend traffic is
+  polled from the server's audit log (`GET /api/mcp-server/activity`), so those
+  beams tick in on the poll interval rather than frame-perfect (there is no push
+  channel).
+- **Cards**: a server card shows transport, reachability + tool count, the tool
+  policy and your recent calls (tool, ok/err, ms, time). A friend card shows
+  server on/off, their scope, and their recent calls.
+- **Two extra tabs on every MCP card.** **Access** edits the node itself: a
+  server's connection (command/args/env or URL/headers) plus a new **per-server
+  tool allow/deny list** (deny is absolute; a non-empty allow list restricts to
+  it — enforced server-side in `Mcp::callTool`), and a friend's **scope**
+  (read/write/exec) and IP allowlist. **Permissions** edits the app-wide shell
+  **allow/deny lists, interpreter levels, auto-approve / auto-deny and the code
+  interpreter** — the same Config values, saved inline.
+- **Audit log is JSON now** (`mcp=<label> tool ok err args result`), so cards and
+  traffic can be reconstructed; each line keeps its index as `seq` for polling.
+- New `ui/js/components/topology3d/mcpPanel.js`; changes in `topology.js`,
+  `topology3d/{index,layout,nodes,popup}.js`, `tools.js`, `api.js`, `src/Mcp.php`,
+  `src/McpServer.php`, `api/index.php`, `topology.css`.
 
 ---
 

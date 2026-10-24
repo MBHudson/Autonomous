@@ -56,6 +56,8 @@ class Mcp {
                 'transport' => 'http',
                 'url' => $url,
                 'headers' => is_array($s['headers'] ?? null) ? $s['headers'] : [],
+                'allow_tools' => self::toolList($s['allow_tools'] ?? []),
+                'deny_tools' => self::toolList($s['deny_tools'] ?? []),
             ];
         }
         $command = trim((string)($s['command'] ?? ''));
@@ -67,7 +69,14 @@ class Mcp {
             'command' => $command,
             'args' => $args,
             'env' => self::envPairs($s['env'] ?? null),
+            'allow_tools' => self::toolList($s['allow_tools'] ?? []),
+            'deny_tools' => self::toolList($s['deny_tools'] ?? []),
         ];
+    }
+
+    /** A normalised list of tool names (trimmed, non-empty). */
+    private static function toolList($raw) {
+        return array_values(array_filter(array_map('strval', (array)$raw), fn($t) => trim($t) !== ''));
     }
 
     /** Normalise an operator-supplied env map into string key/value pairs. */
@@ -139,6 +148,15 @@ class Mcp {
         if (!$s) { throw new \RuntimeException("mcp: no server named \"$id\""); }
         $tool = (string)$tool;
         if ($tool === '') { throw new \RuntimeException('mcp: tool name is required'); }
+        // Operator's per-server allow/deny list. The denylist is absolute (a
+        // denied tool can never run); a non-empty allowlist restricts to it.
+        if (in_array($tool, $s['deny_tools'] ?? [], true)) {
+            throw new \RuntimeException("mcp: tool \"$tool\" is on the deny list for server \"$id\"");
+        }
+        $allow = $s['allow_tools'] ?? [];
+        if ($allow && !in_array($tool, $allow, true)) {
+            throw new \RuntimeException("mcp: tool \"$tool\" is not on the allow list for server \"$id\"");
+        }
         $res = self::rpc($s, 'tools/call', ['name' => $tool, 'arguments' => is_array($args) ? $args : (object)[]]);
         $text = self::flatten($res['content'] ?? null);
         return [

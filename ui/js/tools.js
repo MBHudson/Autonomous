@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=307';
-import { asText, compactText } from './utils.js?v=307';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=307';
-import { settingFor } from './agentConfig.js?v=307';
-import { trace } from './trace.js?v=307';
+import { store } from './store.js?v=308';
+import { asText, compactText } from './utils.js?v=308';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=308';
+import { settingFor } from './agentConfig.js?v=308';
+import { trace } from './trace.js?v=308';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -786,13 +786,37 @@ export function bindSandboxTools(api) {
     }).join('\n');
   };
 
-  TOOL_REGISTRY.mcp_call.run = async (arg) => {
+  TOOL_REGISTRY.mcp_call.run = async (arg, _note, ctx) => {
     const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
     const server = String(a.server || '');
     const tool = String(a.tool || a.name || '');
     if (!server || !tool) return 'error: mcp_call needs "server" and "tool"';
-    const res = await api.mcpCall(server, tool, a.arguments ?? a.args ?? {});
-    return (res.is_error ? '[tool error] ' : '') + (res.text || '(no output)');
+    const args = a.arguments ?? a.args ?? {};
+    // Light up the topology: beam out to the MCP server, and back when it
+    // answers. ctx.agentId is whoever called, so the line runs agent -> server.
+    const from = ctx && ctx.agentId;
+    const nodeId = 'mcp_' + server;
+    if (from) store.emit('flow:speak', { from, to: nodeId });
+    const t0 = Date.now();
+    let ok = true;
+    let out = '';
+    try {
+      const res = await api.mcpCall(server, tool, args);
+      ok = !res.is_error;
+      out = res.text || '(no output)';
+      return (res.is_error ? '[tool error] ' : '') + out;
+    } catch (err) {
+      ok = false;
+      out = err && err.message ? err.message : String(err);
+      throw err;
+    } finally {
+      if (from) store.emit('flow:speak', { from: nodeId, to: from });
+      // Recorded for the node's card: last calls, ok/err, duration.
+      store.emit('mcp:call', {
+        direction: 'out', server, tool, ok, ms: Date.now() - t0,
+        at: Date.now(), args, result: out, agentId: from || null,
+      });
+    }
   };
 
   TOOL_REGISTRY.multi_edit.run = async (arg, _note, ctx) => {

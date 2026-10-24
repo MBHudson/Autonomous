@@ -226,7 +226,7 @@ class McpServer {
                     throw new \RuntimeException("\"$name\" needs the \"{$def['scope']}\" scope, which this token does not have");
                 }
                 $text = self::runTool($name, $args, $token);
-                self::audit($token, $name, $args, true);
+                self::audit($token, $name, $args, true, '', is_string($text) ? $text : '');
                 return self::out(200, self::rpcResult($id, ['content' => [['type' => 'text', 'text' => $text]]]));
             } catch (\Throwable $e) {
                 self::audit($token, $name, $args, false, $e->getMessage());
@@ -468,17 +468,68 @@ class McpServer {
         throw new \RuntimeException("tool \"$name\" is not implemented");
     }
 
-    /** One line per call in storage/mcp.log. Best-effort. */
-    private static function audit($token, $tool, $args, $ok, $err = '') {
+    /**
+     * One JSON line per call in storage/mcp.log. Best-effort.
+     *
+     * JSON, not prose: the topology reads these back to draw a friend's
+     * traffic and fill its card, and free text (with spaces in an error or an
+     * argument) was unparseable. Every field is length-capped so one huge
+     * output cannot bloat the log.
+     */
+    private static function audit($token, $tool, $args, $ok, $err = '', $result = '') {
         try {
             $dir = self::appDirSafe() . '/storage';
             if (!is_dir($dir)) { return; }
-            $line = sprintf("%s mcp=%s tool=%s scope=%s ok=%s%s\n",
-                date('c'), $token['label'] ?? '?', $tool,
-                implode('+', $token['scope'] ?? []), $ok ? '1' : '0',
-                $err !== '' ? ' err=' . str_replace("\n", ' ', substr($err, 0, 160)) : '');
-            @file_put_contents($dir . '/mcp.log', $line, FILE_APPEND | LOCK_EX);
+            $entry = [
+                'at' => date('c'),
+                'mcp' => (string)($token['label'] ?? '?'),
+                'scope' => array_values($token['scope'] ?? []),
+                'tool' => (string)$tool,
+                'ok' => (bool)$ok,
+                'err' => $err !== '' ? self::clip($err, 300) : '',
+                'args' => self::brief($args),
+                'result' => $result !== '' ? self::clip($result, 400) : '',
+            ];
+            @file_put_contents(
+                $dir . '/mcp.log',
+                json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n",
+                FILE_APPEND | LOCK_EX
+            );
         } catch (\Throwable $e) { /* never fail a call over logging */ }
+    }
+
+    private static function clip($s, $n) {
+        $s = str_replace(["\r", "\n"], ' ', (string)$s);
+        return strlen($s) > $n ? substr($s, 0, $n) . '…' : $s;
+    }
+
+    private static function brief($v) {
+        if (is_string($v)) { return self::clip($v, 300); }
+        try {
+            return self::clip(json_encode($v, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 300);
+        } catch (\Throwable $e) { return ''; }
+    }
+
+    /**
+     * Recent calls friends have made, newest last, for the topology's cards.
+     * Each entry keeps its absolute line number as `seq` so a poller can tell
+     * which are new. Unparseable (older-format) lines are skipped.
+     */
+    public static function activity($limit = 80) {
+        try {
+            $path = self::appDirSafe() . '/storage/mcp.log';
+            if (!is_file($path)) { return []; }
+            $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (!is_array($lines)) { return []; }
+            $out = [];
+            foreach (array_slice($lines, -$limit, null, true) as $seq => $line) {
+                $e = json_decode($line, true);
+                if (!is_array($e)) { continue; }
+                $e['seq'] = (int)$seq;
+                $out[] = $e;
+            }
+            return $out;
+        } catch (\Throwable $e) { return []; }
     }
 
     private static function appDirSafe() {

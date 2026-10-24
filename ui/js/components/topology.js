@@ -2,9 +2,9 @@
 // TOPOLOGY.JS — SVG network graph
 // ============================================
 
-import { store } from '../store.js?v=307';
-import { api } from '../api.js?v=307';
-import { esc, agentCode } from '../utils.js?v=307';
+import { store } from '../store.js?v=308';
+import { api } from '../api.js?v=308';
+import { esc, agentCode } from '../utils.js?v=308';
 
 // How long a hop stays bright while in flight, and how long it then lingers as
 // a faint record of the exchange before it fades out and is dropped.
@@ -35,6 +35,15 @@ export class TopologyGraph {
     this.particles = [];
     this.flows = [];
     this._flowSeq = 0;
+    // MCP: servers we call (out) and friends' clients connected to us (in).
+    this._mcpServers = [];
+    this._mcpFriends = [];
+    this._mcpStatus = [];
+    this._mcpEnabled = false;
+    this._mcpLog = [];
+    this._mcpSeq = -1;
+    this._mcpTimer = null;
+    this._mcpCfgTimer = null;
   }
 
   init() {
@@ -106,6 +115,16 @@ export class TopologyGraph {
     }));
     store.on('flow:respond', (d) => this._flowRespond(d?.from));
     store.on('flow:fail', (d) => this._flowFadeTo(d?.to));
+
+    // MCP traffic. Outgoing calls are announced by the tool layer; incoming
+    // (friends connected to us) are polled from the server's audit log —
+    // there is no push channel, so a friend's beam animates on the poll tick.
+    store.on('mcp:call', (d) => this._mcpRecord(d));
+    store.on('mcp:probe', () => this._probeMcp());
+    store.on('mcp:config-changed', () => this._loadMcp());
+    this._loadMcp();
+    this._mcpTimer = setInterval(() => this._pollMcpActivity(), 2500);
+    this._mcpCfgTimer = setInterval(() => this._loadMcp({ quiet: true }), 15000);
 
     // Initial render
     this.refresh();
@@ -210,6 +229,31 @@ export class TopologyGraph {
       // No session edges: tight orbital clustering shows the association.
     });
 
+    // MCP servers we connect OUT to (amber) and friends' clients connected IN to
+    // us (sky). Namespaced ids so they can never collide with an agent.
+    (this._mcpServers || []).forEach(s => {
+      if (!s || !s.id) return;
+      const id = `mcp_${s.id}`;
+      if (this.nodes.some(n => n.id === id)) return;
+      this.nodes.push({
+        id, label: s.id, type: 'mcp', status: 'idle', color: '#f59e0b',
+        transport: s.transport || 'stdio',
+      });
+      this.edges.push({ from: 'user', to: id, type: 'mcp', animated: false });
+    });
+    const seenFriends = new Set();
+    (this._mcpFriends || []).forEach(t => {
+      const label = String((t && t.label) || '').trim() || 'friend';
+      const id = `mcpclient_${label}`;
+      if (seenFriends.has(id)) return;
+      seenFriends.add(id);
+      this.nodes.push({
+        id, label, type: 'mcpclient', status: 'idle', color: '#38bdf8',
+        scope: (t && t.scope) || [],
+      });
+      this.edges.push({ from: 'user', to: id, type: 'mcp', animated: false });
+    });
+
     // Preserve live working states across rebuilds. Any agent at either end of a
     // live line counts as working, so an agent that is mid-conversation with
     // another agent keeps its rings instead of only the one doing the calling.
@@ -283,6 +327,19 @@ export class TopologyGraph {
       this.positions.set(node.id, {
         x: anchor.x + radius * Math.cos(angle),
         y: anchor.y + radius * Math.sin(angle),
+      });
+    });
+
+    // MCP nodes ring the outside, spread over the lower arc so they clear the
+    // provider nebulas above them.
+    const mcpNodes = this.nodes.filter(n => n.type === 'mcp' || n.type === 'mcpclient');
+    const mcpRadius = Math.min(width, height) * 0.46;
+    mcpNodes.forEach((node, i) => {
+      const t = mcpNodes.length === 1 ? 0.5 : i / (mcpNodes.length - 1);
+      const angle = Math.PI * (0.15 + t * 0.7);   // 27° … 153°, i.e. the bottom
+      this.positions.set(node.id, {
+        x: centerX + mcpRadius * Math.cos(angle),
+        y: centerY + mcpRadius * Math.sin(angle),
       });
     });
 
@@ -599,6 +656,73 @@ export class TopologyGraph {
     this._renderFlows();
   }
 
+  // ==================== MCP (servers out / friends in) ====================
+
+  /** Fetch the MCP server + friend list (cheap) and chart them. */
+  async _loadMcp() {
+    try {
+      const [srv, cfg] = await Promise.all([
+        api.mcpServers().catch(() => ({ servers: [] })),
+        api.mcpServerConfig().catch(() => ({ tokens: [] })),
+      ]);
+      this._mcpServers = (srv && srv.servers) || [];
+      this._mcpFriends = (cfg && Array.isArray(cfg.tokens)) ? cfg.tokens : [];
+      this._mcpEnabled = !!(cfg && cfg.enabled);
+      this.refresh();
+    } catch { /* keep the last known set */ }
+  }
+
+  /** Reachability + tool count per server. Probes them, so call it on demand. */
+  async _probeMcp() {
+    try {
+      const res = await api.mcpStatus();
+      this._mcpStatus = (res && res.status) || [];
+      this._mcpNotify();
+    } catch { /* leave the last known status */ }
+    return this._mcpStatus;
+  }
+
+  _mcpStatusFor(id) { return (this._mcpStatus || []).find(s => s.id === id) || null; }
+
+  /** Record a call — outgoing (tool layer) or incoming (activity poll). */
+  _mcpRecord(entry) {
+    if (!entry) return;
+    this._mcpLog.push(entry);
+    while (this._mcpLog.length > 60) this._mcpLog.shift();
+    this._mcpNotify();
+  }
+
+  /** Nudge the 3D card to repaint; harmless when it is not showing. */
+  _mcpNotify() {
+    try { this.popup?.refresh?.(); } catch { /* card is optional */ }
+  }
+
+  /**
+   * Poll the server's audit log for friend activity and turn any new lines into
+   * topology traffic. The FIRST poll only records a baseline, so a reload does
+   * not replay old calls as animations.
+   */
+  async _pollMcpActivity() {
+    let res;
+    try { res = await api.mcpActivity(); } catch { return; }
+    const entries = (res && res.entries) || [];
+    if (!entries.length) return;
+    const maxSeq = entries[entries.length - 1].seq;
+    if (this._mcpSeq < 0) { this._mcpSeq = maxSeq; return; }
+    if (maxSeq <= this._mcpSeq) return;
+    entries.forEach(e => {
+      if (e.seq <= this._mcpSeq) return;
+      const id = `mcpclient_${e.mcp || 'friend'}`;
+      if (this._mcpEnabled && this.nodes.some(n => n.id === id)) {
+        // Ask + answer: a line in from the friend, and one back.
+        store.emit('flow:speak', { from: id, to: 'user' });
+        store.emit('flow:speak', { from: 'user', to: id });
+      }
+      this._mcpRecord({ direction: 'in', ...e });
+    });
+    this._mcpSeq = maxSeq;
+  }
+
   // ==================== NOTIFICATIONS ====================
   /**
    * Add a notification to the bell dropdown.
@@ -824,7 +948,7 @@ export class TopologyGraph {
   }
 
   _getNodeSize(type) {
-    const sizes = { user: 18, router: 14, agent: 12, provider: 10, session: 8 };
+    const sizes = { user: 18, router: 14, agent: 12, provider: 10, session: 8, mcp: 10, mcpclient: 10 };
     return sizes[type] || 10;
   }
 
@@ -850,6 +974,8 @@ export class TopologyGraph {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
+    if (this._mcpTimer) clearInterval(this._mcpTimer);
+    if (this._mcpCfgTimer) clearInterval(this._mcpCfgTimer);
   }
 }
 
