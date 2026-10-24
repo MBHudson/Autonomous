@@ -59,6 +59,18 @@
   animation: pulse 2s ease-in-out infinite;
 }
 
+/* The desktop brand mark (main.png, transparent). The small blinking dot
+   below is kept as the MOBILE fallback only — see the media query. */
+.logo-mark {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 1px;
+  object-fit: contain;
+}
+.logo-dot { display: none; }
+
 .app-version {
   font-size: 9px;
   color: var(--text-dim);
@@ -572,7 +584,10 @@
 .apps {
   position: absolute;
   top: 56px;                       /* = the header row height */
-  left: 50%;
+  /* Centred on the CHAT column, not the header/viewport, so it stays put when
+     the sidebar or the topology panel is resized. The chat spans from 260px
+     (sidebar) to (100% - --topo-w), so its centre is midway between those. */
+  left: calc(260px + (100% - 260px - var(--topo-w, 420px)) / 2);
   transform: translateX(-50%);
   /* Above the chat content (z 50) but under the routing chart / labs. */
   z-index: 120;
@@ -632,7 +647,12 @@
 .apps-item:focus-visible { background: rgba(0, 229, 255, 0.1); color: var(--accent-cyan); }
 
 @media (max-width: 1024px) {
+  /* One column on a phone: centre on the viewport, not the chat column. */
+  .apps { left: 50%; }
   /* Touch target stays comfortably tappable on a phone. */
   .apps-menu { min-width: 200px; }
   .apps-item { padding: 12px 12px; font-size: 12px; }
+  /* Mobile keeps the small blinking dot; the brand mark is desktop-only. */
+  .logo-mark { display: none; }
+  .logo-dot { display: block; }
 }

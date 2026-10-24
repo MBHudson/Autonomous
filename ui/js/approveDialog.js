@@ -17,7 +17,7 @@
 // into an approval is a prompt that approves things while you fumble for the
 // close button.
 
-import { store } from './store.js?v=314';
+import { store } from './store.js?v=315';
 
 /** tool|arg pairs approved this page-load. Gone on reload, by design. */
 const sessionApprovals = new Set();
