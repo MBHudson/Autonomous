@@ -1,8 +1,23 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v314**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v315**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v315 — brand mark + apps-notch shape and centring
+
+- **The apps pull-tab was upside down.** It is now wide at the top (flush under
+  the header) and narrows toward the bottom.
+- **Centred on the chat column**, not the header/viewport: the notch now sits
+  midway between the sidebar and the topology panel, so resizing either keeps it
+  centred over the chat box. On phones (single column) it centres on the
+  viewport as before.
+- **Brand mark.** `ui/img/main.png` (transparent) is now the **favicon**, and on
+  **desktop only** it replaces the blinking green dot beside the title in the
+  header; the small dot remains as the mobile fallback. `main-motion.gif` was not
+  used — its background is white, which cannot sit on the dark header.
 
 ---
 
