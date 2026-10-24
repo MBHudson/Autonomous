@@ -11,7 +11,7 @@
 // Positions survive rebuilds, so adding one agent eases it in rather than
 // reshuffling the whole picture.
 
-const REST = { agent: 26, session: 11, provider: 0 };
+const REST = { agent: 26, session: 11, provider: 0, mcp: 58, mcpclient: 66 };
 
 function fibonacciSphere(i, n, radius) {
   if (n <= 1) return { x: radius, y: 0, z: 0 };
@@ -76,6 +76,9 @@ export class ForceLayout {
         }
       } else if (n.type === 'session') {
         anchorId = (n.agents || [])[0] || null;
+      } else if (n.type === 'mcp' || n.type === 'mcpclient') {
+        // MCP servers (out) and friends' clients (in) orbit You at rest distance.
+        anchorId = 'user';
       }
       if (!b) {
         const near = anchor || (anchorId && (this.bodies.get(anchorId) || anchors.get(anchorId))) || { x: 0, y: 0, z: 0 };

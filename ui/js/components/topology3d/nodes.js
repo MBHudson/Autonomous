@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 
 /** World radius per node type (mirrors the SVG sizes, scaled to the scene). */
-export const NODE_RADIUS = { user: 5.6, router: 4.4, agent: 3.6, provider: 3.0, session: 1.6 };
+export const NODE_RADIUS = { user: 5.6, router: 4.4, agent: 3.6, provider: 3.0, session: 1.6, mcp: 3.4, mcpclient: 3.2 };
 export const radiusFor = type => NODE_RADIUS[type] || 3;
 
 const RED = new THREE.Color('#ff3355');

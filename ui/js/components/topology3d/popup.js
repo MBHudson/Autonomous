@@ -2,9 +2,10 @@
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=307';
-import { esc } from '../../utils.js?v=307';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=307';
+import { store } from '../../store.js?v=308';
+import { esc } from '../../utils.js?v=308';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=308';
+import { McpPanel } from './mcpPanel.js?v=308';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',
@@ -92,6 +93,11 @@ export class PopupCard {
     host.appendChild(this.el);
     this.nodeId = null;
     this._timer = null;
+    // MCP cards add Access / Permissions tabs. While one is open we hold the
+    // 2s auto-repaint, or it would wipe the form the operator is typing into.
+    this._tab = 'metrics';
+    this._holdRender = false;
+    this.mcpPanel = new McpPanel({ onSaved: () => { if (this.isOpen) this.render(true); } });
 
     this.el.addEventListener('pointerdown', e => e.stopPropagation());
     this.el.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
@@ -101,6 +107,7 @@ export class PopupCard {
       const act = btn.dataset.act;
       if (act === 'close') this.close();
       else if (act === 'ask') this.ctx.onAsk?.(this.nodeId);
+      else if (act === 'mcp-probe') this.ctx.onProbeMcp?.();
       else if (act === 'report') {
         const n = this.ctx.nodeById(this.nodeId);
         if (n?.type === 'agent') store.emit('metrics:showAgent', n.id);
@@ -113,8 +120,10 @@ export class PopupCard {
 
   open(nodeId) {
     this.nodeId = nodeId;
+    this._tab = 'metrics';
+    this._holdRender = false;
     this.el.hidden = false;
-    this.render();
+    this.render(true);
     clearInterval(this._timer);
     // "12s ago" and live status keep moving while the card is up.
     this._timer = setInterval(() => this.render(), 2000);
@@ -126,6 +135,9 @@ export class PopupCard {
   close() {
     if (!this.nodeId) return;
     this.nodeId = null;
+    this._tab = 'metrics';
+    this._holdRender = false;
+    this.mcpPanel?.clear();
     this.el.hidden = true;
     clearInterval(this._timer);
     this.ctx.onClose?.();
@@ -134,7 +146,8 @@ export class PopupCard {
   /** Re-render if open (called on metric/latency/status changes). */
   refresh() { if (this.isOpen) this.render(); }
 
-  render() {
+  render(force = false) {
+    if (this._holdRender && !force) return;
     const n = this.ctx.nodeById(this.nodeId);
     if (!n) { this.close(); return; }
     const color = n.color || '#00e5ff';
@@ -143,6 +156,8 @@ export class PopupCard {
     if (n.type === 'agent') body = this._agent(n, color);
     else if (n.type === 'provider') body = this._provider(n, color);
     else if (n.type === 'user') body = this._user(n);
+    else if (n.type === 'mcp') body = this._mcp(n, color);
+    else if (n.type === 'mcpclient') body = this._mcpclient(n, color);
     else body = this._session(n);
     const statusPill = n.type === 'agent' || n.type === 'user'
       ? `<span class="t3d-pill ${esc(n.status || 'idle')}">${esc(n.status === 'online' ? 'online' : (n.status || 'idle'))}</span>` : '';
@@ -160,13 +175,110 @@ export class PopupCard {
       <div class="t3d-pop-body">${body}</div>`;
     const b = this.el.querySelector('.t3d-pop-body');
     if (b) b.scrollTop = scroll;
+    if (n.type === 'mcp' || n.type === 'mcpclient') this._wireMcpTabs(n);
   }
 
   _subtitle(n) {
     if (n.type === 'agent') return [n.code, n.role].filter(Boolean).join(' · ');
     if (n.type === 'provider') return 'provider';
     if (n.type === 'user') return 'operator';
+    if (n.type === 'mcp') return 'MCP server · you call it';
+    if (n.type === 'mcpclient') return 'MCP client · connected in';
     return 'session';
+  }
+
+  // ---------------- MCP cards (Metrics / Access / Permissions) ----------------
+
+  _mcp(n, color) {
+    const body = this._tab === 'metrics' ? this._mcpMetrics(n) : '<div class="t3d-mcp-edit"></div>';
+    return this._mcpTabs(body);
+  }
+
+  _mcpclient(n) {
+    const body = this._tab === 'metrics' ? this._mcpClientMetrics(n) : '<div class="t3d-mcp-edit"></div>';
+    return this._mcpTabs(body);
+  }
+
+  _mcpTabs(body) {
+    const t = this._tab;
+    const tab = (id, label) => `<button class="t3d-tab${t === id ? ' on' : ''}" type="button" data-mcptab="${id}">${label}</button>`;
+    return `<div class="t3d-tabs">${tab('metrics', 'Metrics')}${tab('access', 'Access')}${tab('perm', 'Permissions')}</div>
+      <div class="t3d-tab-body">${body}</div>`;
+  }
+
+  _wireMcpTabs(n) {
+    this.el.querySelectorAll('[data-mcptab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.dataset.mcptab;
+        if (t === this._tab) return;
+        this._tab = t;
+        // Hold the auto-repaint while an editor is on screen.
+        this._holdRender = t !== 'metrics';
+        if (t === 'metrics') this.mcpPanel.clear();
+        this.render(true);
+      });
+    });
+    const host = this.el.querySelector('.t3d-mcp-edit');
+    if (host && this._tab !== 'metrics') {
+      this.mcpPanel.mount(host, n, this._tab === 'access' ? 'access' : 'perm');
+    }
+  }
+
+  _mcpMetrics(n) {
+    const id = String(n.id).replace(/^mcp_/, '');
+    const st = (this.ctx.mcpStatus?.() || []).find(s => s.id === id);
+    const srv = (this.ctx.mcpServers?.() || []).find(s => s.id === id) || {};
+    const calls = (this.ctx.mcpLog?.() || [])
+      .filter(e => e.direction === 'out' && e.server === id).slice(-14).reverse();
+    const allow = (srv.allow_tools || []).length;
+    const deny = (srv.deny_tools || []).length;
+    const okCount = calls.filter(c => c.ok).length;
+    const reach = st
+      ? (st.ok ? `ok · ${st.tools ?? '?'} tools` : `error: ${esc(String(st.error || '').slice(0, 80))}`)
+      : 'not checked';
+    return `
+      <div class="t3d-sec">
+        <div class="t3d-kv"><label>Transport</label><span>${esc(srv.transport || n.transport || 'stdio')}</span></div>
+        <div class="t3d-kv"><label>Reachability</label><span class="${st && !st.ok ? 'bad' : ''}">${reach}</span></div>
+        <div class="t3d-kv"><label>Tool policy</label><span>${allow ? `${allow} allowed` : 'all allowed'}${deny ? ` · ${deny} denied` : ''}</span></div>
+        <div class="t3d-kv"><label>Your calls</label><span>${calls.length ? `${okCount}/${calls.length} ok` : 'none yet'}</span></div>
+      </div>
+      <div class="t3d-sec"><button class="t3d-link" type="button" data-act="mcp-probe">Check now →</button></div>
+      ${this._mcpCallsBlock(calls, 'Recent calls (you → server)')}`;
+  }
+
+  _mcpClientMetrics(n) {
+    const label = String(n.label || 'friend');
+    const enabled = !!this.ctx.mcpEnabled?.();
+    const calls = (this.ctx.mcpLog?.() || [])
+      .filter(e => e.direction === 'in' && (e.mcp || 'friend') === label).slice(-14).reverse();
+    const okCount = calls.filter(c => c.ok).length;
+    const scope = Array.isArray(n.scope) ? n.scope : [];
+    return `
+      <div class="t3d-sec">
+        <div class="t3d-kv"><label>Status</label><span class="${enabled ? '' : 'bad'}">${enabled ? 'server on' : 'server off'}</span></div>
+        <div class="t3d-kv"><label>Scope</label><span>${scope.length ? esc(scope.join(' / ')) : '—'}</span></div>
+        <div class="t3d-kv"><label>Their calls</label><span>${calls.length ? `${okCount}/${calls.length} ok` : 'none yet'}</span></div>
+      </div>
+      ${this._mcpCallsBlock(calls, 'Recent calls (friend → you)')}`;
+  }
+
+  _mcpCallsBlock(calls, title) {
+    if (!calls || !calls.length) {
+      return `<div class="t3d-sec"><div class="t3d-sec-h">${esc(title)}</div><div class="t3d-empty">Nothing yet</div></div>`;
+    }
+    const rows = calls.map(c => {
+      const ts = typeof c.at === 'number' ? c.at : Date.parse(c.at);
+      const when = Number.isFinite(ts) ? ago(ts) : '';
+      const detail = c.ok ? (c.ms != null ? `${c.ms}ms` : '') : 'error';
+      return `<div class="t3d-msg ${c.ok ? '' : 'fail'}">
+        <span class="t3d-msg-dir ${c.ok ? 'out' : 'in'}">${c.ok ? '→' : '✕'}</span>
+        <span class="t3d-msg-who">${esc(c.tool || '?')}</span>
+        <span class="t3d-msg-kind">${esc(detail)}</span>
+        <span class="t3d-msg-t">${esc(when)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="t3d-sec"><div class="t3d-sec-h">${esc(title)}</div>${rows}</div>`;
   }
 
   _latencyBlock(s, color) {
