@@ -78,14 +78,54 @@ class Browser
         @file_put_contents(self::statePath(), json_encode($s, JSON_UNESCAPED_SLASHES), LOCK_EX);
     }
 
-    private static function httpJson($url, $method = 'GET', $timeout = 3)
+    /**
+     * GET/PUT a Chrome DevTools HTTP endpoint and parse the JSON.
+     *
+     * Deliberately NOT file_get_contents: Chrome answers in ~1ms but keeps the
+     * socket alive, and file_get_contents then blocks until its timeout (it
+     * reads to EOF) — so every status/navigate/screenshot paid several seconds.
+     * Reading exactly Content-Length bytes over a raw socket returns at once.
+     */
+    private static function httpJson($url, $method = 'GET', $timeout = 4)
     {
-        $ctx = stream_context_create(['http' => [
-            'method' => $method, 'timeout' => $timeout, 'ignore_errors' => true,
-            'header' => "Accept: application/json\r\n",
-        ]]);
-        $body = @file_get_contents($url, false, $ctx);
-        if ($body === false) { return null; }
+        $u = parse_url($url);
+        $host = $u['host'] ?? '127.0.0.1';
+        $port = (int)($u['port'] ?? 80);
+        $path = ($u['path'] ?? '/') . (isset($u['query']) ? '?' . $u['query'] : '');
+
+        $fp = @fsockopen($host, $port, $errno, $errstr, $timeout);
+        if (!$fp) { return null; }
+        stream_set_timeout($fp, $timeout);
+        @fwrite($fp, "$method $path HTTP/1.1\r\nHost: $host:$port\r\nAccept: application/json\r\nConnection: close\r\n\r\n");
+
+        // Headers, line by line.
+        $header = '';
+        while (($line = fgets($fp)) !== false) {
+            $header .= $line;
+            if ($line === "\r\n" || $line === "\n") { break; }
+        }
+        if (stripos($header, '200') === false && stripos($header, 'HTTP/') !== false
+            && !preg_match('#HTTP/\d\.\d 2\d\d#', $header)) {
+            fclose($fp);
+            return null;
+        }
+        // Body: exactly Content-Length bytes when Chrome sends it.
+        $len = preg_match('/content-length:\s*(\d+)/i', $header, $m) ? (int)$m[1] : null;
+        $body = '';
+        if ($len !== null) {
+            while (strlen($body) < $len) {
+                $chunk = fread($fp, $len - strlen($body));
+                if ($chunk === '' || $chunk === false) { break; }
+                $body .= $chunk;
+            }
+        } else {
+            while (!feof($fp)) {
+                $chunk = fread($fp, 8192);
+                if ($chunk === '' || $chunk === false) { break; }
+                $body .= $chunk;
+            }
+        }
+        fclose($fp);
         $j = json_decode($body, true);
         return is_array($j) ? $j : null;
     }
@@ -144,6 +184,20 @@ class Browser
             '--disable-popup-blocking',
             '--remote-allow-origins=*',
             '--window-size=1280,900',
+            // Trim the background work that makes a cold headless Chrome slow
+            // and chatty (it was spending time on component updates, sync,
+            // translate and the like before the page even loaded).
+            '--disable-extensions',
+            '--disable-component-update',
+            '--disable-background-networking',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--no-service-autorun',
+            '--metrics-recording-only',
+            '--mute-audio',
+            '--disable-features=Translate,MediaRouter,OptimizationHints,CalculateNativeWinOcclusion',
         ];
         if ($headless) { $args[] = '--headless=new'; }
         $args[] = 'about:blank';

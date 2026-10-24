@@ -182,19 +182,27 @@ class Cdp
 
     // ---- the handful the screen uses -------------------------------------
 
-    public function navigate($url, $timeoutSec = 25)
+    public function navigate($url, $timeoutSec = 12)
     {
-        $this->send('Page.enable');
-        $this->send('Page.navigate', ['url' => (string)$url]);
+        // No Page.enable: it makes Chrome stream the whole Page.* event firehose
+        // that our reader then has to discard, and it is not needed to navigate.
+        $this->send('Page.navigate', ['url' => (string)$url], 15);
+        // Wait only until the document is no longer 'loading'. 'interactive' is
+        // already enough to screenshot, and heavy sites (websockets, long-poll)
+        // reach 'complete' far later or never — which is what made a page take
+        // minutes: every navigation sat out the full timeout.
         $deadline = microtime(true) + $timeoutSec;
+        $wait = 150000;   // 150ms, backing off gently
         while (microtime(true) < $deadline) {
             try {
                 $r = $this->send('Runtime.evaluate', [
                     'expression' => 'document.readyState', 'returnByValue' => true,
                 ], 5);
-                if (($r['result']['value'] ?? '') === 'complete') break;
+                $state = $r['result']['value'] ?? '';
+                if ($state === 'interactive' || $state === 'complete') break;
             } catch (\Throwable $e) { /* keep waiting */ }
-            usleep(250000);
+            usleep($wait);
+            $wait = (int) min(600000, $wait * 1.4);
         }
         return $this->info();
     }

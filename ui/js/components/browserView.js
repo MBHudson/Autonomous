@@ -11,9 +11,9 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=313';
-import { api } from '../api.js?v=313';
-import { esc } from '../utils.js?v=313';
+import { store } from '../store.js?v=314';
+import { api } from '../api.js?v=314';
+import { esc } from '../utils.js?v=314';
 
 export class BrowserView {
   constructor() {
@@ -23,6 +23,12 @@ export class BrowserView {
     this.status = { enabled: false, available: false, running: false };
     this._timer = null;
     this._busy = false;
+    // One request at a time per kind. Without these, pressing Go twice (or the
+    // Live poll overlapping a slow screenshot) queued requests in the browser's
+    // connection pool and the whole screen crawled for minutes.
+    this._navBusy = false;
+    this._shotBusy = false;
+    this._actBusy = false;
   }
 
   init() {
@@ -78,7 +84,11 @@ export class BrowserView {
     });
     this.img.addEventListener('click', (e) => this._click(e));
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.open) this.hide();
+      if (e.key !== 'Escape' || !this.open) return;
+      // Never close the screen while the operator is typing in it.
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+      this.hide();
     });
     this.refreshStatus();
   }
@@ -145,23 +155,32 @@ export class BrowserView {
   }
 
   async go() {
+    if (this._navBusy) return;
     const url = this.el.querySelector('#bsUrl').value.trim();
     if (!url) return;
+    this._navBusy = true;
+    const st = this.el.querySelector('#bsStatus');
+    if (st) st.textContent = 'loading…';
     try {
       const info = await api.browserNavigate(url);
       if (info && info.url) this.el.querySelector('#bsUrl').value = info.url;
       await this.shot();
     } catch (e) {
       this._toast(`Navigate: ${e.message}`, 'error');
+    } finally {
+      this._navBusy = false;
+      this._paintStatus();
     }
   }
 
   async shot() {
-    if (!this.status.running) return;
+    if (!this.status.running || this._shotBusy) return;
+    this._shotBusy = true;
     try {
       const res = await api.browserScreenshot();
       if (res && res.png) this.img.src = 'data:image/png;base64,' + res.png;
     } catch { /* keep the last frame */ }
+    finally { this._shotBusy = false; }
   }
 
   _toggleLive(btn) {
@@ -169,8 +188,8 @@ export class BrowserView {
     btn.classList.add('active');
     this._timer = setInterval(() => {
       if (!this.open || !this.status.running) { this._stopLive(); return; }
-      this.shot();
-    }, 1500);
+      if (!this._shotBusy) this.shot();
+    }, 2000);
   }
   _stopLive() {
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
@@ -178,29 +197,37 @@ export class BrowserView {
   }
 
   async _click(e) {
-    if (!this.status.running) return;
-    const rect = this.img.getBoundingClientRect();
-    const nx = this.img.naturalWidth || rect.width;
-    const ny = this.img.naturalHeight || rect.height;
-    const x = (e.clientX - rect.left) * (nx / rect.width);
-    const y = (e.clientY - rect.top) * (ny / rect.height);
+    if (!this.status.running || this._actBusy) return;
+    this._actBusy = true;
     try {
+      const rect = this.img.getBoundingClientRect();
+      const nx = this.img.naturalWidth || rect.width;
+      const ny = this.img.naturalHeight || rect.height;
+      const x = (e.clientX - rect.left) * (nx / rect.width);
+      const y = (e.clientY - rect.top) * (ny / rect.height);
       await api.browserClick(Math.round(x), Math.round(y));
-      this.shot();
+      await this.shot();
     } catch (err) { this._toast(`Click: ${err.message}`, 'error'); }
+    finally { this._actBusy = false; }
   }
 
   async sendText() {
+    if (this._actBusy) return;
     const box = this.el.querySelector('#bsType');
     const text = box.value;
     if (!text) return;
-    try { await api.browserType(text); box.value = ''; this.shot(); }
+    this._actBusy = true;
+    try { await api.browserType(text); box.value = ''; await this.shot(); }
     catch (e) { this._toast(`Type: ${e.message}`, 'error'); }
+    finally { this._actBusy = false; }
   }
 
   async press(key) {
-    try { await api.browserKey(key); this.shot(); }
+    if (this._actBusy) return;
+    this._actBusy = true;
+    try { await api.browserKey(key); await this.shot(); }
     catch (e) { this._toast(`Key: ${e.message}`, 'error'); }
+    finally { this._actBusy = false; }
   }
 
   async readText() {
