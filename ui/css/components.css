@@ -1564,14 +1564,37 @@ body.agent-reordering .agent-editor:hover {
   color: var(--text-secondary);
 }
 
-/* Provider editor: API pool rows (label + key + remove). */
+/* Provider editor: API pool rows (label + key + model scope). */
 .pool-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
 }
-.pool-row .form-input { flex: 1 1 auto; min-width: 0; }
+.pool-row:last-child { border-bottom: 0; }
+.pool-row-main,
+.pool-row-scope { display: flex; align-items: center; gap: 6px; }
+.pool-row-main .form-input { flex: 1 1 auto; min-width: 0; }
 .pool-row [data-pool="label"] { flex: 0 0 34%; }
 .pool-row [data-pool-remove] { flex: 0 0 auto; padding: 4px 9px; }
+.pool-row-scope [data-pool="model"] { flex: 1 1 auto; min-width: 0; }
+.pool-scope {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font: 9.5px var(--font-mono);
+  letter-spacing: 0.03em;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pool-scope.active {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.1);
+}
 

@@ -2,10 +2,10 @@
 // PROVIDEREDITOR.JS — Provider CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=311';
-import { api } from '../api.js?v=311';
-import { persistence } from '../persistence.js?v=311';
-import { esc, uuid } from '../utils.js?v=311';
+import { store } from '../store.js?v=312';
+import { api } from '../api.js?v=312';
+import { persistence } from '../persistence.js?v=312';
+import { esc, uuid } from '../utils.js?v=312';
 
 export class ProviderEditor {
   constructor() {
@@ -73,7 +73,7 @@ export class ProviderEditor {
             <div id="providerKeys"></div>
             <label class="form-label">Rotate after N requests <span class="form-hint-inline">0 = every call</span></label>
             <input type="number" class="form-input" id="providerRotate" min="0" max="100000" value="${provider ? (provider.rotateAfter ?? 0) : 0}">
-            <div class="form-hint" id="providerPoolHint">Active only when Config → Labs → “API pool” is on. The agent's own Key Override always wins. A 429 puts a key on a 60s cooldown and the next call uses another.</div>
+            <div class="form-hint" id="providerPoolHint">Active only when Config → Labs → “API pool” is on. The agent's own Key Override always wins. Tick <b>Only this model</b> and enter a model # (like <code>#63BET7</code>) or a model id to rotate a key around just that model. A 429 puts a key on a 60s cooldown and the next call uses another.</div>
           </div>
           <div class="toggle-row">
             <span class="toggle-label">Active</span>
@@ -178,10 +178,21 @@ async _fetchModels() {
     }
     host.innerHTML = this._pool.map((k, i) => `
       <div class="pool-row" data-pool-row="${i}">
-        <input class="form-input" data-pool="label" value="${esc(k.label || '')}" placeholder="label (optional)" style="max-width:120px">
-        <input class="form-input" type="password" data-pool="key" value="${esc(k.key || '')}" placeholder="sk-…">
-        <button class="btn btn-ghost btn-sm" data-pool-remove="${i}" type="button" title="Remove">&times;</button>
+        <div class="pool-row-main">
+          <input class="form-input" data-pool="label" value="${esc(k.label || '')}" placeholder="label (optional)">
+          <input class="form-input" type="password" data-pool="key" value="${esc(k.key || '')}" placeholder="sk-…">
+          <button class="btn btn-ghost btn-sm" data-pool-remove="${i}" type="button" title="Remove">&times;</button>
+        </div>
+        <div class="pool-row-scope">
+          <button class="pool-scope${k.only ? ' active' : ''}" data-pool-only type="button"
+            title="Use this key only for the model below">Only this model</button>
+          <input class="form-input" data-pool="model" value="${esc(k.model || '')}"
+            placeholder="model # like #63BET7, or a model id — blank = all models">
+        </div>
       </div>`).join('');
+    host.querySelectorAll('[data-pool-only]').forEach((btn) => {
+      btn.addEventListener('click', () => btn.classList.toggle('active'));
+    });
     host.querySelectorAll('[data-pool-remove]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this._pool = this._collectKeys();
@@ -201,6 +212,8 @@ async _fetchModels() {
       id: (this._pool && this._pool[i] && this._pool[i].id) || uuid('key'),
       label: row.querySelector('[data-pool="label"]')?.value.trim() || '',
       key: row.querySelector('[data-pool="key"]')?.value.trim() || '',
+      model: row.querySelector('[data-pool="model"]')?.value.trim() || '',
+      only: !!row.querySelector('[data-pool-only]')?.classList.contains('active'),
     })).filter((k) => k.key);
   }
 

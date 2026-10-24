@@ -1,8 +1,21 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v311**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v312**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v312 — API pool: scope a key to one model
+
+- Each pooled key can now be **pinned to a model**: tick **Only this model** and
+  enter a model # (the agent's code, like `#63BET7`) or a model id. That key is
+  then used only for that model, so a provider can hold keys dedicated to one
+  model and rotate around it while everything else keeps the single key. Blank #
+  means all models.
+- `apiPool.pickKey` filters the pool by scope before rotating; a scoped key that
+  does not match is skipped (and if nothing matches, the provider's single key is
+  used, as before). UI in `providerEditor.js`; styles in `components.css`.
 
 ---
 

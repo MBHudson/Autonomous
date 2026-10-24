@@ -17,7 +17,8 @@
 // A 429 puts a key on cooldown so the next call tries a different one instead
 // of spending the same refusal again.
 
-import { store } from './store.js?v=311';
+import { store } from './store.js?v=312';
+import { agentCode } from './utils.js?v=312';
 
 const counts = new Map();      // keyId -> requests used this round
 const cooldown = new Map();    // keyId -> epoch ms a key is refused until
@@ -43,6 +44,25 @@ export function keysFor(provider, agent) {
   return list.filter(k => k && typeof k.key === 'string' && k.key.trim());
 }
 
+const norm = s => String(s || '').trim().toLowerCase().replace(/^#/, '');
+
+/**
+ * Does this key apply to the model being called?
+ *
+ * A key is universal unless the operator turned on "only this model" AND gave
+ * a model # (the agent's code, like #63BET7) or a model id. Then it is used
+ * only for that model — so a provider can hold keys dedicated to one model and
+ * rotate around it, while everything else keeps the single key.
+ */
+export function scopeMatches(keyObj, agent) {
+  if (!keyObj || !keyObj.only) return true;
+  const want = norm(keyObj.model);
+  if (!want) return true;                 // toggled on but blank => universal
+  const code = norm(agent ? (agent.code || agentCode(agent)) : '');
+  const model = norm(agent && agent.model);
+  return want === code || want === model || (model && model.includes(want));
+}
+
 /** Reset rotation bookkeeping (e.g. when the pool is edited). */
 export function resetPool(providerId) {
   if (providerId) {
@@ -58,7 +78,7 @@ export function resetPool(providerId) {
  * usable key has hit the cap, a new round starts.
  */
 export function pickKey(provider, agent) {
-  const keys = keysFor(provider, agent);
+  const keys = keysFor(provider, agent).filter(k => scopeMatches(k, agent));
   if (!keys.length) return null;
   const now = Date.now();
   const cap = rotateAfter(provider);
