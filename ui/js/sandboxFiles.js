@@ -1,9 +1,9 @@
-import { store } from './store.js?v=309';
-import { persistence } from './persistence.js?v=309';
-import { api } from './api.js?v=309';
-import { esc, escAttr } from './utils.js?v=309';
-import { renderMarkdown } from './markdown.js?v=309';
-import { sandboxRootFor } from './agentConfig.js?v=309';
+import { store } from './store.js?v=310';
+import { persistence } from './persistence.js?v=310';
+import { api } from './api.js?v=310';
+import { esc, escAttr } from './utils.js?v=310';
+import { renderMarkdown } from './markdown.js?v=310';
+import { sandboxRootFor } from './agentConfig.js?v=310';
 
 const TEXT_EXT = new Set([
   'txt', 'md', 'markdown', 'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',

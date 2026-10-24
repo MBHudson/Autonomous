@@ -2,8 +2,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=309';
-import { K as STORAGE_K } from '../storage.js?v=309';
+import { store } from '../store.js?v=310';
+import { K as STORAGE_K } from '../storage.js?v=310';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -12,24 +12,25 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=309';
-import { persistence } from '../persistence.js?v=309';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=309';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=309';
-import { toolProtocolFor, contextLimitFor, detectFamily } from '../toolProtocol.js?v=309';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=309';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=309';
-import { usageFor } from '../rateGovernor.js?v=309';
-import { trace } from '../trace.js?v=309';
-import { latency } from '../latency.js?v=309';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=309';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=309';
-import { SlashCommands } from '../slashCommands.js?v=309';
-import { parseRoute, routingHelp } from '../routing.js?v=309';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=309';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=309';
-import { MessageRenderer, renderToolCalls } from './message.js?v=309';
-import { createAvatar } from './avatar.js?v=309';
+import { api, errText } from '../api.js?v=310';
+import { persistence } from '../persistence.js?v=310';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=310';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=310';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=310';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, TOOL_REGISTRY } from '../tools.js?v=310';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=310';
+import { buildToolInstructions, getEnvFacts, nextDialect } from '../toolManifest.js?v=310';
+import { usageFor } from '../rateGovernor.js?v=310';
+import { trace } from '../trace.js?v=310';
+import { latency } from '../latency.js?v=310';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=310';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=310';
+import { SlashCommands } from '../slashCommands.js?v=310';
+import { parseRoute, routingHelp } from '../routing.js?v=310';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=310';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=310';
+import { MessageRenderer, renderToolCalls } from './message.js?v=310';
+import { createAvatar } from './avatar.js?v=310';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1421,8 +1422,14 @@ _makeLiveNode(agent) {
     // Teach the model the protocol BEFORE anything else, appended to whatever
     // system message the caller already produced (which may carry the agent's
     // own prompt and its memory block).
-    let instructions = toolInstructions(enabled, sandboxRoot,
-      nativeMode ? 'native-api' : toolProtocolFor(agent));
+    //
+    // `dialect` is kept in a variable so the parse-failure escalation below can
+    // move it without rebuilding everything. Env facts (OS, cwd, which commands
+    // exist) come from the SERVER, cached — see toolManifest.js.
+    let dialect = toolProtocolFor(agent);
+    const envFacts = await getEnvFacts().catch(() => null);
+    let instructions = buildToolInstructions(enabled, sandboxRoot,
+      nativeMode ? 'native-api' : dialect, envFacts);
     if (instructions) {
       // Prepend, never overwrite index 0. A messages array with no system
       // message starts with the oldest history turn, and overwriting that
@@ -1449,6 +1456,11 @@ _makeLiveNode(agent) {
     // One nudge if the model DESCRIBES a tool call instead of sending it
     // ("I'll use the remember tool"). See the narration rescue below.
     let narratedRetries = 0;
+    // One re-teach if the model SENDS something that looks like a tool call but
+    // parses to nothing — usually the wrong dialect for this model. See the
+    // parse-failure escalation below.
+    let parseRetries = 0;
+    const triedDialects = new Set([dialect]);
     // Only the tool exchanges, so a follow-up round can resume this work.
     const transcript = [];
     // ??, not ||: an explicit 0 means "no tool rounds left" (the max floors
@@ -1510,7 +1522,8 @@ _makeLiveNode(agent) {
         if (nativeMode && step === 0 && err?.name !== 'AbortError'
             && (Number(err?.status) === 400 || Number(err?.status) === 422)) {
           nativeMode = false;
-          const promptInstructions = toolInstructions(enabled, sandboxRoot, toolProtocolFor(agent));
+          dialect = toolProtocolFor(agent);
+          const promptInstructions = buildToolInstructions(enabled, sandboxRoot, dialect, envFacts);
           const sysIdx = working.findIndex(m => m && m.role === 'system');
           if (sysIdx !== -1) {
             const old = String(working[sysIdx].content || '');
@@ -1574,7 +1587,52 @@ _makeLiveNode(agent) {
         const call = parseToolCall(chunk, res && res.reasoning);
         if (call) calls.push(call);
       }
+      if (calls.length) {
+        // It parsed. Remember this dialect for this provider::model so the next
+        // turn starts here instead of re-guessing.
+        rememberDialect(agent.provider, agent.model, dialect);
+      }
       if (!calls.length) {
+        // Parse-failure escalation. The model TRIED to call a tool — the reply
+        // carries JSON/XML/tag shapes — but nothing parsed, usually because the
+        // dialect taught was the wrong one for this model. Re-teach ONCE with a
+        // different dialect rather than letting the near-miss become the final
+        // answer, which reads as "the tool did not work".
+        const looksLikeTool = enabled.length > 0
+          && /(\{\s*"tool"\s*:|<\|tool_call\||<function_calls|<invoke\s|\{"tool")/i.test(String(chunk || ''));
+        if (looksLikeTool && parseRetries < 1 && !outOfTime() && !(signal && signal.aborted)) {
+          const alt = nextDialect(dialect, triedDialects);
+          if (alt) {
+            parseRetries++;
+            triedDialects.add(alt);
+            dialect = alt;
+            const reteach = buildToolInstructions(enabled, sandboxRoot, dialect, envFacts);
+            const si = working.findIndex(m => m && m.role === 'system');
+            if (si !== -1) {
+              const old = String(working[si].content || '');
+              working[si] = {
+                ...working[si],
+                content: old.includes(instructions) ? old.replace(instructions, reteach) : `${old}${reteach}`,
+              };
+            }
+            instructions = reteach;
+            text = '';
+            painted = '';
+            working = working.concat([
+              { role: 'assistant', content: chunk },
+              {
+                role: 'user',
+                content: `That reply was not a valid tool call. Send it again using the "${alt}" `
+                  + 'format exactly as instructed, or answer the user in plain prose.',
+              },
+            ]);
+            store.emit('toast', {
+              message: `${agent.name}: tool call did not parse — retrying with the "${alt}" dialect`,
+              type: 'info',
+            });
+            continue;
+          }
+        }
         // Narration rescue. With tools offered, a model sometimes SAYS it will
         // use one ("I'll use the remember tool") instead of emitting the call —
         // typically when a global pre-prompt tells it to reply only in text.

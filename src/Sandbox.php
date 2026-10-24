@@ -363,7 +363,36 @@ class Sandbox {
             'search_configured' => !empty($c['read_roots']) || !empty($c['write_roots'])
                 || $c['search_engine'] === 'ddg',
             'require_token' => $c['require_token'],
+            // --- environment facts (read-only) --------------------------
+            // Consumed by the dynamic tool manifest so a model is told which
+            // shell it is on and which allowlisted programs actually exist,
+            // instead of guessing `findstr` on Linux or `grep` where it is
+            // missing. No new privilege: this is the same allowlist config()
+            // already resolves.
+            'os' => self::isWindows() ? 'windows' : 'posix',
+            'os_family' => PHP_OS_FAMILY,
+            'exec_enabled' => !empty($c['exec_enabled']),
+            'code_enabled' => !empty($c['code_enabled']),
+            'exec_allow' => $c['exec_allow'],
+            'binaries' => self::binaryAvailability($c['exec_allow'], 40),
         ];
+    }
+
+    /**
+     * Which allowlisted programs actually resolve on this host. Bounded so a
+     * large allowlist is not re-resolved in full on every status call.
+     */
+    private static function binaryAvailability($names, $cap = 40) {
+        $out = [];
+        $n = 0;
+        foreach ((array) $names as $name) {
+            if ($n >= $cap) { break; }
+            $name = trim((string) $name);
+            if ($name === '') { continue; }
+            $out[$name] = self::resolveProgram($name) !== null;
+            $n++;
+        }
+        return $out;
     }
 
     /**

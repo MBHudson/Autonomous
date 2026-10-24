@@ -1,8 +1,33 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v309**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v310**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v310 — Dynamic tools: teach each model the environment it is really in
+
+Free/quantised models used to burn several tool calls re-guessing the syntax.
+Three changes, all behind **Config → Labs → "Dynamic tools"** (default ON; off
+restores the classic behaviour exactly):
+
+- **Environment-aware manifest.** The tool instructions now open with the facts
+  that actually matter: the **server's** OS and working directory, and which
+  allowlisted shell commands resolve — so a model is told to use `grep` where it
+  exists and not to try `findstr` off Windows. Built from `GET /sandbox/status`
+  (new `os`, `exec_allow`, `binaries` fields); the old check read the *browser's*
+  user-agent, which is wrong when the app is served from another machine.
+- **Parse-failure escalation.** If a reply clearly tries to call a tool but
+  parses to nothing, the loop re-teaches **once** with a different dialect
+  (`plain → json → native → anthropic`) instead of letting the near-miss become
+  the final answer.
+- **Learned dialect.** Once a call parses, the working dialect is remembered per
+  `provider::model` and used first next time (Config → Labs → "Remember the
+  working dialect", default ON).
+
+New `ui/js/toolManifest.js`; edits in `chat.js`, `harness.js`,
+`toolProtocol.js`, `store.js`, `sidebar.js`, `src/Sandbox.php`.
 
 ---
 

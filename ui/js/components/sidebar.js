@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=309';
-import { K } from '../storage.js?v=309';
-import { persistence } from '../persistence.js?v=309';
-import { api } from '../api.js?v=309';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=309';
-import { TOOL_REGISTRY } from '../tools.js?v=309';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=309';
-import { snapshot } from '../rateGovernor.js?v=309';
+import { store } from '../store.js?v=310';
+import { K } from '../storage.js?v=310';
+import { persistence } from '../persistence.js?v=310';
+import { api } from '../api.js?v=310';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=310';
+import { TOOL_REGISTRY } from '../tools.js?v=310';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=310';
+import { snapshot } from '../rateGovernor.js?v=310';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1459,6 +1459,21 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <div class="form-hint" id="sbPolicyHint" style="margin:4px 0 0"></div>
       `)}
 
+      ${this._cfgSection('labs', 'Labs', settings.dynamicTools !== false
+        ? { text: 'ON', cls: 'ok' } : { text: 'OFF' }, `
+        <div class="toggle-row">
+          <span class="toggle-label">Dynamic tools <span class="form-hint-inline">adapt to the model &amp; server</span></span>
+          <div class="toggle ${settings.dynamicTools !== false ? 'active' : ''}" id="sbDynTools"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-hint">Tells each model the environment it is really in — the server's OS, working directory and which shell commands actually exist — and gives one correct example per tool in that model's own dialect. This is what stops free/quantised models burning steps guessing the syntax. Off restores the classic fixed instructions.</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Remember the working dialect</span>
+          <div class="toggle ${settings.toolDialectMemo !== false ? 'active' : ''}" id="sbDialectMemo"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-hint">Once a model's tool call parses, remember which dialect worked for that provider + model and start there next time. Off re-derives it every turn.</div>
+        <div class="form-hint" id="sbLabsStatus"></div>
+      `)}
+
       ${this._cfgSection('throttle', 'Throttle / Limiter', {
         text: settings.rateLimitEnabled !== false ? `ON · ${rpm ? rpm + '/min' : 'AUTO'}` : 'OFF',
         cls: settings.rateLimitEnabled !== false ? 'ok' : '',
@@ -1689,6 +1704,12 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
 
     document.getElementById('sbPolicyBtn')?.addEventListener('click', () => this.openPolicyEditor());
     this._loadPolicyHint();
+
+    // Labs: dynamic tools + dialect memo. Both read live from settings, so a
+    // change takes effect on the next turn with no SAVE.
+    this._initToggle('sbDynTools', (val) => store.set('settings.dynamicTools', val));
+    this._initToggle('sbDialectMemo', (val) => store.set('settings.toolDialectMemo', val));
+    this._loadLabsStatus();
 
     this._initToggle('sbAutoScroll', (val) => store.set('settings.autoScroll', val));
     this._initToggle('sbEnterToSend', (val) => store.set('settings.enterToSend', val));
@@ -2950,6 +2971,24 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         + `${(info.deny || []).length} denied`
         + (nInt ? `, ${nInt} interpreter(s) script-only` : '')
         + `. Shell access is ${info.enabled ? 'ON' : 'off'}.`;
+    } catch {
+      el.textContent = '';
+    }
+  }
+
+  /** One-line summary for Config → Labs: server OS + how much was detected. */
+  async _loadLabsStatus() {
+    const el = document.getElementById('sbLabsStatus');
+    if (!el) return;
+    try {
+      const s = await api.getSandboxStatus();
+      const os = s.os === 'windows' ? 'Windows' : 'POSIX (Linux/macOS)';
+      const bins = s.binaries || {};
+      const total = Object.keys(bins).length;
+      const have = Object.keys(bins).filter(k => bins[k]).length;
+      const memo = Object.keys((store.get('settings') || {}).toolDialectMap || {}).length;
+      el.textContent = `Server: ${os}. ${total ? `${have}/${total} allowlisted commands resolve. ` : ''}`
+        + `${memo} learned dialect${memo === 1 ? '' : 's'} remembered.`;
     } catch {
       el.textContent = '';
     }
