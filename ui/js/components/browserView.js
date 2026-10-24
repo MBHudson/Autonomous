@@ -19,9 +19,13 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=320';
-import { api } from '../api.js?v=320';
-import { esc } from '../utils.js?v=320';
+import { store } from '../store.js?v=321';
+import { api } from '../api.js?v=321';
+import { esc } from '../utils.js?v=321';
+import { k } from '../storage.js?v=321';
+
+/** Live auto-refresh is a sticky preference, not a per-visit toggle. */
+const LIVE_KEY = k('browserLive');
 
 export class BrowserView {
   constructor() {
@@ -30,6 +34,7 @@ export class BrowserView {
     this.open = false;
     this.status = { enabled: false, available: false, running: false };
     this._timer = null;
+    this._live = this._loadLive();
     this._busy = false;
     // One request at a time per kind. Without these, pressing Go twice (or the
     // Live poll overlapping a slow screenshot) queued requests in the browser's
@@ -82,7 +87,7 @@ export class BrowserView {
       if (e.key === 'Enter') { e.preventDefault(); this.go(); }
     });
     el.querySelector('#bsReload').addEventListener('click', () => this.shot());
-    el.querySelector('#bsLive').addEventListener('click', (e) => this._toggleLive(e.currentTarget));
+    el.querySelector('#bsLive').addEventListener('click', () => this._toggleLive());
     el.querySelector('#bsStartStop').addEventListener('click', () => this._startStop());
     el.querySelector('#bsTypeSend').addEventListener('click', () => this.sendText());
     el.querySelector('#bsEnter').addEventListener('click', () => this.press('Enter'));
@@ -98,6 +103,10 @@ export class BrowserView {
       if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
       this.hide();
     });
+    // Live keeps running while the app tab is visible, even when this screen
+    // is not — so returning to it (or an agent acting) shows the current page.
+    document.addEventListener('visibilitychange', () => this._syncLive());
+    this._syncLive();
     this.refreshStatus();
   }
 
@@ -106,6 +115,7 @@ export class BrowserView {
       this.status = { ...this.status, ...(await api.browserStatus()) };
     } catch { /* leave the last known */ }
     this._paintStatus();
+    this._syncLive();
   }
 
   _paintStatus() {
@@ -127,14 +137,25 @@ export class BrowserView {
   show() {
     this.open = true;
     this.el.hidden = false;
+    this._syncLive();
     this.refreshStatus().then(() => { if (this.status.running) this.shot(); });
   }
   hide() {
     this.open = false;
     this.el.hidden = true;
-    this._stopLive();
+    // Live is NOT switched off here: it stays on (and keeps polling while the
+    // app tab is visible) so coming back — or an agent acting — is never stale.
+    this._syncLive();
   }
   toggle() { this.open ? this.hide() : this.show(); }
+
+  _loadLive() {
+    try { const v = localStorage.getItem(LIVE_KEY); return v === null ? true : v === '1'; }
+    catch { return true; }
+  }
+  _saveLive() {
+    try { localStorage.setItem(LIVE_KEY, this._live ? '1' : '0'); } catch { /* private mode */ }
+  }
 
   _toast(message, type = 'info') {
     try { store.emit('toast', { message, type }); } catch { /* no store */ }
@@ -191,17 +212,26 @@ export class BrowserView {
     finally { this._shotBusy = false; }
   }
 
-  _toggleLive(btn) {
-    if (this._timer) { this._stopLive(); return; }
-    btn.classList.add('active');
+  _toggleLive() {
+    this._live = !this._live;
+    this._saveLive();
+    this._syncLive();
+    if (this._live && this.status.running) this.shot();
+  }
+
+  /**
+   * Start/stop the Live poll to match the sticky preference, the browser's
+   * running state, and tab visibility. The poll keeps going while the app tab
+   * is visible even if this screen is hidden, so it "stays live".
+   */
+  _syncLive() {
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    this.el?.querySelector('#bsLive')?.classList.toggle('active', this._live);
+    if (!this._live || !this.status.running || document.hidden) return;
     this._timer = setInterval(() => {
-      if (!this.open || !this.status.running) { this._stopLive(); return; }
+      if (!this._live || !this.status.running || document.hidden) return;
       if (!this._shotBusy) this.shot();
     }, 2000);
-  }
-  _stopLive() {
-    if (this._timer) { clearInterval(this._timer); this._timer = null; }
-    this.el?.querySelector('#bsLive')?.classList.remove('active');
   }
 
   async _click(e) {
@@ -245,7 +275,7 @@ export class BrowserView {
     } catch (e) { this._toast(`Read: ${e.message}`, 'error'); }
   }
 
-  dispose() { this._stopLive(); this.el?.remove(); }
+  dispose() { if (this._timer) clearInterval(this._timer); this._timer = null; this.el?.remove(); }
 }
 
 export default BrowserView;
