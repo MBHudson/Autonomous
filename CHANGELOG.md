@@ -9,8 +9,30 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v318**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v320**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v320 — Resource Manager: optional 3D performance controls + CPU/GPU gauges
+
+- **New Config → Resource Manager section.** Every switch is **OFF by default**,
+  so the 3D graph keeps rendering continuously exactly as before — nothing
+  changes until you turn one on:
+  - **Pause when a panel is open** (routing chart, API Lab, Brain Lab, Browser, modals);
+  - **Pause when the window isn't focused**;
+  - **Pause when the graph is off-screen** — an `IntersectionObserver`, which also
+    fixes the **mobile** case: the right panel is moved off-screen with
+    `transform: translateX(100%)`, so the old `offsetParent` guard never fired and
+    the scene kept rendering hidden;
+  - **Slow down when idle** (default **10 fps**), where idle = no active traffic
+    beams, no working agents, layout settled, and no recent interaction.
+- **Two speedometer (needle) gauges** plus an FPS / frame-ms readout. Honest
+  proxies: **CPU** = this app's JS share of each frame; **GPU** = real GPU ms via
+  `EXT_disjoint_timer_query_webgl2` when the browser exposes it, otherwise an
+  estimate from frame time (labelled as such).
+- New `ui/js/perf.js`; gating in `topology3d/scene.js` and `topology3d/index.js`;
+  the section + gauges in `sidebar.js`; styles in `components.css`.
 
 ---
 

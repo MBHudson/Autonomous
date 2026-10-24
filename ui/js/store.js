@@ -23,7 +23,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 319;
+export const APP_VERSION = 320;
 
 class Store {
   constructor() {
@@ -89,6 +89,17 @@ class Store {
       // API pool: rotate a provider's extra keys after N requests. Default OFF
       // — the single provider key is used exactly as before until it is on.
       apiPool: false,
+      // Resource Manager (Config → Resource Manager). Every switch is OFF by
+      // default, so the 3D graph keeps rendering continuously exactly as it did
+      // before this existed; turning one on lets the app rest when it is not
+      // needed. The gauges read live values from ui/js/perf.js.
+      resourceManager: {
+        pauseCovered: false,    // pause while a full-screen panel is open
+        pauseUnfocused: false,  // pause while the window is not focused
+        pauseOffscreen: false,  // pause while the graph is off-screen
+        idleThrottle: false,    // drop to a low frame rate when nothing happens
+        idleFps: 10,
+      },
     };
   }
 

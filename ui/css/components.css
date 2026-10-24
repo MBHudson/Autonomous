@@ -1636,3 +1636,23 @@ body.agent-reordering .agent-editor:hover {
   .bs-body { flex-direction: column; }
   .bs-side { width: auto; max-width: none; border-left: 0; border-top: 1px solid var(--border); max-height: 42vh; }
 }
+
+/* ---- Resource Manager: needle gauges ---- */
+.rm-gauges { display: flex; gap: 12px; justify-content: space-around; margin: 10px 0 4px; flex-wrap: wrap; }
+.rm-gauge { flex: 1 1 130px; max-width: 190px; text-align: center; }
+.rm-dial { width: 100%; height: auto; display: block; }
+.rm-arc { fill: none; stroke: var(--border); stroke-width: 6; stroke-linecap: round; }
+.rm-ticks line { stroke: var(--text-dim); stroke-width: 1.6; opacity: 0.6; }
+.rm-hub { fill: var(--accent-cyan); }
+.rm-needle {
+  stroke: var(--accent-cyan);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 60px 66px;
+  transition: transform 0.4s ease;
+  filter: drop-shadow(0 0 3px var(--accent-cyan));
+}
+.rm-gauge-label { font: 11px var(--font-mono); letter-spacing: 0.14em; color: var(--text-secondary); margin-top: 2px; }
+.rm-gauge-val { font: 13px var(--font-mono); color: var(--accent-cyan); }
+.rm-gauge-sub { font-size: 9px; color: var(--text-dim); }

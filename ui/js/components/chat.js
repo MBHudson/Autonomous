@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=319';
-import { K as STORAGE_K } from '../storage.js?v=319';
+import { store } from '../store.js?v=320';
+import { K as STORAGE_K } from '../storage.js?v=320';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,26 +20,26 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=319';
-import { persistence } from '../persistence.js?v=319';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=319';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=319';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=319';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=319';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=319';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=319';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=319';
-import { usageFor } from '../rateGovernor.js?v=319';
-import { trace } from '../trace.js?v=319';
-import { latency } from '../latency.js?v=319';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=319';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=319';
-import { SlashCommands } from '../slashCommands.js?v=319';
-import { parseRoute, routingHelp } from '../routing.js?v=319';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=319';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=319';
-import { MessageRenderer, renderToolCalls } from './message.js?v=319';
-import { createAvatar } from './avatar.js?v=319';
+import { api, errText } from '../api.js?v=320';
+import { persistence } from '../persistence.js?v=320';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=320';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=320';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=320';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=320';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=320';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=320';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=320';
+import { usageFor } from '../rateGovernor.js?v=320';
+import { trace } from '../trace.js?v=320';
+import { latency } from '../latency.js?v=320';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=320';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=320';
+import { SlashCommands } from '../slashCommands.js?v=320';
+import { parseRoute, routingHelp } from '../routing.js?v=320';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=320';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=320';
+import { MessageRenderer, renderToolCalls } from './message.js?v=320';
+import { createAvatar } from './avatar.js?v=320';
 
 /**
  * How long an agent may keep working on a single task.
