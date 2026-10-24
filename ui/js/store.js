@@ -23,7 +23,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 321;
+export const APP_VERSION = 322;
 
 class Store {
   constructor() {
@@ -100,6 +100,10 @@ class Store {
         idleThrottle: false,    // drop to a low frame rate when nothing happens
         idleFps: 10,
       },
+      // Browser screen: keep the Live auto-refresh polling while the screen is
+      // hidden (default) or pause it and resume on return. The Live on/off
+      // choice itself is a separate, persisted preference.
+      browserLiveBackground: true,
     };
   }
 
