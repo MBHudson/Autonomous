@@ -13,9 +13,9 @@
 // Toggle: Config → Labs → "Dynamic tools" (settings.dynamicTools). Off = the
 // exact classic toolInstructions() output, byte for byte.
 
-import { store } from './store.js?v=317';
-import { api } from './api.js?v=317';
-import { toolInstructions } from './tools.js?v=317';
+import { store } from './store.js?v=318';
+import { api } from './api.js?v=318';
+import { toolInstructions } from './tools.js?v=318';
 
 const TTL_MS = 5 * 60 * 1000;
 let _facts = null;
@@ -45,6 +45,26 @@ export async function getEnvFacts() {
 
 /** Drop the cache (e.g. after the operator saves config). */
 export function resetEnvFacts() { _facts = null; _at = 0; }
+
+// The browser feature's on/off lives server-side (Config → Labs → Browser).
+// Cached so the tool loop can offer browser tools without a fetch every turn.
+let _browserEnabled = false;
+let _browserAt = 0;
+let _browserInflight = null;
+
+/** Whether the built-in browser is switched on (cached ~5 min). */
+export async function browserEnabled() {
+  if ((Date.now() - _browserAt) < TTL_MS) return _browserEnabled;
+  if (_browserInflight) return _browserInflight;
+  _browserInflight = api.browserStatus()
+    .then((s) => { _browserEnabled = !!(s && s.enabled); _browserAt = Date.now(); return _browserEnabled; })
+    .catch(() => _browserEnabled)
+    .finally(() => { _browserInflight = null; });
+  return _browserInflight;
+}
+
+/** Forget the cached browser state (call after the Labs toggle changes). */
+export function resetBrowserEnabled() { _browserEnabled = false; _browserAt = 0; }
 
 // The commands a model actually reaches for, so the header names the ones that
 // matter instead of dumping a 60-entry allowlist.

@@ -2,14 +2,15 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=317';
-import { K } from '../storage.js?v=317';
-import { persistence } from '../persistence.js?v=317';
-import { api } from '../api.js?v=317';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=317';
-import { TOOL_REGISTRY } from '../tools.js?v=317';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=317';
-import { snapshot } from '../rateGovernor.js?v=317';
+import { store } from '../store.js?v=318';
+import { K } from '../storage.js?v=318';
+import { persistence } from '../persistence.js?v=318';
+import { api } from '../api.js?v=318';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=318';
+import { TOOL_REGISTRY } from '../tools.js?v=318';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=318';
+import { snapshot } from '../rateGovernor.js?v=318';
+import { resetBrowserEnabled } from '../toolManifest.js?v=318';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -3001,6 +3002,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       const on = el.classList.contains('active');
       try {
         await this._patchServerConfig((cfg) => { cfg.browser = { enabled: on }; });
+        resetBrowserEnabled();   // so the tool loop picks the change up at once
         store.emit('toast', { message: on ? 'Browser enabled' : 'Browser disabled', type: on ? 'success' : 'info' });
       } catch (e) {
         el.classList.toggle('active');   // revert the visual on a failed save
