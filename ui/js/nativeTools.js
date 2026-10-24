@@ -106,6 +106,19 @@ export const TOOL_SCHEMAS = {
     tool: str('Tool name'),
     arguments: anyObj('Arguments for that tool'),
   }, ['server', 'tool']),
+  browser_open: obj({ url: str('URL to open, e.g. https://example.com') }, ['url']),
+  browser_click: obj({
+    selector: str('CSS selector to click (if not using x/y)'),
+    x: num('Viewport x to click'),
+    y: num('Viewport y to click'),
+  }),
+  browser_type: obj({
+    text: str('Text to type into the focused field'),
+    selector: str('CSS selector to focus first (optional)'),
+    enter: bool('Press Enter after typing'),
+  }, ['text']),
+  browser_read: obj(),
+  browser_wait: obj({ ms: num('Milliseconds to wait for the page to settle') }),
   declare_goal_complete: obj({ summary: str('What was finished') }, ['summary']),
 };
 

@@ -1,8 +1,28 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v316**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v317**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v317 — tell agents they CAN drive a browser
+
+- A model asked to operate a page replied that it had no browser automation and
+  suggested installing **Playwright/Selenium**. The capability was already there
+  (`browser_open` / `browser_click` / `browser_type` / `browser_read` /
+  `browser_wait`) — nothing made it obvious:
+  - the tool **descriptions were thin** — they now say plainly that these drive a
+    **real Chrome/Edge window the operator watches**, and that **no
+    Playwright/Selenium/extension is needed**;
+  - the prompt protocol had **no examples** for them — JSON and Claude-XML
+    examples added;
+  - native tool-calling gave them a **blank schema** — real schemas now
+    (`url`, `selector`/`x`/`y`, `text`+`enter`, `ms`);
+  - and a new instruction line spells out the workflow (open → read → click/type
+    → read) and says the model must **never claim it lacks browser access**.
+- Note: the browser tools must be ticked on the agent (they are in the default
+  set for new agents).
 
 ---
 
