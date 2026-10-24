@@ -220,6 +220,15 @@
   position: relative;
   cursor: pointer;
   transition: all 0.2s;
+  /* Never let a long label squeeze the track: at default flex-shrink the
+     toggle shrank below the knob's travel, so an "on" knob hung outside it.
+     The label takes the slack instead (and wraps). */
+  flex: 0 0 auto;
+}
+
+.toggle-row .toggle-label {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .toggle.active {
