@@ -1,8 +1,17 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v315**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v316**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v316 — header mark back to the light
+
+- Reverted the **desktop header logo to the blinking indicator** — the `main.png`
+  brand mark didn't read well at 26px beside the title.
+- `main.png` **stays as the favicon** (tabs/bookmarks). The apps-notch shape and
+  chat-column centring from v315 are unchanged.
 
 ---
 
