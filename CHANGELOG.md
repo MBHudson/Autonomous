@@ -9,8 +9,19 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v324**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v325**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v325 — toggle switches no longer squashed by long labels
+
+- In **Config → Resource Manager** (and any row with a long label beside a
+  toggle) the switch was squeezed by flex-shrink: the track shrank below the
+  knob's travel so an "on" knob hung outside it, and every row came out a
+  different width. `.toggle` is now `flex: 0 0 auto` (a fixed 36×20) and
+  `.toggle-label` takes the slack and wraps. Measured before/after: track 25/35/36px
+  → a uniform 36px.
 
 ---
 

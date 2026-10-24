@@ -13,9 +13,9 @@
 // A flat, newest-first timeline of model turns and tool calls with timing,
 // token cost and success, plus totals. Opened from Config → TRACE.
 
-import { store } from '../store.js?v=324';
-import { esc } from '../utils.js?v=324';
-import { recent, clear, stats } from '../trace.js?v=324';
+import { store } from '../store.js?v=325';
+import { esc } from '../utils.js?v=325';
+import { recent, clear, stats } from '../trace.js?v=325';
 
 function fmtTime(t) {
   try { return new Date(t).toLocaleTimeString([], { hour12: false }); } catch { return ''; }
