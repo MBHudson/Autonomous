@@ -2,11 +2,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=317';
-import { acquire, note429 } from './rateGovernor.js?v=317';
-import { latency } from './latency.js?v=317';
-import { detectFamily } from './harness.js?v=317';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=317';
+import { store } from './store.js?v=318';
+import { acquire, note429 } from './rateGovernor.js?v=318';
+import { latency } from './latency.js?v=318';
+import { detectFamily } from './harness.js?v=318';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=318';
 
 latency.bindStore(store);
 

@@ -26,11 +26,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=317';
-import { asText, compactText } from './utils.js?v=317';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=317';
-import { settingFor } from './agentConfig.js?v=317';
-import { trace } from './trace.js?v=317';
+import { store } from './store.js?v=318';
+import { asText, compactText } from './utils.js?v=318';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=318';
+import { settingFor } from './agentConfig.js?v=318';
+import { trace } from './trace.js?v=318';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -370,6 +370,14 @@ export const TOOL_REGISTRY = {
 
 /** Only ever offered to an agent that has a standing goal. */
 export const ALWAYS_ON_TOOLS = ['declare_goal_complete'];
+
+/**
+ * The built-in browser's tools. Offered to EVERY agent automatically while the
+ * Browser feature is on (Config → Labs → Browser), so a model can never claim
+ * it lacks browser automation. Harmless when the feature is off — the tools are
+ * simply not listed, and the API refuses them anyway.
+ */
+export const BROWSER_TOOLS = ['browser_open', 'browser_click', 'browser_type', 'browser_read', 'browser_wait'];
 
 const BUILTIN_TOOL_NAMES = new Set(Object.keys(TOOL_REGISTRY));
 

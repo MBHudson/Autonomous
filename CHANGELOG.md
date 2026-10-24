@@ -1,8 +1,22 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v317**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v318**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v318 — browser tools always offered (while the Browser is on) + mobile logo
+
+- **Every agent now gets the browser tools** automatically while
+  Config → Labs → Browser is on — `browser_open` / `browser_click` /
+  `browser_type` / `browser_read` / `browser_wait` are unioned in the way memory
+  tools are, so an agent with a hand-ticked tool list still has them and can no
+  longer answer that it lacks browser automation. Turning the Browser off removes
+  them again (and the API refuses them regardless). The on/off state is cached
+  ~5 min and cleared the instant the Labs toggle is flipped.
+- **Mobile header:** the wordmark is now centred as a stack on phones — "Loop
+  Studio" under AUTONOMOUS, "Made By: MBHudson" under that. Desktop is unchanged.
 
 ---
 

@@ -475,6 +475,11 @@
     font-size: 7px;
   }
 
+  /* Phone only: centre the wordmark as a stack — "Loop Studio" under
+     AUTONOMOUS, "Made By: MBHudson" under that. Desktop keeps the
+     left-aligned block. */
+  .logo-text { text-align: center; }
+
   .logo {
     font-size: 14px;
     gap: 7px;
