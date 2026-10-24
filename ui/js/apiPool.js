@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // API-POOL.JS — rotate several API keys for one provider
 // ============================================
@@ -17,8 +25,8 @@
 // A 429 puts a key on cooldown so the next call tries a different one instead
 // of spending the same refusal again.
 
-import { store } from './store.js?v=318';
-import { agentCode } from './utils.js?v=318';
+import { store } from './store.js?v=319';
+import { agentCode } from './utils.js?v=319';
 
 const counts = new Map();      // keyId -> requests used this round
 const cooldown = new Map();    // keyId -> epoch ms a key is refused until

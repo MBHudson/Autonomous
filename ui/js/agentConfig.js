@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // AGENT-CONFIG.JS — per-agent locks, reusable profiles, Brain Lab notes
 // ============================================
@@ -15,8 +23,8 @@
 // Keeping one source per setting is what stops the UI, the resolver and the
 // call paths from disagreeing about what an agent is actually using.
 
-import { store } from './store.js?v=318';
-import { DEFAULT_HISTORY_TURNS } from './utils.js?v=318';
+import { store } from './store.js?v=319';
+import { DEFAULT_HISTORY_TURNS } from './utils.js?v=319';
 
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o || {}, k);
 

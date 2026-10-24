@@ -1,9 +1,17 @@
-import { store } from './store.js?v=318';
-import { persistence } from './persistence.js?v=318';
-import { api } from './api.js?v=318';
-import { esc, escAttr } from './utils.js?v=318';
-import { renderMarkdown } from './markdown.js?v=318';
-import { sandboxRootFor } from './agentConfig.js?v=318';
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
+import { store } from './store.js?v=319';
+import { persistence } from './persistence.js?v=319';
+import { api } from './api.js?v=319';
+import { esc, escAttr } from './utils.js?v=319';
+import { renderMarkdown } from './markdown.js?v=319';
+import { sandboxRootFor } from './agentConfig.js?v=319';
 
 const TEXT_EXT = new Set([
   'txt', 'md', 'markdown', 'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',

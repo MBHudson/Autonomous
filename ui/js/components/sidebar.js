@@ -1,16 +1,24 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=318';
-import { K } from '../storage.js?v=318';
-import { persistence } from '../persistence.js?v=318';
-import { api } from '../api.js?v=318';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=318';
-import { TOOL_REGISTRY } from '../tools.js?v=318';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=318';
-import { snapshot } from '../rateGovernor.js?v=318';
-import { resetBrowserEnabled } from '../toolManifest.js?v=318';
+import { store } from '../store.js?v=319';
+import { K } from '../storage.js?v=319';
+import { persistence } from '../persistence.js?v=319';
+import { api } from '../api.js?v=319';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=319';
+import { TOOL_REGISTRY } from '../tools.js?v=319';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=319';
+import { snapshot } from '../rateGovernor.js?v=319';
+import { resetBrowserEnabled } from '../toolManifest.js?v=319';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open

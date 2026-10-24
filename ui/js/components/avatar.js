@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // AVATAR.JS — user + agent avatars
 // ============================================
@@ -10,7 +18,7 @@
 // The robot's eyes scan side to side ONLY while that agent is working
 // (.avatar-agent.thinking) — at rest the pupils sit centered.
 
-import { store } from '../store.js?v=318';
+import { store } from '../store.js?v=319';
 
 const SRC_USER = new URL('../../img/avatar-user.svg', import.meta.url).href;
 const SRC_AGENT = new URL('../../img/avatar-agent.svg', import.meta.url).href;

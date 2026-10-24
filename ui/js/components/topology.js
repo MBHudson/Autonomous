@@ -1,10 +1,18 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOLOGY.JS — SVG network graph
 // ============================================
 
-import { store } from '../store.js?v=318';
-import { api } from '../api.js?v=318';
-import { esc, agentCode } from '../utils.js?v=318';
+import { store } from '../store.js?v=319';
+import { api } from '../api.js?v=319';
+import { esc, agentCode } from '../utils.js?v=319';
 
 // How long a hop stays bright while in flight, and how long it then lingers as
 // a faint record of the exchange before it fades out and is dropped.

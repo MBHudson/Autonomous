@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+#
+# Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+#
+# BryceFromIndiana@gmail.com
+
 # Generate an access token for this copy and turn the API gate on.
 #
 # The API requires a token on EVERY endpoint once require_token is true, so

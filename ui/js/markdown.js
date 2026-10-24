@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // MARKDOWN.JS — Small safe markdown for message prose
 // ============================================
@@ -6,7 +14,7 @@
 // agent output can never inject markup into the dialog. Fenced code is handled
 // by the caller (CodeBlock) and never reaches here.
 
-import { esc } from './utils.js?v=318';
+import { esc } from './utils.js?v=319';
 
 /**
  * Render markdown-ish prose into an element.

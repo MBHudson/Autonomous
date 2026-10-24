@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TERMINALPANEL.JS — Interactive in-page terminal
 // Supports: help, clear, echo + a curl subset
@@ -6,11 +14,11 @@
 // through the server-side relay (POST /api/llm).
 // ============================================
 
-import { store } from '../store.js?v=318';
-import { api } from '../api.js?v=318';
-import { esc } from '../utils.js?v=318';
-import { tokenizeCurl, parseCurl, bearerFromHeaders, resolveShellCurl } from '../curlParser.js?v=318';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=318';
+import { store } from '../store.js?v=319';
+import { api } from '../api.js?v=319';
+import { esc } from '../utils.js?v=319';
+import { tokenizeCurl, parseCurl, bearerFromHeaders, resolveShellCurl } from '../curlParser.js?v=319';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=319';
 
 export class TerminalPanel {
   constructor() {

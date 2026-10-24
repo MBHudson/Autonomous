@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // APILAB.JS — the API Lab drawer
 // ============================================
@@ -18,18 +26,18 @@
 // SECRETS: key-shaped headers are masked on screen and never written to the log
 // pane. The mask is display-only -- copy and send still use the real value.
 
-import { api } from './api.js?v=318';
-import { store } from './store.js?v=318';
-import { persistence } from './persistence.js?v=318';
-import { esc, copyToClipboard } from './utils.js?v=318';
+import { api } from './api.js?v=319';
+import { store } from './store.js?v=319';
+import { persistence } from './persistence.js?v=319';
+import { esc, copyToClipboard } from './utils.js?v=319';
 import {
   LANGUAGES, reqFromCode, guessLanguage, generate,
   prettyJson, maskSecret, isSecretHeader,
-} from './apiLabConvert.js?v=318';
+} from './apiLabConvert.js?v=319';
 // normalizePastedText belongs to the curl parser (it is what turns a pasted
 // snippet into something a tokenizer can read) rather than to the Lab, so it
 // is imported from its owner instead of being re-exported through the Lab.
-import { normalizePastedText } from './curlParser.js?v=318';
+import { normalizePastedText } from './curlParser.js?v=319';
 
 const STORAGE_KEY = 'als.apiLab.v1';
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];

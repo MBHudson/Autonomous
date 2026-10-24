@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+#
+# Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+#
+# BryceFromIndiana@gmail.com
+
 # Start Loop Studio (Linux and macOS). Double-clickable from a file manager on
 # most setups, or:  ./start.sh        (port 8080)
 #                   ./start.sh 8090   (another port)

@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // ALWAYSON.JS — Autonomous agents and direct asks
 // ============================================
@@ -13,9 +21,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=318';
-import { persistence } from './persistence.js?v=318';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=318';
+import { store } from './store.js?v=319';
+import { persistence } from './persistence.js?v=319';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=319';
 
 export class AlwaysOn {
   /**

@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // RATE-GOVERNOR.JS — per-key request pacing
 // ============================================
@@ -21,9 +29,9 @@
 // a stale bucket throttles calls that would succeed, a fresh one merely risks
 // a 429 the retry path already handles.
 
-import { store } from './store.js?v=318';
-import { settingFor, hasRateLock, overridesOf } from './agentConfig.js?v=318';
-import { defaultRpmFor } from './harness.js?v=318';
+import { store } from './store.js?v=319';
+import { settingFor, hasRateLock, overridesOf } from './agentConfig.js?v=319';
+import { defaultRpmFor } from './harness.js?v=319';
 
 /** Sliding window length. Per-minute limits are the common shape. */
 const WINDOW_MS = 60000;

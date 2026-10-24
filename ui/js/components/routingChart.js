@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // ROUTING CHART — an editable plan for what your agents should do
 // ============================================
@@ -34,11 +42,11 @@
 // path would be a second implementation to keep in step, and this is the kind
 // of UI where the two inevitably diverge.
 
-import { store, APP_VERSION } from '../store.js?v=318';
-import { persistence } from '../persistence.js?v=318';
-import { SlashCommands, COMMANDS } from '../slashCommands.js?v=318';
-import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=318';
-import { updateNodeClock } from '../agentClock.js?v=318';
+import { store, APP_VERSION } from '../store.js?v=319';
+import { persistence } from '../persistence.js?v=319';
+import { SlashCommands, COMMANDS } from '../slashCommands.js?v=319';
+import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=319';
+import { updateNodeClock } from '../agentClock.js?v=319';
 
 // Node kinds. 'agent' is the only one that calls a model; the rest are
 // structure -- which is how a fan-out can exist without any agent pretending

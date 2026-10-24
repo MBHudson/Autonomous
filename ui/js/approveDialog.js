@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // APPROVE-DIALOG.JS — one approval prompt, everywhere
 // ============================================
@@ -17,7 +25,7 @@
 // into an approval is a prompt that approves things while you fumble for the
 // close button.
 
-import { store } from './store.js?v=318';
+import { store } from './store.js?v=319';
 
 /** tool|arg pairs approved this page-load. Gone on reload, by design. */
 const sessionApprovals = new Set();

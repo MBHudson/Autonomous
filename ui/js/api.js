@@ -1,12 +1,20 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=318';
-import { acquire, note429 } from './rateGovernor.js?v=318';
-import { latency } from './latency.js?v=318';
-import { detectFamily } from './harness.js?v=318';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=318';
+import { store } from './store.js?v=319';
+import { acquire, note429 } from './rateGovernor.js?v=319';
+import { latency } from './latency.js?v=319';
+import { detectFamily } from './harness.js?v=319';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=319';
 
 latency.bindStore(store);
 

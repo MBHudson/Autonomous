@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // SLASHCOMMANDS.JS — "/" palette in the input box
 // ============================================
@@ -12,9 +20,9 @@
 //
 // Commands are plain data in COMMANDS: adding one is a single entry.
 
-import { store } from './store.js?v=318';
-import { agentCode } from './utils.js?v=318';
-import { share } from './memory.js?v=318';
+import { store } from './store.js?v=319';
+import { agentCode } from './utils.js?v=319';
+import { share } from './memory.js?v=319';
 
 /**
  * @typedef {object} Command

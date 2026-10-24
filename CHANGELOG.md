@@ -1,3 +1,11 @@
+<!--
+  Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+
+  Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+
+  BryceFromIndiana@gmail.com
+-->
+
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the

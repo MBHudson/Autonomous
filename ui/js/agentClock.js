@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // AGENT-CLOCK.JS — per-agent usage line (tokens / requests / uptime)
 // ============================================
@@ -18,10 +26,10 @@
 // Metrics start at zero on an install that has never recorded a call, so a new
 // clock reads "no usage yet" until the agent actually calls.
 
-import { store } from './store.js?v=318';
-import { usageFor, limitsFor } from './rateGovernor.js?v=318';
-import { settingFor } from './agentConfig.js?v=318';
-import { contextLimitFor } from './harness.js?v=318';
+import { store } from './store.js?v=319';
+import { usageFor, limitsFor } from './rateGovernor.js?v=319';
+import { settingFor } from './agentConfig.js?v=319';
+import { contextLimitFor } from './harness.js?v=319';
 
 export { contextLimitFor };
 

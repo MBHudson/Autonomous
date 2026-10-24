@@ -1,11 +1,19 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=318';
-import { esc } from '../../utils.js?v=318';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=318';
-import { McpPanel } from './mcpPanel.js?v=318';
+import { store } from '../../store.js?v=319';
+import { esc } from '../../utils.js?v=319';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=319';
+import { McpPanel } from './mcpPanel.js?v=319';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',

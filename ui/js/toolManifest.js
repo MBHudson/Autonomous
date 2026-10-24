@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOOL-MANIFEST.JS — environment + dialect aware tool instructions
 // ============================================
@@ -13,9 +21,9 @@
 // Toggle: Config → Labs → "Dynamic tools" (settings.dynamicTools). Off = the
 // exact classic toolInstructions() output, byte for byte.
 
-import { store } from './store.js?v=318';
-import { api } from './api.js?v=318';
-import { toolInstructions } from './tools.js?v=318';
+import { store } from './store.js?v=319';
+import { api } from './api.js?v=319';
+import { toolInstructions } from './tools.js?v=319';
 
 const TTL_MS = 5 * 60 * 1000;
 let _facts = null;

@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // TOPOLOGY3D / INDEX.JS — 3D cluster topology (Three.js)
 // ============================================
@@ -15,17 +23,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=318';
-import { store } from '../../store.js?v=318';
-import { k, K } from '../../storage.js?v=318';
-import { latency } from '../../latency.js?v=318';
-import { SceneCore, webglAvailable } from './scene.js?v=318';
-import { ForceLayout } from './layout.js?v=318';
-import { NodeView, Nebula } from './nodes.js?v=318';
-import { Beam } from './beams.js?v=318';
-import { LabelLayer } from './labels.js?v=318';
-import { PopupCard } from './popup.js?v=318';
-import { AskDock } from './ask.js?v=318';
+import { TopologyGraph } from '../topology.js?v=319';
+import { store } from '../../store.js?v=319';
+import { k, K } from '../../storage.js?v=319';
+import { latency } from '../../latency.js?v=319';
+import { SceneCore, webglAvailable } from './scene.js?v=319';
+import { ForceLayout } from './layout.js?v=319';
+import { NodeView, Nebula } from './nodes.js?v=319';
+import { Beam } from './beams.js?v=319';
+import { LabelLayer } from './labels.js?v=319';
+import { PopupCard } from './popup.js?v=319';
+import { AskDock } from './ask.js?v=319';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;

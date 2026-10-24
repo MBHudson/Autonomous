@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================���
 // AUDIO.JS — Speech out and speech in
 // ============================================
@@ -9,8 +17,8 @@
 // Transcripts come from MediaRecorder + the proxy. The older Web Speech path in
 // microphone.js still exists as a fallback for browsers without a key.
 
-import { store } from './store.js?v=318';
-import { api, errText } from './api.js?v=318';
+import { store } from './store.js?v=319';
+import { api, errText } from './api.js?v=319';
 
 /** OpenAI's per-request character ceiling. Matches MAX_CHARS in src/Audio.php. */
 const MAX_CHARS = 4000;

@@ -1,3 +1,11 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
 // ============================================
 // BROWSERVIEW.JS — the built-in browser screen
 // ============================================
@@ -11,9 +19,9 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=318';
-import { api } from '../api.js?v=318';
-import { esc } from '../utils.js?v=318';
+import { store } from '../store.js?v=319';
+import { api } from '../api.js?v=319';
+import { esc } from '../utils.js?v=319';
 
 export class BrowserView {
   constructor() {
