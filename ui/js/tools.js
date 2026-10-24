@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=322';
-import { asText, compactText } from './utils.js?v=322';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=322';
-import { settingFor } from './agentConfig.js?v=322';
-import { trace } from './trace.js?v=322';
+import { store } from './store.js?v=323';
+import { asText, compactText } from './utils.js?v=323';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=323';
+import { settingFor } from './agentConfig.js?v=323';
+import { trace } from './trace.js?v=323';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1219,6 +1219,19 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
         + 'argv, never PowerShell/cmd syntax. npm.cmd and other .cmd/.bat shims are not run.'
       );
     }
+  }
+  // Capabilities a model is prone to deny. A bare LLM has no runtime — true —
+  // but THIS one is wrapped by an app that gives it persistence, and saying "I
+  // can't remember or stay alive" is wrong here.
+  if (names.includes('remember') || names.includes('write_file') || names.includes('declare_goal_complete')) {
+    notes.push(
+      'How you persist — do NOT tell the user you cannot. You are invoked one turn at a time and have no '
+      + 'runtime of your own (that part is true), but the persistence lives in this app, and you have it: '
+      + 'remember/recall/share keep facts across reloads and sessions; write_file and the other file tools '
+      + 'leave work on disk; the conversation is stored and reloaded. If a job needs to keep running over '
+      + 'time, say so — the operator can give you an Always-On goal and this app re-invokes you on a timer. '
+      + 'Reach for these instead of claiming you have no way to persist.'
+    );
   }
   if (names.some(t => String(t).startsWith('browser_'))) {
     notes.push(
