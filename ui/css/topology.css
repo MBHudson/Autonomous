@@ -966,12 +966,25 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
 }
 .t3d-ask-reply-body {
   padding: 10px 12px;
+  /* min-height:0 lets this flex child shrink so overflow-y can actually scroll;
+     without it the body grows past the box and the scrollbar never appears. */
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
+  scrollbar-color: var(--c, var(--accent-cyan)) rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
   font: 12.5px/1.5 inherit;
   white-space: pre-wrap;
   word-break: break-word;
+}
+.t3d-ask-reply-body::-webkit-scrollbar { width: 10px; }
+.t3d-ask-reply-body::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+.t3d-ask-reply-body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--c, #00e5ff) 55%, transparent);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 .t3d-ask-reply-body.thinking { color: var(--text-dim); font-style: italic; }
 .t3d-ask-reply-body.error { color: var(--danger, #ff4757); }
