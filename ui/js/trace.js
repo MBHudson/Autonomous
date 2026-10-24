@@ -19,7 +19,7 @@
 // traces are for watching a run, not for keeping forever, and unbounded logs
 // are how a tab grows to hundreds of megabytes.
 
-import { store } from './store.js?v=322';
+import { store } from './store.js?v=323';
 
 const MAX_EVENTS = 500;
 
