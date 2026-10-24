@@ -52,7 +52,7 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 - **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
 - **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
 
- 🧵**Autonomous's implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
+ 🧵**Autonomous' implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
  Apache serves many requests at once (a pool of worker processes and threads), so a
  whole team of agents really does run in parallel. 
  **Autonomous ships the workaround!:** with **one click** installs XAMPP
