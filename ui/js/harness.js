@@ -22,7 +22,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=309';
+} from './harness.data.js?v=310';
+import { store } from './store.js?v=310';
+import { persistence } from './persistence.js?v=310';
 
 export { API_FAMILIES };
 
@@ -165,8 +167,49 @@ export function autoProtocol(provider, model, familyId) {
 export function toolProtocolFor(agent, provider) {
   const chosen = String(agent?.toolProtocol || '').trim().toLowerCase();
   if (chosen && chosen !== 'auto' && BY_ID.has(chosen)) return chosen;
+  // Learned dialect: a choice that actually worked on a previous turn for this
+  // exact provider::model wins over the heuristic. Feature-gated, and skipped
+  // when the operator has pinned one above.
+  const memo = learnedDialect(provider || agent?.provider, agent?.model);
+  if (memo && BY_ID.has(memo)) return memo;
   return autoProtocol(provider || agent?.provider, agent?.model,
     detectFamily({ provider: provider || agent?.provider, endpoint: agent?.endpoint, model: agent?.model }));
+}
+
+// --- Learned tool dialect (Config → Labs → "Remember the working dialect") ---
+
+function dialectMemoEnabled() {
+  return (store.get('settings') || {}).toolDialectMemo !== false;
+}
+
+function dialectMemoKey(provider, model) {
+  const p = String(provider || '').trim().toLowerCase();
+  const m = String(model || '').trim().toLowerCase();
+  return (p || m) ? `${p}::${m}` : '';
+}
+
+/** The remembered dialect for this provider+model, or '' if none applies. */
+export function learnedDialect(provider, model) {
+  if (!dialectMemoEnabled()) return '';
+  const key = dialectMemoKey(provider, model);
+  if (!key) return '';
+  const map = (store.get('settings') || {}).toolDialectMap || {};
+  return map[key] || '';
+}
+
+/** Remember that `dialect` parsed successfully for this provider+model. */
+export function rememberDialect(provider, model, dialect) {
+  if (!dialectMemoEnabled()) return;
+  const d = String(dialect || '').trim().toLowerCase();
+  if (!BY_ID.has(d)) return;
+  const key = dialectMemoKey(provider, model);
+  if (!key) return;
+  const settings = store.get('settings') || {};
+  const map = { ...(settings.toolDialectMap || {}) };
+  if (map[key] === d) return;
+  map[key] = d;
+  store.set('settings.toolDialectMap', map);
+  try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
 }
 
 /** Known context window for a model id, or null. */
