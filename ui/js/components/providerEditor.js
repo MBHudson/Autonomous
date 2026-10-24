@@ -2,10 +2,10 @@
 // PROVIDEREDITOR.JS — Provider CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=310';
-import { api } from '../api.js?v=310';
-import { persistence } from '../persistence.js?v=310';
-import { esc, uuid } from '../utils.js?v=310';
+import { store } from '../store.js?v=311';
+import { api } from '../api.js?v=311';
+import { persistence } from '../persistence.js?v=311';
+import { esc, uuid } from '../utils.js?v=311';
 
 export class ProviderEditor {
   constructor() {
@@ -65,6 +65,16 @@ export class ProviderEditor {
             <textarea class="form-textarea" id="providerModels" placeholder="model1, model2, model3">${provider ? esc(provider.models.join(', ')) : ''}</textarea>
             <div class="form-hint" id="providerFetchHint">Reads the provider's live catalog and replaces the list below. Works for any OpenAI-compatible endpoint, Anthropic, and Ollama.</div>
           </div>
+          <div class="form-group">
+            <div class="form-label-row">
+              <span class="form-label">API pool <span class="form-hint-inline">extra keys that rotate</span></span>
+              <button class="btn btn-ghost btn-sm" id="providerAddKeyPool" type="button">+ key</button>
+            </div>
+            <div id="providerKeys"></div>
+            <label class="form-label">Rotate after N requests <span class="form-hint-inline">0 = every call</span></label>
+            <input type="number" class="form-input" id="providerRotate" min="0" max="100000" value="${provider ? (provider.rotateAfter ?? 0) : 0}">
+            <div class="form-hint" id="providerPoolHint">Active only when Config → Labs → “API pool” is on. The agent's own Key Override always wins. A 429 puts a key on a 60s cooldown and the next call uses another.</div>
+          </div>
           <div class="toggle-row">
             <span class="toggle-label">Active</span>
             <div class="toggle ${provider ? (provider.active ? 'active' : '') : 'active'}" id="providerActive">
@@ -97,6 +107,17 @@ export class ProviderEditor {
 
     // Fetch the provider's live model catalog and fill the list
     document.getElementById('providerFetchModels').addEventListener('click', () => this._fetchModels());
+
+    // API pool rows. Kept in this._pool so removing a row cannot shuffle ids.
+    this._pool = provider && Array.isArray(provider.apiKeys)
+      ? provider.apiKeys.map(k => ({ id: k.id || uuid('key'), label: k.label || '', key: k.key || '' }))
+      : [];
+    document.getElementById('providerAddKeyPool')?.addEventListener('click', () => {
+      this._pool = this._collectKeys();
+      this._pool.push({ id: uuid('key'), label: '', key: '' });
+      this._renderKeys();
+    });
+    this._renderKeys();
 
     // Save
     document.getElementById('providerSave').addEventListener('click', () => this._save());
@@ -148,6 +169,41 @@ async _fetchModels() {
     }
   }
 
+  _renderKeys() {
+    const host = document.getElementById('providerKeys');
+    if (!host) return;
+    if (!this._pool.length) {
+      host.innerHTML = '<div class="form-hint" style="margin:0 0 6px">No extra keys — the single API Key above is used.</div>';
+      return;
+    }
+    host.innerHTML = this._pool.map((k, i) => `
+      <div class="pool-row" data-pool-row="${i}">
+        <input class="form-input" data-pool="label" value="${esc(k.label || '')}" placeholder="label (optional)" style="max-width:120px">
+        <input class="form-input" type="password" data-pool="key" value="${esc(k.key || '')}" placeholder="sk-…">
+        <button class="btn btn-ghost btn-sm" data-pool-remove="${i}" type="button" title="Remove">&times;</button>
+      </div>`).join('');
+    host.querySelectorAll('[data-pool-remove]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this._pool = this._collectKeys();
+        this._pool.splice(Number(btn.dataset.poolRemove), 1);
+        this._renderKeys();
+      });
+    });
+  }
+
+  /** Read the pool rows back out of the DOM (empty keys dropped). */
+  _collectKeys() {
+    const host = document.getElementById('providerKeys');
+    if (!host) return this._pool || [];
+    const rows = [...host.querySelectorAll('[data-pool-row]')];
+    if (!rows.length) return this._pool || [];
+    return rows.map((row, i) => ({
+      id: (this._pool && this._pool[i] && this._pool[i].id) || uuid('key'),
+      label: row.querySelector('[data-pool="label"]')?.value.trim() || '',
+      key: row.querySelector('[data-pool="key"]')?.value.trim() || '',
+    })).filter((k) => k.key);
+  }
+
   _save() {
     const name = document.getElementById('providerName').value.trim();
     if (!name) {
@@ -161,13 +217,15 @@ async _fetchModels() {
     const modelsStr = document.getElementById('providerModels').value.trim();
     const models = modelsStr ? modelsStr.split(',').map(m => m.trim()).filter(Boolean) : [];
     const active = document.getElementById('providerActive').classList.contains('active');
+    const apiKeys = this._collectKeys();
+    const rotateAfter = Math.max(0, parseInt(document.getElementById('providerRotate')?.value, 10) || 0);
 
     const providers = store.get('providers');
 
     if (this.editingId) {
       const idx = providers.findIndex(p => p.id === this.editingId);
       if (idx >= 0) {
-        providers[idx] = { ...providers[idx], name, endpoint, authType, apiKey, models, active };
+        providers[idx] = { ...providers[idx], name, endpoint, authType, apiKey, models, active, apiKeys, rotateAfter };
       }
       store.emit('toast', { message: 'Provider updated', type: 'success' });
     } else {
@@ -179,6 +237,8 @@ async _fetchModels() {
         apiKey,
         models,
         active,
+        apiKeys,
+        rotateAfter,
       };
       providers.push(newProvider);
       store.emit('toast', { message: 'Provider added', type: 'success' });

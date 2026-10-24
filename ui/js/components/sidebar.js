@@ -2,14 +2,14 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=310';
-import { K } from '../storage.js?v=310';
-import { persistence } from '../persistence.js?v=310';
-import { api } from '../api.js?v=310';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=310';
-import { TOOL_REGISTRY } from '../tools.js?v=310';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=310';
-import { snapshot } from '../rateGovernor.js?v=310';
+import { store } from '../store.js?v=311';
+import { K } from '../storage.js?v=311';
+import { persistence } from '../persistence.js?v=311';
+import { api } from '../api.js?v=311';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=311';
+import { TOOL_REGISTRY } from '../tools.js?v=311';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=311';
+import { snapshot } from '../rateGovernor.js?v=311';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1471,6 +1471,11 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <div class="toggle ${settings.toolDialectMemo !== false ? 'active' : ''}" id="sbDialectMemo"><div class="toggle-knob"></div></div>
         </div>
         <div class="form-hint">Once a model's tool call parses, remember which dialect worked for that provider + model and start there next time. Off re-derives it every turn.</div>
+        <div class="toggle-row">
+          <span class="toggle-label">API pool <span class="form-hint-inline">rotate extra provider keys</span></span>
+          <div class="toggle ${settings.apiPool ? 'active' : ''}" id="sbApiPool"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-hint">When on, a provider's pool of extra keys (Provider editor → API pool) is used, rotating after the number of requests you set; a key that 429s is rested. Off = the single provider key, exactly as before.</div>
         <div class="form-hint" id="sbLabsStatus"></div>
       `)}
 
@@ -1709,6 +1714,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     // change takes effect on the next turn with no SAVE.
     this._initToggle('sbDynTools', (val) => store.set('settings.dynamicTools', val));
     this._initToggle('sbDialectMemo', (val) => store.set('settings.toolDialectMemo', val));
+    this._initToggle('sbApiPool', (val) => store.set('settings.apiPool', val));
     this._loadLabsStatus();
 
     this._initToggle('sbAutoScroll', (val) => store.set('settings.autoScroll', val));

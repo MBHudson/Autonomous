@@ -15,7 +15,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 310;
+export const APP_VERSION = 311;
 
 class Store {
   constructor() {
@@ -78,6 +78,9 @@ class Store {
       dynamicTools: true,
       toolDialectMemo: true,
       toolDialectMap: {},
+      // API pool: rotate a provider's extra keys after N requests. Default OFF
+      // — the single provider key is used exactly as before until it is on.
+      apiPool: false,
     };
   }
 

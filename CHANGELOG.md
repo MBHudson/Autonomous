@@ -1,8 +1,26 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v310**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v311**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v311 — API pool: rotate several keys for one provider
+
+- **A provider can hold a pool of extra keys** (Provider editor → *API pool*:
+  label + key rows) and **rotate after N requests** you set (0 = every call).
+  The agent's own Key Override still wins; with the pool empty or the feature
+  off, the single provider key is used exactly as before.
+- **A 429 rests a key.** A rate-limit refusal puts that key on a 60s cooldown and
+  the next call picks a different one, so one exhausted free-tier key no longer
+  stalls the whole provider.
+- Feature-gated: **Config → Labs → "API pool"** (default **OFF**). Rotation
+  counters are session-only — a reload simply starts a clean round, which is the
+  safe direction (a stale counter only ever rotates away from a good key).
+- New `ui/js/apiPool.js` (`pickKey` / `noteResult`); `chat.js` resolves the key
+  through it and reports the outcome; UI in `providerEditor.js`, toggle in
+  `sidebar.js`, styles in `components.css`.
 
 ---
 
