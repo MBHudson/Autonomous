@@ -2,7 +2,7 @@
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
 
-[![License: Copyright](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+<!-- [![License: Copyright](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) -->
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![No build step](https://img.shields.io/badge/build-none_needed-brightgreen)
 ![Mobile friendly](https://img.shields.io/badge/mobile-first-00e5ff)
