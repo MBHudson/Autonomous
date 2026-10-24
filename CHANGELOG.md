@@ -9,8 +9,25 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v325**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v326**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v326 — config saves on hosts that block PUT; stray headless browsers
+
+- **"Not saved: API 404" when saving the sandbox path** (and the wall of HTML in
+  the status line). Some hosts block or reroute the **`PUT`** method at the
+  web-server level, so the request never reached the app and the site's own 404
+  page came back. Config and state saves now use **POST**, which the API accepts
+  for the same routes (`handleConfig` / `handleState` take PUT or POST), and a
+  non-JSON response no longer dumps a page of markup into the UI — it reports
+  "the server sent a web page instead of JSON — check the app URL / API path".
+- **Stray headless Chrome/Edge instances piling up** (the GPU/CPU you saw —
+  you found ~8). `Browser::launch()` started a *fresh* instance whenever the
+  saved debug port was dead, leaving the old ones running. It now **reaps** any
+  chrome/edge still holding our unique profile dir before launching, and
+  `stop()` reaps too — so there is only ever one, and Stop clears any orphans.
 
 ---
 

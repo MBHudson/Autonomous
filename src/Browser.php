@@ -181,6 +181,12 @@ class Browser
             return self::status();
         }
 
+        // Nothing of ours is answering on the saved port, so any chrome/edge
+        // still holding our profile dir is an orphan from an earlier run — the
+        // cause of the pile-up of headless instances. Clear them before starting
+        // a fresh one, so there is never more than one.
+        self::reap();
+
         $profile = self::profileDir();
         if (!is_dir($profile)) { @mkdir($profile, 0775, true); }
         $port = self::freePort();
@@ -245,7 +251,38 @@ class Browser
             }
         }
         @file_put_contents(self::statePath(), '{}', LOCK_EX);
+        // Browser.close handles the one we know about; reaping catches any
+        // orphan from an earlier run (its port was forgotten, so we cannot
+        // reach it over CDP). This is what finally stops them piling up.
+        self::reap();
         return ['running' => false];
+    }
+
+    /**
+     * Kill every chrome/edge process that is using OUR profile directory.
+     *
+     * The profile path is unique to this install, so its presence in a command
+     * line is a reliable "this one is ours" test — no chance of touching the
+     * operator's everyday browser. Best-effort; never throws.
+     */
+    public static function reap()
+    {
+        $needle = basename(rtrim(self::profileDir(), '/\\'));   // "browser-profile"
+        if ($needle === '') { return; }
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $ps1 = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'router-reap-browsers.ps1';
+                $script = 'Get-CimInstance Win32_Process -Filter "Name=\'chrome.exe\' OR Name=\'msedge.exe\'" '
+                    . '| Where-Object { $_.CommandLine -like \'*' . $needle . '*\' } '
+                    . '| ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }';
+                @file_put_contents($ps1, $script);
+                @exec('powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '
+                    . escapeshellarg($ps1) . ' 2>&1');
+                @unlink($ps1);
+            } else {
+                @exec('pkill -f ' . escapeshellarg($needle) . ' 2>/dev/null');
+            }
+        } catch (\Throwable $e) { /* best effort */ }
     }
 
     /** The page target's websocket URL, creating a tab if there is none. */

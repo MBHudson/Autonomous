@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=325';
-import { acquire, note429 } from './rateGovernor.js?v=325';
-import { latency } from './latency.js?v=325';
-import { detectFamily } from './harness.js?v=325';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=325';
+import { store } from './store.js?v=326';
+import { acquire, note429 } from './rateGovernor.js?v=326';
+import { latency } from './latency.js?v=326';
+import { detectFamily } from './harness.js?v=326';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=326';
 
 latency.bindStore(store);
 
@@ -130,9 +130,15 @@ class ApiClient {
       if (res.status === 401) {
         try { store.emit('token:required'); } catch { /* no store */ }
       }
+      // A non-JSON body (data.raw set) is almost always an HTML error page from
+      // the web server, not our API. Never dump that wall of markup into the UI.
+      const nonJson = data && data.raw !== undefined;
       const err = new Error(res.status === 401
         ? 'Access token required or wrong — set it in Config'
-        : (errText(data.error) || `API ${res.status}: ${text}`));
+        : (errText(data.error)
+            || (nonJson
+              ? `API ${res.status}: the server sent a web page instead of JSON — check the app URL and API path`
+              : `API ${res.status}`)));
       // Carry the status so callers can tell "slow down" (429) from "the key
       // is wrong, retrying is pointless" (401/403) instead of regex-matching
       // the message.
@@ -212,7 +218,11 @@ class ApiClient {
   }
 
   saveConfig(config) {
-    return this.request('PUT', '/config', config);
+    // POST, not PUT: some hosts block or reroute PUT at the web-server level, so
+    // the request never reaches the app and the site's own 404/405 page comes
+    // back — which showed up as "Not saved: API 404: <html>…". The API accepts
+    // POST for the same route.
+    return this.request('POST', '/config', config);
   }
 
   // --- Shell execution ---
@@ -317,7 +327,10 @@ class ApiClient {
   }
 
   saveState(state) {
-    return this.request('PUT', '/state', { state });
+    // POST, not PUT: some hosts block or reroute PUT at the web-server level, so
+    // the request never reaches the app and the site's own 404 page comes back.
+    // The API accepts POST for the same route.
+    return this.request('POST', '/state', { state });
   }
 
   // --- Full backup & restore ---
