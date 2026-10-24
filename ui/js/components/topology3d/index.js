@@ -23,17 +23,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=319';
-import { store } from '../../store.js?v=319';
-import { k, K } from '../../storage.js?v=319';
-import { latency } from '../../latency.js?v=319';
-import { SceneCore, webglAvailable } from './scene.js?v=319';
-import { ForceLayout } from './layout.js?v=319';
-import { NodeView, Nebula } from './nodes.js?v=319';
-import { Beam } from './beams.js?v=319';
-import { LabelLayer } from './labels.js?v=319';
-import { PopupCard } from './popup.js?v=319';
-import { AskDock } from './ask.js?v=319';
+import { TopologyGraph } from '../topology.js?v=320';
+import { store } from '../../store.js?v=320';
+import { k, K } from '../../storage.js?v=320';
+import { latency } from '../../latency.js?v=320';
+import { SceneCore, webglAvailable } from './scene.js?v=320';
+import { ForceLayout } from './layout.js?v=320';
+import { NodeView, Nebula } from './nodes.js?v=320';
+import { Beam } from './beams.js?v=320';
+import { LabelLayer } from './labels.js?v=320';
+import { PopupCard } from './popup.js?v=320';
+import { AskDock } from './ask.js?v=320';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
@@ -166,9 +166,30 @@ export class Topology3D extends TopologyGraph {
       this.raycaster = new THREE.Raycaster();
       this._wirePointer(this.core.renderer.domElement);
 
-      this.core.onFrame = (dt, t) => this._frame(dt, t);
-      this.ready3d = true;
-      return true;
+    this.core.onFrame = (dt, t) => this._frame(dt, t);
+
+    // ---- Resource Manager gates ----------------------------------------
+    // Every switch is off by default, so nothing here changes the loop until
+    // Config → Resource Manager turns one on.
+    this._offscreen = false;
+    this._unfocused = false;
+    this._lastInteractionAt = 0;
+    if (typeof IntersectionObserver !== 'undefined') {
+      this._io = new IntersectionObserver((entries) => {
+        const e = entries[entries.length - 1];
+        this._offscreen = !(e && e.isIntersecting);
+      }, { threshold: 0.01 });
+      this._io.observe(this.root);
+    }
+    this._onBlur = () => { this._unfocused = true; };
+    this._onFocus = () => { this._unfocused = false; };
+    window.addEventListener('blur', this._onBlur);
+    window.addEventListener('focus', this._onFocus);
+    this.core.idleCheck = () => this._sceneIdle();
+    this._gateTimer = setInterval(() => this._refreshGates(), 500);
+
+    this.ready3d = true;
+    return true;
     } catch (err) {
       console.warn('[topology3d] WebGL scene failed to start; using the 2D chart.', err);
       try { this.core?.dispose(); } catch { /* ignore */ }
@@ -214,6 +235,41 @@ export class Topology3D extends TopologyGraph {
   }
 
   get is3d() { return this.mode === '3d' && this.ready3d; }
+
+  // ==================== Resource Manager ====================
+
+  _rm() { return (store.get('settings') || {}).resourceManager || {}; }
+
+  /** Any full-screen overlay that hides the graph. */
+  _panelCovered() {
+    return !!document.querySelector(
+      '.routing-chart.open, .lab-drawer.open, .brainlab.open, '
+      + '.browser-screen:not([hidden]), .modal-bg.open',
+    );
+  }
+
+  /** True when the graph is not doing anything worth redrawing. */
+  _sceneIdle() {
+    if (this.flows && this.flows.some(f => f.phase === 'active')) return false;
+    for (const v of this.views.values()) { if (v.working) return false; }
+    if (this.layout && this.layout.alpha > 0.02) return false;   // still settling
+    if (this._camTween) return false;
+    const last = Math.max(this._lastInteractionAt || 0, this.core?._lastInteract || 0);
+    if (performance.now() - last < 1500) return false;           // just interacted
+    return true;
+  }
+
+  /** Apply the toggles to the render loop (called on a light interval). */
+  _refreshGates() {
+    if (!this.ready3d || !this.core) return;
+    const rm = this._rm();
+    this.core.suspended = (!!rm.pauseCovered && this._panelCovered())
+      || (!!rm.pauseUnfocused && this._unfocused)
+      || (!!rm.pauseOffscreen && this._offscreen);
+    this.core.idleFps = rm.idleThrottle
+      ? Math.max(1, Math.min(60, parseInt(rm.idleFps, 10) || 10))
+      : 0;
+  }
 
   // ==================== overrides of the SVG renderer ====================
 
@@ -439,13 +495,17 @@ export class Topology3D extends TopologyGraph {
       setPtr(e);
       this._pointer.dirty = true;
       this._pointer.inside = true;
+      this._lastInteractionAt = performance.now();
     });
     canvas.addEventListener('pointerleave', () => {
       this._pointer.inside = false;
       this._pointer.dirty = true;
     });
     let down = null;
-    canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    canvas.addEventListener('pointerdown', (e) => {
+      down = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this._lastInteractionAt = performance.now();
+    });
     canvas.addEventListener('pointerup', (e) => {
       if (!down) return;
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
@@ -698,6 +758,10 @@ export class Topology3D extends TopologyGraph {
 
   destroy() {
     super.destroy?.();
+    if (this._gateTimer) clearInterval(this._gateTimer);
+    this._io?.disconnect();
+    if (this._onBlur) window.removeEventListener('blur', this._onBlur);
+    if (this._onFocus) window.removeEventListener('focus', this._onFocus);
     this.beams.forEach(b => b.dispose());
     this.views.forEach(v => v.dispose());
     this.nebulas.forEach(n => n.dispose());

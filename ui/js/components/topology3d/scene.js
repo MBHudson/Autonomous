@@ -16,6 +16,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { perfFrame, perfAttachGL, gpuBegin, gpuEnd, gpuPoll } from '../../perf.js?v=320';
 
 /** True when this browser can give us a WebGL context at all. */
 export function webglAvailable() {
@@ -72,6 +73,12 @@ export class SceneCore {
     this._raf = 0;
     this._lastInteract = 0;
     this.reduced = reducedMotion();
+    // Resource Manager gates (set by the owner from the Config toggles). All
+    // default to "do nothing", so the loop runs as it always has.
+    this.suspended = false;   // skip drawing (panel covered / unfocused / off-screen)
+    this.idleFps = 0;         // 0 = never throttle; >0 = cap fps while idle
+    this.idleCheck = null;    // () => boolean, true when nothing is happening
+    this._lastRender = 0;
 
     const w = Math.max(1, host.clientWidth);
     const h = Math.max(1, host.clientHeight);
@@ -82,6 +89,7 @@ export class SceneCore {
     this.renderer.setClearColor(BG, 1);
     this.renderer.domElement.className = 't3d-canvas';
     host.appendChild(this.renderer.domElement);
+    perfAttachGL(this.renderer.getContext());
 
     this.scene = new THREE.Scene();
     this.scene.background = BG;
@@ -213,6 +221,14 @@ export class SceneCore {
       this._raf = requestAnimationFrame(loop);
       // Hidden panel (mobile drawer closed, 2D mode): skip the GPU work.
       if (this.host.clientWidth < 2 || this.host.offsetParent === null) return;
+      // Resource Manager: a covered / unfocused / off-screen panel draws nothing.
+      if (this.suspended) return;
+      const now = performance.now();
+      // Resource Manager: when idle, draw at most idleFps times a second.
+      if (this.idleFps > 0 && this.idleCheck && this.idleCheck()
+          && (now - this._lastRender) < (1000 / this.idleFps)) return;
+      this._lastRender = now;
+      const t0 = now;
       const dt = Math.min(this.clock.getDelta(), 0.1);
       this.time += dt;
       if (this.stars) {
@@ -226,7 +242,11 @@ export class SceneCore {
       }
       this.onFrame?.(dt, this.time);
       this.controls.update();
+      gpuPoll();
+      gpuBegin();
       this.composer.render();
+      gpuEnd();
+      perfFrame(now, performance.now() - t0);
     };
     this._raf = requestAnimationFrame(loop);
   }

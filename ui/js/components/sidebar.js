@@ -10,15 +10,16 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=319';
-import { K } from '../storage.js?v=319';
-import { persistence } from '../persistence.js?v=319';
-import { api } from '../api.js?v=319';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=319';
-import { TOOL_REGISTRY } from '../tools.js?v=319';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=319';
-import { snapshot } from '../rateGovernor.js?v=319';
-import { resetBrowserEnabled } from '../toolManifest.js?v=319';
+import { store } from '../store.js?v=320';
+import { K } from '../storage.js?v=320';
+import { persistence } from '../persistence.js?v=320';
+import { api } from '../api.js?v=320';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=320';
+import { TOOL_REGISTRY } from '../tools.js?v=320';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=320';
+import { snapshot } from '../rateGovernor.js?v=320';
+import { resetBrowserEnabled } from '../toolManifest.js?v=320';
+import { perf } from '../perf.js?v=320';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1242,6 +1243,7 @@ export class Sidebar {
     // values and undo the rescue it just performed.
     this._commitPendingCfgFields();
     const settings = store.get('settings');
+    const rm = settings.resourceManager || {};
 
     // Numbers typed into a field and not yet saved were rescued at the top of
     // this method, before `settings` was read -- see _commitPendingCfgFields().
@@ -1493,6 +1495,35 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <div class="form-hint" id="sbLabsStatus"></div>
       `)}
 
+      ${this._cfgSection('resources', 'Resource Manager', { text: '' }, `
+        <div class="form-hint">Keep the machine cool. Everything here is <b>off by default</b> — the 3D graph renders continuously, exactly as it always has. Turn a switch on to let the app rest when it is not needed, and watch the gauges.</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Pause when a panel is open <span class="form-hint-inline">routing chart · labs · browser</span></span>
+          <div class="toggle ${rm.pauseCovered ? 'active' : ''}" id="sbRmCovered"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Pause when the window isn't focused</span>
+          <div class="toggle ${rm.pauseUnfocused ? 'active' : ''}" id="sbRmUnfocused"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Pause when the graph is off-screen</span>
+          <div class="toggle ${rm.pauseOffscreen ? 'active' : ''}" id="sbRmOffscreen"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Slow down when idle</span>
+          <div class="toggle ${rm.idleThrottle ? 'active' : ''}" id="sbRmIdle"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Idle frame rate <span class="form-hint-inline">fps</span></span>
+          <input type="number" class="form-input" id="sbRmIdleFps" min="1" max="60" value="${rm.idleFps ?? 10}" style="max-width:84px">
+        </div>
+        <div class="rm-gauges">
+          ${this._dial('Cpu', 'CPU', 'app JS share of each frame')}
+          ${this._dial('Gpu', 'GPU', 'render time per frame')}
+        </div>
+        <div class="form-hint" id="sbRmReadout">&nbsp;</div>
+      `)}
+
       ${this._cfgSection('throttle', 'Throttle / Limiter', {
         text: settings.rateLimitEnabled !== false ? `ON · ${rpm ? rpm + '/min' : 'AUTO'}` : 'OFF',
         cls: settings.rateLimitEnabled !== false ? 'ok' : '',
@@ -1731,6 +1762,21 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbApiPool', (val) => store.set('settings.apiPool', val));
     this._initBrowserToggle();
     this._loadLabsStatus();
+
+    // Resource Manager: every switch defaults off; turning one on lets the
+    // 3D graph rest. The gauges read live values from ui/js/perf.js.
+    this._initToggle('sbRmCovered', (val) => store.set('settings.resourceManager.pauseCovered', val));
+    this._initToggle('sbRmUnfocused', (val) => store.set('settings.resourceManager.pauseUnfocused', val));
+    this._initToggle('sbRmOffscreen', (val) => store.set('settings.resourceManager.pauseOffscreen', val));
+    this._initToggle('sbRmIdle', (val) => store.set('settings.resourceManager.idleThrottle', val));
+    const rmFps = document.getElementById('sbRmIdleFps');
+    rmFps?.addEventListener('change', () => {
+      const n = Math.max(1, Math.min(60, parseInt(rmFps.value, 10) || 10));
+      rmFps.value = n;
+      store.set('settings.resourceManager.idleFps', n);
+      persistence.set('settings', store.get('settings'));
+    });
+    this._startGauges();
 
     this._initToggle('sbAutoScroll', (val) => store.set('settings.autoScroll', val));
     this._initToggle('sbEnterToSend', (val) => store.set('settings.enterToSend', val));
@@ -3043,8 +3089,73 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     }
   }
 
-  _initToggle(id, callback) {
-    const el = document.getElementById(id);
+  /**
+   * A 180° needle gauge (speedometer) built from one arc, tick marks and a CSS
+   * rotated needle — no chart library. `key` is 'Cpu' or 'Gpu'.
+   */
+  _dial(key, label, sub) {
+    const cx = 60, cy = 66, r = 46;
+    let ticks = '';
+    for (let i = 0; i <= 10; i++) {
+      const th = (-90 + i * 18) * Math.PI / 180;
+      const x1 = (cx + (r - 6) * Math.sin(th)).toFixed(1);
+      const y1 = (cy - (r - 6) * Math.cos(th)).toFixed(1);
+      const x2 = (cx + r * Math.sin(th)).toFixed(1);
+      const y2 = (cy - r * Math.cos(th)).toFixed(1);
+      ticks += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    }
+    return `
+      <div class="rm-gauge">
+        <svg viewBox="0 0 120 74" class="rm-dial" aria-hidden="true">
+          <path d="M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy}" class="rm-arc"/>
+          <g class="rm-ticks">${ticks}</g>
+          <line class="rm-needle" id="rmNeedle${key}" x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - (r - 4)}"/>
+          <circle cx="${cx}" cy="${cy}" r="3.4" class="rm-hub"/>
+        </svg>
+        <div class="rm-gauge-label">${label}</div>
+        <div class="rm-gauge-val" id="rmVal${key}">—</div>
+        <div class="rm-gauge-sub">${sub}</div>
+      </div>`;
+  }
+
+  _startGauges() {
+    if (this._gaugeTimer) return;
+    this._gaugeTimer = setInterval(() => this._updateGauges(), 500);
+    this._updateGauges();
+  }
+
+  _updateGauges() {
+    const cpuNeedle = document.getElementById('rmNeedleCpu');
+    const gpuNeedle = document.getElementById('rmNeedleGpu');
+    if (!cpuNeedle && !gpuNeedle) return;   // section collapsed / not on screen
+    const cpu = perf.cpu || 0;
+    this._setNeedle(cpuNeedle, 'rmValCpu', cpu, `${cpu}%`);
+    let pct, text;
+    if (perf.gpuOk && perf.gpu != null) {
+      pct = Math.min(100, (perf.gpu / 16.7) * 100);
+      text = `${perf.gpu.toFixed(1)} ms`;
+    } else {
+      pct = Math.min(100, ((perf.frameMs || 0) / 16.7) * 100);
+      text = `~${(perf.frameMs || 0).toFixed(1)} ms`;
+    }
+    this._setNeedle(gpuNeedle, 'rmValGpu', pct, text);
+    const ro = document.getElementById('sbRmReadout');
+    if (ro) {
+      ro.textContent = `${perf.fps || 0} fps · frame ~${perf.frameMs || 0} ms`
+        + (perf.gpuOk ? '' : ' · GPU is an estimate (this browser exposes no timer query)');
+    }
+  }
+
+  _setNeedle(needle, valId, pct, text) {
+    if (needle) {
+      const angle = -90 + (Math.max(0, Math.min(100, pct)) / 100) * 180;
+      needle.style.transform = `rotate(${angle.toFixed(1)}deg)`;
+    }
+    const v = document.getElementById(valId);
+    if (v) v.textContent = text;
+  }
+
+  _initToggle(id, callback) {    const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('click', () => {
       el.classList.toggle('active');

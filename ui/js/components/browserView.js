@@ -19,9 +19,9 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=319';
-import { api } from '../api.js?v=319';
-import { esc } from '../utils.js?v=319';
+import { store } from '../store.js?v=320';
+import { api } from '../api.js?v=320';
+import { esc } from '../utils.js?v=320';
 
 export class BrowserView {
   constructor() {
