@@ -2,16 +2,16 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=312';
-import { K } from './storage.js?v=312';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=312';
-import { startStateSync } from './stateSync.js?v=312';
-import { api } from './api.js?v=312';
-import { themeManager } from './themes.js?v=312';
-import { Sidebar } from './components/sidebar.js?v=312';
-import { Chat } from './components/chat.js?v=312';
-import { TopologyGraph } from './components/topology.js?v=312';
-import { initTopoPanel } from './components/topoPanel.js?v=312';
+import { store, APP_VERSION } from './store.js?v=313';
+import { K } from './storage.js?v=313';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=313';
+import { startStateSync } from './stateSync.js?v=313';
+import { api } from './api.js?v=313';
+import { themeManager } from './themes.js?v=313';
+import { Sidebar } from './components/sidebar.js?v=313';
+import { Chat } from './components/chat.js?v=313';
+import { TopologyGraph } from './components/topology.js?v=313';
+import { initTopoPanel } from './components/topoPanel.js?v=313';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -20,31 +20,32 @@ import { initTopoPanel } from './components/topoPanel.js?v=312';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=312')
+  return import('./components/topology3d/index.js?v=313')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=312';
-import { AgentEditor } from './components/agentEditor.js?v=312';
-import { ProviderEditor } from './components/providerEditor.js?v=312';
-import { Microphone } from './components/microphone.js?v=312';
-import { ConfigPanel } from './components/configPanel.js?v=312';
-import { ExportPanel } from './components/export.js?v=312';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=312';
-import { TerminalPanel } from './components/terminalPanel.js?v=312';
-import { MetricsPanel } from './components/metricsPanel.js?v=312';
-import { TracePanel } from './components/tracePanel.js?v=312';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=312';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=312';
-import { initApprovals } from './approvals.js?v=312';
-import * as memory from './memory.js?v=312';
-import { audio } from './audio.js?v=312';
-import { AlwaysOn } from './alwaysOn.js?v=312';
-import { ApiLab } from './apiLab.js?v=312';
-import { BrainLab } from './brainlab.js?v=312';
+import { RoutingChart } from './components/routingChart.js?v=313';
+import { AgentEditor } from './components/agentEditor.js?v=313';
+import { ProviderEditor } from './components/providerEditor.js?v=313';
+import { Microphone } from './components/microphone.js?v=313';
+import { ConfigPanel } from './components/configPanel.js?v=313';
+import { ExportPanel } from './components/export.js?v=313';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=313';
+import { TerminalPanel } from './components/terminalPanel.js?v=313';
+import { MetricsPanel } from './components/metricsPanel.js?v=313';
+import { TracePanel } from './components/tracePanel.js?v=313';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=313';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=313';
+import { initApprovals } from './approvals.js?v=313';
+import * as memory from './memory.js?v=313';
+import { audio } from './audio.js?v=313';
+import { AlwaysOn } from './alwaysOn.js?v=313';
+import { ApiLab } from './apiLab.js?v=313';
+import { BrainLab } from './brainlab.js?v=313';
+import { BrowserView } from './components/browserView.js?v=313';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -204,6 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const exportPanel = new ExportPanel();
   const thinkingPanel = new ThinkingPanel();
   const terminalPanel = new TerminalPanel();
+  const browserView = new BrowserView();
   const metricsPanel = new MetricsPanel();
   const tracePanel = new TracePanel();
 
@@ -340,12 +342,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Main-screen API Lab: apiLab.show() opens it full-window (see show()).
   openApp('appsApiLab', () => apiLab.toggle());
   openApp('appsRouting', () => routingChart.toggle());
+  openApp('appsBrowser', () => browserView.toggle());
   safeInit('agentEditor', () => agentEditor.init());
   safeInit('providerEditor', () => providerEditor.init());
   safeInit('microphone', () => microphone.init());
   safeInit('configPanel', () => configPanel.init());
   safeInit('exportPanel', () => exportPanel.init());
   safeInit('thinkingPanel', () => thinkingPanel.init());
+  safeInit('browserView', () => browserView.init());
   safeInit('terminalPanel', () => terminalPanel.init());
   safeInit('metricsPanel', () => metricsPanel.init());
   safeInit('tracePanel', () => tracePanel.init());
