@@ -462,6 +462,6 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 ## 📜 License
 
-**AGPL v3** — free to use, modify and self-host. If you run a modified version as a network service, the AGPL asks you to share your changes back. See [`LICENSE`](LICENSE). 💙
+**Copyright** — M. Bryce Hudson 2026-2029 All Rights Reserved See [`LICENSE`](LICENSE). 💙
 
 Made by [MBHudson](https://github.com/mbhudson/)
