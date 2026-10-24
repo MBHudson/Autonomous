@@ -2,12 +2,12 @@
 // CONFIGPANEL.JS — Settings modal
 // ============================================
 
-import { store } from '../store.js?v=313';
-import { persistence } from '../persistence.js?v=313';
-import { themeManager } from '../themes.js?v=313';
-import { DEFAULT_HISTORY_TURNS } from '../utils.js?v=313';
-import { api } from '../api.js?v=313';
-import { audio } from '../audio.js?v=313';
+import { store } from '../store.js?v=314';
+import { persistence } from '../persistence.js?v=314';
+import { themeManager } from '../themes.js?v=314';
+import { DEFAULT_HISTORY_TURNS } from '../utils.js?v=314';
+import { api } from '../api.js?v=314';
+import { audio } from '../audio.js?v=314';
 
 export class ConfigPanel {
   constructor() {

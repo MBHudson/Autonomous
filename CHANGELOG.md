@@ -1,8 +1,31 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v313**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v314**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v314 — Browser: the multi-second stall that made a page take minutes
+
+- **Root cause found.** Chrome answers its DevTools HTTP endpoints (`/json/version`,
+  `/json/list`) in ~1 ms but keeps the socket open, and `file_get_contents` reads
+  to EOF — so it blocked for the full timeout on every call. Each browser action
+  paid that twice (`status` + `pageWs`), and stacking requests (Go, the Live
+  poll) exhausted the browser's connection pool: a page took **minutes**.
+  `Browser::httpJson()` now reads exactly `Content-Length` bytes over a raw
+  socket and returns at once.
+- **Navigation no longer waits for `complete`.** It returns as soon as
+  `readyState` leaves `loading` (interactive is enough to screenshot); heavy
+  sites that never reach `complete` used to sit out the full 25s every time.
+- **Faster cold launch** — the readiness poll is instant now, and headless starts
+  with background work off (`--disable-extensions`, `--disable-component-update`,
+  `--disable-sync`, `--disable-background-networking`, …).
+- **The screen can't stampede.** Go, click, type, Enter and screenshots are
+  single-flight, the Live poll runs every 2s and skips while a shot is in
+  flight, and it no longer closes on Escape while you are typing in it.
+- Measured on this machine: navigate **8.3s → 0.3s**, screenshot **8.1s → 0.1s**,
+  launch **~14s → ~3s**.
 
 ---
 
