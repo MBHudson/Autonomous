@@ -40,6 +40,9 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 | 🎙️ **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
 | ⌨️ **Slash commands** | `/CODE`, `/ROLE`, `/NAME`, `/ALL`, `/?` — address agents from the composer |
 | 💾 **Export / import** | Take a session out, or back up and restore the whole state |
+| 🧠 **Dynamic tools** | Teaches each model the environment it's really in — and learns the tool dialect that works |
+| 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
+| 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
 | 📱 **Mobile-first** | Built for the phone in your pocket |
 
 ---
@@ -201,6 +204,21 @@ Adding a provider is one line in the alias table, or just a new provider in the 
 
 ---
 
+## 🧠 Dynamic tools & the learned dialect
+
+![Config → Labs: dynamic tools, the learned dialect, the API pool and the browser](screenshots/Learn-Dialect.png)
+
+No two models are alike — and the **free** ones are the fussiest of all. 🔧 **Dynamic tools** hands each model the environment it is *actually* running in — the server's 🪟/🐧 OS, the working directory, and which shell commands **really exist** — then shows **one correct example per tool in that model's own dialect** (JSON, Claude XML, native `<|tool_call|>` tags, or plain). No more `findstr` on Linux, no more guessing the syntax: the model is *told*, up front. 🎯
+
+- 🌍 **Speaks the model's language** — OpenAI-style JSON, Claude XML, native tags or plain JSON, detected from the provider + model id (or forced per agent).
+- 🛟 **One rescue retry** — if a reply *looks* like a tool call but parses to nothing, the loop re-teaches **once** with a different dialect instead of letting the near-miss become the answer.
+- 🧠 **Learns the winner** — once a call parses, the dialect that worked is remembered per `provider + model` and tried first next time.
+- 🛑 **Off in one click** — Config → Labs → *Dynamic tools* restores the classic behaviour exactly, if you ever want it.
+
+Free, quantised models that used to burn **6–8 calls** guessing now get it right the first time. 🚀
+
+---
+
 ## ⏱️ Throttle / limiter / pacer
 
 ![Throttle and metrics](screenshots/throttle-token-metrics-clock.png)
@@ -210,6 +228,21 @@ A 40-requests-per-minute key dies when 16 chart nodes fire at once. The pacer co
 - **Per-key buckets** — four agents on four keys are four buckets; two agents on one key correctly share.
 - **Knows the free tiers** — NVIDIA NIM 40/min, Groq 30, OpenRouter 20, … with a host default for anything unknown. Set the global field to **`0 = AUTO`** to use each provider's real ceiling, or type a number to override everyone. Precedence: **agent lock → provider → global → host default**.
 - **Learns from a 429** — a real refusal holds the bucket closed for the server's `Retry-After`.
+
+---
+
+## 🔑 API pool — rotate your keys
+
+![Provider editor → API pool: extra keys, model scoping and rotate-after-N](screenshots/API-Pool.png)
+
+Got several keys for one provider — a handful of free accounts, a team key, a spare? 🗝️ Drop them into the provider's **API pool** and let the console do the shuffling.
+
+- 🔁 **Rotate after N requests** — set the number and the pool hands out the next key when one reaches it (`0` = every call).
+- 🎯 **Pin a key to a model** — tick *Only this model* and enter a model # (like `#63BET7`) or a model id, and that key circles **just that model** while everything else keeps the single key.
+- 😴 **429s get rested** — a rate-limit refusal puts a key on a **60-second cooldown** and the next call reaches for another, so one exhausted free tier never stalls the whole provider.
+- 🧷 **Your explicit key still wins** — an agent's own Key Override always takes precedence, and with the pool off you get the single key exactly as before.
+
+It stacks with the pacer: every key is counted in its **own** bucket 📈, so a busy fleet spreads its load instead of slamming one ceiling.
 
 ---
 
@@ -324,6 +357,19 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 3. **The friend runs their own copy of Loop Studio** — **Config → MCP Client → + ADD SERVER** (name, transport `http`, url, and a `headers` box with `Authorization: Bearer <token>`). Their agents then reach the operator's tools through `mcp_list` / `mcp_call`.
 
 The operator hands over the **URL + that friend's token**; `FRIENDS.md` is the one-page version to send along.
+
+---
+
+## 🌐 Built-in browser — you watch, the agents drive
+
+![The built-in browser: live page, address bar, click-through and the drive-it rail](screenshots/Browser.png)
+
+A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 no extensions, just the DevTools Protocol. 🖥️ Open it from the **Browser** item in the apps notch and you get the live page, an address bar, **Go / Reload**, a **Live** auto-refresh, a headless ⇄ window toggle, and a **click-through** view: tap the page and it clicks. ✨
+
+- 🖱️ **Click, type, read** — click anywhere on the screenshot, type into the field you need, press **Enter**, and pull the page's visible text.
+- 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
+- 🔐 **Logins stick** — the profile is persistent: log in **once** (headless, or in a window you can take over 🫳) and both you and the agents reuse the session.
+- 🛡️ **Off by default and gated** — Config → Labs → *Browser* switches it on; **http/https only**, cloud-metadata addresses refused, and every route is token-gated.
 
 ---
 
