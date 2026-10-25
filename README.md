@@ -94,6 +94,35 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 ./start.sh          # or ./start.sh 8090 for another port
 ```
 
+### 🌍 Deploying on a real web host (Apache / nginx / IIS)
+
+The one-folder design means `storage/` (the token, provider keys, every session
+and the exec allow/deny lists) lives **inside the app folder**. That folder must
+**never** be reachable over HTTP. Everything here is about keeping it that way. 🔒
+
+- 🟡 **Apache** — `storage/.htaccess` ships with the app and denies the whole
+  folder (`Require all denied`, with a 2.2 fallback). `./setup-token.sh`
+  **re-creates it if a deploy lost it**. Just make sure `AllowOverride` lets
+  `.htaccess` apply (the XAMPP installer sets this for you).
+- 🔴 **nginx** — **ignores `.htaccess` entirely**, so you *must* add the rules
+  yourself. Ship the included **`nginx.example.conf`** into your `server{}` block
+  (it denies `/router/(storage|logs|tmp|sessions)/`, dotfiles and loose
+  `.json/.log/.ini/.bak/.key/.pem` files), then `nginx -t && systemctl reload nginx`.
+- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage`
+  segment, e.g.:
+  ```xml
+  <configuration><system.webServer><security><requestFiltering>
+    <hiddenSegments><add segment="storage" /></hiddenSegments>
+  </requestFiltering></security></system.webServer></configuration>
+  ```
+- 🧪 **The PHP built-in server** (`start-php.bat` / `php serve.php`) already
+  refuses `/storage`, `/logs`, `/tmp`, `/sessions` and dotfiles with a `403` — no
+  config needed.
+- ✅ **Verify it, don't assume it.** After any deploy, fetch
+  `https://your-host/router/storage/config.json` in a private window. You must get
+  **403 / 404** — never JSON. If you see JSON, stop and fix the rule above before
+  doing anything else. 🚨
+
 ### 🔑 First run
 The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
 
@@ -505,6 +534,30 @@ Take your work with you. 📦
 - **🧹 Error hygiene** — failures come back as `{"error": "..."}` with HTTP `400` and a message **meant for the model**, and `display_errors` stays off so stack traces and filesystem paths never leak to a browser.
 - **🔍 Observability for you** — a live **Run trace** and an MCP audit log mean every model turn and tool call is inspectable after the fact.
 
+### 🗄️ 16. `storage/` is never web-served
+- **🔑 What it holds.** The access token, every provider API key, the state
+  bundle, **every session transcript**, and the **exec allow/deny lists** that
+  decide which shell commands an agent may run. It is the most sensitive folder
+  in the app.
+- **🟡 Apache — denied by a file that ships and self-repairs.** `storage/.htaccess`
+  is tracked in the repo and refuses the whole folder with **`Require all denied`**
+  (plus an Apache 2.2 `Order/Deny` fallback so a host without `mod_access_compat`
+  gets a clean `403`, not a 500). `./setup-token.sh` **re-creates it if it's
+  ever missing.**
+- **🔴 nginx — operator rules, shipped as `nginx.example.conf`.** nginx never
+  reads `.htaccess`, so the example config denies `storage/` (and `logs/`, `tmp/`,
+  `sessions/`), all dotfiles, and loose `.json` / `.log` / `.ini` / `.bak` /
+  `.key` / `.pem` files — copy it into your `server{}` block.
+- **🔵 IIS** — a `web.config` `hiddenSegments` entry blocks the `storage` segment.
+- **🧪 The built-in server** refuses `/storage`, `/logs`, `/tmp`, `/sessions` and
+  dotfiles with `403` in `serve.php` — the same policy, no config.
+- **🚨 Verify, don't trust.** After deploying, request
+  `/router/storage/config.json` from an incognito tab. You must see **403 / 404**.
+  If you see JSON, the folder is exposed — fix it before anything else.
+- **🏰 The strongest option:** keep `storage/` **outside** the document root. If
+  the one-folder design forces it inside, the deny rule above is mandatory, not
+  optional.
+
 > ⚖️ **The honest caveat:** the app is only as safe as the operator's switches. Turn
 > everything on, auto-approve writes, and point the root at `/` — and you have built
 > yourself a very capable foot-gun. The design *makes the safe choice the default*
@@ -634,7 +687,8 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 ├── serve.php             # php -S router (no Apache needed)
 ├── start.bat / start.sh  # launchers
 ├── setup-xampp.bat/.ps1  # one-click Apache + PHP (Windows)
-├── setup-token.sh        # create / rotate the access token
+├── setup-token.sh        # create / rotate the access token (+ storage guard)
+├── nginx.example.conf    # deny web access to storage/ on nginx (copy into server{})
 ├── FRIENDS.md            # hand this to a friend to connect over MCP
 ├── CHANGELOG.md
 └── README.md

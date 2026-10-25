@@ -24,6 +24,30 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# storage/ must never be served over the web: it holds the access token,
+# provider keys, every session transcript and the exec allow/deny lists.
+# Apache denies it with this file (which ships in the repo) -- but a copy, a
+# moved folder or a stray `git clean` can lose it, and nginx ignores .htaccess
+# entirely. Re-create the Apache guard here so the operator cannot expose the
+# folder by accident, and print the nginx equivalent for non-Apache hosts.
+ensure_storage_guard() {
+  [ -d storage ] || return 0
+  if [ ! -f storage/.htaccess ]; then
+    cat > storage/.htaccess <<'HTACCESS'
+# Deny ALL web access to storage/. Ships with the app; do not delete.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+HTACCESS
+    echo "Re-created storage/.htaccess (denies web access to storage/)." >&2
+  fi
+}
+ensure_storage_guard
+
 CONFIG="storage/config.json"
 
 if [ ! -f "$CONFIG" ]; then
