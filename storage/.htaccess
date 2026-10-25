@@ -1,8 +1,21 @@
-# Deny all access to storage
-Deny from all
+# Deny ALL web access to storage/.
+#
+# This folder holds the access token, provider API keys, every session
+# transcript, the state bundle, and the exec allow/deny lists that decide which
+# shell commands an agent may run. It must never be readable over HTTP.
+#
+# This file SHIPS WITH THE APP (it is tracked in git) and is re-created by
+# ./setup-token.sh if a deploy loses it. Do not delete it, and do not relax it.
+#
+# Portable across Apache 2.2 and 2.4: the 2.4 directive is used where the authz
+# core exists, and the 2.2 directive only where it does not -- so a host without
+# mod_access_compat gets a clean 403 instead of an "unknown directive" 500.
 
-# But allow access to files within if needed
-<Files "*.json">
-    Order Deny,Allow
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
     Deny from all
-</Files>
+</IfModule>
