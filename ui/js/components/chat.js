@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=329';
-import { K as STORAGE_K } from '../storage.js?v=329';
+import { store } from '../store.js?v=330';
+import { K as STORAGE_K } from '../storage.js?v=330';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,26 +20,26 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=329';
-import { persistence } from '../persistence.js?v=329';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=329';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=329';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=329';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=329';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=329';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=329';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=329';
-import { usageFor } from '../rateGovernor.js?v=329';
-import { trace } from '../trace.js?v=329';
-import { latency } from '../latency.js?v=329';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=329';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=329';
-import { SlashCommands } from '../slashCommands.js?v=329';
-import { parseRoute, routingHelp } from '../routing.js?v=329';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=329';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=329';
-import { MessageRenderer, renderToolCalls } from './message.js?v=329';
-import { createAvatar } from './avatar.js?v=329';
+import { api, errText } from '../api.js?v=330';
+import { persistence } from '../persistence.js?v=330';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=330';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=330';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=330';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=330';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=330';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=330';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=330';
+import { usageFor } from '../rateGovernor.js?v=330';
+import { trace } from '../trace.js?v=330';
+import { latency } from '../latency.js?v=330';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=330';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=330';
+import { SlashCommands } from '../slashCommands.js?v=330';
+import { parseRoute, routingHelp } from '../routing.js?v=330';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=330';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=330';
+import { MessageRenderer, renderToolCalls } from './message.js?v=330';
+import { createAvatar } from './avatar.js?v=330';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2199,12 +2199,18 @@ _makeLiveNode(agent) {
     const injectContext = obj => {
       if (obj && Array.isArray(obj.messages)) {
         // Replay history ahead of the live prompt (after any system message).
+        //
+        // firstUser >= 0, not > 0: a template whose message array is the common
+        // single-user shape (`[{role:"user", content:"$USER-PROMPT-VARIABLE"}]`,
+        // i.e. no system message) puts the live turn at index 0. The old `> 0`
+        // matched neither branch there, so history was dropped entirely and the
+        // agent answered "I don't have context from a previous conversation".
         const history = this._historyFor(agent.id);
         if (history.length) {
           const firstUser = obj.messages.findIndex(m => m && m.role === 'user');
-          if (firstUser > 0) {
+          if (firstUser >= 0) {
             obj.messages.splice(firstUser, 0, ...history);
-          } else if (firstUser === -1) {
+          } else {
             // No user turn yet (history-only body): append history, then let
             // the caller add the prompt.
             obj.messages.push(...history);
