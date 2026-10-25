@@ -10,16 +10,16 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=327';
-import { K } from '../storage.js?v=327';
-import { persistence } from '../persistence.js?v=327';
-import { api } from '../api.js?v=327';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=327';
-import { TOOL_REGISTRY } from '../tools.js?v=327';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=327';
-import { snapshot } from '../rateGovernor.js?v=327';
-import { resetBrowserEnabled } from '../toolManifest.js?v=327';
-import { perf } from '../perf.js?v=327';
+import { store } from '../store.js?v=329';
+import { K } from '../storage.js?v=329';
+import { persistence } from '../persistence.js?v=329';
+import { api } from '../api.js?v=329';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=329';
+import { TOOL_REGISTRY } from '../tools.js?v=329';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=329';
+import { snapshot } from '../rateGovernor.js?v=329';
+import { resetBrowserEnabled } from '../toolManifest.js?v=329';
+import { perf } from '../perf.js?v=329';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -89,6 +89,7 @@ export class Sidebar {
         this._alwaysOnHeld.clear();
       }
       if (this.activeTab === 'agents') this.render();
+      else if (this.activeTab === 'config') this._renderAlwaysOnStatus();
     });
 
     // Tab navigation
@@ -558,14 +559,18 @@ export class Sidebar {
    * prompt that would inject nothing.
    */
   _togglePrePrompt() {
-    const cur = store.get('settings.globalPrePrompt') || { text: '', active: false };
+    const cur = store.get('settings.globalPrePrompt') || { text: '', active: false, mode: 'prepend' };
     const text = cur.text || '';
+    const mode = cur.mode === 'replace' ? 'replace' : 'prepend';
     if (cur.active && text.trim()) {
-      store.set('settings.globalPrePrompt', { text, active: false });
+      store.set('settings.globalPrePrompt', { text, active: false, mode });
       store.emit('toast', { message: 'Global pre-prompt off', type: 'info' });
     } else if (text.trim()) {
-      store.set('settings.globalPrePrompt', { text, active: true });
-      store.emit('toast', { message: 'Global pre-prompt ON — replaces every agent’s own prompt while active', type: 'success' });
+      store.set('settings.globalPrePrompt', { text, active: true, mode });
+      store.emit('toast', {
+        message: `Global pre-prompt ON — ${mode === 'replace' ? 'replaces' : 'prepends to'} every agent's own prompt`,
+        type: 'success',
+      });
     } else {
       this._openPrePromptEditor();
       return;
@@ -577,10 +582,12 @@ export class Sidebar {
   /**
    * Popup editor for the override text. Save stores the text and arms the
    * override whenever there is anything to inject; saving empty (or clearing
-   * the box) disarms it. Cancel changes nothing.
+   * the box) disarms it. Cancel changes nothing. The bottom-left switch picks
+   * whether the override PREPENDS to (default) or REPLACES the agent's prompt.
    */
   _openPrePromptEditor() {
-    const cur = store.get('settings.globalPrePrompt') || { text: '', active: false };
+    const cur = store.get('settings.globalPrePrompt') || { text: '', active: false, mode: 'prepend' };
+    let replace = cur.mode === 'replace';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -590,16 +597,22 @@ export class Sidebar {
           <button class="modal-close" id="prePromptClose">&times;</button>
         </div>
         <div class="modal-body">
-          <div class="form-hint" style="margin-bottom:8px">Replaces every
-            agent's own system prompt while active — main chat, ask-directly and
-            routing-chart runs alike. Stored custom prompts are untouched and
-            return when this is switched off.</div>
+          <div class="form-hint" id="prePromptHint" style="margin-bottom:8px"></div>
           <textarea class="form-textarea" id="prePromptText" rows="6"
             placeholder="e.g. Always explain your reasoning before answering."></textarea>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-ghost" id="prePromptCancel">Cancel</button>
-          <button class="btn btn-primary" id="prePromptSave">Save</button>
+        <div class="modal-footer pre-prompt-footer">
+          <div class="pre-prompt-mode">
+            <span class="form-hint-inline">Mode</span>
+            <div class="toggle" id="prePromptMode" role="switch" aria-checked="false" tabindex="0" title="Off = prepend, On = replace">
+              <div class="toggle-knob"></div>
+            </div>
+            <span class="pre-prompt-mode-label" id="prePromptModeLabel">Prepend</span>
+          </div>
+          <div class="pre-prompt-actions">
+            <button class="btn btn-ghost" id="prePromptCancel">Cancel</button>
+            <button class="btn btn-primary" id="prePromptSave">Save</button>
+          </div>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -610,14 +623,36 @@ export class Sidebar {
     const ta = overlay.querySelector('#prePromptText');
     ta.value = cur.text || '';
     ta.focus();
+
+    // The switch is the one place replace/prepend is chosen, so the hint above
+    // the box and the label beside it always describe the current choice.
+    const hint = overlay.querySelector('#prePromptHint');
+    const modeEl = overlay.querySelector('#prePromptMode');
+    const modeLabel = overlay.querySelector('#prePromptModeLabel');
+    const syncMode = () => {
+      modeEl.classList.toggle('active', replace);
+      modeEl.setAttribute('aria-checked', String(replace));
+      modeLabel.textContent = replace ? 'Replace' : 'Prepend';
+      hint.textContent = replace
+        ? "Replaces every agent's own system prompt while active — main chat, ask-directly and routing-chart runs alike. Stored custom prompts are untouched and return when this is switched off."
+        : "Prepended in front of every agent's own system prompt while active — main chat, ask-directly and routing-chart runs alike. The agent's own prompt still follows.";
+    };
+    const flip = () => { replace = !replace; syncMode(); };
+    modeEl.addEventListener('click', flip);
+    modeEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+    });
+    syncMode();
+
     overlay.querySelector('#prePromptSave').addEventListener('click', () => {
       const text = ta.value;
       const active = !!text.trim();
-      store.set('settings.globalPrePrompt', { text, active });
+      const mode = replace ? 'replace' : 'prepend';
+      store.set('settings.globalPrePrompt', { text, active, mode });
       persistence.set('settings', store.get('settings'));
       store.emit('toast', {
         message: active
-          ? 'Global pre-prompt saved and ON — replaces every agent’s own prompt while active'
+          ? `Global pre-prompt saved and ON — ${mode === 'replace' ? 'replaces' : 'prepends to'} every agent's own prompt`
           : 'Global pre-prompt cleared and off',
         type: active ? 'success' : 'info',
       });
@@ -1072,21 +1107,45 @@ export class Sidebar {
     const eligible = (store.get('agents') || []).filter(
       a => a && a.alwaysOn && a.active && String(a.alwaysOnGoal || '').trim()
     );
+    // Held agents are excluded from every tick, so say so and offer the way
+    // out. A cap (Max iterations / Max minutes) or a click on an ALWAYS ON
+    // badge parks the agent; the hold is saved and survives a reload, which
+    // without this line read as always-on having switched itself off.
+    const held = this._alwaysOnHeld ? this._alwaysOnHeld.size : 0;
+    const releaseBtn = document.getElementById('sbAlwaysOnRelease');
+    if (releaseBtn) releaseBtn.style.display = held ? 'block' : 'none';
+    const heldNote = held ? ` ${held} are stopped and held — release them below.` : '';
     if (!s.alwaysOn) {
       el.textContent = eligible.length
-        ? `${eligible.length} agent(s) have a standing goal. Switch on to let them work.`
+        ? `${eligible.length} agent(s) have a standing goal. Switch on to let them work.${heldNote}`
         : 'Give an agent a standing goal in its editor, then switch this on.';
       return;
     }
     if (!eligible.length) {
-      el.textContent = 'Switched on, but no agent has a standing goal yet.';
+      el.textContent = held
+        ? `Switched on, but every agent with a goal is stopped and held.${heldNote}`
+        : 'Switched on, but no agent has a standing goal yet.';
       return;
     }
     const every = Math.max(10, parseInt(s.alwaysOnIntervalSec, 10) || 30);
     // ~3500 tokens a turn is a fair average for this app's agent prompts.
     const perHour = (3600 / every) * eligible.length;
+    // A cap stops and HOLDS the agent (that is the point -- it is the spend
+    // guard). Say so, and call out the footgun where the cadence is longer than
+    // the minute cap, so the roster is parked after a single tick.
+    const iters = parseInt(s.alwaysOnMaxIterations, 10) || 0;
+    const mins = parseInt(s.alwaysOnMaxMinutes, 10) || 0;
+    let capNote = '';
+    if (iters || mins) {
+      const caps = [iters && `${iters} iteration(s)`, mins && `${mins} minute(s)`].filter(Boolean).join(' / ');
+      const oneTick = (mins && mins * 60 <= every) || iters === 1;
+      capNote = ` Each agent is then stopped and HELD after ${caps}.`
+        + (oneTick
+          ? ' That is only the first tick at this cadence — set the caps to 0 (Limits & Budgets) to loop forever.'
+          : '');
+    }
     el.textContent = `Running for ${eligible.length} agent(s) every ${every}s — roughly `
-      + `${Math.round(perHour)} turns/hour. Each turn is billed by your provider.`;
+      + `${Math.round(perHour)} turns/hour. Each turn is billed by your provider.${heldNote}${capNote}`;
   }
 
   renderProviders() {
@@ -1411,6 +1470,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           </div>
         </div>
         <div class="form-hint" id="sbAlwaysOnStatus"></div>
+        <button class="btn btn-ghost btn-block" id="sbAlwaysOnRelease" style="margin-top:8px;display:none">RELEASE HELD AGENTS</button>
 
         <div class="cfg-sublabel">Approvals</div>
         <div class="toggle-row">
@@ -1884,6 +1944,9 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbAlwaysOnHidden', (val) => {
       store.set('settings.alwaysOnRunHidden', val);
       persistence.set('settings', store.get('settings'));
+    });
+    document.getElementById('sbAlwaysOnRelease')?.addEventListener('click', () => {
+      store.emit('alwaysOn:releaseAll');
     });
     this._renderAlwaysOnStatus();
 

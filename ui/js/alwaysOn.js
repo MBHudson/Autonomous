@@ -21,9 +21,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=327';
-import { persistence } from './persistence.js?v=327';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=327';
+import { store } from './store.js?v=329';
+import { persistence } from './persistence.js?v=329';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=329';
 
 export class AlwaysOn {
   /**
@@ -82,6 +82,9 @@ export class AlwaysOn {
 
   init() {
     this._restoreHeld();
+    // Remember the master switch's last state so a change can be told apart
+    // from an unrelated settings write. See the settings:changed handler below.
+    this._wasOn = this.enabled();
     this.start();
 
     // An agent deleted or renamed elsewhere must not leave a held id behind:
@@ -99,12 +102,42 @@ export class AlwaysOn {
 
     // Re-pacing on any settings or roster change keeps the timer honest
     // without every caller having to remember to restart it.
+    //
+    // The master switch is read as a TRANSITION, not a flat value. Turning it
+    // ON releases every held agent, so flipping it off and back on is a working
+    // reset instead of a no-op. It used to just abort in-flight turns and call
+    // start(): the held set was restored from storage and never cleared, so
+    // re-enabling always-on came back with every badge still stuck on HELD and
+    // nothing ever ticked. Turning it OFF now runs stopAll() -- which is what
+    // actually releases everyone, exactly as its own comment always claimed.
     store.on('settings:changed', () => {
-      // Master off kills in-flight autonomous turns too, not just future
-      // ticks: an "off" that leaves work running is not off. Holds survive
-      // (only stopAll releases those, deliberately).
-      if (!this.enabled()) this.abortAll('always-on switched off');
-      this.start();
+      const on = this.enabled();
+      if (on && !this._wasOn) {
+        this.releaseAll();
+      }
+      if (!on && this._wasOn) {
+        // Master off kills in-flight autonomous turns too, not just future
+        // ticks: an "off" that leaves work running is not off.
+        this.stopAll('always-on switched off');
+      } else {
+        this.start();
+      }
+      this._wasOn = on;
+    });
+
+    // Operator-facing "release everyone", wired to the Config button. Held
+    // agents survive a reload by design, so without this the only way out of a
+    // HELD badge was to click each one; a cap (Max iterations / Max minutes)
+    // parks the whole roster and it looked like always-on had switched itself
+    // off.
+    store.on('alwaysOn:releaseAll', () => {
+      const n = this.releaseAll();
+      store.emit('toast', {
+        message: n
+          ? `${n} agent(s) released — they resume on the next tick`
+          : 'No agents were held',
+        type: n ? 'success' : 'info',
+      });
     });
     store.on('agents:changed', () => { this.start(); this.render(); });
 
@@ -437,6 +470,16 @@ export class AlwaysOn {
     });
     this.render();
     return true;
+  }
+
+  /** Let every held agent tick again. Returns how many were released. */
+  releaseAll() {
+    if (!this.held.size) return 0;
+    const n = this.held.size;
+    this.held.clear();
+    this._persistHeld();
+    store.emit('alwaysOn:held', { agentIds: [] });
+    return n;
   }
 
   /** The master switch, and the kill button behind it. */

