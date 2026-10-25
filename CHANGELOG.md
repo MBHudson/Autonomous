@@ -9,8 +9,25 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v329**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v330**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v330 — curl-template agents now replay conversation history
+
+- **"I don't have context from a previous conversation."** Agents driven by a
+  saved **curl / Python / Node snippet** (the NVIDIA example shape: a single
+  `{"role":"user","content":"$USER-PROMPT-VARIABLE"}` and **no system message**)
+  never received their replayed history. `injectContext()` inserted history only
+  when the first user turn was at index **> 0**; in this — the *most common* —
+  template the live turn sits at index **0**, so it matched neither branch and
+  history was dropped silently. Every ordinary (non-template) agent was fine,
+  which is why only the snippet-based models looked amnesiac.
+- Fix: splice history at the first user turn when `firstUser >= 0` (`chat.js`
+  `injectContext`). History now lands in front of the live turn whether or not
+  the template carries a system message.
+- Cache-buster 329 -> 330.
 
 ---
 
@@ -38,6 +55,17 @@ PHP changes need only the usual file deploy.
   `globalPrePrompt.mode` and a missing `mode` is treated as `prepend`.
   Files: `ui/js/components/{sidebar,chat}.js`, `ui/js/store.js`,
   `ui/css/modals.css`.
+- **SECURITY — `storage/` web-exposure hardened.** The shipped
+  `storage/.htaccess` used Apache **2.2** `Deny from all`, which needs
+  `mod_access_compat` on 2.4 (XAMPP loads it, a plain host may not); it is now the
+  portable form (`Require all denied` with an `!mod_authz_core.c` fallback), so a
+  2.4 host without the module gets a clean `403` instead of a 500.
+  `./setup-token.sh` now **re-creates the guard if a deploy lost it**. New
+  **`nginx.example.conf`** (nginx ignores `.htaccess`) denies `storage/`,
+  `logs/`, `tmp/` and `sessions/`, dotfiles, and loose data files. README
+  gains a *Deploying on a real web host* section and a *storage/ is never
+  web-served* security subsection. Files: `storage/.htaccess`, `setup-token.sh`,
+  `nginx.example.conf`, `README.md`.
 - Cache-buster 327 -> 329 (two feature steps, one entry).
 
 ---
