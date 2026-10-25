@@ -19,10 +19,10 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=326';
-import { api } from '../api.js?v=326';
-import { esc } from '../utils.js?v=326';
-import { k } from '../storage.js?v=326';
+import { store } from '../store.js?v=327';
+import { api } from '../api.js?v=327';
+import { esc } from '../utils.js?v=327';
+import { k } from '../storage.js?v=327';
 
 /** Live auto-refresh is a sticky preference, not a per-visit toggle. */
 const LIVE_KEY = k('browserLive');
@@ -74,6 +74,11 @@ export class BrowserView {
           </div>
           <button class="bs-btn" id="bsRead">Read page text</button>
           <pre class="bs-text" id="bsText"></pre>
+          <div class="bs-side-h">Block list</div>
+          <textarea class="bs-blocklist" id="bsBlocklist" rows="5" spellcheck="false"
+            placeholder="*.gov&#10;this.site.com/folder1/folder2/&#10;*website*&#10;10.0.0.1"></textarea>
+          <div class="bs-side-row"><button class="bs-btn" id="bsBlockSave">Save block list</button></div>
+          <div class="bs-hint">One pattern per line. <b>*</b> is a wildcard: <code>*.gov</code> blocks any .gov site, <code>*word*</code> blocks anything containing it, and a bare host or IP (<code>10.0.0.1</code>) blocks exactly that host. Enforced on every navigation — yours and the agents'.</div>
           <div class="bs-hint">Agents use the browser_* tools on this same page. Log in once here and the session sticks.</div>
         </div>
       </div>`;
@@ -92,6 +97,7 @@ export class BrowserView {
     el.querySelector('#bsTypeSend').addEventListener('click', () => this.sendText());
     el.querySelector('#bsEnter').addEventListener('click', () => this.press('Enter'));
     el.querySelector('#bsRead').addEventListener('click', () => this.readText());
+    el.querySelector('#bsBlockSave').addEventListener('click', () => this.saveBlocklist());
     el.querySelector('#bsType').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.sendText(); }
     });
@@ -139,6 +145,7 @@ export class BrowserView {
     this.open = true;
     this.el.hidden = false;
     this._syncLive();
+    this._loadBlocklist();
     this.refreshStatus().then(() => { if (this.status.running) this.shot(); });
   }
   hide() {
@@ -280,6 +287,28 @@ export class BrowserView {
       const res = await api.browserRead();
       this.el.querySelector('#bsText').textContent = String(res.text || '').slice(0, 20000);
     } catch (e) { this._toast(`Read: ${e.message}`, 'error'); }
+  }
+
+  /** Fill the block-list box from the server config (never clobber typing). */
+  async _loadBlocklist() {
+    try {
+      const cfg = await api.getConfig();
+      const list = (cfg && cfg.browser && Array.isArray(cfg.browser.blocklist)) ? cfg.browser.blocklist : [];
+      const ta = this.el.querySelector('#bsBlocklist');
+      if (ta && document.activeElement !== ta) ta.value = list.join('\n');
+    } catch { /* leave whatever is shown */ }
+  }
+
+  async saveBlocklist() {
+    const ta = this.el.querySelector('#bsBlocklist');
+    const lines = String(ta.value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    try {
+      const cfg = await api.getConfig();
+      cfg.browser = { ...(cfg.browser || {}), blocklist: lines };
+      await api.saveConfig(cfg);
+      ta.value = lines.join('\n');
+      this._toast(`Block list saved (${lines.length} rule${lines.length === 1 ? '' : 's'})`);
+    } catch (e) { this._toast(`Block list not saved: ${e.message}`, 'error'); }
   }
 
   dispose() { if (this._timer) clearInterval(this._timer); this._timer = null; this.el?.remove(); }

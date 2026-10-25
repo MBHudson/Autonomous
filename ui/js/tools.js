@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=326';
-import { asText, compactText } from './utils.js?v=326';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=326';
-import { settingFor } from './agentConfig.js?v=326';
-import { trace } from './trace.js?v=326';
+import { store } from './store.js?v=327';
+import { asText, compactText } from './utils.js?v=327';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=327';
+import { settingFor } from './agentConfig.js?v=327';
+import { trace } from './trace.js?v=327';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -889,14 +889,22 @@ export function bindSandboxTools(api) {
   TOOL_REGISTRY.browser_click.run = async (arg) => {
     const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : (typeof arg === 'string' ? { selector: arg } : {});
     if (a.selector) {
-      const expr = `(() => { const el = document.querySelector(${JSON.stringify(String(a.selector))}); `
+      const sel = String(a.selector);
+      // try/catch INSIDE the page: an invalid CSS selector makes querySelector
+      // throw, which used to surface as a bare "JS: Uncaught" toast. Now it
+      // comes back as a readable "invalid selector" tool result.
+      const expr = `(() => { try { const el = document.querySelector(${JSON.stringify(sel)}); `
         + `if (!el) return ''; el.scrollIntoView({block:'center'}); const r = el.getBoundingClientRect(); `
-        + `return JSON.stringify({x:r.left+r.width/2, y:r.top+r.height/2}); })()`;
-      const res = await api.browserEval(expr);
-      if (!res || !res.result) return `error: no element matches ${a.selector}`;
-      const c = JSON.parse(res.result);
+        + `return JSON.stringify({x:r.left+r.width/2, y:r.top+r.height/2}); } catch (e) { return 'ERR:' + e.message; } })()`;
+      let res;
+      try { res = await api.browserEval(expr); }
+      catch (e) { return `error: could not query "${sel}" on the page (${e.message})`; }
+      const val = String((res && res.result) || '');
+      if (val.startsWith('ERR:')) return `error: invalid selector "${sel}" — ${val.slice(4)}`;
+      if (!val) return `error: no element matches "${sel}"`;
+      const c = JSON.parse(val);
       await api.browserClick(c.x, c.y);
-      return `Clicked ${a.selector}`;
+      return `Clicked ${sel}`;
     }
     const x = Number(a.x), y = Number(a.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return 'error: browser_click needs a "selector", or numeric "x" and "y"';
@@ -909,7 +917,12 @@ export function bindSandboxTools(api) {
     const text = String(a.text ?? a.value ?? '');
     if (!text) return 'error: browser_type needs "text"';
     if (a.selector) {
-      await api.browserEval(`(() => { const el = document.querySelector(${JSON.stringify(String(a.selector))}); if (el) el.focus(); return !!el; })()`);
+      const sel = String(a.selector);
+      try {
+        const r = await api.browserEval(`(() => { try { const el = document.querySelector(${JSON.stringify(sel)}); if (el) el.focus(); return el ? 'ok' : 'ERR:no element matches'; } catch (e) { return 'ERR:' + e.message; } })()`);
+        const val = String((r && r.result) || '');
+        if (val.startsWith('ERR:')) return `error: ${val.slice(4)} ("${sel}")`;
+      } catch (e) { return `error: could not focus "${sel}" (${e.message})`; }
     }
     await api.browserType(text);
     if (a.enter) await api.browserKey('Enter');

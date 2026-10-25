@@ -157,6 +157,7 @@ class Browser
             'running' => $running,
             'port' => $running ? $port : 0,
             'headless' => (bool)($state['headless'] ?? true),
+            'blocklist' => self::blocklist(),
         ];
     }
 
@@ -298,7 +299,50 @@ class Browser
         return $new['webSocketDebuggerUrl'] ?? '';
     }
 
-    /** Refuse non-web schemes and the cloud metadata addresses. */
+    /** The operator's domain/URL/IP block list (config → browser.blocklist). */
+    public static function blocklist()
+    {
+        $cfg = Config::loadConfig();
+        $list = $cfg['browser']['blocklist'] ?? [];
+        if (!is_array($list)) { return []; }
+        return array_values(array_filter(array_map('strval', $list), fn($p) => trim($p) !== ''));
+    }
+
+    /**
+     * Which block-list pattern (if any) refuses this URL.
+     *
+     * Rules, with "*" as a wildcard:
+     *   *.gov                      → any host under .gov (substring over the URL)
+     *   this.site.com/a/b/         → that URL path (substring)
+     *   *word*                     → anything containing "word"
+     *   10.0.0.1 / example.com     → a bare host or IP, matched on the host
+     *                                exactly or as a subdomain
+     * Returns the matching pattern, or '' when allowed.
+     */
+    public static function blockedBy($url)
+    {
+        $u = (string)$url;
+        if ($u === '' || $u === 'about:blank') { return ''; }
+        $host = strtolower((string)parse_url($u, PHP_URL_HOST));
+        foreach (self::blocklist() as $pat) {
+            $p = trim($pat);
+            if ($p === '') { continue; }
+            // Bare host / IP (no wildcard, no path): match host or subdomain.
+            if (strpos($p, '*') === false && strpos($p, '/') === false) {
+                $want = strtolower($p);
+                if ($host === $want || ($want !== '' && substr($host, -strlen($want) - 1) === '.' . $want)) {
+                    return $p;
+                }
+                continue;
+            }
+            // Otherwise a wildcard / substring pattern over the whole URL.
+            $re = '/' . str_replace('\*', '.*', preg_quote($p, '/')) . '/i';
+            if (@preg_match($re, $u)) { return $p; }
+        }
+        return '';
+    }
+
+    /** Refuse non-web schemes, the cloud metadata addresses, and block-listed URLs. */
     public static function checkUrl($url)
     {
         $u = trim((string)$url);
@@ -312,7 +356,32 @@ class Browser
         foreach (['169.254.169.254', 'metadata.google.internal', '100.100.100.200'] as $bad) {
             if ($host === $bad) { throw new \RuntimeException('That address is refused.'); }
         }
+        $blocked = self::blockedBy($u);
+        if ($blocked !== '') {
+            throw new \RuntimeException("Blocked by your block list: \"$blocked\".");
+        }
         return $u;
+    }
+
+    /**
+     * After a click/type that may have navigated, refuse a page the block list
+     * forbids (a link can reach a host the operator banned). Sends the tab to
+     * about:blank and reports it. Best-effort: if the page is mid-navigation we
+     * may not be able to read the URL this instant.
+     */
+    private static function guardCurrent($cdp)
+    {
+        try {
+            $info = $cdp->info();
+            $url = (string)($info['url'] ?? '');
+            $blocked = self::blockedBy($url);
+            if ($blocked !== '') {
+                try { $cdp->navigate('about:blank'); } catch (\Throwable $e) { /* ignore */ }
+                throw new \RuntimeException("Blocked by your block list: \"$blocked\" — the page tried to open $url");
+            }
+        } catch (\RuntimeException $e) {
+            throw $e;
+        } catch (\Throwable $e) { /* could not read the URL; allow */ }
     }
 
     /** Run $fn(Cdp) against the page target, closing the socket after. */
@@ -339,17 +408,26 @@ class Browser
     }
     public static function click($x, $y)
     {
-        self::withCdp(fn($c) => $c->click($x, $y));
+        self::withCdp(function ($c) use ($x, $y) {
+            $c->click($x, $y);
+            self::guardCurrent($c);
+        });
         return ['ok' => true];
     }
     public static function typeText($text)
     {
-        self::withCdp(fn($c) => $c->typeText($text));
+        self::withCdp(function ($c) use ($text) {
+            $c->typeText($text);
+            self::guardCurrent($c);
+        });
         return ['ok' => true];
     }
     public static function pressKey($key)
     {
-        self::withCdp(fn($c) => $c->key($key));
+        self::withCdp(function ($c) use ($key) {
+            $c->key($key);
+            self::guardCurrent($c);
+        });
         return ['ok' => true];
     }
     public static function evaluate($expr)

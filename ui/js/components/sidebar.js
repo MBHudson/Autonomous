@@ -10,16 +10,16 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=326';
-import { K } from '../storage.js?v=326';
-import { persistence } from '../persistence.js?v=326';
-import { api } from '../api.js?v=326';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=326';
-import { TOOL_REGISTRY } from '../tools.js?v=326';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=326';
-import { snapshot } from '../rateGovernor.js?v=326';
-import { resetBrowserEnabled } from '../toolManifest.js?v=326';
-import { perf } from '../perf.js?v=326';
+import { store } from '../store.js?v=327';
+import { K } from '../storage.js?v=327';
+import { persistence } from '../persistence.js?v=327';
+import { api } from '../api.js?v=327';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=327';
+import { TOOL_REGISTRY } from '../tools.js?v=327';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=327';
+import { snapshot } from '../rateGovernor.js?v=327';
+import { resetBrowserEnabled } from '../toolManifest.js?v=327';
+import { perf } from '../perf.js?v=327';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open

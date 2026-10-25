@@ -260,7 +260,14 @@ class Cdp
             'expression' => (string)$expr, 'returnByValue' => true, 'awaitPromise' => true,
         ]);
         if (isset($r['exceptionDetails'])) {
-            throw new \RuntimeException('JS: ' . ($r['exceptionDetails']['text'] ?? 'error'));
+            $ex = $r['exceptionDetails'];
+            $desc = $ex['exception']['description']
+                ?? $ex['exception']['value']
+                ?? $ex['text']
+                ?? 'error';
+            // One line only: a full stack trace is noise in a tool result.
+            $desc = trim(strtok((string)$desc, "\n"));
+            throw new \RuntimeException('page JS: ' . ($desc !== '' ? $desc : 'error'));
         }
         $v = $r['result']['value'] ?? null;
         return is_scalar($v) || $v === null ? $v : json_encode($v, JSON_UNESCAPED_SLASHES);
