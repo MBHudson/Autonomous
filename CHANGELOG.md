@@ -9,8 +9,30 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v326**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v327**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v327 — Always-On survives leaving the tab; browser click fix; block list
+
+- **Always-On no longer stops when you leave the tab.** `visibilitychange`
+  aborted the in-flight turn on *every* hide, even with "Run while tab is hidden"
+  on — so a background run died the instant you switched away. It now aborts only
+  when that setting is off, drives the timer from a **Web Worker** (page
+  `setInterval` is throttled hard in a hidden tab), and ticks immediately on
+  return. Turn on **Config → Permissions → Run while tab is hidden** to run
+  off-screen.
+- **`browser_click` / `browser_type` no longer toast "JS: Uncaught".** An invalid
+  CSS selector made `querySelector` throw inside the page eval; it is now guarded
+  and returns a readable *"invalid selector …"* result, and `Cdp` reports the real
+  one-line exception description instead of "Uncaught".
+- **New domain/URL/IP block list** on the Browser screen (right rail, below the
+  buttons). One pattern per line, `*` wildcard: `*.gov` (any .gov), `*word*`
+  (contains), a bare host/IP (`10.0.0.1`), or a URL path (`site.com/a/b/`).
+  Enforced **server-side on every navigation** (you and the agents), and
+  re-checked after a click/type in case a link reaches a banned host. Stored as
+  `browser.blocklist` in config.
 
 ---
 

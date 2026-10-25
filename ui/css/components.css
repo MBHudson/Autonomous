@@ -1656,3 +1656,18 @@ body.agent-reordering .agent-editor:hover {
 .rm-gauge-label { font: 11px var(--font-mono); letter-spacing: 0.14em; color: var(--text-secondary); margin-top: 2px; }
 .rm-gauge-val { font: 13px var(--font-mono); color: var(--accent-cyan); }
 .rm-gauge-sub { font-size: 9px; color: var(--text-dim); }
+
+/* Browser screen: block-list box (right rail). */
+.bs-blocklist {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font: 11px/1.4 var(--font-mono);
+  padding: 6px 8px;
+  outline: none;
+}
+.bs-blocklist:focus { border-color: var(--accent-cyan); }

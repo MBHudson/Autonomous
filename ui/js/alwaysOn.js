@@ -21,9 +21,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=326';
-import { persistence } from './persistence.js?v=326';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=326';
+import { store } from './store.js?v=327';
+import { persistence } from './persistence.js?v=327';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=327';
 
 export class AlwaysOn {
   /**
@@ -32,6 +32,9 @@ export class AlwaysOn {
   constructor(chat) {
     this.chat = chat;
     this.timer = null;
+    // A Web Worker timer, used only when the operator wants runs while the tab
+    // is hidden — page setInterval is throttled hard in a background tab.
+    this._worker = null;
     // agentIds -> { iterations, startedAt }. Counters for the current run.
     this.runs = new Map();
     // agentIds with a turn in flight right now.
@@ -108,20 +111,51 @@ export class AlwaysOn {
     // Backgrounded tabs do not tick unless explicitly allowed to: nobody is
     // watching the transcript, and each iteration is billed. This matches how
     // cross-device polling already treats a hidden tab.
+    //
+    // The abort MUST honour "run while hidden" too — it used to kill the turn
+    // in flight on every hide regardless of that setting, so switching away
+    // stopped a run the operator had explicitly asked to keep going.
     document.addEventListener?.('visibilitychange', () => {
-      if (document.hidden) this.abortAll('tab hidden');
+      const hidden = document.hidden;
+      if (hidden && !this.settings.alwaysOnRunHidden) this.abortAll('tab hidden');
       this.start();
+      // Coming back, don't wait a whole interval for the next pass.
+      if (!hidden) this.tick();
     });
   }
 
   start() {
     this.stop();
     if (!this.enabled()) return;
-    this.timer = setInterval(() => this.tick(), this.intervalSec() * 1000);
+    const ms = this.intervalSec() * 1000;
+    // A hidden tab throttles setInterval down to as little as once a minute
+    // (Chrome's "intensive throttling"), which stalls a background run. When
+    // the operator has asked for runs while hidden, drive the timer from a Web
+    // Worker instead — it keeps its cadence off-screen.
+    if (this.settings.alwaysOnRunHidden && this._ensureWorker()) {
+      this._worker.postMessage({ ms });
+      return;
+    }
+    this.timer = setInterval(() => this.tick(), ms);
   }
 
   stop() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this._worker) { try { this._worker.postMessage({ stop: true }); } catch { /* gone */ } }
+  }
+
+  /** Lazily create the worker timer. Returns false if workers are unavailable. */
+  _ensureWorker() {
+    if (this._worker) return true;
+    try {
+      const src = 'let id=null;onmessage=function(e){const d=e.data||{};'
+        + 'if(id){clearInterval(id);id=null;}if(d.ms){id=setInterval(function(){postMessage(0);},d.ms);}};';
+      const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+      const w = new Worker(url);
+      w.onmessage = () => this.tick();
+      this._worker = w;
+      return true;
+    } catch { this._worker = null; return false; }
   }
 
   // --- the tick ---
