@@ -23,7 +23,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 327;
+export const APP_VERSION = 329;
 
 class Store {
   constructor() {
@@ -65,9 +65,10 @@ class Store {
       // Absent everywhere means today's behaviour (ask gated tools, run rest).
       autoDeny: false,
       toolPolicy: {},
-      // Global pre-prompt override (Agents tab header). Prepended to every
-      // agent's system prompt while active.
-      globalPrePrompt: { text: '', active: false },
+      // Global pre-prompt override (Agents tab header). PREPENDED to every
+      // agent's system prompt while active by default; mode 'replace' swaps the
+      // agent's own prompt out instead.
+      globalPrePrompt: { text: '', active: false, mode: 'prepend' },
       // The routing chart's ghost transcript: the chat printed faintly behind
       // the canvas. On by default at a low opacity because the whole point is
       // knowing that work is happening without switching screens; the four

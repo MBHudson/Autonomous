@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=327';
-import { K as STORAGE_K } from '../storage.js?v=327';
+import { store } from '../store.js?v=329';
+import { K as STORAGE_K } from '../storage.js?v=329';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,26 +20,26 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=327';
-import { persistence } from '../persistence.js?v=327';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=327';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=327';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=327';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=327';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=327';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=327';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=327';
-import { usageFor } from '../rateGovernor.js?v=327';
-import { trace } from '../trace.js?v=327';
-import { latency } from '../latency.js?v=327';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=327';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=327';
-import { SlashCommands } from '../slashCommands.js?v=327';
-import { parseRoute, routingHelp } from '../routing.js?v=327';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=327';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=327';
-import { MessageRenderer, renderToolCalls } from './message.js?v=327';
-import { createAvatar } from './avatar.js?v=327';
+import { api, errText } from '../api.js?v=329';
+import { persistence } from '../persistence.js?v=329';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=329';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=329';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=329';
+import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=329';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=329';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=329';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=329';
+import { usageFor } from '../rateGovernor.js?v=329';
+import { trace } from '../trace.js?v=329';
+import { latency } from '../latency.js?v=329';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=329';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=329';
+import { SlashCommands } from '../slashCommands.js?v=329';
+import { parseRoute, routingHelp } from '../routing.js?v=329';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=329';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=329';
+import { MessageRenderer, renderToolCalls } from './message.js?v=329';
+import { createAvatar } from './avatar.js?v=329';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2752,11 +2752,18 @@ function setMessageContent(msg, prompt) {
 const memoryFor = agent =>
   (agent && agent.memory !== false ? memoryBlockFor(agent.id) : '');
 
-/** Global pre-prompt override (Agents tab header). When active with text, it
- *  is prepended to every agent's system prompt on every call path. */
+/** Global pre-prompt override (Agents tab header). When active with text it is
+ *  combined with every agent's system prompt on every call path: PREPENDED to
+ *  it (the default) or, in 'replace' mode, standing in for it. */
 const globalPrePromptFor = () => {
   const g = store.get('settings.globalPrePrompt');
   return (g && g.active && g.text && g.text.trim()) ? g.text.trim() : '';
+};
+
+/** Whether the armed override REPLACES each agent's own prompt (vs prepends). */
+const globalPrePromptReplaces = () => {
+  const g = store.get('settings.globalPrePrompt');
+  return !!(g && g.mode === 'replace');
 };
 
 /**
@@ -2860,7 +2867,12 @@ const refreshTodoBlock = messages => {
 
 const systemPromptFor = agent => {
   const pre = globalPrePromptFor();
-  const base = pre || agent.systemPrompt || '';
+  const own = agent.systemPrompt || '';
+  // Prepend (default) keeps the agent's own prompt and puts the override in
+  // front of it; replace swaps it out entirely.
+  const base = pre
+    ? (globalPrePromptReplaces() ? pre : (own ? `${pre}\n\n${own}` : pre))
+    : own;
   const append = [alwaysAppendFor(agent), filesBlockFor(agent), todosBlockFor()].filter(Boolean).join('\n\n');
   return append ? `${base}${base ? '\n\n' : ''}${append}` : base;
 };

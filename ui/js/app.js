@@ -10,16 +10,16 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=327';
-import { K } from './storage.js?v=327';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=327';
-import { startStateSync } from './stateSync.js?v=327';
-import { api } from './api.js?v=327';
-import { themeManager } from './themes.js?v=327';
-import { Sidebar } from './components/sidebar.js?v=327';
-import { Chat } from './components/chat.js?v=327';
-import { TopologyGraph } from './components/topology.js?v=327';
-import { initTopoPanel } from './components/topoPanel.js?v=327';
+import { store, APP_VERSION } from './store.js?v=329';
+import { K } from './storage.js?v=329';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=329';
+import { startStateSync } from './stateSync.js?v=329';
+import { api } from './api.js?v=329';
+import { themeManager } from './themes.js?v=329';
+import { Sidebar } from './components/sidebar.js?v=329';
+import { Chat } from './components/chat.js?v=329';
+import { TopologyGraph } from './components/topology.js?v=329';
+import { initTopoPanel } from './components/topoPanel.js?v=329';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -28,32 +28,32 @@ import { initTopoPanel } from './components/topoPanel.js?v=327';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=327')
+  return import('./components/topology3d/index.js?v=329')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=327';
-import { AgentEditor } from './components/agentEditor.js?v=327';
-import { ProviderEditor } from './components/providerEditor.js?v=327';
-import { Microphone } from './components/microphone.js?v=327';
-import { ConfigPanel } from './components/configPanel.js?v=327';
-import { ExportPanel } from './components/export.js?v=327';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=327';
-import { TerminalPanel } from './components/terminalPanel.js?v=327';
-import { MetricsPanel } from './components/metricsPanel.js?v=327';
-import { TracePanel } from './components/tracePanel.js?v=327';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=327';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=327';
-import { initApprovals } from './approvals.js?v=327';
-import * as memory from './memory.js?v=327';
-import { audio } from './audio.js?v=327';
-import { AlwaysOn } from './alwaysOn.js?v=327';
-import { ApiLab } from './apiLab.js?v=327';
-import { BrainLab } from './brainlab.js?v=327';
-import { BrowserView } from './components/browserView.js?v=327';
+import { RoutingChart } from './components/routingChart.js?v=329';
+import { AgentEditor } from './components/agentEditor.js?v=329';
+import { ProviderEditor } from './components/providerEditor.js?v=329';
+import { Microphone } from './components/microphone.js?v=329';
+import { ConfigPanel } from './components/configPanel.js?v=329';
+import { ExportPanel } from './components/export.js?v=329';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=329';
+import { TerminalPanel } from './components/terminalPanel.js?v=329';
+import { MetricsPanel } from './components/metricsPanel.js?v=329';
+import { TracePanel } from './components/tracePanel.js?v=329';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=329';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=329';
+import { initApprovals } from './approvals.js?v=329';
+import * as memory from './memory.js?v=329';
+import { audio } from './audio.js?v=329';
+import { AlwaysOn } from './alwaysOn.js?v=329';
+import { ApiLab } from './apiLab.js?v=329';
+import { BrainLab } from './brainlab.js?v=329';
+import { BrowserView } from './components/browserView.js?v=329';
 
 
 document.addEventListener('DOMContentLoaded', async () => {

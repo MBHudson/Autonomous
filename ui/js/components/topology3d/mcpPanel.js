@@ -21,10 +21,10 @@
 // chained so two savers can't clobber each other (PUT /config replaces the
 // whole file).
 
-import { api } from '../../api.js?v=327';
-import { store } from '../../store.js?v=327';
-import { persistence } from '../../persistence.js?v=327';
-import { esc } from '../../utils.js?v=327';
+import { api } from '../../api.js?v=329';
+import { store } from '../../store.js?v=329';
+import { persistence } from '../../persistence.js?v=329';
+import { esc } from '../../utils.js?v=329';
 
 const KNOWN_INTERPRETERS = [
   'bash', 'sh', 'zsh',

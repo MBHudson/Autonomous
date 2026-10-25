@@ -9,8 +9,36 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v327**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v329**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## v329 — Always-On hold/release reset; global pre-prompt prepend/replace
+
+- **The HELD badge is no longer a trap.** `alwaysOnMaxIterations` /
+  `alwaysOnMaxMinutes` (or a click on an agent's ALWAYS ON badge) park an agent by
+  adding it to a **saved hold set** — and nothing ever released it. The master
+  switch's own documentation said *"switching it off releases everyone,"* but the
+  function that does that (`stopAll`) was **never called**; off→on was a no-op and
+  the roster came back with every badge stuck on **HELD**.
+- The master switch is now read as a **transition**: turning it **on** clears
+  every hold (a real reset), turning it **off** runs `stopAll()` (stop + release
+  everyone). New `releaseAll()` / `alwaysOn:releaseAll`.
+- **Config → Permissions → Always-On** shows the held count and a **RELEASE HELD
+  AGENTS** button, and the status line warns when the cadence is long enough that
+  a cap would fire after a *single* tick (so a low cap read as "always-on turned
+  itself off"). Files: `ui/js/alwaysOn.js`, `ui/js/components/sidebar.js`.
+- **Global pre-prompt: prepend or replace, your choice.** The override used to
+  **replace** every agent's system prompt (v235), which silently stripped agents
+  of their instructions — hence "they ignore everything and just explore." The
+  popup now carries a **bottom-left mode switch**: **Prepend** (default — the
+  override goes in front of the agent's own prompt, which still follows) or
+  **Replace** (the old behaviour). The hint updates live; the choice is stored as
+  `globalPrePrompt.mode` and a missing `mode` is treated as `prepend`.
+  Files: `ui/js/components/{sidebar,chat}.js`, `ui/js/store.js`,
+  `ui/css/modals.css`.
+- Cache-buster 327 -> 329 (two feature steps, one entry).
 
 ---
 
