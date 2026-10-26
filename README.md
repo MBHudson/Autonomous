@@ -33,9 +33,62 @@
 
 **Autonomous Loop Studio** (the "Router") is a single-folder PHP app — 🚫 no database, 🚫 no build step, 🚫 no external service. It runs on plain PHP (or Apache via XAMPP), keeps everything in JSON files, and drops a whole team of AI agents into your browser with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both directions**.
 
-> 🆕 **Recently added** — ♾️ an **always-on loop** with per-agent standing goals, spend caps, **hold/release** and a master kill switch · ❝ a **global pre-prompt** that **prepends or replaces** every agent's prompt, with a live toggle · 🧠 a **context assembler** sized to each model's *real* window · 🔧 **native tool calling** · 🌐 a **built-in browser** over CDP with a **domain block list** · 🕸️ **MCP servers and friends as live graph nodes** · 🧮 a **Resource Manager** so the 3D graph can rest · and a **security pass** that made every dangerous capability **opt-in**. 🛡️ · 🖥️ a **choice of shells** — Classic by default, Desktop 2026 on request · 🎛️ a **Config → Desktop card** that tunes the topography and the glass for a weak GPU, with **every knob still individually adjustable** · 📌 a **floor that stays put** · 🌫️ a **screen-space haze** that can no longer travel with the map · 🧼 and a **clean, credential-free copy** ready to hand off.
+> 🆕 **Recently added** — ♾️ an **always-on loop** with per-agent standing goals, spend caps, **hold/release** and a master kill switch · ❝ a **global pre-prompt** that **prepends or replaces** every agent's prompt, with a live toggle · 🧠 a **context assembler** sized to each model's *real* window · 🔧 **native tool calling** · 🌐 a **built-in browser** over CDP with a **domain block list** · 🕸️ **MCP servers and friends as live graph nodes** · 🧮 a **Resource Manager** so the 3D graph can rest · and a **security pass** that made every dangerous capability **opt-in**. 🛡️ · 🖥️ a **choice of shells** — Classic by default, Desktop 2026 on request · 🎛️ a **Config → Desktop card** that tunes the topography and the glass for a weak GPU, with **every knob still individually adjustable** · 📌 a **floor that stays put** · 🌫️ a **screen-space haze** that can no longer travel with the map
 
 Made with 💙 by [MBHudson](https://github.com/mbhudson/)
+
+---
+
+## 🧭 Contents
+
+Jump straight to a section — every heading on this page is also clickable.
+
+**🚀 Start here**
+
+- [✨ What's inside](#-whats-inside)
+- [🖥️ Two interfaces, one switch](#️-two-interfaces-one-switch)
+- [🎛️ Config → Desktop](#️-config--desktop--the-machine-room-card)
+- [🚀 Quick start](#-quick-start)
+
+**🧠 Using the studio**
+
+- [🧠 Brain Lab](#-brain-lab)
+- [🧪 API Lab](#-api-lab)
+- [🔀 Routing chart](#-routing-chart)
+- [🖼️ Images & vision](#️-images--vision)
+- [🎙️ Voice & audio](#️-voice--audio)
+- [⌨️ Slash commands](#️-slash-commands)
+- [♾️ Always-On](#️-always-on--the-loop-that-runs-itself)
+- [❝ Global pre-prompt override](#-global-pre-prompt-override--one-instruction-for-the-whole-fleet)
+- [🧭 The apps notch](#-the-apps-notch--one-thumb-to-everything)
+- [🧠 The context assembler](#-the-context-assembler--native-tool-calling)
+- [🛠️ Tools agents can use](#️-tools-agents-can-use)
+- [🧭 The provider harness](#-the-provider-harness)
+- [🧠 Dynamic tools & the learned dialect](#-dynamic-tools--the-learned-dialect)
+- [⏱️ Throttle / limiter / pacer](#️-throttle--limiter--pacer)
+- [🔑 API pool](#-api-pool--rotate-your-keys)
+- [📊 Metrics & 🔎 Run trace](#-metrics---run-trace)
+- [🕸️ Network & topology](#️-network--topology)
+- [🧮 Resource Manager](#-resource-manager--let-the-3d-graph-rest-)
+- [💭 Thinking & reasoning](#-thinking--reasoning)
+- [🧠 Memory](#-memory)
+- [💾 Export & import](#-export--import)
+
+**🔐 Security & guardrails**
+
+[🔐 overview](#-security--guardrails--safe-by-construction-️) · [🔑 token](#-1-the-front-door-is-locked--a-per-device-access-token) · [🚦 approvals](#-2-approvals--nothing-scary-happens-without-a-nod) · [🧾 allow/deny](#-3-allow--deny-lists--an-argv-level-bouncer) · [🧱 the jail](#-4-the-jail--a-fence-with-no-back-gate) · [🐚 no shell](#-5-no-shell-to-hijack) · [🧬 atomic edits](#-6-edits-are-atomic-or-they-dont-happen) · [🐙 git](#-7-git-runs-on-a-leash) · [🌐 SSRF](#-8-network-egress-is-fenced-ssrf-guardrails) · [🕵️ secrets](#️-9-secrets-never-appear-on-screen) · [🖼️ vision](#️-10-vision-is-safe-by-construction) · [🌐 browser gate](#-11-the-built-in-browser-is-gated-on-every-hop) · [🤝 MCP server](#-12-mcp-server--lending-tools-without-giving-away-the-house) · [🧷 injection](#-13-prompt-injection-posture) · [🚫 defaults](#-14-everything-dangerous-defaults-to-off-) · [🧯 fails closed](#-15-fails-closed-and-tells-the-truth) · [🗄️ storage](#️-16-storage-is-never-web-served--in-every-serving-mode) · [🧪 guard tests](#-17-the-guards-are-proven-not-assumed) · [🌐 no CORS](#-18-closed-by-default-in-the-browser-too)
+
+**🔌 Integrations · 📱 Platform · 📚 Reference**
+
+- [🔌 MCP client](#-mcp--connect-out-to-other-servers-client)
+- [🖥️ MCP server](#️-mcp--let-others-connect-in-server)
+- [🌐 Built-in browser](#-built-in-browser--you-watch-the-agents-drive)
+- [📱 Android & mobile](#-android--mobile)
+- [🧩 Architecture](#-architecture)
+- [🧪 Tests](#-tests)
+- [🔗 API endpoints](#-api-endpoints)
+- [🧯 Troubleshooting](#-troubleshooting)
+- [📜 License](#-license)
 
 ---
 
@@ -908,7 +961,6 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 │                         #   stripToolCall                       (run.mjs)
 ├── screenshots/
 ├── storage/              # JSON data (config, state, sessions) — git-ignored
-├── cleancopy/            # clean, credential-free copy of the app (see below)
 ├── serve.php             # php -S router (no Apache needed)
 ├── start.bat / start.sh  # launchers
 ├── setup-xampp.bat/.ps1  # one-click Apache + PHP (Windows)
@@ -920,26 +972,6 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 ```
 
 ---
-
-## 🧼 Clean copy — `cleancopy/`
-
-`cleancopy/` is a complete, runnable copy of this app with **nothing personal in it**: no access token, no provider keys, no MCP servers, no saved state, no session transcripts, no logs or approvals file, no browser profile and no `.htpasswd`. Drop it on any host with PHP and it boots into a first-run state the app fills in itself.
-
-```
-cleancopy/
-├── storage/
-│   ├── .htaccess          # the same deny file the app ships
-│   ├── models.json        # the three hard-coded templates, api_key empty
-│   └── sessions/          # empty
-├── sandbox/               # empty
-└── …                      # the rest of the tree, current with the code
-```
-
-- **The model templates are kept on purpose.** `storage/models.json` carries the same ChatGPT-4 / Claude 3.5 / Gemini 2.0 rows that `Config::saveDefaultModels()` writes — name, provider, endpoint, model, priority and role intact — with every `api_key` empty, so the app opens with a populated model list and no credentials. Paste your own key into a provider row to use them.
-- **`storage/` is the only thing that differs from a live install**, and it is exactly the set of files the `.gitignore` lets ship (`storage/.htaccess`, `storage/models.json`, `sessions/.gitkeep`). Everything else that a running install creates — `config.json`, `state.json`, `exec.log`, `mcp.log`, `exec-approvals.json`, `browser.json`, `browser-profile/`, the session transcripts — is deliberately absent and is recreated on first use. `config.json` starts without a `sandbox.token`; run `php serve.php --ensure-token` (or the launchers) when you want one.
-- **Left out of the copy:** `the-copy-before-the-huge-ui-change/` (a reference archive with its own `storage/` and `tests/`), `Autonomous.zip`, `.idea/`, `.vscode/`, `.freebuff/`, `.htpasswd` and the handover notes (`STATUS.md`, `README-HANDOVER.md`). `FRIENDS.md` is kept because this README links to it.
-- **Its `.git` is preserved.** `cleancopy/` is a clone of the upstream repo (`origin` → `MBHudson/Autonomous`), and the working folder this README lives in has no `.git` at all — so deleting that folder would throw away the only local history. Refresh the files, commit when you are ready to publish.
-- **It ships the current defaults.** A fresh copy (or any install with no saved settings) opens with the values in *Defaults on a fresh install* above — tuned for a low-powered GPU, with every knob individually adjustable afterwards. They live in `ui/js/desktop2026.js` (the `setting(key, default)` calls and `CHAT_ALPHA_DEFAULT` / `BLUR_PX_DEFAULT`), `ui/js/store.js` (the settings block) and `ui/css/desktop2026.css` (the `--d26-*` fallbacks), so a copy and a fresh install can never disagree. 🎛️
 
 ---
 
@@ -970,7 +1002,7 @@ Either half runs on its own, which is what you want while working on one of them
 - **No internet and no browser.** The JS tests import the real modules (`tools.js`, `utils.js`, `nativeTools.js`) straight into Node; the PHP ones use a temporary sandbox root and a local stdio MCP mock. The only servers are the ones two guard tests start for themselves on random loopback ports — `php -S` for `serve.php`'s own router, and the local Apache for the shipped `.htaccess` files — and each shuts its server down when it finishes. `nginxGuards.test.php` starts nothing at all: it lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE, which is the engine nginx matches with. One Apache detail it has to handle: Apache reads `.htaccess` from directories **above** `DocumentRoot` too, so a copy of the app nested inside another copy would have the parent's file parsed as server config (`<IfModule not allowed here`) and answer `500` to everything — which is why the generated config pins every ancestor to `AllowOverride None` and leaves only the shipped files in play.
 - **End a test file with its own count**, e.g. `58 passed, 0 failed`. The runners read that last line for the per-file summary and the total, and never trust the count of a file that failed.
 
-> ⚠️ Some tests **skip** instead of pass, and each prints a `SKIP:` line when it does: `sandbox.test.php` skips its git checks when git is missing or its commands are refused in the temporary directory; `guards.test.php` skips if `proc_open` is disabled, no loopback port can be bound, or a checkout has no `storage/sessions/*.json` yet; and `apacheGuards.test.php` skips when there is no Apache to boot — point `ROUTER_HTTPD` at one to run it (its nested-copy checks also skip when no second copy of the app is present, as in `cleancopy/`). A green run therefore does not cover those cases — read the line, it is not a pass.
+> ⚠️ Some tests **skip** instead of pass, and each prints a `SKIP:` line when it does: `sandbox.test.php` skips its git checks when git is missing or its commands are refused in the temporary directory; `guards.test.php` skips if `proc_open` is disabled, no loopback port can be bound, or a checkout has no `storage/sessions/*.json` yet; and `apacheGuards.test.php` skips when there is no Apache to boot — point `ROUTER_HTTPD` at one to run it (its nested-copy checks also skip when no second copy of the app is present). A green run therefore does not cover those cases — read the line, it is not a pass.
 
 ---
 

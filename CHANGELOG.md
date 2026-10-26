@@ -42,8 +42,11 @@ PHP changes need only the usual file deploy.
   the API-pool section — it stays inert without pool keys), the Config section
   list now matches the app (Interface · Limits & Budgets · Permissions · Labs ·
   Resource Manager · Throttle / Limiter · MCP Client · MCP Server + Desktop), the
-  IIS snippet blocks all five names, `mcpStdio` is in the tree, and the clean
-  copy's defaults point at the single defaults table instead of repeating it.
+  IIS snippet blocks all five names, `mcpStdio` is in the tree, the defaults are
+  stated once and pointed at from elsewhere, and the clean-copy section is gone —
+  the published repo *is* that copy, so a section describing a nested folder was
+  pointing at a door that isn't there. A **contents list** at the top links every
+  section (and all eighteen security subsections) straight to its heading.
 
 ---
 
