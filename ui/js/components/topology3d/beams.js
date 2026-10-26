@@ -20,7 +20,7 @@
 // and agent-to-agent traffic blend from the sender's color to the receiver's.
 
 import * as THREE from 'three';
-import { glowTexture } from './nodes.js?v=330';
+import { glowTexture } from './nodes.js?v=337';
 
 const SEGMENTS = 56;
 const RADIAL = 6;
@@ -174,13 +174,33 @@ export class Beam {
     this.curve.v1.copy(_tmpC);
     this.length = len;
 
-    // Only rebuild the tube when something actually moved.
-    const key = `${p0.x.toFixed(1)},${p0.y.toFixed(1)},${p0.z.toFixed(1)}|${p2.x.toFixed(1)},${p2.y.toFixed(1)},${p2.z.toFixed(1)}|${this.radius.toFixed(2)}`;
+    // Only rebuild the tube when something actually moved. Endpoints keep their
+    // 0.1-unit step; the radius is now quantised to 0.1 too, because it eases on
+    // every phase change, and a 2-decimal key rebuilt the entire tube (allocate +
+    // full GPU upload) nearly every frame to express a 0.16-unit difference.
+    const key = `${p0.x.toFixed(1)},${p0.y.toFixed(1)},${p0.z.toFixed(1)}|${p2.x.toFixed(1)},${p2.y.toFixed(1)},${p2.z.toFixed(1)}|${Math.round(this.radius * 10)}`;
     if (key !== this._lastKey) {
       this._lastKey = key;
       const geo = new THREE.TubeGeometry(this.curve, SEGMENTS, this.radius, RADIAL, false);
-      this.tube.geometry.dispose();
-      this.tube.geometry = geo;
+      // Reuse the existing buffers: a tube with this segment count always has
+      // the same vertex count, so copying in place turns a dispose + new
+      // geometry + new GPU buffers into an attribute update.
+      const cur = this.tube.geometry;
+      const same = cur && cur.attributes.position
+        && cur.attributes.position.count === geo.attributes.position.count;
+      if (same) {
+        ['position', 'normal', 'uv'].forEach(name => {
+          const dst = cur.attributes[name];
+          const src = geo.attributes[name];
+          if (!dst || !src || dst.array.length !== src.array.length) return;
+          dst.array.set(src.array);
+          dst.needsUpdate = true;
+        });
+        geo.dispose();
+      } else {
+        cur?.dispose();
+        this.tube.geometry = geo;
+      }
     }
   }
 

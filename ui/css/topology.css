@@ -115,17 +115,23 @@
   transition: opacity 0.25s;
 }
 
-/* Gentle whole-scene float: the graph feels suspended */
+/* The whole-scene float used to translate the entire SVG every frame, which
+   kept the full-screen map permanently re-compositing. Containment stays; the
+   perpetual motion does not. */
 .topology-svg svg {
-  animation: topoFloat 9s ease-in-out infinite;
-  /* Force GPU compositing + contain transform to container */
-  will-change: transform;
   contain: layout paint;
 }
 
-@keyframes topoFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+/* Node breathing as an opacity pulse on the halo only. Opacity is a compositor
+   property, so this is far cheaper than the old per-node <animate> on radius
+   and fill-opacity that forced a geometry repaint of every circle every frame. */
+.topo-node-halo {
+  animation: topoHalo 3s ease-in-out infinite;
+}
+
+@keyframes topoHalo {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
 }
 
 /* Message-flow overlay: dotted lines streaming toward the target.

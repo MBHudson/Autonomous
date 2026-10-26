@@ -20,9 +20,10 @@
 //
 // Commands are plain data in COMMANDS: adding one is a single entry.
 
-import { store } from './store.js?v=330';
-import { agentCode } from './utils.js?v=330';
-import { share } from './memory.js?v=330';
+import { store } from './store.js?v=337';
+import { agentCode } from './utils.js?v=337';
+import { share } from './memory.js?v=337';
+import { matchesQuery, agentTokens } from './agentSearch.js?v=337';
 
 /**
  * @typedef {object} Command
@@ -276,21 +277,78 @@ export class SlashCommands {
 
   init() {
     if (!this.input) return;
-    this.input.addEventListener('input', () => this._onInput());
+    this._inputId = this.input.id || '';
+    this._bindInput(this.input);
+  }
+
+  /**
+   * Bind to one textarea, and make sure only one palette is bound to it.
+   *
+   * Two instances on the same box (an init that ran twice) each append their own
+   * panel to the composer, so which one the operator saw depended on append
+   * order while the other sat on top of it, stale. The newest instance wins and
+   * the older one is disposed.
+   */
+  _bindInput(input) {
+    if (!input || this._bound === input) return;
+    if (this._bound) this.dispose();          // rebinding: drop the old listeners
+    const previous = input.__slashCommands;
+    if (previous && previous !== this) { try { previous.dispose(); } catch { /* already gone */ } }
+    input.__slashCommands = this;
+    this._bound = input;
+    this._onInputBound = () => this._onInput();
     // Capture phase: the palette has to see keys before the send handler turns
     // Enter into a message.
-    this.input.addEventListener('keydown', (e) => this._onKeyDown(e), true);
-    this.input.addEventListener('blur', () => setTimeout(() => this.close(), 120));
-    document.addEventListener('click', (e) => {
-      if (this.open && this.panel && !this.panel.contains(e.target)) this.close();
-    });
+    this._onKeyBound = (e) => this._onKeyDown(e);
+    this._onBlurBound = () => setTimeout(() => this.close(), 120);
+    input.addEventListener('input', this._onInputBound);
+    input.addEventListener('keydown', this._onKeyBound, true);
+    input.addEventListener('blur', this._onBlurBound);
+    if (!this._docBound) {
+      this._docBound = (e) => {
+        if (this.open && this.panel && !this.panel.contains(e.target)) this.close();
+      };
+      document.addEventListener('click', this._docBound);
+    }
+  }
+
+  /** Unbind and drop the panel. Used when another instance takes over the box. */
+  dispose() {
+    const input = this._bound;
+    if (input) {
+      if (this._onInputBound) input.removeEventListener('input', this._onInputBound);
+      if (this._onKeyBound) input.removeEventListener('keydown', this._onKeyBound, true);
+      if (this._onBlurBound) input.removeEventListener('blur', this._onBlurBound);
+      if (input.__slashCommands === this) delete input.__slashCommands;
+    }
+    if (this._docBound) document.removeEventListener('click', this._docBound);
+    this._docBound = null;
+    this._bound = null;
+    if (this.panel) { this.panel.remove(); this.panel = null; }
+    this.open = false;
+    this.items = [];
   }
 
   // --- what is being typed ---
 
+  /**
+   * The box this palette belongs to.
+   *
+   * The composer is looked up again when the original node has left the
+   * document: a rebuilt chat area left `this.input` pointing at a detached
+   * textarea, so the palette kept rendering into a panel nobody could see.
+   */
+  _liveInput() {
+    if (this._bound && this._bound.isConnected) return this._bound;
+    const found = this._inputId ? document.getElementById(this._inputId) : null;
+    if (found) { this._bindInput(found); return found; }
+    return this._bound || this.input || null;
+  }
+
   /** The fragment after the slash, or null when this is not a slash line. */
   query() {
-    const value = this.input ? this.input.value : '';
+    const input = this._liveInput();
+    const value = input ? input.value : '';
     const m = /^\s*\/([a-z0-9_@#-]*)$/i.exec(value);
     return m ? m[1] : null;
   }
@@ -301,7 +359,9 @@ export class SlashCommands {
    */
   suggestions(query) {
     const q = String(query || '').toLowerCase();
-    const hits = (tokens) => !q || tokens.some(t => t && String(t).toLowerCase().startsWith(q));
+    // The rule itself lives in agentSearch.js: a fragment matches the start of
+    // the code (with or without its "#"), the name, or any word inside the name.
+    const hits = (tokens) => matchesQuery(tokens, q);
 
     const out = [];
     for (const c of COMMANDS) {
@@ -319,7 +379,7 @@ export class SlashCommands {
     const agents = (store.get('agents') || []).filter(a => a && a.active);
     for (const a of agents) {
       const code = String(agentCode(a) || '');
-      if (hits([code, a.name])) {
+      if (matchesQuery(agentTokens(a, code), q)) {
         out.push({
           type: 'agent', agent: a, insert: `/${code} `,
           label: `/${code}`, hint: `${a.name} — only this agent answers`, needsArg: true,
@@ -350,8 +410,12 @@ export class SlashCommands {
   // --- the list ---
 
   _render(query) {
-    if (!this.panel) {
-      const wrap = this.input.closest('.chat-input-area') || this.input.parentElement;
+    const input = this._liveInput();
+    // Rebuild a panel that is no longer in the document: the composer area can
+    // be replaced, and appending to the detached node is what made the palette
+    // stop appearing at all with no error anywhere.
+    if (!this.panel || !this.panel.isConnected) {
+      const wrap = (input && (input.closest('.chat-input-area') || input.parentElement)) || document.body;
       this.panel = document.createElement('div');
       this.panel.className = 'slash-commands';
       wrap.appendChild(this.panel);
@@ -421,24 +485,22 @@ export class SlashCommands {
   _complete({ run }) {
     const item = this.items[this.index];
     if (!item) { this.close(); return; }
-    const typed = this.input.value;
+    const input = this._liveInput();
 
     // Enter on something that needs a message fills it in instead of running,
     // so "/#YLAUX4 what broke" works from the palette.
     if (item.needsArg) {
-      this.input.value = item.insert;
-      this.input.focus();
+      if (input) { input.value = item.insert; input.focus(); }
       this.close();
       return;
     }
     if (run && item.type === 'command') {
-      this.input.value = '';
+      if (input) input.value = '';
       this.close();
       this.runCommand(item.cmd.name, '');
       return;
     }
-    this.input.value = item.insert;
-    this.input.focus();
+    if (input) { input.value = item.insert; input.focus(); }
     this.close();
   }
 
@@ -452,8 +514,8 @@ export class SlashCommands {
     if (!cmd) return false;
     if (cmd.needsArg && !String(args || '').trim()) {
       // /ask with nothing after it: leave the box ready rather than erroring.
-      this.input.value = `/${cmd.name} `;
-      this.input.focus();
+      const input = this._liveInput();
+      if (input) { input.value = `/${cmd.name} `; input.focus(); }
       store.emit('toast', { message: `/${cmd.name} needs ${cmd.args || 'a value'}`, type: 'error' });
       return true;
     }

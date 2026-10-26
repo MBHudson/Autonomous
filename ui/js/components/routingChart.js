@@ -42,11 +42,11 @@
 // path would be a second implementation to keep in step, and this is the kind
 // of UI where the two inevitably diverge.
 
-import { store, APP_VERSION } from '../store.js?v=330';
-import { persistence } from '../persistence.js?v=330';
-import { SlashCommands, COMMANDS } from '../slashCommands.js?v=330';
-import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=330';
-import { updateNodeClock } from '../agentClock.js?v=330';
+import { store, APP_VERSION } from '../store.js?v=337';
+import { persistence } from '../persistence.js?v=337';
+import { SlashCommands, COMMANDS } from '../slashCommands.js?v=337';
+import { copyToClipboard, formatDate, formatTime } from '../utils.js?v=337';
+import { updateNodeClock } from '../agentClock.js?v=337';
 
 // Node kinds. 'agent' is the only one that calls a model; the rest are
 // structure -- which is how a fan-out can exist without any agent pretending
@@ -177,7 +177,10 @@ export class RoutingChart {
 
     // Include active streaming text from liveNodes if present and not yet finalized
     if (this.chat?._liveNodes && this.chat._liveNodes.size > 0) {
-      for (const [agentId, node] of this.chat._liveNodes.entries()) {
+      // _liveNodes is keyed by turn now, so the agent comes off the node itself.
+      for (const node of this.chat._liveNodes.values()) {
+        const agentId = node && node.dataset ? node.dataset.agentId : null;
+        if (!agentId) continue;
         if (node && node.isConnected && (node.text || (node.toolCalls && node.toolCalls.length))) {
           const alreadyFinal = chatList.some(
             m => m.role === 'agent' && m.agentId === agentId && m.content === node.text
@@ -2946,7 +2949,9 @@ export class RoutingChart {
         toolCalls: (res && res.toolCalls) || (live && live.toolCalls) || null,
         timestamp: Date.now(),
       };
-      if (live && live.isConnected) this.chat._replaceLiveNode(live, msg);
+      // The shared commit point appends when the node is detached, so a
+      // workflow reply can no longer be dropped on the floor.
+      if (live) this.chat._replaceLiveNode(live, msg);
       else this.chat._addMessage(msg);
       try { this.chat._recordAgentUse?.(agent.id); } catch { /* metrics are best-effort */ }
       log(`${this._nodeName(node)} finished in ${(ms / 1000).toFixed(1)}s`, 'info');
@@ -2968,7 +2973,7 @@ export class RoutingChart {
           toolCalls: (live && live.toolCalls) || null,
           timestamp: Date.now(),
         };
-        if (live && live.isConnected) this.chat._replaceLiveNode(live, msg);
+        if (live) this.chat._replaceLiveNode(live, msg);
         else this.chat._addMessage(msg);
         throw err;
       }
@@ -2979,7 +2984,9 @@ export class RoutingChart {
         toolCalls: (live && live.toolCalls) || null,
         timestamp: Date.now(),
       };
-      if (live && live.isConnected) this.chat._replaceLiveNode(live, msg);
+      // The shared commit point appends when the node is detached, so a
+      // workflow reply can no longer be dropped on the floor.
+      if (live) this.chat._replaceLiveNode(live, msg);
       else this.chat._addMessage(msg);
       log(`${this._nodeName(node)} failed after ${((Date.now() - t0) / 1000).toFixed(1)}s — ${err.message}`, 'error');
       throw err;

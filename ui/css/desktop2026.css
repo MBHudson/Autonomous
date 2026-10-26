@@ -1,0 +1,1049 @@
+/*
+ * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ *
+ * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+ *
+ * BryceFromIndiana@gmail.com
+ */
+
+/* ==========================================================================
+   DESKTOP 2026 — premium glass facelift, DESKTOP ONLY
+   --------------------------------------------------------------------------
+   Every rule below is gated twice: by the (min-width: 1025px) media query
+   AND by html.d26, which desktop2026.js only sets while that query matches.
+   The mobile layout (<= 1024px) is never touched by anything in this file.
+   ========================================================================== */
+
+@property --d26-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Injected helpers stay invisible unless the desktop skin is active. */
+.d26-chat-expand,
+.d26-chat-resize,
+.d26-floor { display: none; }
+
+@media (min-width: 1025px) {
+
+  html.d26 {
+    --d26-edge: rgba(255, 255, 255, 0.07);
+    --d26-shadow:
+      0 24px 48px -20px rgba(0, 0, 0, 0.95),
+      0 8px 18px -8px rgba(0, 0, 0, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --d26-glass: linear-gradient(160deg, rgba(18, 25, 38, 0.72), rgba(5, 8, 13, 0.82));
+    --d26-glass-solid: linear-gradient(160deg, rgba(16, 22, 34, 0.93), rgba(5, 8, 13, 0.96));
+    --d26-r: 14px;
+    --d26-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --d26-tab: var(--accent-cyan);
+    --d26-top: 72px;
+    --d26-stack-l: 76px;
+    --d26-stack-w: 324px;
+    --d26-chat-w: 440px;
+    --d26-chat-alpha: 0.04;
+    /* Desktop "how much of this stuff" knobs, driven by the Desktop config
+       sliders. Blur is the frosted-glass radius, glow scales the border
+       light-run, motion scales the ambient loops (and 0 pauses them). These
+       start where ui/js/desktop2026.js starts: 1px of frost, 4% chat
+       background -- enough glass to read as glass, cheap enough for a weak GPU. */
+    --d26-blur: 1px;
+    --d26-glow: 1;
+    --d26-motion: 1;
+  }
+
+  /* One accent per stack, so the rail and card edges agree. */
+  html.d26[data-d26-tab="agents"]    { --d26-tab: var(--accent-purple); }
+  html.d26[data-d26-tab="providers"] { --d26-tab: var(--accent-green); }
+  html.d26[data-d26-tab="proxy"]     { --d26-tab: var(--accent-orange); }
+  html.d26[data-d26-tab="config"]    { --d26-tab: var(--accent-red); }
+
+  /* ---------------------------------------------------------------- shell */
+  html.d26 .app {
+    display: block;
+    background: transparent;
+    gap: 0;
+  }
+
+  /* ---------------------------------------------------------------- header
+     Same content, same placement; the bar itself is now see-through so the
+     map runs under it. A soft scrim keeps the text readable over bright
+     nodes, and a thin light sweeps along the bottom edge. */
+  html.d26 .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    z-index: 50;
+    background: linear-gradient(to bottom, rgba(2, 4, 8, 0.82), rgba(2, 4, 8, 0.38) 70%, transparent);
+    border-bottom: 0;
+    overflow: visible;
+  }
+
+  html.d26 .header::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--accent-cyan) 55%, transparent) 20%,
+      transparent 40%,
+      transparent 60%,
+      color-mix(in srgb, var(--accent-purple) 55%, transparent) 80%,
+      transparent 100%);
+    background-size: 200% 100%;
+    animation: d26-sweep 11s linear infinite;
+    opacity: 0.7;
+  }
+
+  html.d26 .header-info { gap: 8px; }
+
+  html.d26 .header-stat {
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: rgba(8, 12, 19, 0.55);
+    border: 1px solid var(--d26-edge);
+    box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 0.8));
+  }
+
+  html.d26 .header-stat .value { text-shadow: var(--glow-cyan); }
+
+  html.d26 .header-toggle {
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: rgba(8, 12, 19, 0.6);
+    border: 1px solid var(--d26-edge);
+    box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: border-color 0.25s, color 0.25s, box-shadow 0.25s, transform 0.25s var(--d26-ease);
+  }
+
+  html.d26 .header-toggle:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent-cyan) 60%, transparent);
+  }
+
+  /* The apps notch: centre of the screen, glass instead of flat. */
+  html.d26 .apps { left: 50%; }
+  html.d26 .apps-tab svg path { fill: rgba(8, 12, 19, 0.75); stroke: var(--d26-edge); }
+
+  /* -------------------------------------------------------- the map (back)
+     The topology is the full-screen floor everything else floats over. */
+  html.d26 .right-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: #04070c;
+  }
+
+  html.d26 .right-panel.topo-expanded { z-index: 800; }
+  html.d26 .topo-resize { display: none; }
+
+  html.d26 .right-panel-body {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Center / 2D / full-window / bell. Outside the map's own full-window mode
+     desktop2026.js moves this group into the header (.d26-in-header): it sits
+     dead centre in the bar, directly above the apps drop-down tab, and stays
+     put whatever the panels do. In full-window mode it returns to the map
+     panel (top centre) so the exit button stays reachable. */
+  html.d26 .right-panel-header {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    padding: 6px 8px 6px 14px;
+    gap: 10px;
+    border: 1px solid var(--d26-edge);
+    border-bottom: 1px solid var(--d26-edge);
+    border-radius: 999px;
+    background: rgba(6, 10, 16, 0.62);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 1.2)) saturate(1.2);
+    box-shadow: var(--d26-shadow), 0 0 28px -12px var(--accent-cyan);
+  }
+
+  html.d26 .right-panel-header.d26-in-header {
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    white-space: nowrap;
+  }
+
+  html.d26 .topo-actions { margin-left: 6px; }
+  html.d26 .topology-notifications { margin-left: 0; }
+
+  html.d26 .topo-btn,
+  html.d26 .notif-bell {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--d26-edge);
+    transition: all 0.25s var(--d26-ease);
+  }
+
+  html.d26 .topo-btn:hover:not(:disabled),
+  html.d26 .notif-bell:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 14px -4px var(--accent-cyan);
+  }
+
+  html.d26 .t3d-hint-bar {
+    left: calc(var(--d26-stack-l) + var(--d26-stack-w));
+    right: calc(var(--d26-chat-w) + 18px);
+    bottom: 10px;
+    transition: left 0.7s var(--d26-ease), right 0.7s var(--d26-ease);
+  }
+
+  html.d26.d26-min .t3d-hint-bar { left: 0; right: 0; }
+
+  /* Fixed polar floor: does not orbit, pan or zoom. It is drawn far larger
+     than the screen and laid back in perspective so its rim runs off every
+     edge, which is what sells the depth behind the floating panels. */
+  html.d26 .d26-floor {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 60%;
+    width: 150vmax;
+    height: 150vmax;
+    margin-left: -75vmax;
+    margin-top: -75vmax;
+    transform: perspective(110vmax) rotateX(74deg);
+    transform-origin: 50% 50%;
+    pointer-events: none;
+    opacity: 0.2;
+    mix-blend-mode: screen;
+    z-index: 0;
+  }
+
+  html.d26 .d26-floor svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  html.d26 .d26-floor-scan {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: d26-scan 8s cubic-bezier(0.3, 0.6, 0.4, 1) infinite;
+  }
+
+  /* `hidden` has to actually hide it: the display:block above outranks the UA
+     [hidden] rule, which is why switching the floor off used to do nothing. */
+  html.d26 .d26-floor[hidden] { display: none; }
+
+  /* Node metrics card: the reference look, just rounder, with the light run. */
+  html.d26 .t3d-popup {
+    border-radius: 16px;
+    --d26-c: var(--c, #00e5ff);
+  }
+
+  html.d26 .t3d-popup::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    pointer-events: none;
+    background: conic-gradient(from var(--d26-a),
+      transparent 0deg 236deg,
+      color-mix(in srgb, var(--d26-c) 35%, transparent) 262deg,
+      var(--d26-c) 318deg,
+      color-mix(in srgb, var(--d26-c) 55%, #fff) 336deg,
+      transparent 356deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: d26-run 1.2s var(--d26-ease) both, d26-breathe 5.5s 1.2s ease-in-out infinite;
+  }
+
+  /* ------------------------------------------------------- left: the rail
+     The old tab strip, now pinned to the screen edge, same order. */
+  html.d26 .sidebar { display: contents; }
+
+  html.d26 .sidebar-nav {
+    position: fixed;
+    left: 0;
+    top: var(--d26-top);
+    bottom: 18px;
+    width: 46px;
+    z-index: 26;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    border-bottom: 0;
+    pointer-events: none;
+  }
+
+  html.d26 .sidebar-nav .nav-btn {
+    pointer-events: auto;
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    padding: 20px 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9.5px;
+    letter-spacing: 2.6px;
+    /* Idle tabs sit on a bright, see-through rail over the lit map. A brighter
+       base colour plus a solid edge shadow keeps them readable in every theme
+       (was --text-dim, which washed out against the map). */
+    color: var(--text-secondary);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 1px rgba(0, 0, 0, 0.9);
+    background: linear-gradient(90deg, rgba(4, 7, 11, 0.97), rgba(14, 20, 31, 0.9));
+    border: 1px solid var(--d26-edge);
+    border-left: 0;
+    border-bottom: 1px solid var(--d26-edge);
+    border-radius: 0 12px 12px 0;
+    box-shadow: 8px 12px 26px -12px rgba(0, 0, 0, 0.95), inset -1px 0 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 0.8));
+    transition: width 0.4s var(--d26-ease), color 0.3s, box-shadow 0.4s, border-color 0.4s;
+  }
+
+  html.d26 .d26-rail-label {
+    display: block;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    white-space: nowrap;
+  }
+
+  html.d26 .sidebar-nav .nav-btn:hover {
+    width: 41px;
+    color: var(--text-primary);
+  }
+
+  html.d26 .sidebar-nav .nav-btn.active {
+    width: 44px;
+    color: var(--d26-tab);
+    background: linear-gradient(90deg, rgba(4, 7, 11, 0.96), color-mix(in srgb, var(--d26-tab) 12%, rgba(14, 20, 31, 0.8)));
+    border-color: color-mix(in srgb, var(--d26-tab) 45%, transparent);
+    box-shadow: 8px 12px 26px -12px rgba(0, 0, 0, 0.95), 0 0 22px -6px var(--d26-tab);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--d26-tab) 70%, transparent);
+  }
+
+  /* Status LED at the top of every rail tab; the active one breathes. */
+  html.d26 .sidebar-nav .nav-btn::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    margin-left: -2.5px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    opacity: 0.45;
+    transition: background 0.3s, opacity 0.3s, box-shadow 0.3s;
+  }
+
+  html.d26 .sidebar-nav .nav-btn.active::before {
+    background: var(--d26-tab);
+    box-shadow: 0 0 8px var(--d26-tab), 0 0 14px var(--d26-tab);
+    opacity: 1;
+    animation: blink 1.8s ease-in-out infinite;
+  }
+
+  /* Light bar on the inner edge of the active tab. */
+  html.d26 .sidebar-nav .nav-btn.active::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 14%;
+    bottom: 14%;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--d26-tab);
+    box-shadow: 0 0 10px var(--d26-tab);
+    animation: d26-bar-in 0.6s var(--d26-ease) both;
+  }
+
+  /* ---------------------------------------------------- left: the stack */
+  html.d26 .sidebar-body {
+    position: fixed;
+    left: var(--d26-stack-l);
+    top: var(--d26-top);
+    bottom: 18px;
+    width: var(--d26-stack-w);
+    z-index: 20;
+    /* Deep bottom padding: the ⋮ dropdowns are absolutely positioned, so the
+       scroll container was clipping the last card's menu. The padding gives
+       an open menu room to fall into. */
+    padding: 6px 14px 150px 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: transparent;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--d26-tab) 45%, transparent) transparent;
+    transition: transform 0.75s var(--d26-ease), opacity 0.55s ease;
+  }
+
+  html.d26 .sidebar-body::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--d26-tab) 50%, transparent);
+  }
+
+  html.d26.d26-flyout .sidebar-body { z-index: 35; }
+
+  /* Stack heading row: count, the floating + button, the § prompt button. */
+  html.d26 .sidebar-body .sidebar-section-header {
+    position: relative;
+    z-index: 41;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 2px 2px 4px;
+    border: 0;
+    background: none;
+  }
+
+  html.d26 .sidebar-body .sidebar-section-title {
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: rgba(8, 12, 19, 0.62);
+    border: 1px solid var(--d26-edge);
+    color: var(--d26-tab);
+    letter-spacing: 1.5px;
+    box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 0.8));
+  }
+
+  html.d26 .sidebar-body .sidebar-section-header .btn-primary {
+    margin-left: auto;
+    border-radius: 999px;
+    padding: 6px 13px;
+    box-shadow: 0 10px 22px -10px var(--d26-tab), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    animation: d26-float 4.5s ease-in-out infinite;
+  }
+
+  html.d26 .sidebar-body .preprompt-btn {
+    border-radius: 10px;
+    background: rgba(8, 12, 19, 0.62);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 0.8));
+  }
+
+  /* Proxy list scrolls with the stack instead of inside its own box. */
+  html.d26 .sidebar-body .proxy-list {
+    max-height: none;
+    overflow: visible;
+    gap: 12px;
+  }
+
+  /* ---------------------------------------------------------- glass cards
+     .d26-card is added by desktop2026.js to session rows, agent cards,
+     provider cards, proxy rows and config sections. */
+  html.d26 .d26-card {
+    --d26-c: var(--d26-tab);
+    --d26-rest: perspective(900px) rotateY(5deg);
+    --d26-hover: perspective(900px) rotateY(1.5deg) translateX(4px);
+    position: relative;
+    margin: 0;
+    border-radius: var(--d26-r);
+    background: var(--d26-glass);
+    border: 1px solid var(--d26-edge);
+    box-shadow: var(--d26-shadow);
+    backdrop-filter: blur(var(--d26-blur, 10px)) saturate(1.25);
+    transform: var(--d26-rest);
+    transform-origin: left center;
+    transition: transform 0.45s var(--d26-ease), box-shadow 0.4s, border-color 0.4s;
+  }
+
+  html.d26 .d26-card:hover {
+    transform: var(--d26-hover);
+    border-color: color-mix(in srgb, var(--d26-c) 28%, transparent);
+    box-shadow: var(--d26-shadow), 0 0 30px -10px var(--d26-c);
+  }
+
+  html.d26 .d26-card.active {
+    --d26-c: var(--accent-green);
+    border-color: color-mix(in srgb, var(--accent-green) 30%, transparent);
+  }
+
+  /* An open ⋮ menu must sit above the next card down. */
+  html.d26 .d26-card:has(.agent-menu.open) { z-index: 40; }
+
+  /* Config sections stay flat (no transform, no backdrop-filter) because
+     their drawer is position:fixed and either property would trap it. */
+  html.d26 .cfg-section.d26-card {
+    --d26-rest: none;
+    --d26-hover: none;
+    backdrop-filter: none;
+    background: var(--d26-glass-solid);
+  }
+
+  /* The bottom cluster of config controls stays flat like the sections above
+     it. Without this it keeps the default deck-deal tilt (rotateY 5deg about
+     the left edge) and reads as if it is leaning away from the stack. */
+  html.d26 .cfg-cluster.d26-card {
+    --d26-rest: none;
+    --d26-hover: none;
+    padding: 14px 14px 16px;
+    border-top: 1px solid var(--d26-edge);
+  }
+
+  html.d26 .cfg-section-head { border-radius: var(--d26-r); min-height: 44px; }
+
+  /* The coloured run along the border: shoots round once when the stack
+     arrives, then parks top-left and slowly breathes. */
+  html.d26 .d26-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: 1;
+    border-radius: inherit;
+    padding: 1.5px;
+    pointer-events: none;
+    background: conic-gradient(from var(--d26-a),
+      transparent 0deg 236deg,
+      color-mix(in srgb, var(--d26-c) 35%, transparent) 262deg,
+      var(--d26-c) 318deg,
+      color-mix(in srgb, var(--d26-c) 55%, #fff) 336deg,
+      transparent 356deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: d26-breathe 5.5s ease-in-out infinite;
+  }
+
+  html.d26 .sidebar-body.d26-enter .d26-card::before {
+    animation:
+      d26-run 1.3s var(--d26-ease) both,
+      d26-breathe 5.5s 1.3s ease-in-out infinite;
+    animation-delay: calc(var(--d26-i, 0) * 55ms + 160ms), calc(var(--d26-i, 0) * 55ms + 1.46s);
+  }
+
+  /* Deck-dealing entrance, staggered top to bottom. */
+  html.d26 .sidebar-body.d26-enter .d26-card {
+    animation: d26-card-in 0.7s var(--d26-ease) both;
+    animation-delay: calc(var(--d26-i, 0) * 55ms + 120ms);
+  }
+
+  html.d26 .sidebar-body.d26-enter .cfg-section.d26-card { animation-name: d26-fade-in; }
+
+  /* The outgoing copy of a stack during the swirl. */
+  html.d26 .d26-ghost { transition: none; }
+
+  /* -------------------------------------------- config: the side drawers
+     Clicking a section: the label stays put, the panel stretches out to the
+     right of it, then drops down the right side of the stack. A press
+     anywhere outside it closes it again (desktop2026.js). */
+  html.d26 .cfg-section > .cfg-body.d26-fly {
+    position: fixed;
+    left: var(--fx, 420px);
+    top: var(--fy, 80px);
+    width: var(--fw, 380px);
+    max-height: var(--fh, 70vh);
+    overflow-y: auto;
+    z-index: 40;
+    padding: 14px 16px 18px;
+    border: 1px solid color-mix(in srgb, var(--d26-tab) 28%, transparent);
+    border-left: 2px solid var(--d26-tab);
+    border-radius: 4px 16px 16px 16px;
+    background: var(--d26-glass-solid);
+    box-shadow:
+      0 32px 64px -22px rgba(0, 0, 0, 0.95),
+      -10px 0 26px -14px var(--d26-tab),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--d26-tab) 45%, transparent) transparent;
+  }
+
+  html.d26 .cfg-section.d26-fly-open {
+    border-color: color-mix(in srgb, var(--d26-tab) 40%, transparent);
+    box-shadow: var(--d26-shadow), 14px 0 26px -14px var(--d26-tab);
+  }
+
+  html.d26 .cfg-section.d26-fly-open > .cfg-section-head {
+    background: linear-gradient(90deg, transparent 55%, color-mix(in srgb, var(--d26-tab) 14%, transparent));
+  }
+
+  /* The chevron points at the drawer (right), not down. */
+  html.d26 .cfg-section[open] > .cfg-section-head .cfg-chevron {
+    transform: rotate(0deg) scale(1.25);
+    color: var(--d26-tab);
+    text-shadow: 0 0 8px var(--d26-tab);
+  }
+
+  /* Bottom block (token, usage, backup…) and SAVE: rethemed only. */
+  html.d26 .cfg-savebar {
+    background: linear-gradient(to bottom, transparent, rgba(4, 7, 11, 0.92) 35%);
+    border-radius: 0 0 var(--d26-r) var(--d26-r);
+  }
+
+  /* -------------------------------------------------- right: the chat */
+  html.d26 .main-panel {
+    position: fixed;
+    top: var(--d26-top);
+    right: 18px;
+    bottom: 18px;
+    width: var(--d26-chat-w);
+    z-index: 20;
+    background: transparent;
+    border-radius: 18px;
+    box-shadow: var(--d26-shadow), 0 0 0 1px var(--d26-edge);
+    transition: width 0.6s var(--d26-ease), transform 0.75s var(--d26-ease);
+  }
+
+  /* Glass lives on a pseudo-element so its backdrop-filter never becomes
+     the containing block for anything the chat positions itself. */
+  html.d26 .main-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(165deg,
+      rgba(14, 20, 31, var(--d26-chat-alpha)),
+      rgba(3, 6, 10, var(--d26-chat-alpha)));
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 1.6)) saturate(1.2);
+    pointer-events: none;
+  }
+
+  html.d26 .main-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    border-radius: inherit;
+    padding: 1.5px;
+    pointer-events: none;
+    --d26-c: var(--accent-cyan);
+    background: conic-gradient(from var(--d26-a),
+      transparent 0deg 236deg,
+      color-mix(in srgb, var(--d26-c) 35%, transparent) 262deg,
+      var(--d26-c) 318deg,
+      color-mix(in srgb, var(--d26-c) 55%, #fff) 336deg,
+      transparent 356deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: d26-run 1.6s 0.3s var(--d26-ease) both, d26-breathe 6s 1.9s ease-in-out infinite;
+  }
+
+  html.d26.d26-chat-full .main-panel {
+    width: calc(100vw - 36px);
+    z-index: 60;
+  }
+
+  body.d26-resizing,
+  body.d26-resizing * { cursor: col-resize !important; user-select: none; }
+  body.d26-resizing canvas { pointer-events: none; }
+  html.d26 body.d26-resizing .main-panel { transition: none; }
+
+  html.d26 .chat-messages { padding: 22px 18px 16px; }
+
+  html.d26 .msg {
+    border-radius: 14px;
+    box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.9);
+  }
+
+  html.d26 .msg-user {
+    background: linear-gradient(160deg, rgba(0, 229, 255, 0.12), rgba(0, 229, 255, 0.04));
+    border-color: rgba(0, 229, 255, 0.28);
+    border-bottom-right-radius: 4px;
+  }
+
+  html.d26 .msg-agent {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+    border-color: var(--d26-edge);
+    border-bottom-left-radius: 4px;
+  }
+
+  html.d26 .chat-input-area {
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 12px 14px 14px;
+    border-radius: 0 0 18px 18px;
+  }
+
+  html.d26 .chat-input {
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.38);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45);
+  }
+
+  html.d26 .chat-input:focus {
+    border-color: color-mix(in srgb, var(--accent-cyan) 60%, transparent);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.45), 0 0 18px -6px var(--accent-cyan);
+  }
+
+  html.d26 .send-btn {
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent-cyan), color-mix(in srgb, var(--accent-cyan) 55%, #6d28d9));
+    box-shadow: 0 10px 22px -10px var(--accent-cyan);
+  }
+
+  html.d26 .mic-btn { background: rgba(0, 0, 0, 0.35); border-color: rgba(255, 255, 255, 0.08); }
+
+  html.d26 .d26-chat-expand {
+    display: inline-flex;
+    position: absolute;
+    top: 8px;
+    right: 42px;
+    z-index: 50;
+    padding: 5px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.25s;
+  }
+
+  html.d26 .d26-chat-expand svg { width: 15px; height: 15px; }
+
+  html.d26 .d26-chat-expand:hover,
+  html.d26 .d26-chat-expand.on {
+    opacity: 1;
+    color: var(--accent-cyan);
+    background: rgba(0, 229, 255, 0.08);
+    box-shadow: 0 0 12px -4px var(--accent-cyan);
+  }
+
+  /* Drag the chat's left edge to widen it toward the map. */
+  html.d26 .d26-chat-resize {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 22px;
+    bottom: 22px;
+    width: 8px;
+    z-index: 55;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  html.d26 .d26-chat-resize::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 30%;
+    bottom: 30%;
+    width: 2px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.2s, box-shadow 0.2s, top 0.3s, bottom 0.3s;
+  }
+
+  html.d26 .d26-chat-resize:hover::after,
+  body.d26-resizing .d26-chat-resize::after {
+    top: 10%;
+    bottom: 10%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 10px var(--accent-cyan);
+  }
+
+  html.d26.d26-chat-full .d26-chat-resize { display: none; }
+
+  /* ------------------------------------------- panels tuck to the edges
+     While a node card is open (and the map is not in its own fullscreen),
+     the stack swings back to the rail and the chat slides to the right
+     edge, leaving a thin lit sliver. */
+  html.d26.d26-min .sidebar-body {
+    transform: translateX(-118%) perspective(900px) rotateY(38deg);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  html.d26.d26-min .main-panel {
+    transform: translateX(calc(100% + 8px));
+  }
+
+  html.d26.d26-min .sidebar-nav .nav-btn.active {
+    animation: d26-glow 2.4s ease-in-out infinite;
+  }
+
+  /* -------------------------------------------- pop-ups, menus, dialogs
+     Same triggers, same places; new skin. */
+  html.d26 .modal,
+  html.d26 .approve-box,
+  html.d26 .notif-dropdown,
+  html.d26 .apps-menu,
+  html.d26 .agent-menu,
+  html.d26 .slash-commands,
+  html.d26 .thinking-panel,
+  html.d26 .terminal-panel,
+  html.d26 .toast {
+    border-radius: 16px;
+    background: var(--d26-glass-solid);
+    border: 1px solid var(--d26-edge);
+    box-shadow:
+      0 32px 70px -22px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 255, 255, 0.02),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 1.6)) saturate(1.2);
+  }
+
+  html.d26 .agent-menu { border-radius: 12px; overflow: hidden; padding: 5px; }
+  html.d26 .agent-menu-item { border-radius: 8px; }
+
+
+  html.d26 .modal { position: relative; }
+
+  html.d26 .modal::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: 5;
+    border-radius: inherit;
+    padding: 1.5px;
+    pointer-events: none;
+    --d26-c: var(--accent-cyan);
+    background: conic-gradient(from var(--d26-a),
+      transparent 0deg 236deg,
+      color-mix(in srgb, var(--d26-c) 35%, transparent) 262deg,
+      var(--d26-c) 318deg,
+      color-mix(in srgb, var(--d26-c) 55%, #fff) 336deg,
+      transparent 356deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: d26-run 1.1s 0.1s var(--d26-ease) both, d26-breathe 6s 1.2s ease-in-out infinite;
+  }
+
+  html.d26 .modal-bg.open .modal,
+  html.d26 .modal-overlay .modal,
+  html.d26 .approve-box {
+    animation: d26-pop 0.42s var(--d26-ease) both;
+  }
+
+  html.d26 .modal-bg,
+  html.d26 .modal-overlay,
+  html.d26 .approve-veil {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(calc(var(--d26-blur, 10px) * 0.5));
+  }
+
+  html.d26 .apps-menu,
+  html.d26 .notif-dropdown:not([hidden]) {
+    animation: d26-pop 0.32s var(--d26-ease) both;
+  }
+
+  /* Terminal / thinking float in the map gap between the panels. */
+  html.d26 .thinking-panel,
+  html.d26 .terminal-panel {
+    left: calc(var(--d26-stack-l) + var(--d26-stack-w) + 14px);
+    right: calc(var(--d26-chat-w) + 32px);
+    bottom: 40px;
+  }
+
+  /* Form controls and buttons everywhere on desktop. */
+  html.d26 .form-input,
+  html.d26 .form-select,
+  html.d26 .form-textarea {
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.36);
+    border-color: rgba(255, 255, 255, 0.08);
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  html.d26 .form-input:focus,
+  html.d26 .form-select:focus,
+  html.d26 .form-textarea:focus {
+    border-color: color-mix(in srgb, var(--accent-cyan) 60%, transparent);
+    box-shadow: 0 0 16px -6px var(--accent-cyan);
+  }
+
+  html.d26 .btn {
+    border-radius: 10px;
+    transition: transform 0.25s var(--d26-ease), box-shadow 0.25s, background 0.25s;
+  }
+
+  html.d26 .btn:hover { transform: translateY(-1px); }
+
+  html.d26 .btn-primary {
+    background: linear-gradient(135deg, var(--accent-cyan), color-mix(in srgb, var(--accent-cyan) 55%, #6d28d9));
+    box-shadow: 0 10px 22px -12px var(--accent-cyan);
+  }
+
+  html.d26 .btn-ghost {
+    border-color: color-mix(in srgb, var(--accent-cyan) 45%, transparent);
+    background: rgba(0, 229, 255, 0.04);
+  }
+
+  html.d26 .agent-menu-btn,
+  html.d26 .provider-menu-btn,
+  html.d26 .agent-ask-btn,
+  html.d26 .btn-proxy {
+    border-radius: 8px;
+  }
+
+  html.d26 .agent-avatar {
+    box-shadow: 0 0 14px -4px currentColor;
+  }
+
+  /* -------------------------------------------------- "how much stuff" knobs
+     The Desktop config sliders write --d26-glow and --d26-motion. Glow scales
+     the coloured border run; motion scales the ambient loops. At 0 the body
+     gets .d26-still / .d26-no-glow and the loops stop (see deactivate/activate
+     in desktop2026.js for the matching class toggles). */
+  html.d26 .d26-card::before,
+  html.d26 .main-panel::after,
+  html.d26 .modal::before,
+  html.d26 .t3d-popup::before {
+    filter: opacity(var(--d26-glow, 1));
+  }
+
+  /* Animation durations divide by the motion factor: 100% = designed speed,
+     lower = calmer. 0 is handled by .d26-still below (no invalid calc). */
+  html.d26 .header::after { animation-duration: calc(11s / var(--d26-motion, 1)); }
+  html.d26 .d26-floor-scan { animation-duration: calc(8s / var(--d26-motion, 1)); }
+  html.d26 .sidebar-nav .nav-btn.active::before { animation-duration: calc(1.8s / var(--d26-motion, 1)); }
+  html.d26 .sidebar-body .sidebar-section-header .btn-primary { animation-duration: calc(4.5s / var(--d26-motion, 1)); }
+  html.d26 .d26-card::before { animation-duration: calc(5.5s / var(--d26-motion, 1)); }
+  html.d26 .sidebar-body.d26-enter .d26-card::before { animation-duration: 1.3s, calc(5.5s / var(--d26-motion, 1)); }
+  html.d26 .main-panel::after { animation-duration: 1.6s, calc(6s / var(--d26-motion, 1)); }
+  html.d26 .modal::before { animation-duration: 1.1s, calc(6s / var(--d26-motion, 1)); }
+  html.d26 .t3d-popup::before { animation-duration: 1.2s, calc(5.5s / var(--d26-motion, 1)); }
+
+  html.d26.d26-still .header::after,
+  html.d26.d26-still .d26-floor-scan,
+  html.d26.d26-still .sidebar-nav .nav-btn.active::before,
+  html.d26.d26-still .sidebar-body .sidebar-section-header .btn-primary,
+  html.d26.d26-still .d26-card::before,
+  html.d26.d26-still .main-panel::after,
+  html.d26.d26-still .modal::before,
+  html.d26.d26-still .t3d-popup::before {
+    animation: none !important;
+  }
+
+  /* Glow at 0%: drop the border run's animation too, so turning it off also
+     stops its per-frame repaint instead of animating an invisible gradient. */
+  html.d26.d26-no-glow .d26-card::before,
+  html.d26.d26-no-glow .main-panel::after,
+  html.d26.d26-no-glow .modal::before,
+  html.d26.d26-no-glow .t3d-popup::before {
+    animation: none !important;
+  }
+
+  /* An open three-dot menu must sit above the next card down. :has() handles
+     browsers that support it; the hover/focus rules are the fallback so the
+     menu stays clickable everywhere. */
+  html.d26 .d26-card:hover,
+  html.d26 .d26-card:focus-within { z-index: 40; }
+  html.d26 .agent-menu { z-index: 200; }
+}
+
+/* Tighter header on mid-size desktops so the stats on the right never run
+   under the centred topology buttons. */
+@media (min-width: 1025px) and (max-width: 1500px) {
+  html.d26 .header-info { gap: 5px; }
+  html.d26 .header-stat { padding: 4px 8px; font-size: 10px; }
+  html.d26 .header-toggle { padding: 5px 8px; }
+  html.d26 .right-panel-header.d26-in-header { padding: 4px 6px 4px 10px; gap: 6px; }
+  html.d26 .logo-line1 { letter-spacing: 1px; }
+}
+
+/* ------------------------------------------------------------- keyframes */
+@keyframes d26-run {
+  from { --d26-a: -300deg; opacity: 1; }
+  to   { --d26-a: 0deg; opacity: 1; }
+}
+
+@keyframes d26-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.42; }
+}
+
+@keyframes d26-card-in {
+  from { opacity: 0; transform: perspective(900px) translateX(-34px) rotateY(32deg); }
+  to   { opacity: 1; transform: var(--d26-rest, none); }
+}
+
+@keyframes d26-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes d26-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes d26-sweep {
+  to { background-position: -200% 0; }
+}
+
+@keyframes d26-scan {
+  0%   { transform: scale(0.06); opacity: 0.9; }
+  75%  { opacity: 0.18; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes d26-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}
+
+@keyframes d26-bar-in {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes d26-glow {
+  0%, 100% { box-shadow: 8px 12px 26px -12px rgba(0, 0, 0, 0.95), 0 0 0 0 transparent; }
+  50%      { box-shadow: 8px 12px 26px -12px rgba(0, 0, 0, 0.95), 0 0 18px -4px var(--d26-tab, #00e5ff); }
+}
+
+/* Respect the OS "reduce motion" switch for everything added here. */
+@media (prefers-reduced-motion: reduce) {
+  html.d26 .d26-card,
+  html.d26 .d26-card::before,
+  html.d26 .d26-floor-scan,
+  html.d26 .main-panel::after,
+  html.d26 .header::after,
+  html.d26 .modal::before,
+  html.d26 .t3d-popup::before,
+  html.d26 .sidebar-body .sidebar-section-header .btn-primary {
+    animation: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------- flat
+   The glass-blur slider at 0. Zero has to remove the backdrop-filter LAYER, not
+   set its radius to 0px: any backdrop-filter sitting over the animated map is
+   re-blurred by the compositor every single frame, which is the largest GPU
+   cost in this skin. With the layer gone the panels get a little more body so
+   the text stays legible over the map. */
+.d26-flat .main-panel::before,
+.d26-flat .d26-card,
+.d26-flat .t3d-hint-bar,
+.d26-flat .right-panel-header,
+.d26-flat .header-stat,
+.d26-flat .apps-menu,
+.d26-flat .sidebar-body .sidebar-section-title,
+.d26-flat .sidebar-body .preprompt-btn,
+.d26-flat .modal,
+.d26-flat .t3d-popup,
+.d26-flat .t3d-ask-prompt,
+.d26-flat .t3d-ask-reply {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Specificity has to match the glass rules above (html.d26 .d26-card), or the
+   translucent gradient survives and the text sits on the map unreadably. */
+html.d26.d26-flat .d26-card { background: var(--d26-glass-solid); }
+html.d26.d26-flat .t3d-popup,
+html.d26.d26-flat .t3d-ask-reply { background: rgba(7, 11, 19, 0.96); }

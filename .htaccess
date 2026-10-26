@@ -2,6 +2,36 @@
 
 RewriteEngine On
 
+# Refuse runtime data and dev tooling at ANY depth, not only directly under the
+# app root. storage/ holds the token and every API key, and tests/ is dev code --
+# each folder ships its own .htaccess, which only ever governs itself. A second
+# copy of the app kept inside the web root (a backup, an archived version) brings
+# its own storage/ and tests/, and its tests/ may have been made before
+# tests/.htaccess existed -- so those files were served in full, PHP source
+# included. serve.php and nginx.example.conf refuse these names as any path
+# segment; this is the same rule for Apache.
+#
+# The pattern is anchored on the segment boundaries, so /testsuite/ and
+# /ui/js/tests.js are NOT caught -- only a folder actually named tests. API routes
+# are exempt: /api/sessions is the session LIST, not the storage folder, and
+# matching it broke the sidebar. No API route maps onto a path from disk.
+#
+# mod_rewrite is NOT enough on its own here. In per-directory context a child
+# .htaccess replaces its parent's rewrite rules unless it opts into
+# `RewriteOptions Inherit`, and a copy of this app ships its own root .htaccess --
+# so the rule above never sees `<copy>/tests/...`. (Verified with a rewrite trace:
+# the root rules are skipped entirely once the request maps into the copy.)
+#
+# mod_alias config IS merged normally, so `RedirectMatch 403` holds no matter what
+# a nested folder declares. It takes the full URL-path, which is exactly what this
+# needs, and has been in Apache since 1.3 -- unlike <If>, which only became legal
+# in .htaccess in later 2.4 releases. The <IfModule> wrapper only means a host
+# without mod_alias skips this rule instead of failing to parse the file.
+RewriteRule (^|/)(storage|logs|tmp|sessions|tests)(/|$) - [F,L,NC]
+<IfModule mod_alias.c>
+    RedirectMatch 403 (?i)^/(?!(?:.*/)?api/)(?:.*/)?(?:storage|logs|tmp|sessions|tests)(?:/|$)
+</IfModule>
+
 # Never cache HTML entry points (JS/CSS already carry ?v= cache busters)
 <FilesMatch "index\.html$">
     Header set Cache-Control "no-store, no-cache, must-revalidate"

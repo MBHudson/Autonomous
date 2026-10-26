@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=330';
-import { asText, compactText } from './utils.js?v=330';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=330';
-import { settingFor } from './agentConfig.js?v=330';
-import { trace } from './trace.js?v=330';
+import { store } from './store.js?v=337';
+import { asText, compactText } from './utils.js?v=337';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=337';
+import { settingFor } from './agentConfig.js?v=337';
+import { trace } from './trace.js?v=337';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1628,6 +1628,105 @@ function fromToolObject(source) {
     try { arg = JSON.parse(arg); } catch { /* keep the raw string */ }
   }
   return { tool: name, arg };
+}
+
+/**
+ * Cut the tool-call markup out of a reply and keep the prose.
+ *
+ * The live bubble is meant to show the raw stream, but a FINISHED message must
+ * not commit `{"tool":"read_file","arg":{…}}` into the transcript: the tool
+ * panel already carries the call, its arguments and its result as structured
+ * data, so the raw block is duplicated noise in the saved conversation.
+ *
+ * Removal is always validated with the same parser that decides whether a
+ * reply IS a call, so ordinary prose that happens to contain braces or angle
+ * brackets is left exactly as it was.
+ */
+export function stripToolCall(text) {
+  let out = String(text || '');
+  if (!out.trim()) return '';
+
+  // A fenced block whose body is the call (the most common prompt-dialect
+  // shape, and the one a model uses when it is asked for JSON).
+  out = out.replace(/```[ \t]*[a-zA-Z0-9_-]*[ \t]*\r?\n([\s\S]*?)```/g,
+    (m, inner) => (_parseToolCall(inner) ? ' ' : m));
+
+  // XML/native wrappers, whole block at a time. Repeated so a container is
+  // handled after the call inside it has gone (removing <invoke> first used to
+  // leave an empty <function_calls></function_calls> behind), and then any
+  // wrapper that is empty is dropped outright.
+  for (let pass = 0; pass < 3; pass++) {
+    const before = out;
+    for (const re of TOOL_BLOCK_PATTERNS) {
+      out = out.replace(re, m => (_parseToolCall(m) ? ' ' : m));
+    }
+    if (out === before) break;
+  }
+  // Qwen/GLM begin…end spelling. Its body must stop at an END marker: a lazy
+  // body that also accepted "begin" closed on the opening pair and removed
+  // nothing. Whatever tags remain after that are markup, never prose.
+  out = out.replace(TOOL_BEGIN_END_BLOCK, m => (_parseToolCall(m) ? ' ' : m));
+  out = out.replace(TOOL_TAGS, ' ');
+
+  // Bare JSON objects: walk the balanced spans and drop the ones that parse as
+  // a call. Non-call objects are skipped, not removed, and the scan advances
+  // past them so a harmless `{…}` earlier in the prose cannot hide a real call.
+  let from = 0;
+  for (let guard = 0; guard < 8; guard++) {
+    const start = out.indexOf('{', from);
+    if (start === -1) break;
+    const end = balancedObjectEnd(out, start);
+    if (end === -1) break;
+    if (_parseToolCall(out.slice(start, end))) {
+      out = `${out.slice(0, start)} ${out.slice(end)}`;
+      from = start;
+    } else {
+      from = end;
+    }
+  }
+
+  return out
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\s+|\s+$/g, '');
+}
+
+// Containers before their contents: <function_calls> wraps <invoke>.
+const TOOL_BLOCK_PATTERNS = [
+  /<\s*function_calls\s*>[\s\S]*?<\s*\/\s*function_calls\s*>/gi,
+  /<\s*invoke\b[\s\S]*?<\s*\/\s*invoke\s*>/gi,
+  /<\s*function\b[\s\S]*?<\s*\/\s*function\s*>/gi,
+  /<\s*tool_call\s*>[\s\S]*?<\s*\/\s*tool_call\s*>/gi,
+  /<\s*\|?\s*tool[-_]call\s*\|?\s*>[\s\S]*?(?:<\s*\|?\s*\/?\s*\|?\s*tool[-_]call\s*\|?\s*>|$)/gi,
+];
+
+/** `<|tool_calls_begin|> … <|tool_call_end|>` (Qwen / GLM). */
+const TOOL_BEGIN_END_BLOCK = /<\s*\|?\s*tool[-_]?calls?_\s*begin\s*\|?\s*>[\s\S]*?(?:<\s*\|?\s*\/?\s*\|?\s*tool[-_]?calls?_\s*end\s*\|?\s*>|$)/gi;
+
+/** Any native wrapper tag left over once the call is gone. Pure markup. */
+const TOOL_TAGS = /<\s*\|?\s*\/?\s*\|?\s*tool[-_]?calls?_\s*(?:begin|end)\s*\|?\s*>|<\s*\|?\s*\/?\s*\|?\s*tool[-_]call\s*\|?\s*>/gi;
+
+/** Index just past the `}` that closes the object opened at `start`, or -1. */
+function balancedObjectEnd(text, start) {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return -1;
 }
 
 /** Zero-width, bidi and fullwidth characters models sprinkle into markup. */

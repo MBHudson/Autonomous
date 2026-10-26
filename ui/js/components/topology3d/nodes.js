@@ -172,6 +172,16 @@ export class NodeView {
     }
   }
 
+  /** Toggle scene fog on this node's materials (fog modes on the map). */
+  setFog(on) {
+    const flag = !!on;
+    const mats = [this.coreMat, this.shellMat, this.haloMat, this.cageMat, this.orbitMat];
+    this.rings?.forEach(s => mats.push(s.material));
+    mats.forEach(m => {
+      if (m && m.fog !== flag) { m.fog = flag; m.needsUpdate = true; }
+    });
+  }
+
   get working() { return this.status === 'thinking' || this.status === 'active'; }
 
   pulse(strength = 1) { this.flash = Math.min(1.4, this.flash + strength); }
@@ -195,9 +205,11 @@ export class NodeView {
     this.core.scale.setScalar(r * 0.62 * scale);
     this.shell.scale.setScalar(r * (1 + breathe * 0.04 + this.flash * 0.15));
 
-    const glow = (working ? 0.85 : 0.5) + breathe * 0.12 + this.flash * 0.6 + (this.selected ? 0.25 : 0);
+    // Idle nodes carry much less halo so their wireframe/geometric structure
+    // reads instead of being smothered in fuzz; working ones keep the full glow.
+    const glow = (working ? 0.85 : 0.3) + breathe * 0.12 + this.flash * 0.6 + (this.selected ? 0.25 : 0);
     this.haloMat.opacity = Math.max(0, glow) * vis;
-    this.halo.scale.setScalar(r * (5.2 + this.flash * 3 + (working ? 1.2 : 0) + this.failFlash * 4));
+    this.halo.scale.setScalar(r * ((working ? 5.2 : 4.2) + this.flash * 3 + (working ? 1.2 : 0) + this.failFlash * 4));
     this.shellMat.opacity = (0.14 + (working ? 0.08 : 0) + this.flash * 0.15) * vis;
     this.coreMat.opacity = vis;
 
@@ -290,8 +302,10 @@ export class Nebula {
     this.group.position.lerp(center, Math.min(1, dt * 3));
     this.radius += (radius - this.radius) * Math.min(1, dt * 2);
     const breathe = reduced ? 0 : Math.sin(t * 0.8 + this.seed);
-    this.cloud.scale.setScalar(this.radius * (3.2 + breathe * 0.15));
-    this.mat.opacity = (0.04 + breathe * 0.008) * (1 - dim * 0.7);
+    // Cluster fog trimmed ~40% in opacity and ~12% in radius: still a soft
+    // marker, but the geometric wirework inside is visible from further out.
+    this.cloud.scale.setScalar(this.radius * (2.8 + breathe * 0.12));
+    this.mat.opacity = (0.024 + breathe * 0.0048) * (1 - dim * 0.7);
     this.dust.scale.setScalar(this.radius * 1.25);
     if (!reduced) this.dust.rotation.y += dt * 0.05;
     this.dustMat.opacity = 0.32 * (1 - dim * 0.7);

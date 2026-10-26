@@ -23,7 +23,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 330;
+export const APP_VERSION = 337;
 
 class Store {
   constructor() {
@@ -34,7 +34,7 @@ class Store {
       currentConversation: null,
       settings: this._defaultSettings(),
       ui: {
-        activeTab: 'sessions',
+        activeTab: 'agents',
         thinkingOpen: false,
         terminalOpen: false,
         editingAgentId: null,
@@ -50,6 +50,11 @@ class Store {
   _defaultSettings() {
     return {
       theme: 'dark',
+      // Which desktop shell to wear: 'classic' (the left setup panel, the chat
+      // and the right map/network panel side by side -- the layout from before
+      // the desktop refresh) or 'desktop' (the Desktop 2026 glass shell).
+      // Absent or unrecognised counts as classic; the rule lives in ifaceMode.js.
+      interfaceMode: 'classic',
       temperature: 1.0,
       maxTokens: 16384,
       autoScroll: true,
@@ -87,9 +92,11 @@ class Store {
       dynamicTools: true,
       toolDialectMemo: true,
       toolDialectMap: {},
-      // API pool: rotate a provider's extra keys after N requests. Default OFF
-      // — the single provider key is used exactly as before until it is on.
-      apiPool: false,
+      // API pool: rotate a provider's extra keys after N requests. Default ON,
+      // because it only ever engages for a provider that actually carries a
+      // pool — with no pool keys it falls straight back to the single provider
+      // key, exactly as before.
+      apiPool: true,
       // Resource Manager (Config → Resource Manager). Every switch is OFF by
       // default, so the 3D graph keeps rendering continuously exactly as it did
       // before this existed; turning one on lets the app rest when it is not

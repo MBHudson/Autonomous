@@ -9,8 +9,634 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v330**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v337**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+---
+
+## 📸 README rebuilt around the two interfaces *(docs only — still v337)*
+
+- **The README now opens on the new UI.** `screenshots/new-ui-main.png` is the
+  hero, captioned as **Desktop 2026**; `screenshots/mainscreen01.png` follows
+  immediately as **Classic**, stated plainly to be **the default** and not a
+  legacy mode. Both are 1920×1080 and referenced relatively, so they render on
+  GitHub exactly as they do locally.
+- **Two new sections.** *Two interfaces, one switch* compares the shells row by
+  row with a layout sketch, and *Config → Desktop — the machine-room card* uses
+  `screenshots/desktop-settings.png` to walk every knob: a relative-cost ladder
+  (blur > detail > bloom > floor > fps > glow/motion > rotate), what the
+  performance preset writes and how it restores, and a full topography
+  explanation — the screen-space haze (v336), the pinned floor, why map detail is
+  manual now (the three-or-four "flashes" that used to degrade the lines), the
+  frame cap, idle auto-rotate — ending with a defaults table for Desktop, Labs
+  and Resource Manager.
+- **Security grew real detail.** §16 is now a **path × serving-mode matrix**
+  (`serve.php` / Apache / nginx / IIS) covering any-depth paths, case variants,
+  dotfiles, loose data files, the `/api/*` exemption and lookalike names, plus
+  *why* the nested-copy case exists and why Apache needs `RedirectMatch` where a
+  `RewriteRule` is silently replaced by the child `.htaccess`. New **§17** lists
+  the tests that request each path for real, and new **§18** documents the closed
+  browser-side defaults: no CORS wildcard (with `ROUTER_CORS_ORIGINS` as the
+  opt-in), the three security headers, and the `no-store` / `no-cache` policy.
+- **Corrected while passing through:** the API-pool default is **ON** (§14 and
+  the API-pool section — it stays inert without pool keys), the Config section
+  list now matches the app (Interface · Limits & Budgets · Permissions · Labs ·
+  Resource Manager · Throttle / Limiter · MCP Client · MCP Server + Desktop), the
+  IIS snippet blocks all five names, `mcpStdio` is in the tree, and the clean
+  copy's defaults point at the single defaults table instead of repeating it.
+
+---
+
+## v337 — shipped defaults for a weak GPU, and a genuinely clean copy
+
+- **The Desktop card now opens the way a low-powered machine wants it.** These
+  are the defaults a fresh install starts from; anything already saved in
+  `storage/state.json` is untouched, so an existing install keeps its own values
+  until a control is moved. Chat background **4%** (`d26ChatAlpha` 0.72 → 0.04),
+  glass blur **1px** (`d26Blur` 10 → 1), floor **pinned** (`topoFloorFixed` false
+  → true). Already at the requested end and left alone: tuck panels away **on**,
+  background fog **on**, bloom **on**, floating floor **on**, slow auto-rotate
+  **on**, glow and ambient motion **100%**, map detail **100%**, frame cap **60**,
+  performance mode **off**. The blur slider is pixels (0-24), not per cent, so
+  "2%" is half a pixel: 1px is the nearest whole step that still frosts rather
+  than switching the glass off. `desktop2026.css`'s `--d26-chat-alpha` /
+  `--d26-blur` fallbacks were brought to the same values so the first paint
+  matches what JS then sets.
+- **Labs:** API pool is now **on** by default (it only engages for a provider that
+  actually carries pool keys — `pickKey` returns null with an empty pool, so the
+  single provider key is used exactly as before), Dynamic tools **on**, Remember
+  the working dialect **on**, Keep Live running when hidden **on**, and the
+  built-in Browser **off** (already the server-side default: `browser.enabled`
+  absent or false). Resource Manager was already **all four switches off**; that
+  is unchanged and now covered by the defaults check in the clean copy.
+- **`cleancopy/` is now a clean, runnable copy of the current app.** It carries no
+  access token, no provider keys, no MCP servers, no saved state, no session
+  transcripts, no exec/MCP logs, no approvals file, no browser profile and no
+  `.htpasswd` — and it ships `storage/models.json` with the three hard-coded
+  model templates (ChatGPT-4 / Claude 3.5 / Gemini 2.0, endpoints intact,
+  `api_key` empty) plus `storage/.htaccess`, so it starts from a first-run state
+  that the app fills in itself. The reference archive, `Autonomous.zip`, the
+  editor folders and the handover notes are not part of it; its `.git` (the clone
+  of the upstream repo — the working folder has none) is preserved.
+- **`apacheGuards.test.php` could 500 on any nested checkout.** Apache reads
+  `.htaccess` files **above** DocumentRoot too, so a copy of the app sitting
+  *inside* another copy had the parent's file parsed as server config, where its
+  `<IfModule>` is illegal: `C:/…/router/.htaccess: <IfModule not allowed here`,
+  and every request in the document root answered 500 — 19 red assertions that
+  said nothing about the copy. The generated config now pins every ancestor of
+  the document root to `AllowOverride None`, so only the shipped `.htaccess`
+  files (root, `storage/`, `tests/`) are under test. Proof: nested copy before the
+  fix `19 failed, 16 passed`; after, `35 passed, 0 failed` (the archive-specific
+  assertions skip, since the archive is not shipped); the main tree still
+  `50 passed, 0 failed`.
+- **Version** bumped to v337 in `store.js` (`APP_VERSION`) and every `?v=` in
+  `index.html` and `ui/index.html`.
+
+---
+
+## v336 — the background fog stops travelling with the map
+
+- **The haze was a fog effect, not a backdrop.** `scene.fog` was active with
+  `fog.mode = 'bg'` and the scene background was a `HAZE → SPACE` gradient texture
+  whose vertical span was the map's own extent (`minY … maxY`). Fog is painted in
+  the map's eye space, so orbiting, zooming or dragging the chart carried the haze
+  along with the nodes it surrounded — and because the gradient was anchored to the
+  picture, it only ever covered the slice of the window the map happened to fill.
+- **The backdrop now paints itself, in screen space.** `scene.background` is a
+  `_skyTexture()` sized to the renderer (the same 512 px radial gradient, same six
+  stops — clear near the grid at the bottom, ~0.5 alpha at the top edge, darker than
+  the fog's old `fogColor` so the bottom keeps its contrast), and `scene.fog` is
+  `null` so nothing can smear it again. Background quads are drawn by the renderer
+  before any scene content and never move with the camera, so the haze reaches the
+  top of the viewport at every angle and never drifts.
+- **Nothing else changed.** The gradient's stops are untouched (same sizes, same
+  falloff), `fog: false` on the ground haze keeps it out of the removed fog's reach,
+  and **Background Only** still fills the window; turning fog off still gives a flat
+  `SPACE` colour, **Background + floor** still fogs the floor.
+- **Measured in the running app** (1400×900, real WebGL, left edge of the canvas to
+  stay clear of nodes): fog on, top-of-viewport pixel `rgb(20, 47, 72)`, 75% height
+  `rgb(19, 43, 67)`, bottom `rgb(4, 7, 12)` — the fade into the grid survives. After
+  a 49° orbit the top and 75% pixels are **byte-identical** while an off-centre world
+  point moved from NDC `(0.855, 0.104)` to `(0, −0.063)`, i.e. the view really
+  changed and the haze did not. Fog off → every sample is `rgb(4, 7, 12)` and the
+  background is a plain `Color`, so the toggle is intact.
+
+---
+
+## v335 — the Config tab stops locking the page up, and the guard stops eating /api/sessions
+
+- **A childList observer that fed itself.** `syncDesktopConfig()` was called from
+  the sidebar's mutation observer and always ran `syncSkinOnly()` →
+  `syncFloorControls()`, which assigned `out.textContent = …`. Assigning
+  `textContent` replaces a text node, which is a childList mutation, so the
+  observer fired again on its own write — forever. With the Config tab open, any
+  sidebar mutation (the Resource Manager CPU readout ticks ~3.5×/s) started an
+  endless loop and Chrome killed the page: *Script terminated by timeout at
+  syncSkinOnly … syncDesktopConfig … MutationCallback*.
+- **Fixed at the source, twice over.** The observer now returns immediately when
+  the Desktop card is already in place — it does no work, so it cannot re-enter —
+  and `syncDesktopConfig()` on its own only injects a missing card. The floor label
+  is written only when the string actually changes, so no future caller can feed a
+  mutation back into the same observer. `sync()` now calls `syncSkinOnly()`
+  explicitly, since the observer no longer does it for free.
+- **Measured after the fix:** two seconds idle on the Config tab produce only the
+  Resource Manager readout mutations (`rmValCpu`, `sbRmReadout`), the Desktop card
+  is the same DOM node throughout, and both shell switches, the floor-fix label
+  and narrow/wide transitions still work. The page stays responsive.
+- **The any-depth guard was refusing `/api/sessions`.** That path is the session
+  LIST, not the storage folder: `serve.php` answered 403 with its `Forbidden` page,
+  the API client could not parse it, and the sidebar reported *API 403: the server
+  sent a web page instead of JSON*. The nginx rule and the Apache `RedirectMatch`
+  had the same collision. In all three modes the segment rule now skips the API
+  namespace — `$isApiRoute` in `serve.php`, a `(?!api/)` lookahead in
+  `nginx.example.conf` and in the root `.htaccess` — because API routes are
+  endpoints, not files: the handlers open `storage/` themselves, server-side.
+- Each mode has a test that would have caught it: `guards.test.php` asserts
+  `/api`, `/api/sessions`, `/api/config` and `/api/state` are never refused and are
+  never answered with the guard page (86 assertions), `nginxGuards.test.php` lists
+  three API routes as must-serve (58), and `apacheGuards.test.php` asserts three
+  API paths are not 403 (50).
+
+---
+
+## v335 — the interface is a choice again: Classic by default, Desktop 2026 on request
+
+- **Two shells, one switch.** Config → Interface now carries an **Interface**
+  picker. **Classic** is the default and is the layout from before the desktop
+  refresh: the left setup panel, the chat and the right map/network panel side by
+  side, with nothing tucked away. **Desktop 2026** is the glass shell that used to
+  arrive on its own at 1025px — floating cards on a rail, Config in drawers that
+  fly out of their labels, a wider chat.
+- **Silence means Classic.** The rule lives in the new `ui/js/ifaceMode.js`: any
+  value that is not an explicit `desktop` — absent, empty, stale, misspelled —
+  resolves to Classic. A fresh install and every existing profile therefore start
+  Classic on the next load, with nothing migrated and no setting rewritten behind
+  the operator.
+- **Width still decides for itself.** Below 1025px both shells hand over to the
+  same slide-over drawer layout that `layout.css` owns alone, so the switch can
+  only ever put the glass on a window wide enough to hold it. The phone view is
+  untouched in either mode.
+- **No reload, nothing lost.** Changing the picker applies at once (the skin
+  listens for the change) and is written through immediately, so it survives a
+  reload even if SAVE is never pressed. Every feature works in both shells — map
+  detail, floor pinning, the performance preset, the `/` palette, the streaming
+  fixes; only the glass goes away.
+- **The Desktop card now exists in both shells.** It used to be injected by the
+  skin, so choosing Classic would have removed the only controls for map detail,
+  FPS, fog, bloom, floor pinning and performance mode. It is kept in the Config
+  tab in either mode; the six rows that address the glass itself (panel tucking,
+  chat background, glass blur, glow, ambient motion, floating floor) stay visible
+  with their saved values and are disabled in Classic, under a line that says so.
+- **The floating floor can no longer leave Classic mapless.** With the shell off
+  there is no injected floor layer, so `applyFloor()` no longer hides the scene's
+  own polar grid in favour of one that is not there: Classic always draws its
+  grid, and *Fix the floor in place* is enabled there (it holds that grid) rather
+  than being disabled by a floating-floor setting Classic does not have.
+- Covered by `tests/js/ifaceMode.test.mjs` (37 assertions: the default, every
+  spelling that must not upgrade the shell, and the narrow-window rule). The
+  archive at `the-copy-before-the-huge-ui-change/` was used only to confirm the
+  change was additive — `layout.css`, `chat.css` and `base.css` are identical
+  there, so Classic needs no duplicated front end. It is not a second copy of the
+  app: nothing loads from it, and it is 588 MB including its own `storage/`.
+- **The `storage`/`tests` refusal now holds at any depth.** Verified while
+  adding the archive: `serve.php` only checked the root of the path, so
+  `/the-copy-before-the-huge-ui-change/storage/config.json` came back **200**
+  with the old config (token and keys) while `/storage/config.json` was 403. The
+  router now refuses those names as any path segment, case-insensitively, and
+  `guards.test.php` has four nested cases (`/a-copy-of-the-app/storage/config.json`,
+  a nested case variant, a nested transcript, nested dev tooling) so it cannot
+  slide back. App files inside a nested copy are still served — only the data
+  folders are refused.
+- **The same hole in `nginx.example.conf`, closed the same way.** Its rules
+  anchored on `^/router/(storage|logs|tmp|sessions|tests)/`, so only the app's own
+  folders were guarded: a nested copy's bare `storage/`, and the extension-less
+  files under it (`storage/browser-profile/` — the Chromium cookie jar), were
+  readable. Its `.json/.log/.ini` files were already caught by the loose-data rule,
+  which is why this narrower hole went unnoticed. The two folder rules are now one
+  case-insensitive rule matching those names as any path segment —
+  `^/router/(.+/)?(storage|logs|tmp|sessions|tests)(/|$)` — which also covers the
+  bare folder with or without a trailing slash (the old pair needed 1b for that).
+  `tests/php/nginxGuards.test.php` now pins it: it lifts the regexes out of the
+  shipped file and runs them through PCRE (the engine nginx itself uses, so no
+  nginx binary is needed): 37 refused URIs, a real session transcript too when one
+  exists, and 15 that must still be served — including `ui/js/storage.js`,
+  `ui/js/tests.js`, `mytests/run.mjs`, `storagelike/` and the `/.well-known/` ACME
+  exception. Put the old anchored rule  back and 7 of them fail, including the bare nested folder and nested tooling; the
+  file was restored byte-identically (sha256 checked) and all 55 pass again.
+- **Apache had the same gap, and it was the worst of the three.** Booting the
+  local XAMPP Apache (2.4.58) with this project as DocumentRoot and
+  `AllowOverride All`, the archive's `storage/` was refused by its own
+  `storage/.htaccess` — but `…/the-copy-before-the-huge-ui-change/tests/php/sandbox.test.php`
+  came back **200, in full, PHP source included**, and `tests/js/context.test.mjs`
+  returned its `import` lines. That copy predates `tests/.htaccess`, and the app
+  root `.htaccess` had no path rule at all.
+- **A root `RewriteRule` does not fix it.** Verified with a rewrite trace: once a
+  request maps into the copy's directory, its own root `.htaccess` takes over and
+  the parent's rewrite rules are skipped (per-directory rewrites are not inherited
+  without `RewriteOptions Inherit`). mod_alias config IS merged normally, so the
+  root `.htaccess` now carries `RedirectMatch 403 (?i)^/(?:.*/)?(?:storage|logs|tmp|sessions|tests)(?:/|$)`,
+  inside `<IfModule mod_alias.c>` so a host without the module skips it rather than
+  failing to parse. mod_alias has shipped with Apache since 1.3 and `RedirectMatch`
+  sees the full URL-path, which is what the nested case needs — the alternative,
+  `<If>`, only became legal in `.htaccess` in later 2.4 releases. The `RewriteRule`
+  stays as the cheap root-level path; segment anchoring keeps `/testsuite/`,
+  `/ui/js/tests.js` and `/storagelike/` out of both.
+- `apacheGuards.test.php` covers the copy: nested config, state, both bare folders,
+  the cookie jar under `browser-profile/` (no extension, so only a folder rule
+  protects it), nested PHP and JS tooling, and an upper-case spelling — while
+  asserting a nested copy's `ui/js/store.js` still serves and names that merely
+  contain a guarded word are not blocked. 47 assertions, up from 28. Deleting the
+  `RedirectMatch` block and re-running fails 7 of them (`nested PHP tooling is
+  denied (got 200, want 403)` among them); restored from a hash-checked copy, 47
+  pass again. The test's minimal Apache config now loads `mod_alias` too, since
+  every stock httpd.conf does.
+
+---
+
+## v335 — the "/" palette answers to how an agent is actually written
+
+- **A code can be typed without its hash.** Codes are displayed as `#B8NL6F`, so
+  the hash reads as part of the handle — but the palette compared what you typed
+  against the stored value *including* the `#`, so `/B8NL6F` listed nothing while
+  `/#B8NL6F` worked. `agentSearch.js` normalises both sides the same way
+  `routing.js` already did, so either spelling finds the agent.
+- **Any word of a name matches, not just its first.** `/north` found
+  `North-mini` but `/mini` did not; `/light` missed `nemotron-lightning` and
+  `/alpha` missed `Ox Alpha`. The palette now matches the whole name, each
+  word of it, and each segment of a hyphenated or versioned model name
+  (`/m3.1` and `/flash` both find `minimax-m3.1-flash`).
+- **The palette can no longer stop appearing silently.** It kept the element it
+  was built into and the textarea it read from, so a rebuilt chat area left both
+  pointing at detached nodes: typing then rendered the list into a panel nobody
+  could see, with no error. `_render()` now rebuilds a panel that has left the
+  document, the input is re-resolved when it has gone, and two instances on one
+  textarea (an init that ran twice) resolve to one — the newest takes the box and
+  disposes the older, instead of stacking a stale copy over it.
+- The matching rule moved into `ui/js/agentSearch.js`, which imports nothing and
+  touches no browser global, so it is covered by `tests/js/agentSearch.test.mjs`
+  (36 assertions: hash and no hash, every word of a name, roles, and the
+  negative cases). `node tests/run.mjs` runs it with the rest: 8 JS files, 221
+  assertions, plus the PHP suite.
+
+---
+
+## v335 — the fallback floor can be fixed in place, and no longer drags with an orbit
+
+- **Why it moved.** With the floating floor off, the grid you get is a real
+  object in the 3D scene, sitting at a real height along with the graph — so an
+  orbit carried it around with the camera, and a low angle flattened it into a
+  line. It was never the still backdrop the DOM floor is.
+- **Desktop → Fix the floor in place** (Config tab, Desktop section, under
+  Floating floor). On, `_pinGrid()` re-places the polar grid in camera space each
+  frame, sized and pitched like the DOM floor: a 150vmax disc centred 10% below
+  the middle of the view. The same spot at every orbit angle, pan and zoom, while
+  the graph itself stays fully orbitable, draggable and zoomable. Measured: after
+  a 35° orbit and a 3× zoom, every sampled point of the grid projected to the same
+  pixel as before.
+- **`setGridFixed()` / `setFloor()` share the transform.** While pinned, the
+  follow lerp stops writing to the grid, so the auto-fit cannot nudge it; its
+  target is still recorded, and releasing the pin lands on the world pose instead
+  of sliding back to it. Fog is skipped on the grid while it is pinned (at a fixed
+  camera distance it would only dim evenly, or erase it in "background only"
+  mode), and restored when it is released.
+- **The disc is clamped to stay in front of the camera.** At a 74° pitch 96% of
+  its radius comes back toward the viewer, so geometry behind the near plane — the
+  cause of the tearing a full-bleed fixed floor would show — is avoided by holding
+  its near edge at least 35% of the placement distance away; it spans about three
+  quarters of the window at 1500×900.
+- **The control only applies to the fallback grid**, so it is disabled (keeping
+  its value) while the floating floor is the one on screen, and says why:
+  "floating floor is on" / "pinned" / "moves with the map".
+
+---
+
+## v335 — the map keeps its detail, and one control lowers it on purpose
+
+- **The pixelation was the map lowering its own resolution.** `SceneCore` shipped
+  an adaptive render scale: every 1.5s it sampled the GPU timer (or frame time)
+  and stepped the internal resolution down one rung — 100% → 85% → 70% → 55% →
+  42% — whenever a frame ran long. Every rung re-set the renderer's pixel ratio
+  and re-sized the composer, which is the flash or refresh you saw, and the map
+  never came back up unless the machine was comfortably fast. On a slower GPU
+  that is four steps within the first ~6s, so the lines went soft a few seconds
+  after load and stayed that way.
+- **`_adapt()` is gone.** Nothing steps the map's resolution behind your back
+  any more; the scene renders at one scale from load until you change it. The
+  scale is now an explicit setting, read once by `_applyTopoSettings()`.
+- **Desktop → Map detail** (Config tab, Desktop section): 100 / 85 / 70 / 55 /
+  42%, shown as a slider with its value beside the label. `setQuality()` in
+  `scene.js` snaps to the nearest rung and does nothing when it is already there,
+  so re-applying the setting never re-sizes or flickers the composer. Lowering it
+  is the GPU win the old adaptive scale was reaching for — it draws the same map,
+  fewer pixels deep.
+- **Performance mode includes it now** (70%), so the one-click cheap preset
+  still cuts fill rate; switching the preset off restores whatever value you had,
+  and the slider always shows the truth either way.
+
+---
+
+## v335 — the config drawer closes once, and a press outside closes it
+
+- **The re-open.** Closing an expanded section from the left stack retracted,
+  then the panel popped back in about four fifths of the way through and
+  vanished again. `closeFly()` clears `fly` immediately (so a click during the
+  animation is not read as "still out"), but the Config tab repaints its live
+  status lines, and every repaint runs `decorate()` → `syncFly()`, which saw the
+  section still `open` for the rest of the 440ms retract and opened it again.
+  A new `closing` reference (`desktop2026.js`) remembers what is retracting, and
+  `syncFly()` now skips it; its `done()` also stands down if a drawer has taken
+  the section back.
+- **One animation at a time.** `stopAnimating()` cancels a clip animation still
+  running on the drawer before starting the next one, so a close begun while the
+  open was still playing can no longer leave two animations fighting over
+  `clip-path`, with whichever ends last deciding what stays on screen.
+- **A press anywhere else closes the expanded section**, in both layouts. The
+  desktop skin already did (a `pointerdown` outside the drawer); the plain
+  accordion below 1025px now does too (`sidebar.js`), and skips itself while the
+  skin is active because that close is animated and needs `<details>` open.
+- **The rule moved out of the DOM so it can be tested.** `drawerState.js` now
+  owns "which section's drawer should be out" as `planDrawer()`, with no DOM and
+  no imports; the skin passes the section elements in and gets them back. It is
+  the same rule, including the `closing` gate above.
+- **`tests/js/drawerState.test.mjs` pins the race** — 21 assertions: the named
+  cases (a repaint mid-close, a click mid-close, clicking the retracting section,
+  a finished close, a swap, a click that closed its own section) plus every
+  combination of open-set × current × closing × clicked (512), asserting no
+  combination ever opens the retracting section, never folds up the outgoing or
+  the incoming drawer, always retracts before opening, and always obeys a click
+  on an open section. Proved to fail: dropping the `closing` filter reproduces
+  the original bug (`open=[A] current=null closing=A -> target A`) and fails 6.
+- **The retract goes back to the label in one move.** Closing used to play the
+  open's keyframes backwards: the panel folded up into a full-width bar and only
+  then wiped away leftwards, and for a section low enough that `placeFly()` had
+  raised the drawer, that bar sat on the drawer's top instead of the label's row.
+  `closeFrames()` now collapses both axes at once onto a 44px band on the label's
+  own row, at the stack's edge, and `labelBand()` gives the open the same origin
+  (`flyFrames()` takes the band offset), so open and close are mirror images.
+
+---
+
+## v335 — a finished reply never commits raw tool-call JSON
+
+- **The leak.** When a turn ended without prose (out of steps, out of time, or
+  stopped right after a call), the fallback committed `turnText` — the run's raw
+  stream — so the transcript could end up holding
+  `{"tool":"read_file","arg":{…}}` as the answer, duplicating the tool panel in a
+  shape that reads like an unfinished reply.
+- **Two accumulators, two jobs.** `node.turnText` stays the raw stream and is what
+  the live bubble paints (the operator asked to see everything while it runs).
+  `node.turnProse` is the same steps with the markup cut out, and it is the only
+  thing the finished message falls back to.
+- **`stripToolCall()` in `tools.js`** does the cutting, next to the parser that
+  owns the dialects: it removes fenced call blocks, XML/native wrappers
+  (`<invoke>`, `<function>`, `<tool_call>`, Qwen `tool_call_begin`), and bare
+  balanced JSON objects — each removal validated by `_parseToolCall()`, so prose
+  containing braces or angle brackets is left untouched. It walks past non-call
+  objects instead of stopping at the first `{`.
+- **An out-of-budget turn now returns prose (possibly none)** instead of the raw
+  stream, so `_finalMsg()` turns a call-only run into the "finished after running
+  N tool calls" notice.
+- **`tests/js/stripToolCall.test.mjs`** pins it: 27 DOM-free assertions over every
+  markup shape (JSON, fenced JSON, `<invoke>`/`<function_calls>`, the three Qwen
+  spellings), plus the cases that must be left alone — ordinary code blocks,
+  brace-and-angle-bracket prose, and an object naming no known tool. Verified to
+  fail (15 assertions) against a no-op `stripToolCall`, so it cannot pass by
+  accident.
+- **`node tests/js/run.mjs`** runs the whole JS suite in one step: each
+  `*.test.mjs` in its own Node process, a line per file with its own count, full
+  output for failures, and a non-zero exit if any file failed (6 files, 164
+  assertions today). Its own filename does not match `*.test.mjs`, so it is never
+  picked up as a test.
+- **`php tests/php/run.php`** does the same for the PHP suite (7 files, 265
+  assertions): each `*.test.php` in its own PHP process via `PHP_BINARY`.
+  `mcp-mock-server.php` stays a helper — it is not named `*.test.php`.
+- **`tests/php/apacheGuards.test.php` — the `.htaccess` denial is tested too,**
+  not just the router in `serve.php`. It writes a throwaway Apache config (free
+  loopback port, `DocumentRoot` at this project, `AllowOverride All`, only the
+  modules the shipped `.htaccess` files need — each added only when its `.so`
+  exists, since loading a compiled-in module is fatal), boots the local Apache,
+  asserts, and shuts it down; config, logs, pidfile all in the system temp dir and
+  removed afterwards. It **skips** (exit 0, `SKIP:` line) when there is no Apache
+  to boot, with `ROUTER_HTTPD` as the override.
+  - **tests:** `/tests/js/run.mjs`, a JS test, `/tests/php/run.php`, this test
+    itself, `tests/.htaccess`, `/tests`, `/tests/`; `/storage/state.json`,
+    `/storage/config.json`, `storage/.htaccess`, `/storage`, `/storage/`,
+    `/storage/sessions/`. Each denied path is checked for **403** *and* for the
+    absence of that file's own content in the error body (Apache answers with an
+    HTML error page, so "tiny body" is not available here).
+  - **case variants** (`/Tests/…`, `/TESTS/`) accept **403 or 404**: Windows and
+    macOS resolve them to the real folder, Linux does not.
+  - **still served, checked by content:** `/` (real `index.html`) and
+    `/ui/js/store.js` (`APP_VERSION`).
+  - **no overreach:** `/testsuite/missing` must not be 403.
+- **Proved it fails:** removing `tests/.htaccess` → exit 1, **11 failures**, with
+  the JS and PHP test sources served; removing `storage/.htaccess` → exit 1,
+  **7 failures**, with `state.json` and `config.json` served and `/storage`
+  answering **301** (a listing). Both files were restored byte-identical (`cmp`)
+  and the suite went back to green.
+- **`tests/php/guards.test.php` — the guards are now tested, not just written.**
+  It starts `php -S 127.0.0.1:<free port> serve.php` from the project root, makes
+  real requests, and stops the server (a shutdown function kills it even on a
+  fatal). 70 assertions, each blocked path checked **twice**: the status must be
+  **403**, and the body must be the router's own nine-byte `Forbidden` — anything
+  larger means content came with it.
+  - **tests:** the two runners, a JS test, `guards.test.php` itself, the folder
+    with and without a slash, and the case variants `/TESTS/…`, `/Tests/…`.
+  - **storage and its neighbours:** `state.json`, `config.json`, the bare folder,
+    `sessions/`, a missing transcript, a `.bak` dropped in there, `/STORAGE/…`, and
+    **a real transcript by its real name** (globbed from the disk, skipped cleanly
+    when a checkout has none).
+  - **the other refused dirs:** `logs/`, a log file, `tmp/`, `/sessions/` and a
+    session file at the root.
+  - **dotfiles:** `/.htaccess`, `/.htpasswd`, `/.gitattributes`, `/.env`,
+    `/.git/config`, `storage/.htaccess`, `tests/.htaccess`, `api/.htaccess`, and a
+    dotfile inside an already-refused folder.
+  - **still served, checked by content:** `/`, `/index.html`, `/ui/js/store.js`,
+    `/ui/css/base.css`.
+  - **no overreach:** `/testsuite/missing` and `/ui/index.html` (a dot that is only
+    part of a filename) are not blocked.
+  Loopback only, no curl extension (this machine has none), no token, and it never
+  writes to `storage/`.
+- **Proved it fails when it should** — three mutations, each restored byte-for-byte
+  (`cmp`) and re-run green:
+  - drop `'/tests'` → exit 1, 6 failures;
+  - make the prefix match case-sensitive → exit 1 on exactly the two case variants;
+  - disable the dotfile rule → exit 1, 12 failures, including `.htaccess` served
+    with **1871 bytes** and `.htpasswd` with **67**;
+  - drop `'/storage'` → exit 1, 18 failures, including `state.json` served with
+    **1,339,033 bytes** and `config.json` (token + keys) with **334**. The test
+    prints body *lengths* only, never body content, so a failing run cannot spill
+    secrets into a log.
+- **`node tests/run.mjs`** runs both: `$PHP_BINARY` or `php` on PATH, then Node,
+  each suite keeping its own runner so it can still be run alone. A suite whose
+  interpreter is missing is reported as **did not run and fails the command**,
+  never as a pass (verified: with a broken `PHP_BINARY` the JS suite still runs
+  and the exit code is 1).
+- **README → 🧪 Tests** documents all three commands, the naming rule that
+  registers a test, the exit-code contract, the `PHP_BINARY` fallback, and the
+  the two cases that **skip** rather than pass: `sandbox.test.php` when git is
+  unavailable or refused, and `guards.test.php` when `proc_open` is disabled or
+  no loopback port can be bound (and, for the transcript case, when a checkout
+  has no `storage/sessions/*.json` yet). The architecture tree now lists the two
+  runners as well. Suite now: 14 files, 450 assertions (PHP 265 + JS 185), ~9s
+  (two of the PHP files boot a real server).
+- **The section leads with what `tests/` is NOT:** optional dev tooling that the
+  app never loads, needing no `package.json`, no `node_modules` and no install —
+  the app stays plain PHP and drag-and-drop — and says where the folder is
+  blocked and where it is not.
+- **The same denial now exists in every serving mode.** `tests/.htaccess` ships
+  with the app (the same portable `Require all denied` + Apache 2.2 fallback as
+  `storage/.htaccess`), and `nginx.example.conf` denies
+  `/router/(storage|logs|tmp|sessions|tests)/` plus the bare folder. **Verified
+  against a real XAMPP Apache 2.4.58** serving this folder with `AllowOverride
+  All`: `/tests/js/run.mjs`, `/tests/php/run.php`, `/tests/`, `/tests` and the
+  case variant `/Tests/js/run.mjs` all returned **403** from Apache itself, while
+  `/`, `/index.html` and `/ui/js/store.js` stayed **200** and `/storage/*` stayed
+  **403**. (That Apache instance had no PHP handler wired up, so the 403s are the
+  access rules, not PHP.) The nginx regexes were exercised against sample URIs
+  with PCRE: `tests/`, `tests/js/run.mjs` and bare `tests` match,
+  `testsuite/x` does not.
+- **`serve.php` refuses `/tests`** exactly as it refuses `/storage`, `/logs`,
+  `/tmp` and `/sessions`, so `tests/js/*.mjs` (previously served as static text)
+  and the PHP test scripts both answer 403. That prefix list is now matched
+  **case-insensitively**: on Windows and macOS the disk is case-insensitive, so
+  `/STORAGE/state.json` and `/TESTS/js/run.mjs` used to resolve to the real files
+  and slip past a case-sensitive check. The `.php` guard was left comparing the
+  exact `$uri`, because `/API/index.php` is a case variant of the front controller
+  and serving it as a file would print PHP source. Verified over HTTP: `/tests`,
+  `/tests/`, `/tests/js/run.mjs?x=1`, `/TESTS/js/run.mjs`, `/Tests/php/run.php`,
+  `/storage/state.json` and `/STORAGE/state.json` all 403; `/`, `/index.html`,
+  `/ui/js/store.js?v=335` and `/api/index.php` still 200.
+
+---
+
+## v334 — streaming stays cheap as the bubble grows
+
+- **The cost.** v333 made the live bubble hold the whole run, but it was still one
+  string rewritten on every token, so a long turn recopied everything it had said
+  for each new token — work that grows with the length of the turn.
+- **The bubble is now three text nodes**: the run's settled prose, a paragraph gap
+  that exists only once there are two blocks, and the step in flight.
+  `_paintProse()` writes each only when it changed, so the settled block is written
+  once per step instead of once per token, and a token touches only its own tail.
+- **Nothing changes on screen.** They live inside the same `white-space: pre-wrap`
+  element and the join is still `joinProse()`, so `textContent` is byte-identical to
+  v333, the streaming caret (a `::after` on the same element) still sits after the
+  last token, and `node.text` still mirrors the whole stream for the abort paths.
+- A node not created by `_makeLiveNode` still paints the old single-string way, so
+  no other caller has to change.
+
+---
+
+## v333 — the live reply reads continuously across tool steps
+
+- **The bug.** The streaming bubble painted only the CURRENT step's stream, so
+every tool call wiped the prose the operator had just watched arrive and the
+bubble collapsed back to the newest few words. A working turn looked like it
+kept starting over, and an aborted turn kept only the final step's fragment.
+- **One accumulator owns the run's prose.** `node.turnText` is the run's settled
+prose; `_paintProse()` paints `turnText` plus the step in flight, joined with a
+paragraph gap, and is now the only writer of the bubble's text. `_paintStream()`
+delegates to it, so the composer, always-on, ask-directly and routing-chart paths
+all paint identically.
+- **It survives the round boundary too.** `_toolLoop()` seeds `turnText` from the
+live node instead of `''`, so `_runToCompletion()`'s next round continues the same
+answer rather than resetting the bubble it is still writing into.
+- **`node.text` mirrors what is on screen**, so the abort paths that keep
+"whatever streamed" keep the whole turn, not the last step's fragment. The
+`painted` accumulator, which existed only to rebuild that display string, is gone.
+- The finished message is unchanged: it is still the model's last answer, with
+`turnText` as the fallback when a turn ends without one.
+
+---
+
+## v332 — replies can no longer vanish when they finish
+
+- **The bug.** A finished turn could be committed with `content: ''`: `text` only
+  ever held the CURRENT step's stream (each step starts a fresh one), so a turn
+  that ended on a tool call — or was cut short by the step/time budget — returned
+  no text of its own. `sendMessage()` then did `result.value.content ??
+  result.value.text`, which `??` does not fall back for, and `''` is an empty
+  string, so the blank answer was accepted. The renderer produced an empty
+  bubble, which replaced the streaming node *at the moment the reply finished*,
+  and the same `''` was what `_saveDialog` sent to the server — which is why
+  reloading did not bring it back either.
+- **Each run now owns its turn and its text.**
+  - `_liveNodes` is keyed by a **turn id**, not by agent. Before, a second run for
+    the same agent (composer fan-out, always-on tick, ask-from-a-node,
+    routing-chart workflow) deleted the first run's node and the finishing run
+    wrote into whatever node the map held at completion. The fan-out now creates
+    and captures its node at dispatch and commits to that exact node.
+  - `_toolLoop()` keeps `turnText` — every step's prose in the run — so the
+    finished message can fall back to everything the operator watched arrive.
+- **One commit point, and it cannot produce a blank.** `_replaceLiveNode()` now:
+  normalises the message through `_finalMsg()` (last answer → streamed text →
+  “finished after running N tool calls…” → “finished without writing a reply”);
+  removes its node from `_liveNodes` by turn id; and **appends** the message when
+  its node is detached instead of silently `return`ing. A detached node (session
+  reload, cleared transcript, an overlapping run) used to drop the reply from the
+  screen *and* from the stored conversation. `_addMessage()` refuses a blank agent
+  bubble for the same reason, and the routing chart / ask-directly / always-on
+  paths all commit through this one function now that it handles that case.
+- **Always-on stopped leaving a stranded stream.** It appended with `_addMessage`
+  and never replaced the streaming node it had created, so an autonomous reply
+  left a caret blinking forever and a second bubble next to it. It commits through
+  `_replaceLiveNode` like every other run.
+- **No more duplicate history.** `_saveDialog()` pushed the user turn and every
+  reply into `conv.messages` a second time (the render path already recorded
+  them), so stored conversations accumulated duplicates that re-rendered on the
+  next session open. It now only saves to the server and touches freshness.
+- **`MessageRenderer.render()` always returns a whole message.** With “Show Code”
+  off it returned a bare `.message-body` — no wrapper, no header, no actions — so a
+  streaming placeholder was being swapped for a different kind of element.
+- Cache-buster 331 -> 332.
+
+---
+
+## v331 — performance mode, and a render scale that actually scales
+
+- **The adaptive render scale was a no-op — this is the 99% GPU bug.**
+  `EffectComposer` caches the renderer's pixel ratio at construction and only
+  refreshes it in `reset()`/`setPixelRatio()`, but `SceneCore._setScale()` changed
+  the renderer alone. So the scene, the bloom mip chain and every pass kept
+  rendering at the **original** 1.5x resolution however far the scale stepped
+  down, and only the final blit shrank. The composer is now told the ratio
+  explicitly, which is what makes the existing "step down when the frame is over
+  budget" logic real. (`resize()` also stopped sizing bloom a second time — the
+  composer already sizes every pass — so a resize no longer rebuilds its render
+  targets twice.)
+- **No per-frame allocation in the map's hot paths.**
+  - `_updateLinks()` reuses grow-only position/colour buffers instead of
+    allocating two `Float32Array`s and two fresh GPU attributes on every frame
+    the force layout is settling (and no longer recomputes a bounding sphere the
+    object does not cull against).
+  - `Beam.setEnds()` copies the new tube into the existing attributes instead of
+    disposing and reallocating a `TubeGeometry`, and the rebuild key quantises the
+    radius (it eases on every phase change, so a 2-decimal key rebuilt the whole
+    tube nearly every frame for a 0.16-unit difference).
+  - `LabelLayer.place()` writes `transform`/`opacity` only when they change and
+    buckets `zIndex` to 0.02 of NDC z, so a slow camera drift no longer forces a
+    style recalc for every label every frame.
+- **Two knobs that lied now do what they say.** Glass blur at **0** emits
+  `backdrop-filter: none` instead of `blur(0px)` — the zero position used to keep
+  the compositing layer (and its per-frame re-blur of the live map) alive. Ambient
+  motion at **0** actually stops: the old `Math.max(0.05, ...)` clamp left every
+  loop running at 1/20 speed, which still repainted every frame.
+- **New, ordinary controls in Desktop → Config**, each one reversible on its own:
+  **Bloom glow**, **Floating floor** (falls back to the cheap in-scene polar
+  grid) and **Slow auto-rotate** (the idle camera drift, which is what used to
+  keep the whole scene — and everything composited over it — permanently busy).
+- **Performance mode** preset at the top of Desktop → Config (and it is *not* a
+  second set of visual state): it writes the same settings those controls already
+  own — blur 0, glow 0, motion 0, fog off, 30fps, bloom/floor/drift off, plus the
+  Resource Manager's idle throttle and covered-panel pause — and puts them back
+  when switched off. A value you move by hand while it is on is kept when it is
+  switched off, and it only ever *tightens*: a machine already running at 20fps
+  and an idle floor of 5fps keeps both.
+- **The floating floor can be switched off at all now.** `html.d26 .d26-floor
+  { display: block }` outranked the `[hidden]` attribute, so hiding it did
+  nothing.
+- Cache-buster 330 -> 331.
 
 ---
 

@@ -16,9 +16,13 @@
 //     web, which matters because one of the commands writes the access token.
 //   * cli-server: the request router. Replicates what .htaccess does under
 //     Apache, because there is no Apache here:
-//       - /storage, /logs, /tmp, /sessions and dotfiles: refused (403), always.
-//         storage/ holds the access token and API keys; Apache denies it via
-//         storage/.htaccess, and this is the equivalent here. Do not relax this.
+//       - storage, logs, tmp, sessions, tests and dotfiles: refused (403),
+//         always, at any depth -- a nested copy of the app has its own storage/
+//         holding the same keys. storage/ holds the access token and API keys;
+//         Apache denies it via storage/.htaccess, and this is the equivalent
+//         here. tests/ is dev
+//         tooling the app never loads -- its .mjs sources are ordinary static
+//         text, so without this they were simply handed out. Do not relax this.
 //       - /api/* (except direct .php): the api/index.php front controller.
 //       - anywhere.php except /api/index.php: refused. Under php -S a requested
 //         .php file would otherwise execute, including src/ classes.
@@ -241,13 +245,29 @@ $ROOT = __DIR__;
 $uri = parse_url(isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/', PHP_URL_PATH);
 if (!is_string($uri) || $uri === '') { $uri = '/'; }
 
-// 1. Never serve these, ever.
-foreach (array('/storage', '/logs', '/tmp', '/sessions') as $prefix) {
-    if ($uri === $prefix || strpos($uri, $prefix . '/') === 0) {
-        http_response_code(403);
-        header('Content-Type: text/plain');
-        echo "Forbidden\n";
-        return true;
+// 1. Never serve these, ever. Compared case-insensitively: on Windows and
+//    macOS the disk is case-insensitive, so /STORAGE/state.json would have
+//    resolved to the real file and slipped through a case-sensitive check.
+//
+//    Checked at ANY depth, not just at the root. A nested copy of the app -- an
+//    archive of an older version, a backup, a folder someone dropped in to
+//    compare against -- carries its own storage/ with the same config.json,
+//    tokens and sessions in it, and a root-only check happily served those.
+//
+//    API routes are exempt: they are endpoints, not files. The UI calls
+//    /api/sessions for the session LIST, and refusing that because "sessions"
+//    looks like the folder broke loading the sidebar. No API route maps onto a
+//    path from disk -- handlers open storage/ themselves, server-side.
+$lowerUri = strtolower($uri);
+$isApiRoute = ($lowerUri === '/api' || strpos($lowerUri, '/api/') === 0);
+if (!$isApiRoute) {
+    foreach (explode('/', $lowerUri) as $part) {
+        if ($part !== '' && in_array($part, array('storage', 'logs', 'tmp', 'sessions', 'tests'), true)) {
+            http_response_code(403);
+            header('Content-Type: text/plain');
+            echo "Forbidden\n";
+            return true;
+        }
     }
 }
 foreach (explode('/', $uri) as $part) {
@@ -258,7 +278,8 @@ foreach (explode('/', $uri) as $part) {
         return true;
     }
 }
-$lowerUri = strtolower($uri);
+// Exact $uri, not the lower-cased copy: /API/index.php is a case variant of the
+// front controller, and serving it as a static file would print PHP source.
 if (substr($lowerUri, -4) === '.php' && $uri !== '/api/index.php') {
     http_response_code(403);
     header('Content-Type: text/plain');

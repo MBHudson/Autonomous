@@ -10,9 +10,9 @@
 // TOPOLOGY.JS — SVG network graph
 // ============================================
 
-import { store } from '../store.js?v=330';
-import { api } from '../api.js?v=330';
-import { esc, agentCode } from '../utils.js?v=330';
+import { store } from '../store.js?v=337';
+import { api } from '../api.js?v=337';
+import { esc, agentCode } from '../utils.js?v=337';
 
 // How long a hop stays bright while in flight, and how long it then lingers as
 // a faint record of the exchange before it fades out and is dropped.
@@ -371,13 +371,18 @@ export class TopologyGraph {
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
 
-    // Shared defs: soft bloom for neon glow
-    svg += `<defs><filter id="bloom" x="-60%" y="-60%" width="220%" height="220%">`
-      + `<feGaussianBlur stdDeviation="1.6" result="b"/>`
-      + `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>`
-      + `</filter></defs>`;
+    // Per-node soft glow used to be an feGaussianBlur filter on every circle.
+    // The circles pulse (animate r / fill-opacity) every frame, so the browser
+    // re-ran the blur for every node on every frame -- the single biggest GPU
+    // cost in the 2D view. A radial-gradient halo is vector art the compositor
+    // rasterises once and just scales, for the same soft glow.
+    let glowDefs = '';
+    const glowId = (id) => 'glow-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '');
+    svg += `<defs></defs>`;
 
-    // Deep-space starfield: twinkling motes + slow drifters (seeded, stable)
+    // Deep-space starfield: seeded, stable motes. Static on purpose -- the old
+    // per-star <animate> twinkle (and the drifting motes) forced the compositor
+    // to repaint the whole map every frame for movement you can barely see.
     svg += `<g class="topo-starfield">`;
     const moteColors = ['#00e5ff', '#ffffff', '#a855f7', '#00ff88'];
     for (let i = 0; i < 42; i++) {
@@ -385,17 +390,7 @@ export class TopologyGraph {
       const my = ((i * 311.7) % 1000) / 1000 * height;
       const mr = 0.6 + ((i * 13) % 10) / 10 * 0.9;
       const mc = moteColors[i % moteColors.length];
-      const tw = 2.5 + ((i * 7) % 50) / 10;
-      svg += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${mr.toFixed(1)}" fill="${mc}" opacity="0.175">`
-        + `<animate attributeName="opacity" values="0.06;0.3;0.06" dur="${tw.toFixed(1)}s" begin="${((i * 0.37) % tw).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
-    }
-    for (let i = 0; i < 7; i++) {
-      const dx = ((i * 149) % 1000) / 1000 * width;
-      const dy = ((i * 263) % 1000) / 1000 * height;
-      const dd = 16 + ((i * 11) % 14);
-      svg += `<g opacity="0.25"><circle cx="0" cy="0" r="1.6" fill="#00e5ff">`
-        + `<animateMotion dur="${dd}s" repeatCount="indefinite" path="M${dx.toFixed(0)},${dy.toFixed(0)} q${(20 + i * 6)},${(-14 - i * 3)} ${(i % 2 ? -30 : 34)},${(i % 2 ? 18 : -22)}"/>`
-        + `</circle></g>`;
+      svg += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${mr.toFixed(1)}" fill="${mc}" opacity="0.14"/>`;
     }
     svg += `</g>`;
 
@@ -485,10 +480,19 @@ export class TopologyGraph {
         });
       }
 
-      svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${size}" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2" class="topo-node-circle" filter="url(#bloom)">
-        <animate attributeName="r" values="${size};${size + 2};${size}" dur="3s" repeatCount="indefinite" />
-        <animate attributeName="fill-opacity" values="0.2;0.4;0.2" dur="3s" repeatCount="indefinite" />
-      </circle>`;
+      // Soft halo as a cached radial gradient (cheap) instead of a Gaussian
+      // blur filter on an animated circle (re-rasterised every frame).
+      const gid = glowId(node.id);
+      glowDefs += `<radialGradient id="${gid}">`
+        + `<stop offset="0" stop-color="${esc(color)}" stop-opacity="0.55"/>`
+        + `<stop offset="0.55" stop-color="${esc(color)}" stop-opacity="0.12"/>`
+        + `<stop offset="1" stop-color="${esc(color)}" stop-opacity="0"/>`
+        + `</radialGradient>`;
+      // Static halo + static core. The old <animate r / fill-opacity> on every
+      // node repainted each circle every frame; the breathing is now a single
+      // compositor-friendly opacity pulse in CSS (see .topo-node-halo).
+      svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${(size * 2.8).toFixed(1)}" fill="url(#${gid})" class="topo-node-halo" pointer-events="none"/>`;
+      svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${size}" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2" class="topo-node-circle"/>`;
 
       if (node.type === 'agent') {
         // Rich agent label: name (agent color) + role + model + working status.
@@ -527,6 +531,9 @@ export class TopologyGraph {
     });
 
     svg += '<g id="flowOverlay"></g>';
+    // Gradients collected while drawing the nodes. <defs> may sit anywhere in
+    // an SVG, so appending here keeps the node loop free of forward references.
+    if (glowDefs) svg += `<defs>${glowDefs}</defs>`;
     svg += '</svg>';
     this.svgEl.innerHTML = svg;
 

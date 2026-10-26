@@ -161,12 +161,31 @@ export class ForceLayout {
     return true;
   }
 
-  /** Bounding sphere of every body: { cx,cy,cz, r, minY } */
+  /**
+   * Bounding sphere of every body: { cx,cy,cz, r, minY }.
+   *
+   * Centred on "You" (the pinned user node) when there is one, rather than on
+   * the centroid of every body. The centroid drifts toward whichever side the
+   * provider clusters happen to sit on, which left the red "You" node off to
+   * one side; centring on You keeps the operator in the middle of the view
+   * with the grid under them, and the fit radius is measured from You so the
+   * whole cloud still fits.
+   */
   bounds() {
     let n = 0, cx = 0, cy = 0, cz = 0, minY = Infinity;
-    for (const b of this.bodies.values()) { cx += b.x; cy += b.y; cz += b.z; n++; if (b.y < minY) minY = b.y; }
+    let user = null;
+    for (const b of this.bodies.values()) {
+      n++;
+      if (b.pinned && !user) user = b;
+      if (b.y < minY) minY = b.y;
+    }
     if (!n) return { cx: 0, cy: 0, cz: 0, r: 40, minY: 0 };
-    cx /= n; cy /= n; cz /= n;
+    if (user) {
+      cx = user.x; cy = user.y; cz = user.z;
+    } else {
+      for (const b of this.bodies.values()) { cx += b.x; cy += b.y; cz += b.z; }
+      cx /= n; cy /= n; cz /= n;
+    }
     let r = 0;
     for (const b of this.bodies.values()) {
       r = Math.max(r, Math.hypot(b.x - cx, b.y - cy, b.z - cz));

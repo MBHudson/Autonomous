@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=330';
-import { K as STORAGE_K } from '../storage.js?v=330';
+import { store } from '../store.js?v=337';
+import { K as STORAGE_K } from '../storage.js?v=337';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,26 +20,26 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=330';
-import { persistence } from '../persistence.js?v=330';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=330';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=330';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=330';
-import { toolInstructions, parseToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=330';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=330';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=330';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=330';
-import { usageFor } from '../rateGovernor.js?v=330';
-import { trace } from '../trace.js?v=330';
-import { latency } from '../latency.js?v=330';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=330';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=330';
-import { SlashCommands } from '../slashCommands.js?v=330';
-import { parseRoute, routingHelp } from '../routing.js?v=330';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=330';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=330';
-import { MessageRenderer, renderToolCalls } from './message.js?v=330';
-import { createAvatar } from './avatar.js?v=330';
+import { api, errText } from '../api.js?v=337';
+import { persistence } from '../persistence.js?v=337';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=337';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=337';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=337';
+import { toolInstructions, parseToolCall, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=337';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=337';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=337';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=337';
+import { usageFor } from '../rateGovernor.js?v=337';
+import { trace } from '../trace.js?v=337';
+import { latency } from '../latency.js?v=337';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=337';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=337';
+import { SlashCommands } from '../slashCommands.js?v=337';
+import { parseRoute, routingHelp } from '../routing.js?v=337';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=337';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=337';
+import { MessageRenderer, renderToolCalls } from './message.js?v=337';
+import { createAvatar } from './avatar.js?v=337';
 
 /**
  * How long an agent may keep working on a single task.
@@ -80,6 +80,19 @@ function toolResultStatus(text) {
   const exit = /\[exit (-?\d+)/i.exec(t);
   if (exit && Number(exit[1]) !== 0) return 'error';
   return 'ok';
+}
+
+/**
+ * Glue two blocks of prose together with a paragraph gap, skipping either when
+ * it is empty. Used to keep every settled step of a run visible above the one
+ * that is still streaming, so a long turn reads as one continuous answer
+ * instead of the bubble collapsing back to the current step.
+ */
+function joinProse(before, next) {
+  const a = asText(before).trim();
+  const b = asText(next);
+  if (!a) return b;
+  return b.trim() ? `${a}\n\n${b.trim()}` : a;
 }
 
 /**
@@ -228,8 +241,19 @@ export class Chat {
     this.isTyping = false;
     this.currentSessionId = null;
     this.renderer = new MessageRenderer();
-    /** Streaming placeholders, keyed by agentId. */
+    /**
+     * Streaming placeholders, keyed by TURN, not by agent.
+     *
+     * An agent can have more than one run in flight (the composer fan-out, an
+     * always-on tick, an ask from a node card, a routing-chart workflow). Keyed
+     * by agent, each new run deleted the previous run's node from the DOM and the
+     * finishing run then wrote its reply into whichever node the map held at that
+     * moment -- so a reply could be swapped out, replaced by another run's, or
+     * dropped entirely when its own node was already detached. One key per run
+     * means a turn always commits to the node it actually painted into.
+     */
     this._liveNodes = new Map();
+    this._turnSeq = 0;
     /**
      * Images staged for the NEXT turn. Deliberately in memory only: persisting
      * base64 would blow the localStorage quota and the replayed-history budget,
@@ -694,8 +718,12 @@ export class Chat {
       // Parallel fan-out: all agents dispatch at the same time so turns run
       // concurrently. The _turnResponded dedup below stops any agent from
       // answering twice if the scheduler re-fires after this turn ends.
+      // Each run owns its node from the moment it is dispatched. Looking the node
+      // up again at completion (by agent id) is what let an overlapping run steal
+      // or orphan it, and a reply whose node was gone was silently discarded.
+      const turnNodes = uniqueAgents.map(agent => this._makeLiveNode(agent));
       const results = await Promise.all(
-        uniqueAgents.map(agent => this._callAgent(text, agent, this.aborter.signal, this._makeLiveNode(agent), pending).then(
+        uniqueAgents.map((agent, i) => this._callAgent(text, agent, this.aborter.signal, turnNodes[i], pending).then(
           value => {
             this._busy.delete(agent.id);
             store.emit('flow:respond', { from: agent.id });
@@ -718,7 +746,7 @@ export class Chat {
         // it from answering the same message a second time.
         if (this._turnResponded.has(agent.id)) return;
         this._turnResponded.add(agent.id);
-        const live = this._liveNodes.get(agent.id);
+        const live = turnNodes[i];
         if (result.status === 'fulfilled' && result.value) {
           const agentMsg = {
             role: 'agent',
@@ -937,22 +965,13 @@ export class Chat {
       await api.updateSession(this.currentSessionId, {
         dialog: { timestamp: Math.floor(Date.now() / 1000), user_input: userText, responses },
       });
-      // Refresh local copy so reload shows the new turn immediately
+      // The transcript itself is written as each message lands (_addMessage /
+      // _replaceLiveNode), so this only touches freshness. Pushing the same turn
+      // in again here duplicated every user message and every reply in the
+      // stored conversation, which then rendered twice on the next session open.
       const convs = store.get('conversations') || [];
       const conv = convs.find(c => c.id === this.currentSessionId);
       if (conv) {
-        conv.messages = conv.messages || [];
-        conv.messages.push({ role: 'user', content: userText, timestamp: Date.now() });
-        responses.forEach(r => {
-          conv.messages.push({
-            role: 'agent',
-            content: r.response || r.error || '',
-            agentId: r.model_id,
-            reasoning: r.reasoning || null,
-            toolCalls: r.tool_calls || null,
-            timestamp: Date.now(),
-          });
-        });
         conv.updatedAt = Date.now();
         store.set('conversations', [...convs]);
         persistence.set('conversations', store.get('conversations'));
@@ -978,28 +997,50 @@ export class Chat {
  */
 _makeLiveNode(agent) {
     if (!this._liveNodes) this._liveNodes = new Map();
-    // A previous turn for this agent never finalised (overlapping user and
-    // autonomous turns both paint here): the map can only find the newest
-    // node, so the older one would blink forever as an orphan. Remove it
-    // silently -- the superseding turn carries the conversation forward.
-    const prev = this._liveNodes.get(agent.id);
-    if (prev && prev.isConnected) prev.remove();
-    this._liveNodes.delete(agent.id);
+    // A new key per run. An earlier run for the same agent is left alone: it
+    // owns its own node and will commit to it, so removing it here would delete
+    // a reply that is still being written.
+    const turnId = 'turn_' + (++this._turnSeq);
     const node = this.renderer.render({
       role: 'agent', content: '', agentId: agent.id, timestamp: Date.now(),
     });
     node.classList.add('message-streaming');
     node.dataset.agentId = agent.id;
+    node.dataset.turnId = turnId;
     const body = node.querySelector('.message-body');
     const toolBox = document.createElement('div');
     toolBox.className = 'tool-calls-slot';
     toolBox.hidden = true;
     body.appendChild(toolBox);
+    // The bubble is three text nodes, not one string: the run's settled prose,
+    // the paragraph gap that only exists once there are two blocks, and the step
+    // in flight. Settled prose is written once per step and the tail once per
+    // token, so a long run no longer recopies everything it has said on every
+    // token. They sit in one pre-wrapped element, so `textContent` (and the
+    // caret, and every reader of the bubble) still sees exactly one stream.
     const textEl = document.createElement('div');
     textEl.className = 'message-content stream-text';
     body.appendChild(textEl);
+    const settledText = document.createTextNode('');
+    const gapText = document.createTextNode('');
+    const liveText = document.createTextNode('');
+    textEl.append(settledText, gapText, liveText);
+    node.settledText = settledText;
+    node.gapText = gapText;
+    node.liveText = liveText;
     document.getElementById('chatMessages').appendChild(node);
+    // turnText: every SETTLED step's stream in this run, tool-call markup and
+    // all -- what the operator watched arrive, and what the bubble shows above
+    // the step in flight.
+    // turnProse: the same steps with the tool-call markup cut out. Painting keeps
+    // the raw stream (a turn is transparent while it runs), but the FINISHED
+    // message only ever falls back to prose: committing `{"tool":…}` into the
+    // transcript duplicates the tool panel and reads as an unfinished reply.
+    // text: what is currently painted (turnText + the live step), so the abort
+    // paths keep the whole turn rather than the last fragment of it.
     node.text = '';
+    node.turnText = '';
+    node.turnProse = '';
     node.reasoning = '';
     node.toolCalls = [];
     node.toolBox = toolBox;
@@ -1022,25 +1063,43 @@ _makeLiveNode(agent) {
     node.reasonEl = rBody;
     node.reasonBlock = rDetails;
     if (!this._liveNodes) this._liveNodes = new Map();
-    this._liveNodes.set(agent.id, node);
+    this._liveNodes.set(turnId, node);
     this._scrollToBottom();
     return node;
   }
 
-  /** Swap a streaming placeholder for the final rendered message. */
+  /**
+   * Swap a streaming placeholder for the final rendered message.
+   *
+   * This is the single commit point for a run. It always leaves exactly one
+   * message on screen AND in the conversation, even when the run's node has been
+   * detached in the meantime (session reload, transcript cleared), and it never
+   * commits a blank bubble.
+   */
   _replaceLiveNode(node, msg) {
-    if (!node || !node.isConnected) return;
-    const finalEl = this.renderer.render(msg);
-    node.replaceWith(finalEl);
-    if (this._liveNodes) this._liveNodes.delete(node.dataset.agentId);
+    const final = this._finalMsg(node, msg);
+    const finalEl = this.renderer.render(final);
+    if (node && node.isConnected) {
+      node.replaceWith(finalEl);
+    } else {
+      // The node is gone but the reply is not: append it rather than dropping
+      // it. This used to be a silent `return`, and that reply was lost from the
+      // screen and from the stored conversation at the same time.
+      const box = document.getElementById('chatMessages');
+      if (!box) return;
+      document.getElementById('emptyState')?.remove();
+      box.appendChild(finalEl);
+    }
+    const turnId = node && node.dataset ? node.dataset.turnId : null;
+    if (this._liveNodes && turnId) this._liveNodes.delete(turnId);
     this._scrollToBottom();
 
-    if (msg && (msg.role === 'user' || msg.role === 'agent')) {
+    if (final && (final.role === 'user' || final.role === 'agent')) {
       const conv = this._ensureConversation();
       if (conv) {
         conv.messages = conv.messages || [];
-        if (!conv.messages.includes(msg)) {
-          conv.messages.push(msg);
+        if (!conv.messages.includes(final)) {
+          conv.messages.push(final);
         }
         conv.updatedAt = Date.now();
         store.set('currentConversation', conv);
@@ -1052,7 +1111,7 @@ _makeLiveNode(agent) {
         }
       }
     }
-    store.emit('chat:message', msg);
+    store.emit('chat:message', final);
 
     // Announce it, exactly as _addMessage does. This path is taken whenever a
     // reply streamed, which since streaming was fixed is very nearly every
@@ -1061,19 +1120,81 @@ _makeLiveNode(agent) {
     // voice or pitch of its own, so every agent came out in the same global
     // voice. The Test button in the agent editor kept working because it
     // speaks directly rather than waiting to be told a reply landed.
-    if (msg && msg.role === 'agent') {
-      store.emit('chat:reply', msg);
+    if (final && final.role === 'agent') {
+      store.emit('chat:reply', final);
     }
+  }
+
+  /**
+   * Guarantee a finished agent turn has something to show. Preference order:
+   * what the model said last, then the prose it streamed during the run, then a
+   * plain notice. A turn that ends on a tool call -- or one cut short by the
+   * step or time budget -- returns no text of its own, and an empty string used
+   * to be accepted as the answer: the bubble went blank the instant the reply
+   * finished, and the same empty string was what got saved.
+   *
+   * `turnProse`, not `turnText`: the streamed fallback carries the run's words,
+   * never its raw tool-call markup. A turn that only ever emitted calls has no
+   * prose, and gets the "finished after running N tool calls" notice instead of
+   * a bubble full of JSON.
+   */
+  _finalMsg(node, msg) {
+    const m = msg || { role: 'agent', timestamp: Date.now() };
+    if (m.role !== 'agent') return m;
+    if (asText(m.content).trim()) return m;
+    const streamed = asText(node && node.turnProse).trim();
+    if (streamed) return { ...m, content: streamed };
+    const calls = (Array.isArray(m.toolCalls) && m.toolCalls.length)
+      ? m.toolCalls
+      : ((node && Array.isArray(node.toolCalls)) ? node.toolCalls : []);
+    if (calls.length) {
+      const n = calls.length;
+      return { ...m, content: `Finished after running ${n} tool call${n === 1 ? '' : 's'} without writing an answer.` };
+    }
+    return { ...m, content: 'The agent finished without writing a reply.' };
+  }
+
+  /**
+   * Paint the live bubble from everything the run has accumulated
+   * (`node.turnText`, which spans steps AND rounds) plus the step in flight.
+   * Painting only the step's own stream was what made a working turn look like
+   * it kept starting over: each tool call wiped the prose the operator had just
+   * watched arrive, and the bubble collapsed to the newest few words.
+   *
+   * `node.text` mirrors what is on screen, so the abort paths that keep
+   * "whatever streamed" keep the whole turn's prose rather than the last step's.
+   */
+  _paintProse(node, step = '') {
+    if (!node) return;
+    // Same join rule as the accumulator uses, so what the bubble shows, what
+    // `node.text` reports and what an abort commits can never disagree.
+    const settled = asText(node.turnText).trim();
+    const live = settled ? asText(step).trim() : asText(step);
+    const shown = joinProse(settled, live);
+    node.text = shown;
+
+    const el = node.querySelector('.stream-text');
+    if (el) {
+      const { settledText, gapText, liveText } = node;
+      if (settledText && liveText) {
+        // Write only the piece that changed: the growing settled block is the
+        // expensive half, and it changes once per step, not once per token.
+        if (settledText.data !== settled) settledText.data = settled;
+        const gap = settled && live ? '\n\n' : '';
+        if (gapText && gapText.data !== gap) gapText.data = gap;
+        if (liveText.data !== live) liveText.data = live;
+      } else {
+        // A node not built by _makeLiveNode (an older caller): one string.
+        if (el.textContent !== shown) el.textContent = shown;
+      }
+    }
+    this._scrollToBottom();
+    store.emit('chat:stream', { agentId: node.dataset.agentId, text: shown });
   }
 
   /** Append streamed text to a live node. */
   _paintStream(node, piece, whole) {
-    if (!node) return;
-    node.text = whole;
-    const el = node.querySelector('.stream-text');
-    if (el) el.textContent = whole;
-    this._scrollToBottom();
-    store.emit('chat:stream', { agentId: node.dataset.agentId, text: whole });
+    this._paintProse(node, whole);
   }
 
   /** Append streamed reasoning to the live node's reasoning block. */
@@ -1464,7 +1585,17 @@ _makeLiveNode(agent) {
 
     let text = '';
     let reasoning = '';
-    let painted = '';
+    // Every step's prose in this run. `text` only ever holds the CURRENT step's
+    // stream, and a step that ends on a tool call holds nothing -- which is how a
+    // finished turn came back with an empty answer and blanked the bubble the
+    // operator had just watched fill up.
+    //
+    // Seeded from the live node, not from '': _runToCompletion starts a new
+    // round against the same node, so each round continues the same answer
+    // instead of resetting the bubble at every round boundary.
+    let turnText = liveNode ? asText(liveNode.turnText) : '';
+    // The same steps, prose only -- see _finalMsg.
+    let turnProse = liveNode ? asText(liveNode.turnProse) : '';
     // An empty completion is usually a one-off: the output is sampled, and the
     // same request almost always succeeds a second time. Re-asking once is
     // exactly what a person does when this happens, so do it for them rather
@@ -1634,7 +1765,6 @@ _makeLiveNode(agent) {
             }
             instructions = reteach;
             text = '';
-            painted = '';
             working = working.concat([
               { role: 'assistant', content: chunk },
               {
@@ -1662,7 +1792,6 @@ _makeLiveNode(agent) {
         if (claimsTool && narratedRetries < 1 && !outOfTime() && !(signal && signal.aborted)) {
           narratedRetries++;
           text = '';
-          painted = '';
           working = working.concat([
             { role: 'assistant', content: chunk },
             {
@@ -1702,7 +1831,6 @@ _makeLiveNode(agent) {
             // Clear the half-drawn stream so the retry does not appear to
             // append to the abandoned attempt.
             text = '';
-            painted = '';
             store.emit('toast', {
               message: `${agent.name} returned an empty response — asking again…`,
               type: 'info',
@@ -1729,14 +1857,31 @@ _makeLiveNode(agent) {
         };
       }
 
+      // Keep this step's prose before running anything: if a later step ends
+      // with no text at all, the finished reply falls back to everything the
+      // operator actually watched arrive.
+      if (chunk.trim()) {
+        turnText = joinProse(turnText, chunk);
+        if (liveNode) liveNode.turnText = turnText;
+        // What this step actually SAID, with its tool-call markup removed. A
+        // call-only step contributes nothing here, which is the point: the
+        // finished reply must not commit the JSON the call was written in.
+        const stepProse = stripToolCall(chunk);
+        if (stepProse.trim()) {
+          turnProse = joinProse(turnProse, stepProse);
+          if (liveNode) liveNode.turnProse = turnProse;
+        }
+      }
+
       // Show the tool request(s) as real entries, then run them. Native
       // responses can carry several independent calls; prompt-protocol
       // responses carry one. All calls are painted before the first await so
       // a slow tool cannot hide its siblings.
-      if (liveNode) {
-        const el = liveNode.querySelector('.stream-text');
-        if (el) el.textContent = `${painted}${chunk}`.trimEnd();
-      }
+      //
+      // Repaint once from the settled accumulator so the bubble is exactly the
+      // run's prose so far (the stream paint already matches it, minus the
+      // trailing whitespace a step may end on).
+      if (liveNode) this._paintProse(liveNode);
       const records = calls.map(call => ({
         tool: call.tool,
         arg: toolArgForUi(call.arg),
@@ -1814,7 +1959,6 @@ _makeLiveNode(agent) {
 
       working = working.concat(exchanges);
       transcript.push(...exchanges);
-      painted = (painted || '') + chunk + '\n';
 
       // Out of budget, but the person may have steered while this step was in
       // flight. Honouring that means spending one more model call, so the round
@@ -1825,15 +1969,21 @@ _makeLiveNode(agent) {
       if (step >= budget - 1 && !(this._steerQueue && this._steerQueue.length)) {
         // Budget for this round is gone. Hand back to _runToCompletion, which
         // starts a fresh round if the agent is still working.
+        // Prose only: an out-of-budget turn used to hand back the raw stream,
+        // so a run that ended on a tool call committed its `{"tool":…}` block
+        // as the answer. Empty here is fine -- _finalMsg turns it into the
+        // "finished after running N tool calls" notice.
         return {
-          content: text, text, sections: null, reasoning: reasoning || null,
+          content: turnProse, text: turnProse, sections: null,
+          reasoning: reasoning || null,
           steps: step + 1, exhausted: true, transcript,
           toolCalls: log.slice(),
         };
       }
     }
     return {
-      content: text, text, sections: null, reasoning: reasoning || null,
+      content: turnProse, text: turnProse, sections: null,
+      reasoning: reasoning || null,
       steps: budget, exhausted: true, transcript,
       toolCalls: log.slice(),
     };
@@ -2554,7 +2704,9 @@ _makeLiveNode(agent) {
       // message on top of it was the double reply: once while streaming, once
       // when it landed. Swap the placeholder instead, exactly as the main
       // send path does.
-      if (live && live.isConnected) this._replaceLiveNode(live, agentMsg);
+      // _replaceLiveNode appends when the node is gone, so there is no case
+      // where the reply is dropped any more.
+      if (live) this._replaceLiveNode(live, agentMsg);
       else this._addMessage(agentMsg);
       this._recordAgentUse(agent.id);
     } catch (err) {
@@ -2568,7 +2720,7 @@ _makeLiveNode(agent) {
         toolCalls: (live && live.toolCalls) || null,
         timestamp: Date.now(),
       };
-      if (live && live.isConnected) this._replaceLiveNode(live, errorMsg);
+      if (live) this._replaceLiveNode(live, errorMsg);
       else this._addMessage(errorMsg);
     } finally {
       this._busy.delete(agent.id);
@@ -2634,6 +2786,13 @@ _makeLiveNode(agent) {
   _addMessage(msg) {
     const empty = document.getElementById('emptyState');
     if (empty) empty.remove();
+
+    // An agent message with no text and no tool calls renders as an empty
+    // bubble, which reads as "the reply vanished". Give it something to say.
+    if (msg && msg.role === 'agent' && !asText(msg.content).trim()
+        && !(Array.isArray(msg.toolCalls) && msg.toolCalls.length)) {
+      msg = { ...msg, content: 'The agent finished without writing a reply.' };
+    }
 
     // Last line of defence: whatever reaches the transcript is text-only, so a
     // base64 blob can never be written to localStorage.

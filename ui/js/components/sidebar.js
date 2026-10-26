@@ -10,16 +10,17 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=330';
-import { K } from '../storage.js?v=330';
-import { persistence } from '../persistence.js?v=330';
-import { api } from '../api.js?v=330';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=330';
-import { TOOL_REGISTRY } from '../tools.js?v=330';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=330';
-import { snapshot } from '../rateGovernor.js?v=330';
-import { resetBrowserEnabled } from '../toolManifest.js?v=330';
-import { perf } from '../perf.js?v=330';
+import { store } from '../store.js?v=337';
+import { K } from '../storage.js?v=337';
+import { persistence } from '../persistence.js?v=337';
+import { api } from '../api.js?v=337';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=337';
+import { TOOL_REGISTRY } from '../tools.js?v=337';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=337';
+import { snapshot } from '../rateGovernor.js?v=337';
+import { resetBrowserEnabled } from '../toolManifest.js?v=337';
+import { perf } from '../perf.js?v=337';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=337';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -29,7 +30,7 @@ import { perf } from '../perf.js?v=330';
 export class Sidebar {
   constructor() {
     this.bodyEl = null;
-    this.activeTab = 'sessions';
+    this.activeTab = 'agents';
     this.busySessionId = null;
     this.workingAgents = new Set();
     // Set by app.js. The Agents-tab header carries the API Lab and Brain Lab
@@ -103,8 +104,24 @@ export class Sidebar {
       });
     });
 
+    // A floating three-dot menu closes on any click outside it. The opener and
+    // the menu's own items stop propagation, so this only fires on outside clicks.
+    document.addEventListener('click', () => this._hideMenu());
+
+    // A press anywhere outside an expanded Config section closes it, so a panel
+    // left open never just sits there. The desktop skin is skipped: its drawer
+    // animates itself shut over 440ms and needs the <details> to stay open for
+    // that, so it runs the same rule in ui/js/desktop2026.js instead.
+    document.addEventListener('pointerdown', (e) => {
+      if (document.documentElement.classList.contains('d26')) return;
+      if (this.activeTab !== 'config' || !this.bodyEl) return;
+      const t = e.target;
+      if (!(t instanceof Element) || t.closest('.cfg-section')) return;
+      this.bodyEl.querySelectorAll('details.cfg-section[open]').forEach(d => { d.open = false; });
+    }, true);
+
     // Set initial active tab
-    const initialTab = store.get('ui.activeTab') || 'sessions';
+    const initialTab = store.get('ui.activeTab') || 'agents';
     const tabBtn = document.querySelector(`.nav-btn[data-tab="${initialTab}"]`);
     if (tabBtn) {
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -162,6 +179,70 @@ export class Sidebar {
         light.style.boxShadow = '';
       }
     });
+  }
+
+  // ---- Three-dot menus -----------------------------------------------------
+  // The menu is shown as a floating copy in <body>, not inside the card. As an
+  // in-card dropdown it was at the mercy of the stack's scroll container
+  // (clipping) and the next card (stacking); its inline display style was also
+  // being mangled. A body-level overlay with fixed coordinates has none of
+  // those failure modes.
+  _showMenu(btn, sourceMenu) {
+    if (!btn || !sourceMenu) return;
+    const kind = sourceMenu.dataset.kind || '';
+    const owner = sourceMenu.dataset.owner || '';
+    // Clicking the same ⋮ again closes it.
+    if (this._menuEl && this._menuEl.dataset.kind === kind && this._menuEl.dataset.owner === owner) {
+      this._hideMenu();
+      return;
+    }
+    this._hideMenu();
+    const el = sourceMenu.cloneNode(true);
+    el.removeAttribute('id');
+    el.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    el.classList.add('open', 'd26-float-menu');
+    el.dataset.kind = kind;
+    el.dataset.owner = owner;
+    document.body.appendChild(el);
+    el.style.position = 'fixed';
+    el.style.right = 'auto';
+    el.style.zIndex = '3000';
+    const r = btn.getBoundingClientRect();
+    const mw = el.offsetWidth || 160;
+    const mh = el.offsetHeight || 96;
+    const left = Math.min(window.innerWidth - mw - 8, Math.max(8, r.right - mw));
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+    el.style.left = Math.round(left) + 'px';
+    el.style.top = Math.round(top) + 'px';
+    this._menuEl = el;
+    this._wireMenu(el, kind, owner);
+  }
+
+  _wireMenu(el, kind, owner) {
+    el.querySelectorAll('.agent-menu-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pre = item.dataset.preAction;
+        const action = item.dataset.action;
+        if (pre === 'edit') this._openPrePromptEditor();
+        else if (pre === 'toggle') this._togglePrePrompt();
+        else if (kind === 'agent') {
+          if (action === 'edit') store.emit('agent:edit', owner);
+          else if (action === 'toggle') store.emit('agent:toggle', owner);
+          else if (action === 'delete') store.emit('agent:delete', owner);
+        } else if (kind === 'provider') {
+          if (action === 'edit') store.emit('provider:edit', owner);
+          else if (action === 'toggle') store.emit('provider:toggle', owner);
+          else if (action === 'delete') store.emit('provider:delete', owner);
+        }
+        this._hideMenu();
+      });
+    });
+  }
+
+  _hideMenu() {
+    if (this._menuEl) { this._menuEl.remove(); this._menuEl = null; }
   }
 
   render() {
@@ -391,7 +472,7 @@ export class Sidebar {
       <span class="sidebar-section-title">${activeCount} active</span>
       <span class="preprompt-wrap">
         <button class="agent-menu-btn preprompt-btn${preActive ? ' armed' : ''}" id="prePromptBtn" title="Global pre-prompt override${preActive ? ' (ON)' : ' (off)'}">§</button>
-        <div class="agent-menu" id="prePromptMenu" style="display:none">
+        <div class="agent-menu" id="prePromptMenu" data-kind="preprompt">
           <button class="agent-menu-item" data-pre-action="edit">Edit</button>
           <button class="agent-menu-item ${preActive ? 'danger' : 'go'}" data-pre-action="toggle">${preActive ? 'Deactivate' : 'Activate'}</button>
         </div>
@@ -430,7 +511,7 @@ export class Sidebar {
           ${provider ? ' &middot; ' + esc(provider.name) : ''}
         </div>
         <div class="agent-clock" data-clock-agent="${esc(agent.id)}" title=""></div>
-        <div class="agent-menu" id="menu-${esc(agent.id)}" style="display:none">
+        <div class="agent-menu" id="menu-${esc(agent.id)}" data-kind="agent" data-owner="${esc(agent.id)}">
           <button class="agent-menu-item" data-action="edit">Edit</button>
           <button class="agent-menu-item" data-action="toggle">${agent.active ? 'Deactivate' : 'Activate'}</button>
           <button class="agent-menu-item danger" data-action="delete">Delete</button>
@@ -483,14 +564,7 @@ export class Sidebar {
     this.bodyEl.querySelectorAll('[data-agent-menu]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const agentId = btn.dataset.agentMenu;
-        const menu = document.getElementById('menu-' + agentId);
-        if (menu) {
-          const isOpen = menu.style.display !== 'none';
-          // Close all menus first
-          this.bodyEl.querySelectorAll('.agent-menu').forEach(m => m.style.display = 'none');
-          menu.style.display = isOpen ? 'none' : 'block';
-        }
+        this._showMenu(btn, document.getElementById('menu-' + btn.dataset.agentMenu));
       });
     });
 
@@ -513,7 +587,7 @@ export class Sidebar {
         }
         // Close menu
         const menu = document.getElementById('menu-' + agentId);
-        if (menu) menu.style.display = 'none';
+        if (menu) menu.classList.remove('open');
       });
     });
 
@@ -529,12 +603,9 @@ export class Sidebar {
     }
 
     // Global pre-prompt button + menu (same open/close behaviour as agent rows)
-    document.getElementById('prePromptBtn')?.addEventListener('click', (e) => {      e.stopPropagation();
-      const menu = document.getElementById('prePromptMenu');
-      if (!menu) return;
-      const isOpen = menu.style.display !== 'none';
-      this.bodyEl.querySelectorAll('.agent-menu').forEach(m => m.style.display = 'none');
-      menu.style.display = isOpen ? 'none' : 'block';
+    document.getElementById('prePromptBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._showMenu(e.currentTarget, document.getElementById('prePromptMenu'));
     });
     // API Lab and Brain Lab now live in the apps notch under the header, so the
     // sidebar no longer carries their buttons.
@@ -543,7 +614,7 @@ export class Sidebar {
         e.stopPropagation();
         const action = item.dataset.preAction;
         const menu = document.getElementById('prePromptMenu');
-        if (menu) menu.style.display = 'none';
+        if (menu) menu.classList.remove('open');
         if (action === 'edit') this._openPrePromptEditor();
         else if (action === 'toggle') this._togglePrePrompt();
       });
@@ -1167,7 +1238,7 @@ export class Sidebar {
         </div>
         <div style="font-size:10px;color:var(--text-secondary);word-break:break-all">${esc(provider.endpoint)}</div>
         <div style="font-size:9px;color:var(--text-dim);margin-top:4px">${provider.models.length} models &middot; ${esc(provider.authType)}</div>
-        <div class="agent-menu" id="menu-${esc(provider.id)}" style="display:none">
+        <div class="agent-menu" id="menu-${esc(provider.id)}" data-kind="provider" data-owner="${esc(provider.id)}">
           <button class="agent-menu-item" data-action="edit">Edit</button>
           <button class="agent-menu-item" data-action="toggle">${provider.active ? 'Deactivate' : 'Activate'}</button>
           <button class="agent-menu-item danger" data-action="delete">Delete</button>
@@ -1181,14 +1252,7 @@ export class Sidebar {
     this.bodyEl.querySelectorAll('[data-provider-menu]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const providerId = btn.dataset.providerMenu;
-        const menu = document.getElementById('menu-' + providerId);
-        if (menu) {
-          const isOpen = menu.style.display !== 'none';
-          // Close all menus first
-          this.bodyEl.querySelectorAll('.agent-menu').forEach(m => m.style.display = 'none');
-          menu.style.display = isOpen ? 'none' : 'block';
-        }
+        this._showMenu(btn, document.getElementById('menu-' + btn.dataset.providerMenu));
       });
     });
 
@@ -1207,7 +1271,7 @@ export class Sidebar {
         }
         // Close menu
         const menu = document.getElementById('menu-' + providerId);
-        if (menu) menu.style.display = 'none';
+        if (menu) menu.classList.remove('open');
       });
     });
 
@@ -1308,12 +1372,15 @@ export class Sidebar {
     // this method, before `settings` was read -- see _commitPendingCfgFields().
 
     const themeLabel = { dark: 'Dark', matrix: 'Matrix', cyberpunk: 'Cyberpunk' }[settings.theme] || 'Dark';
+    const iface = normalizeIface(settings.interfaceMode);
 const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings.chartGhost || {}) };
     const mem = settings.historyTurns ?? DEFAULT_HISTORY_TURNS;
     const rpm = Number(settings.rateLimitRpm) || 0;
 
     this.bodyEl.innerHTML = `
-      ${this._cfgSection('iface', 'Interface', { text: themeLabel }, `
+      ${this._cfgSection('iface', 'Interface', {
+        text: `${iface === 'desktop' ? 'Desktop 2026' : 'Classic'} · ${themeLabel}`,
+      }, `
         <div class="form-group">
           <label class="form-label">Theme</label>
           <select class="form-select" id="sbTheme">
@@ -1321,6 +1388,14 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
             <option value="matrix" ${settings.theme === 'matrix' ? 'selected' : ''}>Matrix</option>
             <option value="cyberpunk" ${settings.theme === 'cyberpunk' ? 'selected' : ''}>Cyberpunk</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Interface <span class="form-hint-inline">${iface === 'desktop' ? 'glass shell' : 'both panels'}</span></label>
+          <select class="form-select" id="sbIface">
+            <option value="classic" ${iface === 'classic' ? 'selected' : ''}>Classic — setup, chat and map panels side by side</option>
+            <option value="desktop" ${iface === 'desktop' ? 'selected' : ''}>Desktop 2026 — glass shell, rail and drawers</option>
+          </select>
+          <div class="form-hint">Classic is the layout from before the desktop refresh: the left setup panel and the right map/network panel both stay open, with nothing tucked away. Desktop 2026 is the glass shell — floating cards on a rail at the left, config flying out of its labels, a wider chat. Narrow the window and either one becomes the same slide-over drawers, so the phone layout is identical whichever you pick. Changing this takes effect at once, no reload.</div>
         </div>
         <div class="toggle-row">
           <span class="toggle-label">Auto Scroll</span>
@@ -1710,6 +1785,24 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     // Theme change
     document.getElementById('sbTheme').addEventListener('change', (e) => {
       store.emit('theme:change', e.target.value);
+    });
+
+    // Interface: Classic (default, both panels) or the Desktop 2026 glass
+    // shell. Applies immediately -- desktop2026.js listens for the event -- and
+    // is written through at once, so the choice survives a reload even if SAVE
+    // is never pressed. Every feature stays in both shells; only the glass
+    // goes away.
+    document.getElementById('sbIface')?.addEventListener('change', (e) => {
+      const mode = normalizeIface(e.target.value);
+      store.set('settings.interfaceMode', mode);
+      try { persistence.set('settings', store.get('settings')); } catch { /* view pref only */ }
+      store.emit(IFACE_EVENT, mode);
+      store.emit('toast', {
+        message: mode === 'desktop'
+          ? 'Desktop 2026 interface on — glass shell, rail and drawers'
+          : 'Classic interface on — both panels side by side',
+        type: 'info',
+      });
     });
 
     // Temperature
