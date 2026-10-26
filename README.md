@@ -21,11 +21,19 @@
 [![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-6E56CF?logo=readthedocs&logoColor=white)](https://deepwiki.com/MBHudson/Autonomous)
 
 
-![Main screen](screenshots/mainscreen01.png)
+![Desktop 2026 — the glass shell: edge rail, Config drawers, a wide chat and the live network map](screenshots/new-ui-main.png)
+
+**☝️ That's Desktop 2026** — the new face of the studio: 💎 floating glass cards on an edge rail, 🗂️ Config that flies out of its own label, 💬 a chat you can drag wider or throw to the full screen, 🕸️ the map front and centre with its button group lifted into the header, and 🪶 panels that tuck away while you read a node. Pick it in **Config → Interface** — no reload, and nothing you had set is lost.
+
+**🗂️ Classic is the default** — and it is the picture right below. Setup panel, chat and map/network panel side by side, nothing behind a rail, everything where it has always been.
+
+![Classic — the default interface: setup panel, chat and network map side by side](screenshots/mainscreen01.png)
+
+**Both are the same app.** Same components, same store, same tools: Classic is **not** a legacy mode, and neither shell is missing a feature — Classic is simply the calmer, flatter way to see all of it at once. Narrow the window under 1025px and **either** one becomes the same slide-over drawer layout, so the phone experience is identical whichever you choose. 🔁
 
 **Autonomous Loop Studio** (the "Router") is a single-folder PHP app — 🚫 no database, 🚫 no build step, 🚫 no external service. It runs on plain PHP (or Apache via XAMPP), keeps everything in JSON files, and drops a whole team of AI agents into your browser with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both directions**.
 
-> 🆕 **Recently added** — ♾️ an **always-on loop** with per-agent standing goals, spend caps, **hold/release** and a master kill switch · ❝ a **global pre-prompt** that **prepends or replaces** every agent's prompt, with a live toggle · 🧠 a **context assembler** sized to each model's *real* window · 🔧 **native tool calling** · 🌐 a **built-in browser** over CDP with a **domain block list** · 🕸️ **MCP servers and friends as live graph nodes** · 🧮 a **Resource Manager** so the 3D graph can rest · and a **security pass** that made every dangerous capability **opt-in**. 🛡️
+> 🆕 **Recently added** — ♾️ an **always-on loop** with per-agent standing goals, spend caps, **hold/release** and a master kill switch · ❝ a **global pre-prompt** that **prepends or replaces** every agent's prompt, with a live toggle · 🧠 a **context assembler** sized to each model's *real* window · 🔧 **native tool calling** · 🌐 a **built-in browser** over CDP with a **domain block list** · 🕸️ **MCP servers and friends as live graph nodes** · 🧮 a **Resource Manager** so the 3D graph can rest · and a **security pass** that made every dangerous capability **opt-in**. 🛡️ · 🖥️ a **choice of shells** — Classic by default, Desktop 2026 on request · 🎛️ a **Config → Desktop card** that tunes the topography and the glass for a weak GPU, with **every knob still individually adjustable** · 📌 a **floor that stays put** · 🌫️ a **screen-space haze** that can no longer travel with the map · 🧼 and a **clean, credential-free copy** ready to hand off.
 
 Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 
@@ -60,7 +68,107 @@ Made with 💙 by [MBHudson](https://github.com/mbhudson/)
 | 🧭 **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |
 | 🧮 **Resource Manager** | Optional pause / idle throttles + CPU/GPU gauges so the 3D graph can rest |
 | 🕸️ **MCP on the graph** | Outgoing calls and incoming friends drawn as live nodes with editable access |
+| 🖥️ **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
+| 🎛️ **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
 | 📱 **Mobile-first** | Built for the phone in your pocket |
+
+---
+
+## 🖥️ Two interfaces, one switch
+
+Both shells are the same application: one store, one set of components, one feature list. `settings.interfaceMode` decides which decoration is worn, and it applies the moment you pick it in **Config → Interface** — no reload, no second install, and **no feature that exists in only one of them**.
+
+| | 🗂️ **Classic** *(the default)* | 💎 **Desktop 2026** |
+| --- | --- | --- |
+| Layout | setup · chat · map, side by side | floating glass cards on an edge rail, map front-centre |
+| Config | collapsible sections in the left panel | drawers that fly out of their label — and **retract back into it** as one motion |
+| Chat | standard width | **440px** by default, drag the edge to widen, or throw it to the full screen |
+| Panels | always where they are | optional **tuck-away** while a node's card is open |
+| Glass | flat — no blur, no glow, no drift | frosted cards, border glow, ambient motion: every one adjustable, every one switchable off |
+| Map controls | inside the map panel | lifted into the header, centred over the apps notch |
+| Below 1025px | slide-over drawers | the same slide-over drawers |
+
+```
+                            DESKTOP 2026 — where things live
++-------------+---------------------------------------+-------------+
+|   RAIL      |                  CHAT                 |     MAP     |
+|             |                                       |             |
+| sessions    | drag the edge to widen, or            | nodes,      |
+| agents      | throw it to the full screen.          | beams,      |
+| providers   | 440px by default.                     | fog, floor  |
+| config ---> |                                       |             |
+| mcp         |                                       | 3D / 2D     |
++-------------+---------------------------------------+-------------+
+      ^ Config flies out of its label, then retracts back into it
+
+  CLASSIC is the same app with all three panels always open:
+  +--------------+-------------+---------------+
+  |    SETUP     |    CHAT     |      MAP      |
+  +--------------+-------------+---------------+
+```
+
+Two rules kept that honest:
+
+- 🧩 **The choice is the only switch.** Nothing else forks. `ui/js/desktop2026.js` *decorates* the DOM the existing components already render — it owns no state and no feature — so a bug in the shell can never take one with it.
+- 📱 **Narrow windows are untouched.** Under 1025px both shells resolve to the same slide-over drawer layout, which is why the phone view looks and behaves exactly as it always did.
+
+---
+
+## 🎛️ Config → Desktop — the machine-room card
+
+![Config → Desktop: performance mode, glass and topography controls](screenshots/desktop-settings.png)
+
+The card is in **both** shells on purpose. Most of it is the map — fog, bloom, floor, frame rate, detail — so Classic gets it too. The rows that address the glass (chat background, blur, glow, ambient motion, the floating floor) stay **visible** in Classic with their saved values but are disabled there, because there is no glass to tune. Nothing is hidden and nothing is lost. 🧷
+
+### 🧮 What each knob buys
+
+| Knob | Fresh default | Relative GPU cost | What it does |
+| --- | --- | --- | --- |
+| 🌫️ **Glass blur** | **1px** | ██████████ **the big one** | `backdrop-filter` behind every card — a live canvas re-composited each frame |
+| 🎚️ **Map detail** | **100%** | ███████ | internal resolution: 100 / 85 / 70 / 55 / 42% of the pixel-ratio cap |
+| ✨ **Bloom glow** | **on** | ██████ | multi-pass blur halos on nodes and beams |
+| 🟠 **Floating floor** | **on** | ████ | the big screen-blended polar grid layer over the canvas |
+| 🎞️ **Frames per second** | **60** | ███ | hard cap on redraws (1–60) |
+| 🟣 **Glow & border animation** | **100%** | ██ | the colour running around card borders |
+| 🌀 **Ambient motion** | **100%** | ██ | background sweep, floor scan, the slow breathing |
+| 🔄 **Slow auto-rotate** | **on** | █ | idle camera drift, 12s after you stop touching the map |
+| 💬 **Chat background** | **4%** | ░ free | how much of the map shows through the chat |
+| 📌 **Fix the floor in place** | **on** | ░ free | keeps the fallback grid still in the window |
+| 🪶 **Tuck panels away** | **on** | ░ free | slides the rail and the chat aside while a node card is open |
+| 🐢 **Performance mode** | **off** | — | one click: the cheap column, still editable |
+
+Every row is a normal setting with its own control — the defaults above are defaults, not law. 🎛️
+
+### ⚡ Performance mode is a preset, not another mode
+
+One switch writes **the same nine settings the controls above already own** — blur 0, glow 0, motion 0, fog off, 30fps, 70% detail, bloom off, floating floor off, auto-rotate off — plus Resource Manager's **pause-when-covered** and **idle throttle**.
+
+- 🧷 **It only ever tightens** — already at 24fps? it keeps 24, not 30.
+- ↩️ **Switching it off gives your numbers back** — it restores the values it actually wrote, and a knob you moved by hand in the meantime keeps *your* value instead of being silently reverted.
+- 🔍 **Every row stays visible**, so you can see exactly what it did and undo one part of it without undoing the rest.
+- 🚫 **Nothing is removed, hidden or disabled** by the preset — which is the whole point of it being a preset.
+
+### 🗺️ The topography, in detail
+
+- 🌫️ **Background fog** — a haze that begins past the polar grid, under the graph, and reaches the top of the panel. Since **v336** it is drawn as the **scene background in screen space**, not as fog in the world: it cannot orbit, slide or zoom with the map, and it always fills the window. The checkbox turns it on and off; the scene still knows a third, older "full fog" mode internally (`topoFog: 0`), which the card deliberately does not offer.
+- ✨ **Bloom** — the glow on every node and beam comes from one post-process pass, not from per-object tricks. Off keeps every emissive colour and drops the multi-pass blur.
+- 🟠 **Floating floor** — the fixed polar grid belongs to the glass shell, so Classic always uses the cheap grid that lives inside the scene. In Desktop 2026 the DOM floor layer is the expensive one: a `150vmax` screen-blended element over the canvas.
+- 📌 **Fix the floor in place** — the in-scene grid is part of the world, so orbiting carried it around and a low angle squashed it into a line. This holds it at the same spot in the window while orbiting, dragging and zooming all keep working. It only means something while the floating floor is **off**, so the row is disabled (not hidden, and keeping its value) whenever the floating floor is showing.
+- 🎚️ **Map detail** — five explicit steps. **This is the one that used to degrade itself:** the map silently stepped its own resolution down whenever a frame ran long, which on a slower machine read as three or four visible “flashes” of the lines getting fuzzier a few seconds after load. It is manual now and stays exactly where you put it — and each step also holds the **composer** (bloom’s mip chain included) at that resolution, so the saving is real instead of a smaller final blit.
+- 🎞️ **Frames per second** — a hard cap, 1 to 60, independent of everything else.
+- 🔄 **Slow auto-rotate** — the drift resumes 12s after you stop. Off parks the view until you orbit it yourself, which is also what lets the scene — and everything composited over it — go genuinely idle.
+
+> 💡 **On a low-powered machine:** glass blur to **0** (0 removes the backdrop layer entirely — `blur(0px)` would still cost one), bloom and the floating floor **off**, detail **70%**, cap **30fps** — or just click **Performance mode** and adjust from there. Every one of those is reversible. 🔁
+
+### 🎚️ Defaults on a fresh install
+
+| Section | Defaults |
+| --- | --- |
+| 🖥️ **Desktop** | tuck panels away **on** · chat background **4%** · glass blur **1px** · glow **100%** · ambient motion **100%** · background fog **on** · bloom **on** · floating floor **on** · floor **pinned** · auto-rotate **on** · map detail **100%** · **60fps** · performance mode **off** |
+| 🧪 **Labs** | dynamic tools **on** · dialect memo **on** · API pool **on** · Keep Live when hidden **on** · built-in **Browser off** |
+| 🧮 **Resource Manager** | all four switches **off** |
+
+Saved settings always win: a fresh copy starts here, and an existing install keeps whatever you already chose until you move that control. 💾
 
 ---
 
@@ -100,28 +208,49 @@ The one-folder design means `storage/` (the token, provider keys, every session
 and the exec allow/deny lists) lives **inside the app folder**. That folder must
 **never** be reachable over HTTP. Everything here is about keeping it that way. 🔒
 
-- 🟡 **Apache** — `storage/.htaccess` ships with the app and denies the whole
-  folder (`Require all denied`, with a 2.2 fallback). `./setup-token.sh`
-  **re-creates it if a deploy lost it**. Just make sure `AllowOverride` lets
-  `.htaccess` apply (the XAMPP installer sets this for you).
+The same rules also cover `tests/`: dev tooling that never runs at runtime, but
+that nobody else needs to read either. The full grid — every path against every
+serving mode, dotfiles and case variants included — is in
+**Security & guardrails → §16**, and the rules are **tested by making the real
+request** (§17). 🧪
+
+- 🟡 **Apache** — `storage/.htaccess` and `tests/.htaccess` ship with the app and
+  deny their whole folder (`Require all denied`, with a 2.2 fallback).
+  `./setup-token.sh` **re-creates the storage one if a deploy lost it**. Just make
+  sure `AllowOverride` lets `.htaccess` apply (the XAMPP installer sets this for
+  you). The app root `.htaccess` also refuses `storage`, `logs`, `tmp`, `sessions`
+  and `tests` as a path segment **at any depth** — a backup or archived copy of the
+  app kept inside the web root brings its own `storage/` and `tests/`, and a copy
+  made before `tests/.htaccess` existed would otherwise serve its test files in
+  full. That guard is `RedirectMatch 403` (mod_alias), not a `RewriteRule`: a child
+  `.htaccess` replaces its parent's per-directory rewrites, so a rewrite never sees
+  the nested path, while mod_alias config merges normally.
 - 🔴 **nginx** — **ignores `.htaccess` entirely**, so you *must* add the rules
   yourself. Ship the included **`nginx.example.conf`** into your `server{}` block
-  (it denies `/router/(storage|logs|tmp|sessions)/`, dotfiles and loose
+  (it denies `storage`, `logs`, `tmp`, `sessions` and `tests` as a path segment **at
+  any depth** — so a backup or an archived copy of the app kept inside the web root
+  cannot expose its own `config.json` — plus dotfiles and loose
   `.json/.log/.ini/.bak/.key/.pem` files), then `nginx -t && systemctl reload nginx`.
-- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage`
-  segment, e.g.:
+  A file whose *name* merely contains one of those words (`ui/js/storage.js`, `ui/js/tests.js`)
+  is still served.
+- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage` and
+  `tests` segments, e.g.:
   ```xml
   <configuration><system.webServer><security><requestFiltering>
-    <hiddenSegments><add segment="storage" /></hiddenSegments>
+    <hiddenSegments>
+      <add segment="storage" /><add segment="logs" /><add segment="tmp" />
+      <add segment="sessions" /><add segment="tests" />
+    </hiddenSegments>
   </requestFiltering></security></system.webServer></configuration>
   ```
 - 🧪 **The PHP built-in server** (`start-php.bat` / `php serve.php`) already
-  refuses `/storage`, `/logs`, `/tmp`, `/sessions` and dotfiles with a `403` — no
-  config needed.
+  refuses `/storage`, `/logs`, `/tmp`, `/sessions`, `/tests` and dotfiles with a
+  `403` — no config needed.
 - ✅ **Verify it, don't assume it.** After any deploy, fetch
-  `https://your-host/router/storage/config.json` in a private window. You must get
-  **403 / 404** — never JSON. If you see JSON, stop and fix the rule above before
-  doing anything else. 🚨
+  `https://your-host/router/storage/config.json` **and**
+  `https://your-host/router/tests/js/run.mjs` in a private window. You must get
+  **403 / 404** for both — never JSON or source. If you do, stop and fix the rule
+  above before doing anything else. 🚨
 
 ### 🔑 First run
 The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
@@ -148,10 +277,17 @@ One rail for everything about the selected agent:
 
 Every setting has a 🔒 **lock**: unlocked agents follow the global value live; a lock pins the agent to its own value so a global change never moves it. 🔏
 
-> 🗂️ **Config, tidied.** The Config tab is split into collapsible sections
-> (**Interface / Limits & Budgets / Permissions / Throttle & Limiter**) with a
-> live status badge on each header — and it **rescues numbers you typed but
-> haven't Saved yet**, so switching tabs mid-edit never silently discards them.
+> 🗂️ **Config, tidied.** The Config tab is split into collapsible sections —
+> **Interface · Limits & Budgets · Permissions · Labs · Resource Manager ·
+> Throttle / Limiter · MCP Client · MCP Server**, with **Desktop** appended as its
+> own card (see *Config → Desktop* above) — each carrying a live status badge on
+> its header. It also **rescues numbers you typed but haven't Saved yet**, so
+> switching tabs mid-edit never silently discards them.
+
+> 🖥️ **Two interfaces, one switch.** **Interface** (the first control in Config)
+> picks the shell — **Classic** by default, **Desktop 2026** on request. Both are
+> the same app, the same features and the same store; the full comparison and the
+> screenshots live in *Two interfaces, one switch* above. 🔁
 
 ---
 
@@ -366,7 +502,7 @@ Got several keys for one provider — a handful of free accounts, a team key, a 
 - 🔁 **Rotate after N requests** — set the number and the pool hands out the next key when one reaches it (`0` = every call).
 - 🎯 **Pin a key to a model** — tick *Only this model* and enter a model # (like `#63BET7`) or a model id, and that key circles **just that model** while everything else keeps the single key.
 - 😴 **429s get rested** — a rate-limit refusal puts a key on a **60-second cooldown** and the next call reaches for another, so one exhausted free tier never stalls the whole provider.
-- 🧷 **Your explicit key still wins** — an agent's own Key Override always takes precedence, and with the pool off you get the single key exactly as before.
+- 🧷 **Your explicit key still wins** — an agent's own Key Override always takes precedence. The feature is **on** by default and stays completely inert until a provider actually carries pool keys (empty pool → the single provider key, exactly as before); switch it off in **Config → Labs** to ignore pools entirely.
 
 It stacks with the pacer: every key is counted in its **own** bucket 📈, so a busy fleet spreads its load instead of slamming one ceiling.
 
@@ -384,6 +520,8 @@ It stacks with the pacer: every key is counted in its **own** bucket 📈, so a 
 ![The live network graph — agents, providers and traffic](screenshots/mainscreen.png)
 
 The whole loop as a living map. Every activated agent and provider becomes a glowing node, and each exchange paints a dotted line whose dots travel the way the traffic actually moved.
+
+> 🎛️ **It is also the most expensive thing in the app**, so every visual it owns has a switch in **Config → Desktop** — fog, bloom, the floating floor, auto-rotate, map detail and the frame cap. That card — every knob, what it costs and what it defaults to — is detailed in *Config → Desktop* above. 🧮
 
 - 🧑 **You** — the red node at the heart of the graph, with a live card: 📨 prompts sent, 💬 replies, 🤖 agents online, ⚙️ working now, 🪙 session tokens and 📡 fleet average ping.
 - 🤖 **Agent nodes** — one per activated agent, ringed in its own colour, showing its role, model, ⚙️ tool calls and ⬡ token spend, with 💧 ripple rings while it works.
@@ -523,7 +661,7 @@ Take your work with you. 📦
 | 🐚 `exec` (shell) | **off** | allowlist + absolute deny + no shell |
 | 🐍 `run_code` | **off** | per-interpreter level (Blocked / Scripts / Full) |
 | 🌐 Built-in browser | **off** | `403`, http/https only, block list, SSRF guard |
-| 🔁 API pool | **off** | single key used exactly as before |
+| 🔁 API pool | **on** | only engages for a provider that *has* pool keys — with none, `pickKey` returns null and the single provider key is used exactly as before |
 | 🖥️ MCP server | **off** | per-friend scoped tokens, audit log |
 | 🟢 Auto-approve | **off** | every write still asks |
 | 🕶️ Run while tab hidden | **off** | a background loop can't bill you silently |
@@ -534,29 +672,110 @@ Take your work with you. 📦
 - **🧹 Error hygiene** — failures come back as `{"error": "..."}` with HTTP `400` and a message **meant for the model**, and `display_errors` stays off so stack traces and filesystem paths never leak to a browser.
 - **🔍 Observability for you** — a live **Run trace** and an MCP audit log mean every model turn and tool call is inspectable after the fact.
 
-### 🗄️ 16. `storage/` is never web-served
+### 🗄️ 16. `storage/` is never web-served — in **every** serving mode
+
 - **🔑 What it holds.** The access token, every provider API key, the state
   bundle, **every session transcript**, and the **exec allow/deny lists** that
   decide which shell commands an agent may run. It is the most sensitive folder
-  in the app.
-- **🟡 Apache — denied by a file that ships and self-repairs.** `storage/.htaccess`
-  is tracked in the repo and refuses the whole folder with **`Require all denied`**
-  (plus an Apache 2.2 `Order/Deny` fallback so a host without `mod_access_compat`
-  gets a clean `403`, not a 500). `./setup-token.sh` **re-creates it if it's
-  ever missing.**
-- **🔴 nginx — operator rules, shipped as `nginx.example.conf`.** nginx never
-  reads `.htaccess`, so the example config denies `storage/` (and `logs/`, `tmp/`,
-  `sessions/`), all dotfiles, and loose `.json` / `.log` / `.ini` / `.bak` /
-  `.key` / `.pem` files — copy it into your `server{}` block.
-- **🔵 IIS** — a `web.config` `hiddenSegments` entry blocks the `storage` segment.
-- **🧪 The built-in server** refuses `/storage`, `/logs`, `/tmp`, `/sessions` and
-  dotfiles with `403` in `serve.php` — the same policy, no config.
-- **🚨 Verify, don't trust.** After deploying, request
-  `/router/storage/config.json` from an incognito tab. You must see **403 / 404**.
-  If you see JSON, the folder is exposed — fix it before anything else.
+  in the app, and the one-folder design puts it *inside* the web root — so the
+  refusal has to be part of the app, not a step you remember. 🧠
+- **🧭 Same policy everywhere.** `storage/` is not special-cased: `storage`, `logs`,
+  `tmp`, `sessions` and `tests` are refused as **path segments**, in **all four**
+  serving modes, and the dev tooling is treated exactly like the secrets.
+
+| What is requested | 🧪 `serve.php` | 🟡 Apache | 🔴 nginx | 🔵 IIS |
+| --- | --- | --- | --- | --- |
+| `storage/config.json`, `state.json`, sessions | **403** | **403** | **404** | **404** |
+| `tests/php/…`, `tests/js/…` | **403** | **403** | **404** | **404** |
+| The bare folders (`/storage`, `/tests/`) — no listing either | **403** | **403** | **404** | **404** |
+| **Any depth**: `<copy>/storage/config.json`, `<copy>/tests/…` | **403** | **403** | **404** | **404** |
+| `…/STORAGE/state.json` (case variant) | **403** | **403** | **404** | **404** |
+| Dotfiles (`.htaccess`, `.git`, `.env`, `.htpasswd`) | **403** | `.ht*` denied by Apache itself ¹ | **404** | deny ¹ |
+| Loose `.json` `.log` `.ini` `.bak` `.key` `.pem` outside `storage/` | served ² | served ² | **404** | served ² |
+| `/api`, `/api/sessions`, `/api/config` | **served** | **served** | **served** | **served** |
+| `ui/js/tests.js`, `ui/js/storage.js`, `/testsuite/` | **served** | **served** | **served** | **served** |
+
+<sub>¹ Apache's own default config blocks `.ht*`; `.git`/`.env` in a web root need a rule of their own, which `nginx.example.conf` already carries for nginx. ² These only exist if something wrote them there — `storage/` never is.</sub>
+
+- **🪆 Why “any depth” matters.** A second copy of the app — a backup, an
+  archive of an older version, a folder kept for comparison — brings its **own**
+  `storage/` with the same token and keys in it, and its `tests/` may predate
+  `tests/.htaccess`. A root-only check served all of that. The guard is therefore a
+  **segment** rule, not a prefix rule: anything named `storage` anywhere in the path
+  is refused, which is why `https://host/router/old-copy/storage/config.json`
+  answers `403` instead of a token.
+- **🧠 Why Apache needs `RedirectMatch`, not just a `RewriteRule`.** In
+  per-directory context a child `.htaccess` **replaces** its parent's rewrite rules
+  unless it opts into `RewriteOptions Inherit` — and every copy of this app ships
+  its own root `.htaccess`, so a rewrite in the outer app never sees
+  `<copy>/tests/…`. mod_alias configuration *is* merged down the tree, so the
+  shipped `RedirectMatch 403` holds no matter what a nested folder declares. (Found
+  with an Apache `rewrite:trace3` log: once the request maps into the copy, the
+  parent's rules are skipped entirely.)
+- **🚫 API routes are exempt — deliberately.** They are **endpoints, not files**.
+  The sidebar asks for `/api/sessions` to list sessions; a rule that matched the
+  word refused that call and broke the UI. No API route maps onto a path on disk —
+  the handlers open `storage/` themselves, server-side.
+- **🎯 Segment-anchored, not substring.** `ui/js/tests.js`, `ui/js/storage.js` and
+  `/testsuite/` are still served: only a folder actually named `tests` is refused.
+- **🔠 Case-insensitive on purpose.** Windows and macOS disks resolve
+  `/STORAGE/state.json` to the real file, so a case-sensitive check was not a
+  check at all — `serve.php` lower-cases every segment, Apache uses `NC` / `(?i)`,
+  and nginx uses `~*`.
+- **🧾 No source either.** `serve.php` refuses any `.php` request except the API
+  front controller, so a mistyped path can't print PHP source as text; nginx is
+  told to deny dotfiles and loose data files (`.json`, `.log`, `.ini`, `.bak`,
+  `.key`, `.pem`) even outside `storage/`.
+- **🟡 Apache files that ship and self-repair.** `storage/.htaccess` refuses its
+  whole folder with `Require all denied` (plus an Apache 2.2 `Order/Deny` fallback,
+  so an old host gets a clean `403` rather than a `500`), `tests/.htaccess` does
+  the same for the dev tooling, and `./setup-token.sh` **re-creates the storage one
+  if a deploy lost it**.
+- **🚨 Verify, don't trust.** After deploying, ask for both — in a private window:
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/storage/config.json   # want 403 / 404
+  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/tests/js/run.mjs       # want 403 / 404
+  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/api/sessions           # want 401, never 403
+  ```
+  JSON or source in the first two means the folder is exposed — stop and fix the
+  rule before anything else. 🛑
 - **🏰 The strongest option:** keep `storage/` **outside** the document root. If
-  the one-folder design forces it inside, the deny rule above is mandatory, not
+  the one-folder design forces it inside, the deny rules above are mandatory, not
   optional.
+
+### 🧪 17. The guards are proven, not assumed
+
+A guard nobody requests is a guard you don't have, so each serving mode has a test
+that **makes the real request** and fails loudly when a path comes back:
+
+| Test | What it actually does |
+| --- | --- |
+| 🧪 `guards.test.php` | Boots `serve.php` on a loopback port and requests the live paths — files, bare folders, case variants, dotfiles, the `/api/*` exemption and lookalike names |
+| 🟡 `apacheGuards.test.php` | Boots the local Apache with this folder as `DocumentRoot` and `AllowOverride All`, so the **shipped `.htaccess` files themselves** are what answer |
+| 🔴 `nginxGuards.test.php` | Lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE — the engine nginx matches with — so a rule that reopens a hole fails without nginx installed |
+| 🪆 nested-copy checks | `guards.test.php` requests nested paths directly; `apacheGuards.test.php` does the same against the archived copy when one is present — the case a root-anchored rule misses |
+
+Run them with the rest of the suite (*Tests*, below). 🌱
+
+### 🌐 18. Closed by default in the browser, too
+
+- 🚫 **No CORS wildcard — deliberately.** The API used to answer with
+  `Access-Control-Allow-Origin: *`, which let **any** website on the internet
+  `fetch()` this server and read the answers: every conversation, the memory and
+  the whole config. The UI is served from this same origin and never needed it.
+  Cross-origin is now refused unless the origin is explicitly listed in
+  `ROUTER_CORS_ORIGINS` (comma-separated), and `Vary: Origin` keeps caches honest.
+- 🛡️ **Security headers on every Apache response** — `X-Content-Type-Options:
+  nosniff` (a `.js` can’t be talked into being a script of another type),
+  `X-Frame-Options: DENY` (the console can’t be framed inside another site, so no
+  clickjacking a SAVE button) and `X-XSS-Protection: 1; mode=block`. The built-in
+  server adds `nosniff` to everything it serves, SPA fallback included.
+- 🧊 **Cache policy is part of the contract** — HTML is `no-store`; JS and CSS are
+  `no-cache, must-revalidate`, so a browser can never pair a new module with a
+  month-old one (which is how an old `api.js` once ran beside a new `tools.js`).
+  The UI you audited is the UI that loads. ✅
+- 🔑 **The token never rides along** — it is stripped from every state bundle
+  before that bundle is mirrored to the server or synced to another device (§1).
 
 > ⚖️ **The honest caveat:** the app is only as safe as the operator's switches. Turn
 > everything on, auto-approve writes, and point the root at `/` — and you have built
@@ -673,26 +892,85 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 ├── ui/
 │   ├── js/               # app modules: store · api · stateSync · tools ·
 │   │                     #   toolManifest · toolProtocol · harness · nativeTools ·
-│   │                     #   apiPool · trace · perf · brainlab · alwaysOn · memory…
+│   │                     #   apiPool · trace · perf · brainlab · alwaysOn · memory ·
+│   │                     #   desktop2026 (the glass shell) · ifaceMode · drawerState
 │   │   └── components/   # chat · sidebar · routingChart · browserView · topology3d/…
-│   └── css/
+│   └── css/              # base · layout · chat · components · topology · desktop2026
 ├── tools/
 │   ├── gen-harness.php   # generates ui/js/harness.data.js
 │   └── cacert.pem
 ├── tests/
-│   ├── php/              # sandbox · harness · mcp · mcpServer
-│   └── js/
+│   ├── run.mjs           # the whole suite: PHP, then JS
+│   ├── php/              # sandbox · harness · mcp · mcpServer · mcpStdio ·
+│                         #   guards · apacheGuards · nginxGuards  (run.php)
+│   └── js/               # agentSearch · context · curl · drawerState ·
+│                         #   harness · ifaceMode · latency · nativeTools ·
+│                         #   stripToolCall                       (run.mjs)
 ├── screenshots/
 ├── storage/              # JSON data (config, state, sessions) — git-ignored
+├── cleancopy/            # clean, credential-free copy of the app (see below)
 ├── serve.php             # php -S router (no Apache needed)
 ├── start.bat / start.sh  # launchers
 ├── setup-xampp.bat/.ps1  # one-click Apache + PHP (Windows)
 ├── setup-token.sh        # create / rotate the access token (+ storage guard)
-├── nginx.example.conf    # deny web access to storage/ on nginx (copy into server{})
+├── nginx.example.conf    # deny storage/ + tests/ on nginx (copy into server{})
 ├── FRIENDS.md            # hand this to a friend to connect over MCP
 ├── CHANGELOG.md
 └── README.md
 ```
+
+---
+
+## 🧼 Clean copy — `cleancopy/`
+
+`cleancopy/` is a complete, runnable copy of this app with **nothing personal in it**: no access token, no provider keys, no MCP servers, no saved state, no session transcripts, no logs or approvals file, no browser profile and no `.htpasswd`. Drop it on any host with PHP and it boots into a first-run state the app fills in itself.
+
+```
+cleancopy/
+├── storage/
+│   ├── .htaccess          # the same deny file the app ships
+│   ├── models.json        # the three hard-coded templates, api_key empty
+│   └── sessions/          # empty
+├── sandbox/               # empty
+└── …                      # the rest of the tree, current with the code
+```
+
+- **The model templates are kept on purpose.** `storage/models.json` carries the same ChatGPT-4 / Claude 3.5 / Gemini 2.0 rows that `Config::saveDefaultModels()` writes — name, provider, endpoint, model, priority and role intact — with every `api_key` empty, so the app opens with a populated model list and no credentials. Paste your own key into a provider row to use them.
+- **`storage/` is the only thing that differs from a live install**, and it is exactly the set of files the `.gitignore` lets ship (`storage/.htaccess`, `storage/models.json`, `sessions/.gitkeep`). Everything else that a running install creates — `config.json`, `state.json`, `exec.log`, `mcp.log`, `exec-approvals.json`, `browser.json`, `browser-profile/`, the session transcripts — is deliberately absent and is recreated on first use. `config.json` starts without a `sandbox.token`; run `php serve.php --ensure-token` (or the launchers) when you want one.
+- **Left out of the copy:** `the-copy-before-the-huge-ui-change/` (a reference archive with its own `storage/` and `tests/`), `Autonomous.zip`, `.idea/`, `.vscode/`, `.freebuff/`, `.htpasswd` and the handover notes (`STATUS.md`, `README-HANDOVER.md`). `FRIENDS.md` is kept because this README links to it.
+- **Its `.git` is preserved.** `cleancopy/` is a clone of the upstream repo (`origin` → `MBHudson/Autonomous`), and the working folder this README lives in has no `.git` at all — so deleting that folder would throw away the only local history. Refresh the files, commit when you are ready to publish.
+- **It ships the current defaults.** A fresh copy (or any install with no saved settings) opens with the values in *Defaults on a fresh install* above — tuned for a low-powered GPU, with every knob individually adjustable afterwards. They live in `ui/js/desktop2026.js` (the `setting(key, default)` calls and `CHAT_ALPHA_DEFAULT` / `BLUR_PX_DEFAULT`), `ui/js/store.js` (the settings block) and `ui/css/desktop2026.css` (the `--d26-*` fallbacks), so a copy and a fresh install can never disagree. 🎛️
+
+---
+
+## 🧪 Tests
+
+> 🧰 **Optional dev tooling.** Nothing in `tests/` is loaded by the app or imported by the UI — the folder exists only to be run from a terminal, and deleting it changes nothing about how the app behaves. **The app itself stays plain PHP with no build or dependency step:** drag the folder onto a host and it runs. Node is needed only if *you* choose to run the JavaScript tests; `php tests/php/run.php` needs nothing beyond the `php` you already have. No `package.json`, no `node_modules`, nothing to install.
+>
+> 🔒 `tests/` is not needed at runtime, and **every serving mode refuses it**, the same way it refuses `storage/`: `serve.php` answers **403** for anything under `/tests` (and for a `storage`, `logs`, `tmp`, `sessions` or `tests` folder **at any depth**, so a copy of the app kept inside the web root cannot expose its own `config.json`), `tests/.htaccess` (which ships) plus the root `.htaccess`'s any-depth `RedirectMatch` deny it on Apache, and `nginx.example.conf` covers it for nginx in every folder, not just the root. **API routes are exempt in all three** — `/api/sessions` is the session *list*, not the `storage/sessions` folder, and no API route maps onto a path from disk. Leaving `tests/` out of a deploy is still the tidiest option — it holds no config, keys or tokens either way.
+
+One command runs the whole suite:
+
+```bash
+node tests/run.mjs      # PHP first, then JS
+```
+
+Either half runs on its own, which is what you want while working on one of them:
+
+| Command | What it runs |
+| --- | --- |
+| 🧪 `node tests/run.mjs` | Both suites, PHP then JS |
+| 🐘 `php tests/php/run.php` | PHP only — sandbox, harness, MCP client/server, HTTP guards (`serve.php`, Apache `.htaccess`, and the nginx rules via PCRE) |
+| 🟨 `node tests/js/run.mjs` | JS only — context, curl, drawer state, harness, interface mode, latency, native tools, tool-markup stripping |
+
+- **Each test file is its own process**, exactly as if you had run it by hand, so one file's globals or a failed import cannot colour another's result.
+- **Naming is the registration.** A `*.test.mjs` in `tests/js/` or a `*.test.php` in `tests/php/` is picked up automatically — there is no list to update. Helpers (like `tests/php/mcp-mock-server.php`, which `mcp.test.php` spawns itself) simply don't use the `.test.` name.
+- **A file passes by exiting `0`.** A failure prints that file's full output — stdout and stderr — and the runner exits `1` if anything failed, so CI or a pre-commit hook can just check the status.
+- **A suite that cannot run fails the command** instead of being quietly skipped: with no `php` on PATH you get `PHP suite did not run` and exit `1`. Point `PHP_BINARY` at the binary if it lives somewhere unusual.
+- **No internet and no browser.** The JS tests import the real modules (`tools.js`, `utils.js`, `nativeTools.js`) straight into Node; the PHP ones use a temporary sandbox root and a local stdio MCP mock. The only servers are the ones two guard tests start for themselves on random loopback ports — `php -S` for `serve.php`'s own router, and the local Apache for the shipped `.htaccess` files — and each shuts its server down when it finishes. `nginxGuards.test.php` starts nothing at all: it lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE, which is the engine nginx matches with. One Apache detail it has to handle: Apache reads `.htaccess` from directories **above** `DocumentRoot` too, so a copy of the app nested inside another copy would have the parent's file parsed as server config (`<IfModule not allowed here`) and answer `500` to everything — which is why the generated config pins every ancestor to `AllowOverride None` and leaves only the shipped files in play.
+- **End a test file with its own count**, e.g. `58 passed, 0 failed`. The runners read that last line for the per-file summary and the total, and never trust the count of a file that failed.
+
+> ⚠️ Some tests **skip** instead of pass, and each prints a `SKIP:` line when it does: `sandbox.test.php` skips its git checks when git is missing or its commands are refused in the temporary directory; `guards.test.php` skips if `proc_open` is disabled, no loopback port can be bound, or a checkout has no `storage/sessions/*.json` yet; and `apacheGuards.test.php` skips when there is no Apache to boot — point `ROUTER_HTTPD` at one to run it (its nested-copy checks also skip when no second copy of the app is present, as in `cleancopy/`). A green run therefore does not cover those cases — read the line, it is not a pass.
 
 ---
 

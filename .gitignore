@@ -30,3 +30,5 @@ sandbox/*
 Thumbs.db
 *.tmp
 *.log
+
+.fake

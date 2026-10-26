@@ -21,9 +21,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=330';
-import { persistence } from './persistence.js?v=330';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=330';
+import { store } from './store.js?v=337';
+import { persistence } from './persistence.js?v=337';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=337';
 
 export class AlwaysOn {
   /**
@@ -302,19 +302,25 @@ export class AlwaysOn {
     const ac = new AbortController();
     this.aborters.set(agent.id, ac);
 
+    // This run owns its node from dispatch, exactly like a typed turn.
+    const live = this.chat._makeLiveNode?.(agent) || null;
     try {
       const reply = await this.chat._callAgent(
-        prompt, agent, ac.signal, this.chat._makeLiveNode?.(agent), null, { autonomous: true },
+        prompt, agent, ac.signal, live, null, { autonomous: true },
       );
       const text = (reply && reply.content) || '';
 
-      // The turn itself is posted by _callAgent's caller normally; here the
-      // scheduler owns the transcript so an unattended reply still shows up.
-      this.chat._addMessage?.({
+      // Commit through the same function a typed turn uses. Appending with
+      // _addMessage instead left the streaming node on screen forever with a
+      // blinking caret and stacked a second bubble beside it.
+      const msg = {
         role: 'agent', content: text, agentId: agent.id,
         timestamp: Date.now(), autonomous: true,
+        reasoning: (reply && reply.reasoning) || null,
         toolCalls: (reply && reply.toolCalls) || null,
-      });
+      };
+      if (typeof this.chat._replaceLiveNode === 'function') this.chat._replaceLiveNode(live, msg);
+      else this.chat._addMessage?.(msg);
 
       if (reply && reply.completed) {
         this._note(agent, `goal declared complete after ${run.iterations} iteration(s)`);

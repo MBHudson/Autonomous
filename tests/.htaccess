@@ -1,0 +1,22 @@
+# Deny ALL web access to tests/.
+#
+# This folder is development tooling: the app never loads it, the UI never
+# imports it, and nothing in it is used at runtime. Its .mjs files are plain
+# static text -- which is exactly why a default config hands them out -- and the
+# PHP test scripts must never be executed from a browser.
+#
+# serve.php refuses /tests the same way it refuses /storage; this file is the
+# Apache equivalent. Leaving tests/ out of a deploy is still the cleanest option.
+#
+# Portable across Apache 2.2 and 2.4: the 2.4 directive is used where the authz
+# core exists, and the 2.2 directive only where it does not -- so a host without
+# mod_access_compat gets a clean 403 instead of an "unknown directive" 500.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

@@ -10,10 +10,10 @@
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=330';
-import { esc } from '../../utils.js?v=330';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=330';
-import { McpPanel } from './mcpPanel.js?v=330';
+import { store } from '../../store.js?v=337';
+import { esc } from '../../utils.js?v=337';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=337';
+import { McpPanel } from './mcpPanel.js?v=337';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',
@@ -443,17 +443,20 @@ export class PopupCard {
   }
 
   /** Keep the card beside its node, inside the container. */
-  place(x, y, w, h, nodeRadius = 0) {
+  place(x, y, w, h, nodeRadius = 0, topInset = 0) {
     if (!this.isOpen) return;
     const cw = this.el.offsetWidth || 280;
     const ch = this.el.offsetHeight || 300;
     const pad = 10;
+    // The desktop skin pins the header over the full-screen map, so the card
+    // must start below it or its close button hides under the bar.
+    const topPad = pad + topInset;
     const gap = 18 + Math.min(nodeRadius, 120);
     let left = x + gap;
     if (left + cw > w - pad) left = x - cw - gap;
     if (left < pad) left = Math.max(pad, Math.min(w - cw - pad, x - cw / 2));
     let top = y - ch * 0.3;
-    top = Math.max(pad, Math.min(h - ch - pad, top));
+    top = Math.max(topPad, Math.min(h - ch - pad, top));
     // Remember where we landed so the inline ask box can dock just below us.
     this._rect = { left: Math.round(left), top: Math.round(top), w: cw, h: ch };
     this.el.style.transform = `translate3d(${this._rect.left}px, ${this._rect.top}px, 0)`;

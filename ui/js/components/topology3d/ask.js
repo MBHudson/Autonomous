@@ -21,9 +21,9 @@
 // and it is isolated from the main transcript. The traffic still shows on the
 // graph because chat.askAgentInline emits the normal flow events.
 
-import { store } from '../../store.js?v=330';
-import { audio } from '../../audio.js?v=330';
-import { k } from '../../storage.js?v=330';
+import { store } from '../../store.js?v=337';
+import { audio } from '../../audio.js?v=337';
+import { k } from '../../storage.js?v=337';
 
 const VOICE_KEY = k('topoAskVoice');
 const PAD = 12;
@@ -206,16 +206,19 @@ export class AskDock {
   closeReply() { this.replyEl.hidden = true; }
 
   /** Dock the prompt box just under its card (overlap when there is no room). */
-  placePrompt(rect, w, h) {
+  placePrompt(rect, w, h, topInset = 0) {
     if (this.promptEl.hidden) return;
     const pw = this.promptEl.offsetWidth || 290;
     const ph = this.promptEl.offsetHeight || 92;
+    // Never let the box (or its buttons) slide under the fixed header.
+    const minTop = PAD + topInset;
     let left = rect ? rect.left : 0;
     left = Math.max(PAD, Math.min(w - pw - PAD, left));
     // Prefer just below the card; if that runs off the bottom (phones, a card
     // low on the screen), let it overlap upward rather than disappear.
-    let top = rect ? rect.top + rect.h + 8 : PAD;
-    if (top + ph > h - PAD) top = Math.max(PAD, h - ph - PAD);
+    let top = rect ? rect.top + rect.h + 8 : minTop;
+    if (top < minTop) top = minTop;
+    if (top + ph > h - PAD) top = Math.max(minTop, h - ph - PAD);
     this.promptEl.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   }
 
@@ -224,7 +227,7 @@ export class AskDock {
    * Passing the node's live screen x (or null when it is off-view) lets the
    * box flip sides as the operator orbits the graph.
    */
-  placeReply(nodeScreenX, w) {
+  placeReply(nodeScreenX, w, topInset = 0) {
     if (this.replyEl.hidden) return;
     const rw = this.replyEl.offsetWidth || 320;
     const side = (nodeScreenX != null && nodeScreenX > w / 2) ? 'left' : 'right';
@@ -234,7 +237,9 @@ export class AskDock {
       this.replyEl.classList.toggle('side-right', side === 'right');
     }
     const left = side === 'left' ? PAD : Math.max(PAD, w - rw - PAD);
-    this.replyEl.style.transform = `translate3d(${Math.round(left)}px, ${PAD}px, 0)`;
+    // Start below the fixed header so the close button stays clickable.
+    const top = PAD + topInset;
+    this.replyEl.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
   }
 
   dispose() {

@@ -15,9 +15,10 @@
 // can carry a POOL and this module hands out the next key, rotating after a
 // number of requests the operator sets.
 //
-// Feature-gated: Config → Labs → "API pool" (settings.apiPool, default OFF).
-// Off = nothing here is consulted and the single provider key is used exactly
-// as before.
+// Feature-gated: Config → Labs → "API pool" (settings.apiPool, default ON).
+// It only engages for a provider that carries pool keys; with none, pickKey
+// returns null and the single provider key is used exactly as before. Off =
+// nothing here is consulted at all.
 //
 // Counters and cooldowns are SESSION-ONLY on purpose. Persisting "this key has
 // served 7 of 10" buys little, and a stale counter only ever rotates away from
@@ -25,8 +26,8 @@
 // A 429 puts a key on cooldown so the next call tries a different one instead
 // of spending the same refusal again.
 
-import { store } from './store.js?v=330';
-import { agentCode } from './utils.js?v=330';
+import { store } from './store.js?v=337';
+import { agentCode } from './utils.js?v=337';
 
 const counts = new Map();      // keyId -> requests used this round
 const cooldown = new Map();    // keyId -> epoch ms a key is refused until
@@ -35,7 +36,8 @@ const cursor = new Map();      // providerId -> last key index handed out
 const DEFAULT_COOLDOWN_MS = 60 * 1000;
 
 export function poolEnabled() {
-  return (store.get('settings') || {}).apiPool === true;   // default OFF
+  const s = store.get('settings') || {};
+  return s.apiPool !== false;   // default ON
 }
 
 /** How many requests one key serves before rotating. 0/blank => every call. */

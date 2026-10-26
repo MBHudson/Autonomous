@@ -10,12 +10,12 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=330';
-import { renderMarkdown } from '../markdown.js?v=330';
-import { CodeBlock, splitFences } from './codeBlock.js?v=330';
-import { createAvatar } from './avatar.js?v=330';
-import { store } from '../store.js?v=330';
-import { audio, AudioController } from '../audio.js?v=330';
+import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=337';
+import { renderMarkdown } from '../markdown.js?v=337';
+import { CodeBlock, splitFences } from './codeBlock.js?v=337';
+import { createAvatar } from './avatar.js?v=337';
+import { store } from '../store.js?v=337';
+import { audio, AudioController } from '../audio.js?v=337';
 
 const TOOL_DISPLAY_LIMIT = 8000;
 
@@ -334,10 +334,12 @@ export class MessageRenderer {
     // it, so flipping it changed nothing.
     const showCode = store.get('settings.showCode') !== false;
     if (!showCode) {
+      // Plain text: no code containers, but still a WHOLE message. This used to
+      // `return body` -- a node with no wrapper, no header and no actions -- and
+      // every caller that swaps a streaming placeholder for it was replacing one
+      // kind of element with another.
       if (raw.trim()) body.appendChild(renderMarkdown(raw));
-      return body;
-    }
-    if (msg.sections && msg.sections.length > 0) {
+    } else if (msg.sections && msg.sections.length > 0) {
       // Legacy path: callers that pre-split into sections.
       const prose = raw.replace(/```[A-Za-z0-9_+#.-]*\r?\n?[\s\S]*?```/g, '').trim();
       if (prose) body.appendChild(renderMarkdown(prose));

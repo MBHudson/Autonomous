@@ -23,17 +23,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=330';
-import { store } from '../../store.js?v=330';
-import { k, K } from '../../storage.js?v=330';
-import { latency } from '../../latency.js?v=330';
-import { SceneCore, webglAvailable } from './scene.js?v=330';
-import { ForceLayout } from './layout.js?v=330';
-import { NodeView, Nebula } from './nodes.js?v=330';
-import { Beam } from './beams.js?v=330';
-import { LabelLayer } from './labels.js?v=330';
-import { PopupCard } from './popup.js?v=330';
-import { AskDock } from './ask.js?v=330';
+import { TopologyGraph } from '../topology.js?v=337';
+import { store } from '../../store.js?v=337';
+import { k, K } from '../../storage.js?v=337';
+import { latency } from '../../latency.js?v=337';
+import { SceneCore, webglAvailable } from './scene.js?v=337';
+import { ForceLayout } from './layout.js?v=337';
+import { NodeView, Nebula } from './nodes.js?v=337';
+import { Beam } from './beams.js?v=337';
+import { LabelLayer } from './labels.js?v=337';
+import { PopupCard } from './popup.js?v=337';
+import { AskDock } from './ask.js?v=337';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
@@ -93,6 +93,8 @@ export class Topology3D extends TopologyGraph {
     store.on('agent:ask-inline:reply', (d) => this.ask?.settle(d));
     store.on('latency:changed', () => this._queueInfoRefresh());
     store.on('metrics:changed', (d) => { if (d?.sessionId) this.sessionId = d.sessionId; this._queueInfoRefresh(); });
+    // Desktop → Topography: fog mode + frame cap.
+    store.on('topo:settings', () => this._applyTopoSettings());
 
     document.getElementById('topoModeBtn')?.addEventListener('click', () => {
       this.setMode(this.mode === '3d' ? '2d' : '3d');
@@ -117,6 +119,7 @@ export class Topology3D extends TopologyGraph {
       this.containerEl.appendChild(this.root);
 
       this.core = new SceneCore(this.root);
+      this._applyTopoSettings();
       this.layout = new ForceLayout();
       this.labels = new LabelLayer(this.root);
       this.popup = new PopupCard(this.root, {
@@ -373,6 +376,10 @@ export class Topology3D extends TopologyGraph {
       if (!keep.has(id)) { v.dispose(); this.views.delete(id); }
     }
 
+    // Keep node fog in step with the Desktop → Fog setting.
+    const fogged = !!this.core?.nodesFogged;
+    this.views.forEach(v => v.setFog(fogged));
+
     // One nebula per provider that has agents; tinted by its agents' colors.
     const clusters = new Map();
     this.nodes.forEach(n => {
@@ -419,6 +426,34 @@ export class Topology3D extends TopologyGraph {
     this._applyFocus();
     this._syncBeams();
     this.popup.refresh();
+  }
+
+  /**
+   * Apply the Desktop → Topography settings (fog mode + frame cap) to the
+   * scene, and push the fog flag to every existing node. Safe to call before
+   * the scene or any node exists.
+   */
+  _applyTopoSettings() {
+    if (!this.core) return;
+    const s = store.get('settings') || {};
+    const fogVal = s.topoFog === undefined ? 1 : Number(s.topoFog);
+    // 0 = full fog, 1 = background only, 2 = off (matches the Desktop control).
+    const mode = ['full', 'bg', 'off'][Math.max(0, Math.min(2, Number.isFinite(fogVal) ? fogVal : 1))] || 'bg';
+    try { this.core.setFogMode(mode); } catch { /* scene optional */ }
+    try { this.core.setMaxFps(s.topoFps); } catch { /* scene optional */ }
+    // Quality knobs that live in the scene rather than in CSS. Each one has its
+    // own control in Desktop -> Config, so the performance preset is nothing but
+    // a set of values written to those same settings -- and can be undone one at
+    // a time without losing anything.
+    try { this.core.setBloom(s.topoBloom !== false); } catch { /* scene optional */ }
+    try { this.core.setAutoRotate(s.topoAutoRotate !== false); } catch { /* scene optional */ }
+    try { this.core.setPixelCap(s.topoPixelCap); } catch { /* scene optional */ }
+    // Hold the in-scene grid in place instead of letting an orbit swing it.
+    try { this.core.setGridFixed(s.topoFloorFixed === true); } catch { /* scene optional */ }
+    // Desktop -> Map detail: an explicit render scale, never an automatic one.
+    try { this.core.setQuality(s.topoQuality); } catch { /* scene optional */ }
+    const fogged = !!this.core.nodesFogged;
+    this.views.forEach(v => v.setFog(fogged));
   }
 
   _syncBeams() {
@@ -545,6 +580,11 @@ export class Topology3D extends TopologyGraph {
       if (!fromPopup) this.popup.close();
       this.ask?.closePrompt();
       this.core.holdRotate = false;
+      // Glide the view back to centre "You" once the card is closed, so the
+      // operator is not left on a camera parked over the last node they opened.
+      this._followId = null;
+      this.core.userInteracted = false;
+      this._fitBoost = 1;
     }
     this._applyFocus();
   }
@@ -588,7 +628,7 @@ export class Topology3D extends TopologyGraph {
     this._camTween = null;
     this.core.userInteracted = false;
     this.core.holdRotate = false;
-    if (!this.core.reduced) this.core.controls.autoRotate = true;
+    if (!this.core.reduced && this.core.autoRotateAllowed !== false) this.core.controls.autoRotate = true;
     this._fitBoost = 1;
   }
 
@@ -654,6 +694,9 @@ export class Topology3D extends TopologyGraph {
 
     const w = this.core.width, h = this.core.height;
     const cam = this.core.camera;
+    // The desktop skin pins the header over the full-screen map, so the metrics
+    // card and the ask boxes must clear it or their controls sit under the bar.
+    const topInset = this._headerInset();
     this.labels.place(cam, w, h, this.views, cam.position.distanceTo(this.core.controls.target));
     if (this.popup.isOpen) {
       const v = this.views.get(this._selectedId);
@@ -664,9 +707,9 @@ export class Topology3D extends TopologyGraph {
         const sx = (_v.x * 0.5 + 0.5) * w;
         const sy = (-_v.y * 0.5 + 0.5) * h;
         const rad = Math.abs((_v2.x * 0.5 + 0.5) * w - sx);
-        this.popup.place(sx, sy, w, h, rad);
+        this.popup.place(sx, sy, w, h, rad, topInset);
         // Dock the inline ask prompt just under the card.
-        this.ask?.placePrompt(this.popup._rect, w, h);
+        this.ask?.placePrompt(this.popup._rect, w, h, topInset);
       }
     }
     // The reply box survives the card closing: keep it in whichever top corner
@@ -675,33 +718,62 @@ export class Topology3D extends TopologyGraph {
       const rv = this.views.get(this.ask.replyAgentId);
       let rvx = null;
       if (rv) { _v.copy(rv.group.position).project(cam); rvx = (_v.x * 0.5 + 0.5) * w; }
-      this.ask.placeReply(rvx, w);
+      this.ask.placeReply(rvx, w, topInset);
     }
+  }
+
+  /** How much of the header overlaps the top of the graph, in graph pixels. */
+  _headerInset() {
+    if (!this.root) return 0;
+    const header = document.querySelector('.app > .header') || document.querySelector('.header');
+    if (!header) return 0;
+    const hr = header.getBoundingClientRect();
+    const rr = this.root.getBoundingClientRect();
+    return Math.max(0, Math.round(hr.bottom - rr.top));
   }
 
   _updateLinks() {
     this._linksDirty = false;
     const n = this.links.length;
-    const pos = new Float32Array(n * 6);
-    const col = new Float32Array(n * 6);
-    const c = new THREE.Color();
-    this.links.forEach((l, i) => {
+    // Grow-only capacity. This runs on every frame the layout is still moving,
+    // and it used to allocate two fresh arrays plus two fresh GPU attributes
+    // each time -- a full buffer re-upload for the same few hundred floats.
+    if (!this._linkCap || n > this._linkCap) {
+      this._linkCap = Math.max(16, 1 << Math.ceil(Math.log2(Math.max(1, n))));
+      this._linkPos = new Float32Array(this._linkCap * 6);
+      this._linkCol = new Float32Array(this._linkCap * 6);
+      this.linkGeo.setAttribute('position', new THREE.BufferAttribute(this._linkPos, 3));
+      this.linkGeo.setAttribute('color', new THREE.BufferAttribute(this._linkCol, 3));
+    }
+    const pos = this._linkPos;
+    const col = this._linkCol;
+    const c = this._linkColor || (this._linkColor = new THREE.Color());
+    for (let i = 0; i < n; i++) {
+      const l = this.links[i];
+      const o = i * 6;
       const a = this.views.get(l.from);
       const b = this.views.get(l.to);
-      if (!a || !b) return;
-      pos.set([a.group.position.x, a.group.position.y, a.group.position.z,
-        b.group.position.x, b.group.position.y, b.group.position.z], i * 6);
+      if (!a || !b) {
+        pos.fill(0, o, o + 6);
+        col.fill(0, o, o + 6);
+        continue;
+      }
+      const ap = a.group.position;
+      const bp = b.group.position;
+      pos[o] = ap.x; pos[o + 1] = ap.y; pos[o + 2] = ap.z;
+      pos[o + 3] = bp.x; pos[o + 4] = bp.y; pos[o + 5] = bp.z;
       const working = a.working || b.working;
       const dim = this._focusKeep && !(this._focusKeep.has(l.from) && this._focusKeep.has(l.to)) ? 0.12 : 1;
       const k = l.w * (working ? 1.8 : 1.2) * dim;
       c.copy(a.color).multiplyScalar(k);
-      col.set([c.r, c.g, c.b], i * 6);
+      col[o] = c.r; col[o + 1] = c.g; col[o + 2] = c.b;
       c.copy(b.color).multiplyScalar(k);
-      col.set([c.r, c.g, c.b], i * 6 + 3);
-    });
-    this.linkGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.linkGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    this.linkGeo.computeBoundingSphere();
+      col[o + 3] = c.r; col[o + 4] = c.g; col[o + 5] = c.b;
+    }
+    this.linkGeo.attributes.position.needsUpdate = true;
+    this.linkGeo.attributes.color.needsUpdate = true;
+    this.linkGeo.setDrawRange(0, n * 2);
+    // frustumCulled stays off on this object, so no bounding sphere is needed.
   }
 
   _updateCamera(dt) {

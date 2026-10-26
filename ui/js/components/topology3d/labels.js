@@ -15,8 +15,8 @@
 // the label is moved with a transform (no layout thrash).
 
 import * as THREE from 'three';
-import { esc } from '../../utils.js?v=330';
-import { fmtMs, latencyTier } from '../../latency.js?v=330';
+import { esc } from '../../utils.js?v=337';
+import { fmtMs, latencyTier } from '../../latency.js?v=337';
 
 const _v = new THREE.Vector3();
 
@@ -81,7 +81,7 @@ export class LabelLayer {
   place(camera, width, height, views, focusDist = 200) {
     for (const [id, it] of this.items) {
       const v = views.get(id);
-      if (!v) { it.el.style.opacity = '0'; continue; }
+      if (!v) { this._write(it, { opacity: '0' }); continue; }
       v.group.getWorldPosition(_v);
       // Farther labels are fainter (relative to the orbit focus distance, not
       // NDC z, which is ~1 for everything in a perspective projection).
@@ -90,15 +90,30 @@ export class LabelLayer {
       // Offset below the sphere in world space, scaled by node size.
       _v.y -= v.r * 1.25;
       _v.project(camera);
-      if (_v.z > 1 || _v.z < -1) { it.el.style.opacity = '0'; continue; }
+      if (_v.z > 1 || _v.z < -1) { this._write(it, { opacity: '0' }); continue; }
       const x = (_v.x * 0.5 + 0.5) * width;
       const y = (-_v.y * 0.5 + 0.5) * height;
       // Sessions are small and numerous: name them only on hover/selection.
       const sessionFade = v.type === 'session' ? ((v.hovered || v.selected) ? 1 : 0) : 1;
       const op = depth * (1 - v.dim * 0.88) * sessionFade;
-      it.el.style.opacity = op.toFixed(3);
-      it.el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, 0)`;
-      it.el.style.zIndex = String(1000 - Math.round(_v.z * 1000));
+      // zIndex only has to get the ORDER right, not be sub-pixel exact: bucketing
+      // z to 0.02 steps means a slow camera drift no longer rewrites every
+      // label's zIndex (and forces the style recalc that comes with it) each
+      // frame. The transform/opacity writes are skipped when nothing changed.
+      this._write(it, {
+        opacity: op.toFixed(3),
+        transform: `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, 0)`,
+        zIndex: String(1000 - Math.round(_v.z * 50) * 20),
+      });
+    }
+  }
+
+  /** Apply only the styles that actually changed for one label. */
+  _write(it, next) {
+    for (const key in next) {
+      if (it[key] === next[key]) continue;
+      it[key] = next[key];
+      it.el.style[key] = next[key];
     }
   }
 

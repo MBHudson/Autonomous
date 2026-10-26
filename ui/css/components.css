@@ -412,6 +412,7 @@ body.agent-reordering .agent-editor:hover {
 
 /* Settings dropdown menu */
 .agent-menu {
+  display: none;
   position: absolute;
   top: 100%;
   right: 0;
@@ -423,6 +424,10 @@ body.agent-reordering .agent-editor:hover {
   z-index: 100;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
+/* Open state is a class, not an inline style: the skin was mangling the
+   inline display value ("none" -> "non"), which left the menu dead. */
+.agent-menu.open { display: block; }
 
 .agent-menu-item {
   display: block;
