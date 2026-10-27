@@ -135,11 +135,40 @@ leave the hook on at all. A cold machine, or a scanner reading 280 fresh files, 
 work, so the figure is stated with its conditions rather than as a promise.
 
 It is no longer stated at all, on trust: the check ends **every** run — passing or failing — with what it
-cost, `took: 43.0s (copy 0.4s, PHP 41.6s, JS 1.0s)`, and the hook prints its own end-to-end seconds next to
-it. A quoted cost that nobody re-measures is how *about two minutes* survived as long as it did. The
-breakdown also answers the question the total cannot: the **PHP half is the entire price** — it boots
-`serve.php` on a loopback port, boots Apache against a generated config and spawns an MCP mock server,
-which on Windows is a second of process startup per file — while the JS half runs in about a second.
+cost, `took: 41.0s (copy 0.5s, PHP 39.4s, JS 1.0s)`, and the hook prints its own end-to-end seconds next to
+it. A quoted cost that nobody re-measures is how *about two minutes* survived as long as it did.
+
+The breakdown also answered a question the total could not, and the answer was **not** the one guessed here
+first: the PHP half is the whole price, but not because of the servers. Apache, `serve.php` and the MCP mock
+cost about two seconds *between them*. Per file, two files were 27 of the 41 seconds — `programs.test.php`
+at ~14 (`Programs::list()` is one PowerShell start per look at the process table, ~0.65s, and the feature is
+about what that table says) and `setupToken.test.php` at ~13 (16 real invocations of the recovery script,
+~0.8s each, in an environment where python is deliberately broken so php is what gets used). Both were found
+by timing each file, which is what the phase breakdown in the output is for.
+
+Three of those seconds were removable without weakening anything, so they are gone. **Four `sleep(1)` calls
+in `install.test.php`** existed only to give four snapshots distinct mtimes so the prune order was
+deterministic; the folders are now given known ages by `touch` (the same idiom the stale-lock case above
+already used) and the assertion is *sharper* than the one it replaces — it no longer settles for "at most two
+survive" but states that exactly two do, and that they are the two newest. Names turned out to be the wrong
+identity to phrase that on: snapshot folders are named to the second and a name that has just been pruned is
+free again, so the fourth snapshot can legitimately carry the first one's name — measured, not assumed. **A
+duplicated process-table read** in `programs.test.php` is gone too: the poll now hands back the look that
+satisfied it instead of the test asking the same instant again, which A/B measured at 2.3s. And
+`setup-token.sh` no longer probes php when python has already proved itself — every read and write in that
+script picks python in that case, so the probe was ~150ms proving an interpreter that would never be called.
+(It saves nothing in the case where python is *broken*, which is most of what the test covers: then php is
+the engine and it has to be found.)
+
+Honest accounting of what that bought: **6.5 seconds of work removed** (4s of sleeps, 2.3s of duplicate
+querying, 0.15s of probing), and the end-to-end fresh-copy check moved from 43.0s to 40.9–41.7s on the same
+machine on the same day. The rest of the difference is the noise floor of this setting: a fresh copy is 280
+newly written files plus everything the suites create, and Windows' file scanning makes two runs of
+*identical* code differ by 2–4s. What is left is not slack: 16 genuine invocations of a script that costs
+~0.8s to run, and ~15 genuine observations of process state at ~0.65s each. The remaining lever is a parallel
+runner, and it is deliberately **not** taken here — several files bind loopback ports and two of them write
+`storage/exec.log`, so concurrency needs those hazards designed away first, and an intermittently failing
+hook is worse than a slow one.
 
 Covered by the new `php tests/php/secrets.test.php` (66 assertions: mask/restore round-trips, the
 friend-token lifecycle, the local-only gate, and the live routes with the real handlers running against a

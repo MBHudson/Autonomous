@@ -239,17 +239,22 @@ if ($runner === '') {
 
     // Process lookup finds it by the program it is running from -- the only
     // thing that can be trusted, since `start` hands off and never tells us a pid.
-    $found = until(function () {
+    //
+    // The poll hands back the look that satisfied it, rather than the test asking
+    // for the same instant a moment later: one enumeration reads the whole
+    // process table, and on Windows that is a PowerShell start (this file used
+    // to spend 14 seconds, most of it asking the same question twice).
+    $launched = [];
+    $found = until(function () use (&$launched) {
         foreach (Programs::list()['apps'] as $a) {
-            if ($a['name'] === 'sleeper' && !empty($a['running'])) { return true; }
+            if ($a['name'] === 'sleeper' && !empty($a['running'])) {
+                $launched = $a['running'];
+                return true;
+            }
         }
         return false;
     });
     ok($found, 'the launched process is found by looking for the program');
-    $launched = [];
-    foreach (Programs::list()['apps'] as $a) {
-        if ($a['name'] === 'sleeper') { $launched = $a['running']; }
-    }
     ok(count($launched) === 1, 'exactly the process this test started is found');
 
     // The window outliving the request is the whole feature: nothing here
