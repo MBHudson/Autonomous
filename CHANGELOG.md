@@ -135,7 +135,8 @@ leave the hook on at all. A cold machine, or a scanner reading 280 fresh files, 
 work, so the figure is stated with its conditions rather than as a promise.
 
 It is no longer stated at all, on trust: the check ends **every** run — passing or failing — with what it
-cost, `took: 41.0s (copy 0.5s, PHP 39.4s, JS 1.0s)`, and the hook prints its own end-to-end seconds next to
+cost, `took: 40.6s (copy 0.4s, PHP 39.2s, JS 0.9s)` -- a verbatim run, not a tidy one, since a figure that
+drifts is the thing this line exists to stop -- and the hook prints its own end-to-end seconds next to
 it. A quoted cost that nobody re-measures is how *about two minutes* survived as long as it did.
 
 The breakdown also answered a question the total could not, and the answer was **not** the one guessed here
