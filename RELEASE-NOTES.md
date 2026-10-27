@@ -81,7 +81,7 @@ localhost), and type in the composer.
 
 | | |
 |---|---|
-| **No installer** | Config → Updates detects a newer release, downloads it, verifies it and shows a file-by-file diff — then **stops**. Installing is manual: replace the app files, keep `storage/`. |
+| **The installer needs write access** | Where the web server owns the app's files — the XAMPP path on Windows — an update downloads, verifies and installs itself, keeping a rollback copy of the code first. A host where the app folder belongs to someone else stops it before the download and points you at `install-update.php`, which does the same job from a terminal. |
 | **Comms log is in memory** | Bounded to 300 exchanges, cleared when the server restarts. It is for watching a run, not an archive. |
 | **One token, no accounts** | Fine on localhost or a LAN you trust. Put basic auth in front of it if it is ever reachable from outside. |
 | **`exec.log` never rotates** | It grows until you delete it. |
