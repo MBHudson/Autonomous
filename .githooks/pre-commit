@@ -20,6 +20,11 @@
 # --no-verify` skips it once; the copy is kept when a suite fails, so the failure
 # can be looked at where it happened.
 #
+# None of those figures has to be taken on trust: this hook prints how long its
+# own run took, and the check it calls prints a phase breakdown as well, so the
+# number above is re-measured by every commit instead of remembered. A quoted
+# cost that nobody re-measures drifts -- this one had drifted by 3x.
+#
 # Enable it in a clone (it is not automatic -- nothing in a repo can install a
 # hook into someone's .git):
 #
@@ -71,12 +76,42 @@ echo "pre-commit: both suites, in a fresh copy of the staged tree"
 echo "            about 40 seconds -- git commit --no-verify skips this"
 echo ""
 
-if ! "$php_bin" tests/freshClone.php --index; then
-    echo ""
+# Timed so the printed figure is the measured one, not the estimate above. Kept
+# in plain `date +%s` seconds with no external tool, and if a host's date will
+# not produce a number the line is simply omitted -- a missing duration must not
+# be the thing that blocks a commit.
+started=$(date +%s 2>/dev/null)
+case "${started:-}" in
+    ''|*[!0-9]*) timed=0 ;;
+    *)           timed=1 ;;
+esac
+
+"$php_bin" tests/freshClone.php --index
+check_status=$?
+
+elapsed=""
+if [ "$timed" = "1" ]; then
+    finished=$(date +%s 2>/dev/null)
+    case "${finished:-}" in
+        ''|*[!0-9]*) ;;
+        *)           elapsed=$((finished - started)) ;;
+    esac
+fi
+
+if [ "$check_status" -ne 0 ]; then
+    echo "" >&2
     echo "pre-commit: the suites do not pass on the tree you are committing." >&2
-    echo "  The fresh copy is kept where the output above says, so the failure can be" >&2
+    if [ -n "$elapsed" ]; then
+        echo "  It ran for ${elapsed}s. The fresh copy is kept where the output above says, so" >&2
+    else
+        echo "  The fresh copy is kept where the output above says, so the failure can be" >&2
+    fi
     echo "  looked at in place. Bypass this once with: git commit --no-verify" >&2
     exit 1
+fi
+
+if [ -n "$elapsed" ]; then
+    echo "pre-commit: the suites passed in ${elapsed}s -- this commit is going out verified"
 fi
 
 exit 0

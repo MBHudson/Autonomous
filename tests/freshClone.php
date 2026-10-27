@@ -46,8 +46,20 @@
  * Needs git (the file list comes from it) and, for the JS half, node. A suite
  * that cannot run is reported as a failure, never as a pass.
  *
+ * Every run ends by printing how long it took, split by phase (copy, PHP, JS),
+ * on the way past whether it passed or failed. The README and the pre-commit
+ * hook both quote a figure for this check so a reader can decide whether to pay
+ * it: printing the real one is what keeps a quoted number from drifting, which
+ * it had (`about two minutes` for a check that runs in 40 seconds).
+ *
  * Exits 0 when both suites pass, 1 otherwise.
  */
+
+// Timed from here, so the figure at the end is the whole check and not just the
+// suites. Every phase is measured separately: a reader deciding whether to run
+// this (or to leave the pre-commit hook on) is deciding about the total, while
+// whoever is trying to make it faster needs to know WHICH half is slow.
+$t_started = microtime(true);
 
 $root = dirname(__DIR__);
 $args = isset($argv) ? array_slice($argv, 1) : [];
@@ -180,6 +192,8 @@ if ($head) {
         . ($gone ? " (" . $gone . " listed in the index but missing on disk)" : '') . "\n";
 }
 
+$t_copied = microtime(true);
+
 // The point of the exercise: none of the operator's runtime state is here. Say
 // so, because that absence is the thing the suites are being checked against.
 $runtime = array();
@@ -200,12 +214,15 @@ $suites = array(
 );
 $failed = array();
 $summaries = array();
+$seconds = array();
 
 foreach ($suites as $label => $cmd) {
     echo str_repeat('-', 60) . "\n";
     echo $label . ": " . implode(' ', $cmd) . "  (in the fresh copy)\n";
     echo str_repeat('-', 60) . "\n";
+    $suiteStart = microtime(true);
     list($code, $out) = run($cmd, $app);
+    $seconds[$label] = microtime(true) - $suiteStart;
     echo $out;
     if ($code !== 0) {
         $failed[] = $label;
@@ -219,6 +236,17 @@ echo str_repeat('=', 60) . "\n";
 foreach ($summaries as $label => $summary) {
     echo str_pad($label, 4) . ' ' . $summary . "\n";
 }
+
+// What it cost, measured -- printed on the way past on BOTH outcomes, because a
+// failure's duration is a fact about the failure. The README and the
+// pre-commit hook each quote a figure so a reader can decide whether to pay it;
+// a quoted figure nobody re-measures drifts (this one was wrong by 3x), and this
+// line is what makes the documented number checkable instead of remembered.
+$phases = array('copy ' . number_format($t_copied - $t_started, 1) . 's');
+foreach ($seconds as $label => $took) {
+    $phases[] = $label . ' ' . number_format($took, 1) . 's';
+}
+echo 'took: ' . number_format(microtime(true) - $t_started, 1) . 's  (' . implode(', ', $phases) . ")\n";
 
 if ($failed) {
     echo "\nFAILED: " . implode(' and ', $failed) . " in a fresh copy of this tree.\n";
