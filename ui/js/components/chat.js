@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=350';
-import { K as STORAGE_K } from '../storage.js?v=350';
+import { store } from '../store.js?v=351';
+import { K as STORAGE_K } from '../storage.js?v=351';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=350';
-import { persistence } from '../persistence.js?v=350';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=350';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=350';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=350';
-import { toolInstructions, parseToolCall, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=350';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=350';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=350';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=350';
-import { usageFor } from '../rateGovernor.js?v=350';
-import { trace } from '../trace.js?v=350';
-import { latency } from '../latency.js?v=350';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=350';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=350';
-import { SlashCommands } from '../slashCommands.js?v=350';
-import { parseRoute, routingHelp } from '../routing.js?v=350';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=350';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=350';
-import { MessageRenderer, renderToolCalls } from './message.js?v=350';
-import { createAvatar } from './avatar.js?v=350';
-import * as comms from '../commsLog.js?v=350';
+import { api, errText } from '../api.js?v=351';
+import { persistence } from '../persistence.js?v=351';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=351';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=351';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=351';
+import { toolInstructions, parseToolCall, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=351';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=351';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=351';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=351';
+import { usageFor } from '../rateGovernor.js?v=351';
+import { trace } from '../trace.js?v=351';
+import { latency } from '../latency.js?v=351';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=351';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=351';
+import { SlashCommands } from '../slashCommands.js?v=351';
+import { parseRoute, routingHelp } from '../routing.js?v=351';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=351';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=351';
+import { MessageRenderer, renderToolCalls } from './message.js?v=351';
+import { createAvatar } from './avatar.js?v=351';
+import * as comms from '../commsLog.js?v=351';
 
 /**
  * How long an agent may keep working on a single task.
@@ -739,72 +739,35 @@ export class Chat {
       // up again at completion (by agent id) is what let an overlapping run steal
       // or orphan it, and a reply whose node was gone was silently discarded.
       const turnNodes = uniqueAgents.map(agent => this._makeLiveNode(agent));
+      // Committed as EACH agent settles, not in one pass after Promise.all.
+      //
+      // The batching was the whole visible symptom: a reply that had already
+      // finished stayed on screen as a live node -- blinking caret, no copy
+      // button, reasoning still labelled "streaming" -- until the slowest agent
+      // in the turn was done. One fast agent therefore looked hung for as long
+      // as the slowest one, and the turn only "landed" when the last reply did.
+      // The node is replaced where it was created, so the transcript still
+      // reads in dispatch order no matter which agent finishes first.
       const results = await Promise.all(
         uniqueAgents.map((agent, i) => this._callAgent(text, agent, this.aborter.signal, turnNodes[i], pending).then(
           value => {
             this._busy.delete(agent.id);
             store.emit('flow:respond', { from: agent.id });
-            return { status: 'fulfilled', value };
+            const result = { status: 'fulfilled', value };
+            this._commitAgentReply(agent, result, turnNodes[i]);
+            return result;
           },
           reason => {
             this._busy.delete(agent.id);
             store.emit('flow:fail', { to: agent.id });
-            return { status: 'rejected', reason };
+            const result = { status: 'rejected', reason };
+            this._commitAgentReply(agent, result, turnNodes[i]);
+            return result;
           }
         ))
       );
 
       this._removeTyping(typingId);
-
-      results.forEach((result, i) => {
-        const agent = uniqueAgents[i];
-        // A given agent only answers once per user turn. The always-on
-        // scheduler can re-fire the instant this turn ends; this guard stops
-        // it from answering the same message a second time.
-        if (this._turnResponded.has(agent.id)) return;
-        this._turnResponded.add(agent.id);
-        const live = turnNodes[i];
-        if (result.status === 'fulfilled' && result.value) {
-          const agentMsg = {
-            role: 'agent',
-            // Raw content (fences intact): the renderer splits prose from code
-            // itself, so a live reply and the same reply after reload render
-            // identically. _saveDialog persists this same string.
-            content: result.value.content ?? result.value.text,
-            agentId: agent.id,
-            reasoning: result.value.reasoning || null,
-            toolCalls: result.value.toolCalls || (live && live.toolCalls) || null,
-            timestamp: Date.now()
-          };
-          // If a streaming node was already on screen, swap it for the fully
-          // rendered message rather than appending a duplicate.
-          if (live) { this._replaceLiveNode(live, agentMsg); }
-          else { this._addMessage(agentMsg); }
-          this._recordAgentUse(agent.id);
-          store.emit('agent:status', { agentId: agent.id, status: 'active' });
-          setTimeout(() => store.emit('agent:status', { agentId: agent.id, status: 'idle' }), 2500);
-        } else {
-          const stopped = result.reason?.name === 'AbortError';
-          // A stopped stream keeps whatever arrived before the abort — both
-          // the reply text and any reasoning. Only fall back to a bare
-          // notice if genuinely nothing streamed.
-          const partialText = live && live.text ? live.text : null;
-          const partialReason = live && live.reasoning ? live.reasoning : null;
-          const errorMsg = {
-            role: 'agent',
-            content: stopped
-              ? (partialText || 'Stopped by user.')
-              : 'Error: ' + (result.reason?.message || 'Unknown error'),
-            reasoning: partialReason || null,
-            toolCalls: (live && live.toolCalls) || null,
-            agentId: agent.id,
-            timestamp: Date.now()
-          };
-          if (live) { this._replaceLiveNode(live, errorMsg); }
-          else { this._addMessage(errorMsg); }
-          store.emit('agent:status', { agentId: agent.id, status: 'idle' });
-        }
-      });
 
       // Persist the whole turn as one dialog (the only shape the backend keeps)
       this._saveDialog(text, uniqueAgents, results);
@@ -1012,6 +975,68 @@ export class Chat {
  * tokens arrive. Plain text while streaming (cheap); replaced by the fully
  * rendered message (markdown + code containers + reasoning) when it lands.
  */
+/**
+ * Commit ONE agent's finished reply, the moment that agent lands.
+ *
+ * This is the per-agent half of the fan-out's commit path, and it exists
+ * because batching it was the visible bug: replies used to be committed in one
+ * `results.forEach` after `Promise.all`, so an agent that had already finished
+ * kept a live node on screen -- blinking caret, no copy button, reasoning
+ * still marked "streaming" -- until the slowest agent in the turn was done. A
+ * fast answer therefore looked hung for as long as a slow one.
+ *
+ * Called from both settle paths (answer and failure) so a refusal is committed
+ * at its own pace too, and never left as a stranded streaming bubble.
+ */
+_commitAgentReply(agent, result, live) {
+    // A given agent only answers once per user turn. The always-on
+    // scheduler can re-fire the instant this turn ends; this guard stops
+    // it from answering the same message a second time.
+    if (this._turnResponded.has(agent.id)) return;
+    this._turnResponded.add(agent.id);
+    if (result.status === 'fulfilled' && result.value) {
+      const agentMsg = {
+        role: 'agent',
+        // Raw content (fences intact): the renderer splits prose from code
+        // itself, so a live reply and the same reply after reload render
+        // identically. _saveDialog persists this same string.
+        content: result.value.content ?? result.value.text,
+        agentId: agent.id,
+        reasoning: result.value.reasoning || null,
+        toolCalls: result.value.toolCalls || (live && live.toolCalls) || null,
+        timestamp: Date.now()
+      };
+      // If a streaming node was already on screen, swap it for the fully
+      // rendered message rather than appending a duplicate. The swap happens
+      // WHERE THE NODE SITS, so finishing early does not reorder the turn.
+      if (live) { this._replaceLiveNode(live, agentMsg); }
+      else { this._addMessage(agentMsg); }
+      this._recordAgentUse(agent.id);
+      store.emit('agent:status', { agentId: agent.id, status: 'active' });
+      setTimeout(() => store.emit('agent:status', { agentId: agent.id, status: 'idle' }), 2500);
+    } else {
+      const stopped = result.reason?.name === 'AbortError';
+      // A stopped stream keeps whatever arrived before the abort — both
+      // the reply text and any reasoning. Only fall back to a bare
+      // notice if genuinely nothing streamed.
+      const partialText = live && live.text ? live.text : null;
+      const partialReason = live && live.reasoning ? live.reasoning : null;
+      const errorMsg = {
+        role: 'agent',
+        content: stopped
+          ? (partialText || 'Stopped by user.')
+          : 'Error: ' + (result.reason?.message || 'Unknown error'),
+        reasoning: partialReason || null,
+        toolCalls: (live && live.toolCalls) || null,
+        agentId: agent.id,
+        timestamp: Date.now()
+      };
+      if (live) { this._replaceLiveNode(live, errorMsg); }
+      else { this._addMessage(errorMsg); }
+      store.emit('agent:status', { agentId: agent.id, status: 'idle' });
+    }
+}
+
 _makeLiveNode(agent) {
     if (!this._liveNodes) this._liveNodes = new Map();
     // A new key per run. An earlier run for the same agent is left alone: it

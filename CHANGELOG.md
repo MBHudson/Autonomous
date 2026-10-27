@@ -17,6 +17,46 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## ⏱️ Replies that land when they land, and an Always-On switch that goes both ways *(UI — `VERSION` 353, cache-buster v350 → v351)*
+
+**A finished reply is finished now, not when the slowest agent is done.** Every
+agent in a fan-out had its turn committed in one `results.forEach` *after*
+`Promise.all`, so a reply that had already arrived stayed on screen as a live
+node — blinking caret, no copy button, reasoning still labelled "streaming" —
+until the last agent in the turn finished. One fast model therefore looked hung
+for as long as one slow model, and the whole turn only settled when the slowest
+one did. Each agent now commits at the moment it lands: its bubble finalizes in
+place (same position, so the transcript still reads in dispatch order), enters the
+conversation immediately, and the failure path commits a refusal at its own pace
+too instead of leaving a stranded streaming bubble behind.
+
+Five agents also answered in single file on one server: nothing started until the
+reply ahead of it had finished. Nothing in the loop was wrong there — PHP's
+built-in server (the one `start-php.bat` starts) accepts **one request at a
+time**, and while a streamed reply is open the next call waits outside in the
+kernel's backlog. Apache (which `start.bat` installs) answers many at once.
+Measured on the same machine, three streams against the same endpoint reached it
+at **1.1 s, 1.1 s and 1.1 s** through Apache, and at **1.1 s, 4.1 s and 7.2 s**
+through `php -S`. That is a property of the server — no change in the browser can
+move it.
+
+The app now **knows which server is answering**. `/api/diag` reports the SAPI, the
+worker count and a plain `concurrent` flag; the page asks once at load and, on a
+one-at-a-time server, raises **one** notification naming the cause and the fix
+(`start.bat` → Apache; settings, sessions and keys are untouched because they live
+in `storage/`). The Diagnose readout in Config carries the same warning. Nothing
+is refused and nothing is hidden: one agent on the built-in server still works
+exactly as it did.
+
+**Always-On → Apply to All works in both directions now.** It used to ship the goal
+text only, and to refuse an empty box — so the one thing it could not do was
+**remove**. You could hand a goal to every agent and never take it back. The
+switch and the sentence travel together: untick the box, clear the goal, click
+apply, and every agent's Always-On turns off with its goal deleted (conversations,
+memory and every other setting stay put). Ticked, it behaves as before and also
+turns the switch **on** for the agents that receive the goal, which it previously
+left alone.
+
 ## 🗣️ What the agents said, and a trail that can be trusted *(UI — `VERSION` 352, cache-buster v349 → v350)*
 
 The map could already show **that** two agents spoke. It could not show a word of

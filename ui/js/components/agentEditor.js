@@ -10,15 +10,15 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=350';
-import { persistence } from '../persistence.js?v=350';
-import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=350';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=350';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=350';
-import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=350';
-import { audio } from '../audio.js?v=350';
-import { api } from '../api.js?v=350';
-import * as memory from '../memory.js?v=350';
+import { store } from '../store.js?v=351';
+import { persistence } from '../persistence.js?v=351';
+import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=351';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=351';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=351';
+import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=351';
+import { audio } from '../audio.js?v=351';
+import { api } from '../api.js?v=351';
+import * as memory from '../memory.js?v=351';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
@@ -850,33 +850,53 @@ export class AgentEditor {
   }
 
   /**
-   * Copy the standing goal in the box onto every agent, after an explicit
-   * Yes. Only the goal text travels: each agent's on/off switch (and
-   * everything else in this still-open editor) is left alone.
+   * Copy Always-On to every agent — in BOTH directions.
+   *
+   * This used to send the goal text only, and to refuse when the box was empty,
+   * so "clear it everywhere" — the state an operator most often wants to hand
+   * out after experimenting — could not be expressed at all: the one thing the
+   * button would not do was remove. The switch and the sentence now travel
+   * together, exactly as the box shows them: ticked copies the goal and turns
+   * Always-On on for everyone; unticked deletes every standing goal and turns
+   * Always-On off. Their conversations, memory and other settings are not
+   * touched — only the switch and the goal.
    */
   _applyGoalToAll() {
     const goal = (document.getElementById('agentAlwaysOnGoal')?.value || '').trim();
-    if (!goal) {
-      store.emit('toast', { message: 'Type a standing goal first', type: 'error' });
+    const on = !!document.getElementById('agentAlwaysOn')?.checked;
+    if (on && !goal) {
+      store.emit('toast', {
+        message: 'Type a standing goal first — or clear the box to switch Always-On off everywhere',
+        type: 'error',
+      });
       return;
     }
     const agents = store.get('agents') || [];
+    if (!agents.length) {
+      store.emit('toast', { message: 'There are no agents to apply this to yet', type: 'error' });
+      return;
+    }
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <span class="modal-title">Apply to all agents?</span>
+          <span class="modal-title">${on ? 'Apply to all agents?' : 'Turn Always-On off everywhere?'}</span>
           <button class="modal-close" id="goalAllClose">&times;</button>
         </div>
         <div class="modal-body">
-          <div>This standing goal will replace the goal on all
-            <b>${agents.length} agent(s)</b>. Their on/off switches stay as they are.</div>
-          <div class="form-hint" style="margin-top:8px">“${esc(goal.slice(0, 160))}${goal.length > 160 ? '…' : ''}”</div>
+          ${on
+            ? `<div>This standing goal will replace the goal on all
+                 <b>${agents.length} agent(s)</b>, and <b>Always-On will be turned on</b> for them.</div>
+               <div class="form-hint" style="margin-top:8px">“${esc(goal.slice(0, 160))}${goal.length > 160 ? '…' : ''}”</div>`
+            : `<div><b>Always-On will be turned off for all ${agents.length} agent(s)</b>,
+                 and every standing goal will be deleted.</div>
+               <div class="form-hint" style="margin-top:8px">Only the switch and the goal
+                 change — their conversations, memory and other settings stay as they are.</div>`}
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="goalAllCancel">Cancel</button>
-          <button class="btn btn-primary" id="goalAllYes">Yes</button>
+          <button class="btn btn-primary" id="goalAllYes">${on ? 'Apply to all' : 'Turn off everywhere'}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -885,11 +905,22 @@ export class AgentEditor {
     overlay.querySelector('#goalAllCancel').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     overlay.querySelector('#goalAllYes').addEventListener('click', () => {
-      const updated = (store.get('agents') || []).map(a => ({ ...a, alwaysOnGoal: goal }));
+      const updated = (store.get('agents') || [])
+        .map(a => ({ ...a, alwaysOn: on, alwaysOnGoal: goal }));
       store.set('agents', updated);
       persistence.set('agents', updated);
+      // This editor is still open on one agent. Leave its switch showing what
+      // now applies to everyone, or a later Save would quietly put the old
+      // one back and undo half of what was just applied.
+      const box = document.getElementById('agentAlwaysOn');
+      if (box) box.checked = on;
       store.emit('agents:changed');
-      store.emit('toast', { message: `Standing goal applied to ${updated.length} agent(s)`, type: 'success' });
+      store.emit('toast', {
+        message: on
+          ? `Standing goal applied to ${updated.length} agent(s)`
+          : `Always-On switched off on ${updated.length} agent(s); goals cleared`,
+        type: 'success',
+      });
       close();
     });
   }

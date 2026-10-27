@@ -10,12 +10,12 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=350';
-import { renderMarkdown } from '../markdown.js?v=350';
-import { CodeBlock, splitFences } from './codeBlock.js?v=350';
-import { createAvatar } from './avatar.js?v=350';
-import { store } from '../store.js?v=350';
-import { audio, AudioController } from '../audio.js?v=350';
+import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=351';
+import { renderMarkdown } from '../markdown.js?v=351';
+import { CodeBlock, splitFences } from './codeBlock.js?v=351';
+import { createAvatar } from './avatar.js?v=351';
+import { store } from '../store.js?v=351';
+import { audio, AudioController } from '../audio.js?v=351';
 
 const TOOL_DISPLAY_LIMIT = 8000;
 

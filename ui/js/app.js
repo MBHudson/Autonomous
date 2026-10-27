@@ -10,16 +10,16 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=350';
-import { K } from './storage.js?v=350';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=350';
-import { startStateSync } from './stateSync.js?v=350';
-import { api } from './api.js?v=350';
-import { themeManager } from './themes.js?v=350';
-import { Sidebar } from './components/sidebar.js?v=350';
-import { Chat } from './components/chat.js?v=350';
-import { TopologyGraph } from './components/topology.js?v=350';
-import { initTopoPanel } from './components/topoPanel.js?v=350';
+import { store, APP_VERSION } from './store.js?v=351';
+import { K } from './storage.js?v=351';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=351';
+import { startStateSync } from './stateSync.js?v=351';
+import { api } from './api.js?v=351';
+import { themeManager } from './themes.js?v=351';
+import { Sidebar } from './components/sidebar.js?v=351';
+import { Chat } from './components/chat.js?v=351';
+import { TopologyGraph } from './components/topology.js?v=351';
+import { initTopoPanel } from './components/topoPanel.js?v=351';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -28,33 +28,33 @@ import { initTopoPanel } from './components/topoPanel.js?v=350';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=350')
+  return import('./components/topology3d/index.js?v=351')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=350';
-import { AgentEditor } from './components/agentEditor.js?v=350';
-import { ProviderEditor } from './components/providerEditor.js?v=350';
-import { Microphone } from './components/microphone.js?v=350';
-import { ConfigPanel } from './components/configPanel.js?v=350';
-import { ExportPanel } from './components/export.js?v=350';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=350';
-import { TerminalPanel } from './components/terminalPanel.js?v=350';
-import { MetricsPanel } from './components/metricsPanel.js?v=350';
-import { TracePanel } from './components/tracePanel.js?v=350';
-import { AgentRecord } from './components/agentRecord.js?v=350';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=350';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=350';
-import { initApprovals } from './approvals.js?v=350';
-import * as memory from './memory.js?v=350';
-import { audio } from './audio.js?v=350';
-import { AlwaysOn } from './alwaysOn.js?v=350';
-import { ApiLab } from './apiLab.js?v=350';
-import { BrainLab } from './brainlab.js?v=350';
-import { BrowserView } from './components/browserView.js?v=350';
+import { RoutingChart } from './components/routingChart.js?v=351';
+import { AgentEditor } from './components/agentEditor.js?v=351';
+import { ProviderEditor } from './components/providerEditor.js?v=351';
+import { Microphone } from './components/microphone.js?v=351';
+import { ConfigPanel } from './components/configPanel.js?v=351';
+import { ExportPanel } from './components/export.js?v=351';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=351';
+import { TerminalPanel } from './components/terminalPanel.js?v=351';
+import { MetricsPanel } from './components/metricsPanel.js?v=351';
+import { TracePanel } from './components/tracePanel.js?v=351';
+import { AgentRecord } from './components/agentRecord.js?v=351';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=351';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=351';
+import { initApprovals } from './approvals.js?v=351';
+import * as memory from './memory.js?v=351';
+import { audio } from './audio.js?v=351';
+import { AlwaysOn } from './alwaysOn.js?v=351';
+import { ApiLab } from './apiLab.js?v=351';
+import { BrainLab } from './brainlab.js?v=351';
+import { BrowserView } from './components/browserView.js?v=351';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -579,6 +579,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       type: type || 'info',
       message: message,
     });
+  });
+
+  // --- How this copy is served --------------------------------------------
+  //
+  // PHP's built-in server (start-php.bat) answers ONE request at a time. A
+  // streamed reply holds the only worker, so the next agent's call waits
+  // outside until it finishes: a fan-out of agents runs in single file, and
+  // every one of them looks hung until the reply ahead of it lands. No change
+  // in this file can fix that — but naming the cause, and the one thing to do
+  // about it, turns an unexplained hang into a sentence.
+  //
+  // Once per tab, and only when the server actually reports it: Apache and
+  // php-fpm say nothing, because there is nothing to say.
+  safeInit('serverMode', () => {
+    api.serverInfo().then((res) => {
+      const c = res && res.concurrency;
+      if (!c || c.concurrent !== false) return;
+      store.set('serverMode', c);
+      let seen = false;
+      try {
+        seen = sessionStorage.getItem('loop:server-mode-notified') === '1';
+        sessionStorage.setItem('loop:server-mode-notified', '1');
+      } catch { /* private mode: say it every load rather than not at all */ }
+      if (seen) return;
+      store.emit('toast', {
+        message: `${c.detail || 'This server answers one request at a time, so agents take turns.'} ${c.fix || ''}`.trim(),
+        type: 'error',
+      });
+    }).catch(() => { /* no token yet, or an older copy with no /diag */ });
   });
 
   // --- Update check at load ------------------------------------------------

@@ -10,18 +10,18 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=350';
-import { K } from '../storage.js?v=350';
-import { persistence } from '../persistence.js?v=350';
-import { api } from '../api.js?v=350';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=350';
-import { errText } from '../api.js?v=350';
-import { TOOL_REGISTRY } from '../tools.js?v=350';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=350';
-import { snapshot } from '../rateGovernor.js?v=350';
-import { resetBrowserEnabled } from '../toolManifest.js?v=350';
-import { perf } from '../perf.js?v=350';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=350';
+import { store } from '../store.js?v=351';
+import { K } from '../storage.js?v=351';
+import { persistence } from '../persistence.js?v=351';
+import { api } from '../api.js?v=351';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=351';
+import { errText } from '../api.js?v=351';
+import { TOOL_REGISTRY } from '../tools.js?v=351';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=351';
+import { snapshot } from '../rateGovernor.js?v=351';
+import { resetBrowserEnabled } from '../toolManifest.js?v=351';
+import { perf } from '../perf.js?v=351';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=351';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -2248,7 +2248,12 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           const badge = document.createElement('div');
           badge.className = 'form-hint';
           badge.style.cssText = 'font-family:var(--font-mono);font-size:10px;margin:0 0 8px;word-break:break-all';
-          badge.textContent = `server: ${srv.software} · PHP ${srv.php} · ${srv.path}`;
+          badge.textContent = `server: ${srv.software} · PHP ${srv.php} · ${srv.path}`
+            // Worth saying here as well as at load: this is where an operator
+            // comes to ask "why is it slow / why do the agents queue?".
+            + (srv.concurrency && srv.concurrency.concurrent === false
+              ? ' · ⚠ one request at a time — agents take turns (use start.bat)'
+              : '');
           out.appendChild(badge);
         }
         const LABEL = {
