@@ -17,6 +17,44 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🗄️ Add sandboxes from Brain Lab, and the Browser rail stops overlapping on a phone *(UI — `VERSION` 351, cache-buster v348 → v349)*
+
+- **The gap.** A per-agent file jail already existed (`agent.sandboxRoot`, picked
+  from a dropdown in Brain Lab → Sandbox), but the only places you could *create*
+  one were Config → Sandbox's two textareas. So "give this agent its own
+  directory" meant leaving the agent you were editing, typing a path into a
+  multi-line list as text, coming back, and hoping it matched. The dropdown only
+  ever showed what the global allowlist already contained.
+- **What was added.** Brain Lab → Sandbox now has an **Add a sandbox** row: type a
+  folder, press ADD, and it becomes a selectable jail for the open agent (and for
+  every other agent) immediately. Nothing about Config → Sandbox changed — it is
+  the same `sandbox.read_roots` / `write_roots` allowlist, edited from a second
+  place, because one allowlist that two screens share is the whole reason the
+  jail is enforceable.
+- **Why it appends to the global lists instead of keeping its own.** The jail is
+  checked server-side against `storage/config.json`; a per-agent list that the
+  server cannot see would be a UI that offers jails every tool call then refuses.
+  Adding here unions the effective roots (not just the stored ones — a fresh
+  install has no `sandbox` block at all and runs on the app-directory default,
+  which writing a single path would have silently dropped) with the new folder,
+  saves, and re-reads them.
+- **"Saved" is not "usable", so the two are answered separately.** The server
+  `realpath`s every root and drops anything that is not an existing directory. The
+  new control checks whether the folder actually came back, and if it did not it
+  says so — keeping what you typed in the box to fix, and leaving the agent on its
+  previous jail rather than pointing it at a path that will fail on the next call.
+- **The Browser screen's right rail was being squashed, not scrolled.** In mobile
+  view (and in any short window) `.bs-side` is a `flex` column with a `max-height`
+  and `overflow-y: auto`. A `<textarea>` has no intrinsic minimum height, so flex
+  shrank the text boxes to fit instead of letting the rail scroll: measured on a
+  390×844 viewport, the **type box was 14px tall with 46px of content** and the
+  **block list was 14px with 74px**, so their text drew over the rows beneath them
+  — "Block list" on top of "Save block list", "Drive it" on top of "Send text".
+  The rail's children now refuse to shrink (`flex: 0 0 auto`), which turns the
+  same overflow into ordinary scrolling; the read-text pane is restated as the one
+  child that should still absorb leftover height, so the desktop rail looks
+  exactly as it did (verified at 1400×900: 355px tall, rail not scrolling).
+
 ## 🗂️ The checkout moved to the app root — and Apache was serving `.git` *(Apache + tests + docs — `VERSION` 350, cache-buster unchanged)*
 
 - **What changed.** `git` now lives in the project root, which is also the web

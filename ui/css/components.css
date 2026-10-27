@@ -1767,6 +1767,21 @@ body.agent-reordering .agent-editor:hover {
 .bs-side-row { display: flex; gap: 8px; }
 .bs-text { flex: 1; min-height: 120px; margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 11px/1.4 var(--font-mono); color: var(--text-secondary); background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
 .bs-hint { font-size: 10px; color: var(--text-dim); }
+
+/* The rail is a SCROLLING column, not a squash box. Without this, a rail
+   shorter than its contents (a phone, or any short window) shrinks every child
+   instead of scrolling: a <textarea> has no intrinsic minimum height, so the
+   type box and the block list collapsed to a sliver and their text spilled out
+   over the buttons underneath -- "Block list" drew on top of "Save block list",
+   and "Drive it" on top of "Send text". Refusing the shrink turns that into
+   ordinary scrolling, which is what overflow-y is already there for.
+   The read-text pane has a min-height, so it was never part of the collapse; the
+   rule right after this one restates it so it keeps growing on a tall rail. */
+.bs-side > * { flex: 0 0 auto; }
+/* Restated after the rule above, which would otherwise reset it: the read-text
+   box is the one child that SHOULD absorb leftover height on a tall rail. */
+.bs-side > .bs-text { flex: 1 1 auto; min-height: 120px; }
+
 @media (max-width: 900px) {
   .bs-body { flex-direction: column; }
   .bs-side { width: auto; max-width: none; border-left: 0; border-top: 1px solid var(--border); max-height: 42vh; }
