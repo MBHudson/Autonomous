@@ -381,12 +381,32 @@ ok($pre['busy'] === true, 'a fresh lock reads as busy');
 throws(fn() => Install::apply(), 'apply refuses while another install holds the lock', 'already running');
 
 // --- 8. snapshots are pruned -----------------------------------------
+// Four snapshots back to back, with their TIMES stated rather than waited for.
+// The prune orders by mtime, and each snapshot used to be followed by sleep(1)
+// purely to make that order deterministic -- four seconds of wall clock, on
+// every run of the whole suite, to test one line. Touching each new folder to a
+// known age is the same idiom as the stale lock above, and it buys a sharper
+// assertion than a bare count: the two OLDEST must be the two that went.
+//
+// Ages are the identity here, not names. Snapshot folders are named to the
+// second, and a name that has just been pruned is free again -- so the fourth
+// snapshot can legitimately carry the first one's name, and an assertion phrased
+// on names would be comparing two different folders that share one. (Measured:
+// it does exactly that, and it is why this reads mtimes back instead.)
 build($app, '359');
 for ($i = 0; $i < 4; $i++) {
-    Install::snapshot();
-    sleep(1);
+    $fresh = Install::snapshot();
+    // clearstatcache matters: PHP caches the mtime it just read, and the prune
+    // orders by exactly that value -- without this the folder still looks brand
+    // new, and the test prunes an order the wall clock chose.
+    @touch($fresh['dir'], time() - (600 * (4 - $i)));   // 2400, 1800, 1200, 600
+    clearstatcache(true, $fresh['dir']);
 }
-ok(count(Install::snapshots()) <= Install::BACKUP_KEEP, 'old rollback copies are pruned');
+$ages = array_map(fn($s) => time() - $s['at'], Install::snapshots());
+sort($ages);
+ok(count($ages) === Install::BACKUP_KEEP
+    && abs($ages[0] - 600) < 60 && abs($ages[1] - 1200) < 60,
+    'old rollback copies are pruned -- the two NEWEST survive, the two oldest go');
 
 // --- report -----------------------------------------------------------
 rmTree($tmp);

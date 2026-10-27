@@ -95,13 +95,24 @@ done
 
 # PHP_BIN can be set by hand for a PHP that is not on PATH, which is the usual
 # state of affairs on Windows (the app's own php lives inside XAMPP).
+#
+# Probed only when it can actually be used: every read and write below picks
+# python when python proved itself, so looking for php then is a process start
+# spent proving an interpreter that will not be called -- ~150ms, on each run,
+# for nothing. (Measured, and worth being exact about: this saves nothing in the
+# case where python is BROKEN, because then php is the engine that gets used and
+# it has to be found. Both cases are covered -- the tests drive the script 16
+# times with a failing python3/python planted ahead of the real ones, and twice
+# on this machine's own PATH where a real python answers.) An explicit PHP_BIN is
+# still checked here and a bad one is still a hard error, because that is an
+# operator's claim about their own host rather than a guess at what a name means.
 PHP_BIN="${PHP_BIN:-}"
 if [ -n "$PHP_BIN" ]; then
   if [ "$("$PHP_BIN" -r 'echo 1;' 2>/dev/null || true)" != "1" ]; then
     echo "PHP_BIN=$PHP_BIN did not answer, so it is not a working php." >&2
     exit 1
   fi
-else
+elif [ -z "$PY" ]; then
   for candidate in php /c/xampp/php/php.exe /usr/bin/php /usr/local/bin/php; do
     if command -v "$candidate" >/dev/null 2>&1; then
       if [ "$("$candidate" -r 'echo 1;' 2>/dev/null || true)" = "1" ]; then
