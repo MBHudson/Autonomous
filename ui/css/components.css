@@ -699,6 +699,196 @@ body.agent-reordering .agent-editor:hover {
   vertical-align: top;
 }
 
+/* Run trace: three views over one modal (runs / comms / exec) */
+.trace-modal {
+  max-width: 720px;
+  width: min(720px, 94vw);
+}
+
+.trace-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.trace-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.trace-tab:hover { color: var(--text-primary); }
+
+.trace-tab.active {
+  color: var(--accent-cyan);
+  border-bottom-color: var(--accent-cyan);
+}
+
+.trace-count {
+  margin-left: 5px;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.trace-scroll {
+  max-height: 58vh;
+  overflow: auto;
+  margin-top: 8px;
+}
+
+.trace-empty {
+  padding: 18px 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.trace-fail { color: var(--accent-red); }
+
+.trace-row-open td { background: rgba(255, 71, 87, 0.05); }
+
+.trace-cmd {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  word-break: break-all;
+  max-width: 300px;
+}
+
+/* Comms: one block per exchange, both halves together */
+.comms-item {
+  border-left: 2px solid var(--border);
+  padding: 7px 0 7px 9px;
+  margin-bottom: 8px;
+}
+
+.comms-item.fail { border-left-color: var(--accent-red); }
+
+.comms-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 10px;
+  margin-bottom: 3px;
+}
+
+.comms-name {
+  font-weight: 700;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+}
+
+.comms-arrow { color: var(--text-dim); }
+
+.comms-meta {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.comms-text,
+.comms-reply {
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comms-text { color: var(--text-primary); }
+
+.comms-reply {
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.comms-reply.fail { color: var(--accent-red); }
+
+.comms-reply.pending { font-style: italic; color: var(--text-dim); }
+
+/* Per-agent record: a drawer off the map, opened from an agent's card */
+.agent-record-bg {
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.agent-record {
+  width: min(430px, 100vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+  animation: agentRecordIn 0.18s ease-out;
+}
+
+@keyframes agentRecordIn {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-record { animation: none; }
+}
+
+.agent-record-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-record-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.agent-record-sub {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-dim);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-record-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-record-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 14px 20px;
+}
+
+.agent-record-body .trace-scroll {
+  max-height: none;
+  overflow: visible;
+}
+
 /* Agent reference code, e.g. #K7M4QX — shown beside the name everywhere */
 .agent-code {
   font-size: 9px;

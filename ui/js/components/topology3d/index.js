@@ -23,17 +23,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=349';
-import { store } from '../../store.js?v=349';
-import { k, K } from '../../storage.js?v=349';
-import { latency } from '../../latency.js?v=349';
-import { SceneCore, webglAvailable } from './scene.js?v=349';
-import { ForceLayout } from './layout.js?v=349';
-import { NodeView, Nebula } from './nodes.js?v=349';
-import { Beam } from './beams.js?v=349';
-import { LabelLayer } from './labels.js?v=349';
-import { PopupCard } from './popup.js?v=349';
-import { AskDock } from './ask.js?v=349';
+import { TopologyGraph } from '../topology.js?v=350';
+import { store } from '../../store.js?v=350';
+import { k, K } from '../../storage.js?v=350';
+import { latency } from '../../latency.js?v=350';
+import { SceneCore, webglAvailable } from './scene.js?v=350';
+import { ForceLayout } from './layout.js?v=350';
+import { NodeView, Nebula } from './nodes.js?v=350';
+import { Beam } from './beams.js?v=350';
+import { LabelLayer } from './labels.js?v=350';
+import { PopupCard } from './popup.js?v=350';
+import { AskDock } from './ask.js?v=350';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
@@ -325,7 +325,15 @@ export class Topology3D extends TopologyGraph {
 
   _flowAdd(opts = {}) {
     const flow = super._flowAdd(opts);
-    if (flow) this._historyPush({ from: opts.from, to: opts.to, kind: opts.kind || 'message' });
+    // `text` rides along into the history so the card's Recent messages can
+    // show the sentence, not only the fact that two agents spoke. Absent for
+    // user prompts and fan-out, which is fine: those rows stay as they were.
+    if (flow) {
+      this._historyPush({
+        from: opts.from, to: opts.to, kind: opts.kind || 'message',
+        text: opts.text || '',
+      });
+    }
     return flow;
   }
 

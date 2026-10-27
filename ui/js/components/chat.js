@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=349';
-import { K as STORAGE_K } from '../storage.js?v=349';
+import { store } from '../store.js?v=350';
+import { K as STORAGE_K } from '../storage.js?v=350';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,26 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=349';
-import { persistence } from '../persistence.js?v=349';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=349';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=349';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=349';
-import { toolInstructions, parseToolCall, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=349';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=349';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=349';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=349';
-import { usageFor } from '../rateGovernor.js?v=349';
-import { trace } from '../trace.js?v=349';
-import { latency } from '../latency.js?v=349';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=349';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=349';
-import { SlashCommands } from '../slashCommands.js?v=349';
-import { parseRoute, routingHelp } from '../routing.js?v=349';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=349';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=349';
-import { MessageRenderer, renderToolCalls } from './message.js?v=349';
-import { createAvatar } from './avatar.js?v=349';
+import { api, errText } from '../api.js?v=350';
+import { persistence } from '../persistence.js?v=350';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=350';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=350';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=350';
+import { toolInstructions, parseToolCall, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=350';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=350';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=350';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=350';
+import { usageFor } from '../rateGovernor.js?v=350';
+import { trace } from '../trace.js?v=350';
+import { latency } from '../latency.js?v=350';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=350';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=350';
+import { SlashCommands } from '../slashCommands.js?v=350';
+import { parseRoute, routingHelp } from '../routing.js?v=350';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=350';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=350';
+import { MessageRenderer, renderToolCalls } from './message.js?v=350';
+import { createAvatar } from './avatar.js?v=350';
+import * as comms from '../commsLog.js?v=350';
 
 /**
  * How long an agent may keep working on a single task.
@@ -293,11 +294,16 @@ export class Chat {
       post: (targetId, fromId, message) => {
         const list = this._mailbox.get(targetId) || [];
         const from = (store.get('agents') || []).find(a => a.id === fromId);
+        const to = (store.get('agents') || []).find(a => a.id === targetId);
         list.push({ from: from?.name || 'an agent', message });
         this._mailbox.set(targetId, list);
         // An order is communication too: one line out, none back, because
         // nothing is being awaited.
-        store.emit('flow:speak', { from: fromId, to: targetId, kind: 'tell' });
+        comms.record({
+          fromId, fromName: from?.name, toId: targetId, toName: to?.name,
+          kind: 'tell', text: message,
+        });
+        store.emit('flow:speak', { from: fromId, to: targetId, kind: 'tell', text: message });
       },
       mailbox: agentId => this._mailbox.get(agentId) || [],
       consume: agentId => this._mailbox.delete(agentId),
@@ -387,7 +393,12 @@ export class Chat {
       const fromName = from === 'user' ? 'user' : (store.get('agents') || []).find(a => a.id === from)?.name || 'an agent';
       list.push({ from: fromName, message });
       this._mailbox.set(agentId, list);
-      store.emit('flow:speak', { from: from || 'user', to: agentId, kind: 'tell' });
+      comms.record({
+        fromId: from, fromName,
+        toId: agentId, toName: (store.get('agents') || []).find(a => a.id === agentId)?.name,
+        kind: 'tell', text: message,
+      });
+      store.emit('flow:speak', { from: from || 'user', to: agentId, kind: 'tell', text: message });
     });
 
     // Wake up an agent and prompt them to read their mailbox.
@@ -397,9 +408,15 @@ export class Chat {
       // Emit a 'tell' with a special instruction so the agent's next turn
       // naturally calls read_mailbox without any extra plumbing.
       const list = this._mailbox.get(agentId) || [];
-      list.push({ from: 'system', message: 'PING — check your mailbox (read_mailbox) for new instructions.' });
+      const ping = 'PING — check your mailbox (read_mailbox) for new instructions.';
+      list.push({ from: 'system', message: ping });
       this._mailbox.set(agentId, list);
-      store.emit('flow:speak', { from: 'user', to: agentId, kind: 'ping' });
+      comms.record({
+        fromId: 'user', fromName: 'you',
+        toId: agentId, toName: (store.get('agents') || []).find(a => a.id === agentId)?.name,
+        kind: 'ping', text: ping,
+      });
+      store.emit('flow:speak', { from: 'user', to: agentId, kind: 'ping', text: ping });
     });
   }
 
@@ -2019,9 +2036,16 @@ _makeLiveNode(agent) {
 
     this._nestedBusy.add(targetId);
     store.emit('agent:status', { agentId: targetId, status: 'thinking' });
-    // Draw the ask itself, so the map shows who is talking to whom rather
-    // than only the fan-out from the user.
-    store.emit('flow:speak', { from: ctx?.agentId, to: targetId });
+    // Recorded AND drawn: the beam keeps showing who is talking to whom, and
+    // the comms log keeps the sentence. Settled in the finally below with the
+    // answer, so one exchange is one entry with both halves rather than two
+    // unrelated lines that cannot be matched up afterwards.
+    const exchange = comms.record({
+      fromId: ctx?.agentId, fromName: me?.name,
+      toId: targetId, toName: target?.name,
+      kind: 'ask', text: question,
+    });
+    store.emit('flow:speak', { from: ctx?.agentId, to: targetId, text: question });
     store.emit('toast', {
       message: `${me?.name || 'An agent'} asked ${target.name}…`, type: 'info',
     });
@@ -2031,6 +2055,8 @@ _makeLiveNode(agent) {
       ? `${me.name} asks you: ${question}\n\nAnswer ${me.name} directly and concisely.`
       : question;
 
+    let answer = '';
+    let answered = true;
     try {
       // No live node: a nested reply belongs to the asking agent's answer, not
       // the transcript, or the panel fills with duplicates.
@@ -2039,7 +2065,8 @@ _makeLiveNode(agent) {
         { chain: [...chain, targetId] },
       );
       const text = asText(res?.content ?? res?.text ?? '').trim();
-      return text || `(${target.name} returned an empty reply)`;
+      answer = text || `(${target.name} returned an empty reply)`;
+      return answer;
     } catch (err) {
       // Only abandon the whole turn when the USER cancelled it. A nested
       // request that failed or was dropped on its own (Firefox reports those
@@ -2049,11 +2076,15 @@ _makeLiveNode(agent) {
       const why = err?.message === 'The user aborted a request.'
         ? 'the request was cancelled'
         : (err?.message || asText(err));
-      return `error: ${target.name} could not answer — ${why}`;
+      answered = false;
+      answer = `error: ${target.name} could not answer — ${why}`;
+      return answer;
     } finally {
       this._nestedBusy.delete(targetId);
-      // And the answer travelling back, so each exchange is a line each way.
-      store.emit('flow:speak', { from: targetId, to: ctx?.agentId });
+      // The answer travelling back. Settled even on failure, so a refusal is
+      // readable in the log instead of an ask that looks unanswered forever.
+      comms.settle(exchange, answer, answered);
+      store.emit('flow:speak', { from: targetId, to: ctx?.agentId, text: answer });
       store.emit('agent:status', { agentId: targetId, status: 'active' });
       setTimeout(() => store.emit('agent:status', { agentId: targetId, status: 'idle' }), 2500);
     }

@@ -17,6 +17,55 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🗣️ What the agents said, and a trail that can be trusted *(UI — `VERSION` 352, cache-buster v349 → v350)*
+
+The map could already show **that** two agents spoke. It could not show a word of
+it, and the audit log it pointed at could not prove a command had run at all.
+Both records are now readable, and both are honest about what happened.
+
+**The audit trail tells the truth now.** `storage/exec.log` used to get one line
+per run, written *after* the process was reaped, with no idea who asked for it.
+That meant a run killed mid-command — the operator force-stops, the server
+restarts, a GUI app is left open — left **no record whatsoever**, and a line
+could never be tied to the turn that requested it. Each run now writes **two**
+lines: `phase=start` *before* the spawn and `phase=end` after it, sharing one
+`run=` id, both carrying `agent=<id>`. A start with no end is now visible as
+exactly what it is: something that started and never reported back. `run_code`
+(the code interpreter) was not audited at all; it is now, as `kind=code`.
+
+**Config → TRACE is three views of one question.** The single table became
+**RUNS · COMMS · EXEC**:
+
+- **RUNS** — unchanged: model turns and tool calls with timing, tokens, success.
+- **COMMS** — what the agents *said* to each other, with the text: the question an
+  agent asked, the answer that came back, one-way orders, and pings, each with
+  its duration and a failure marker. Questions and answers stay paired as one
+  exchange instead of two unrelated lines.
+- **EXEC** — `storage/exec.log`, parsed server-side and paired into runs, newest
+  first: time, agent, command, working directory, duration, exit code, and a
+  **no end** marker for a run that never finished. Read-only on purpose — the
+  UI cannot clear evidence, and the Clear button only ever empties RUNS or
+  COMMS.
+
+**Per-agent, from the map itself.** The 3D agent card's *Recent messages* now
+shows what was said, and a **Messages →** button opens a drawer scoped to that
+agent: **TALK** (every exchange it sent or received, both halves with the text)
+and **RUNS** (its own audited commands, fetched by agent id). Hovering a beam on
+the chart shows *"Agent A → Agent B: …"*, so the map stops being mute.
+
+Agent-to-agent chat is memory-only and bounded to 300 exchanges, like the run
+trace: it is for watching a run, and a second copy of every conversation on
+disk would need its own retention decision.
+
+**Plumbing.** `exec` and `run_code` now pass the calling `agentId`; the new
+`storage/exec.log` reader tails only the last 256 KB (bounded, read-only) and
+parses both the new two-line shape and the older one-line records, so an
+existing log stays readable. New: `ui/js/commsLog.js`,
+`ui/js/components/agentRecord.js`, `tests/js/commsLog.test.mjs`, and audit
+assertions in `tests/php/sandbox.test.php`.
+
+---
+
 ## 🗄️ Add sandboxes from Brain Lab, and the Browser rail stops overlapping on a phone *(UI — `VERSION` 351, cache-buster v348 → v349)*
 
 - **The gap.** A per-agent file jail already existed (`agent.sandboxRoot`, picked
