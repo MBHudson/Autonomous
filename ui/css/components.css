@@ -1550,6 +1550,28 @@ body.agent-reordering .agent-editor:hover {
   background: rgba(255, 71, 87, 0.12);
 }
 
+/* A fact inside a Config section that needs acting on — an install that is one
+   rename short, a file that could not be swapped. Orange rather than red: the
+   app still works, and the fix is one button. */
+.cfg-alert {
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 159, 67, 0.4);
+  border-left: 3px solid var(--accent-orange, #ff9f43);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+}
+
+.cfg-alert-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-orange, #ff9f43);
+  margin-bottom: 6px;
+}
+
 /* Un-saved numbers. */
 .cfg-section.dirty > .cfg-section-head .cfg-section-title::after {
   content: ' ●';

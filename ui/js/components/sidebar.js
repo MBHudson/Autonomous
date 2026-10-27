@@ -10,18 +10,18 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=353';
-import { K } from '../storage.js?v=353';
-import { persistence } from '../persistence.js?v=353';
-import { api } from '../api.js?v=353';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=353';
-import { errText } from '../api.js?v=353';
-import { TOOL_REGISTRY } from '../tools.js?v=353';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=353';
-import { snapshot } from '../rateGovernor.js?v=353';
-import { resetBrowserEnabled } from '../toolManifest.js?v=353';
-import { perf } from '../perf.js?v=353';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=353';
+import { store } from '../store.js?v=354';
+import { K } from '../storage.js?v=354';
+import { persistence } from '../persistence.js?v=354';
+import { api } from '../api.js?v=354';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=354';
+import { errText } from '../api.js?v=354';
+import { TOOL_REGISTRY } from '../tools.js?v=354';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=354';
+import { snapshot } from '../rateGovernor.js?v=354';
+import { resetBrowserEnabled } from '../toolManifest.js?v=354';
+import { perf } from '../perf.js?v=354';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=354';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1721,14 +1721,17 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <div class="form-hint" id="sbMcpSrvStatus"></div>
       `)}
 
-      ${this._cfgSection('updates', 'Updates', this._updatePlan
-        ? { text: `PUBLISHED v${esc(this._updatePlan.targetVersion?.label || '?')}`, cls: 'warn' }
-        : { text: '' }, `
+      ${this._cfgSection('updates', 'Updates', (this._installPre?.pending || []).length
+        ? { text: 'UNFINISHED', cls: 'danger' }
+        : this._updatePlan
+          ? { text: `PUBLISHED v${esc(this._updatePlan.targetVersion?.label || '?')}`, cls: 'warn' }
+          : { text: '' }, `
         <div class="form-hint">Fetches the published release into <code>storage/updates/</code>,
           checks the archive, and lists what is different. <b>Downloading replaces nothing.</b>
           INSTALL then copies the new files over the app's own — after writing a rollback copy to
           <code>storage/backups/</code> first. Nothing under <code>storage/</code> is ever written, so
           sessions, agents, models and keys stay exactly as they are.</div>
+        <div id="sbUpdatePending"></div>
         <div class="toggle-row">
           <span class="toggle-label">Check for updates when the app loads</span>
           <div class="toggle ${settings.checkUpdatesOnStartup === false ? '' : 'active'}" id="sbUpdateAuto"><div class="toggle-knob"></div></div>
@@ -3282,11 +3285,11 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
   /**
    * Config → Updates: fetch the published release and show what differs.
    *
-   * Read-only by design. The server writes only inside storage/updates, and this
-   * panel renders the plan it returns — there is no apply path in the UI or the
-   * API, so a mis-click cannot replace a file. The plan is kept on the instance
-   * (not in storage) so re-rendering the Config tab does not re-download tens of
-   * megabytes or hit GitHub again.
+   * The plan is kept on the instance (not in storage) so re-rendering the Config
+   * tab does not re-download tens of megabytes or hit GitHub again — and the
+   * two things that can write are separate, explicit buttons: INSTALL UPDATE
+   * (a whole staged release, rollback copy first) and FINISH THE UPDATE (the
+   * single rename an unfinished install is missing).
    */
   _initUpdates() {
     const btn = document.getElementById('sbUpdateCheck');
@@ -3294,6 +3297,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     if (!btn || !statusEl) return;
 
     this._renderUpdatePlan();
+    this._paintPending();
 
     // Adopt whatever is already staged from an earlier session.
     if (!this._updateLoaded) {
@@ -3309,6 +3313,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           }
           this._renderUpdatePlan();
           this._paintInstall();
+          this._paintPending();
         })
         .catch(() => { /* offline is not an error worth a toast here */ });
     }
@@ -3381,6 +3386,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
         this._renderUpdatePlan();
         this._paintInstall();
+        this._paintPending();
         const n = (plan?.counts?.new || 0) + (plan?.counts?.changed || 0);
         // "this copy / published" rather than "vA → vB": the published number
         // can be LOWER than this one, and an arrow then reads as an upgrade
@@ -3425,6 +3431,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           this._renderUpdatePlan();
           this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
           this._paintInstall();
+          this._paintPending();
           const done = document.getElementById('sbUpdateInstallHint');
           if (done) {
             done.textContent = `Installed ${res.installed} file(s) — this copy now reports v${res.to}. `
@@ -3477,15 +3484,6 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         hint.textContent = `Replaces this copy's v${from} files with v${to}. A rollback copy is written first.`;
       }
     }
-
-    // A file that an install could not swap (the entry script, held open by the
-    // request doing the install) shows up here as work still to do.
-    if (hint && !work && (pre?.pending || []).length) {
-      hint.textContent = `Waiting to be swapped in: ${(pre.pending || []).join(', ')}. `
-        + 'It happens by itself a second after an install; if it does not, run '
-        + 'php install-update.php --finish.';
-    }
-
     if (!roll) return;
     const snaps = pre?.snapshots || [];
     if (!snaps.length) {
@@ -3505,9 +3503,136 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         const res = await api.updateRollback(newest.dir);
         this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
         this._paintInstall();
+        this._paintPending();
         store.emit('toast', { message: `Rolled back to ${res.to ? 'v' + res.to : 'the backup'} — reload`, type: 'success' });
       } catch (e) {
         store.emit('toast', { message: `Rollback failed: ${errText(e)}`, type: 'error' });
+      }
+    });
+  }
+
+  /**
+   * An install left one file behind: say so, and offer to finish it here.
+   *
+   * An installer cannot rename over the script that is running it — on Windows
+   * that is always api/index.php — so the new copy is written beside its target
+   * and a detached process swaps it in. Where the copy being replaced cannot
+   * find PHP (v354/v355 under XAMPP) that process never started, and until v357
+   * nothing retried: the panel said "up to date" and the swap waited for a
+   * command line. autoload.php retries it on every page load now, so this box
+   * only survives a load when the retry could not manage it either — which is
+   * exactly when a button is worth having.
+   */
+  _paintPending() {
+    const host = document.getElementById('sbUpdatePending');
+    if (!host) return;
+    const pending = this._installPre?.pending || [];
+
+    // The badge is the only signal while the section is collapsed, and the
+    // status fetch lands after the first paint — which built the header with no
+    // badge at all, because it did not know yet. So the span is created here
+    // when there is something to say, instead of only being re-labelled.
+    let badge = document.querySelector('[data-cfg-section="updates"] .cfg-section-badge');
+    if (!badge && pending.length) {
+      const head = document.querySelector('[data-cfg-section="updates"] .cfg-section-head');
+      if (head) {
+        badge = document.createElement('span');
+        badge.className = 'cfg-section-badge';
+        head.appendChild(badge);
+      }
+    }
+    if (badge) {
+      if (pending.length) {
+        badge.textContent = 'UNFINISHED';
+        badge.classList.remove('warn', 'ok');
+        badge.classList.add('danger');
+      } else {
+        badge.classList.remove('danger');
+        if (this._updatePlan) {
+          badge.textContent = `PUBLISHED v${this._updatePlan.targetVersion?.label || '?'}`;
+          badge.classList.add('warn');
+        } else if (badge.textContent === 'UNFINISHED') {
+          // A session that only knew about the waiting file has no plan to go
+          // back to, and an empty pill left behind would claim nothing at all.
+          // The header it was built into had no badge either, so remove it.
+          badge.remove();
+        }
+      }
+    }
+
+    if (!pending.length) {
+      host.innerHTML = '';
+      return;
+    }
+
+    const files = pending.map((f) => `<code>${esc(f)}</code>`).join(', ');
+    host.innerHTML = `
+      <div class="cfg-alert">
+        <div class="cfg-alert-title">${pending.length} file${pending.length === 1 ? '' : 's'} waiting — this update is unfinished</div>
+        <div class="form-hint" style="margin:0">
+          The installer cannot replace a file the server is running, so ${files}
+          ${pending.length === 1 ? 'is' : 'are'} written and waiting for one rename. Every page
+          load retries it; this does it now.
+        </div>
+        <button class="btn btn-primary btn-block" id="sbUpdateFinish" style="margin-top:8px">FINISH THE UPDATE</button>
+        <div class="form-hint" id="sbUpdateFinishHint"></div>
+      </div>`;
+
+    const btn = host.querySelector('#sbUpdateFinish');
+    btn?.addEventListener('click', async () => {
+      if (this._finishBusy) return;
+      this._finishBusy = true;
+      btn.disabled = true;
+      const was = btn.textContent;
+      btn.textContent = 'FINISHING…';
+      try {
+        const res = await api.updateFinish();
+        const swapped = res?.swapped || [];
+        const still = res?.pending || [];
+        // Re-read the state before repainting: the answer to "what is still
+        // waiting" is the server's, not this function's.
+        this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
+        this._paintInstall();
+        this._paintPending();
+        if (swapped.length) {
+          store.emit('toast', {
+            message: `Update finished — ${swapped.join(', ')} swapped in`,
+            type: 'success',
+          });
+          return;
+        }
+        const left = document.getElementById('sbUpdateFinishHint');
+        if (!left) return;
+        if (!still.length) {
+          left.textContent = 'Nothing was left waiting. Reloading…';
+          setTimeout(() => location.reload(), 900);
+          return;
+        }
+        // The common case, and the one no request can win: the file still
+        // waiting is api/index.php, so THIS request is holding it — a rename
+        // from inside it fails for as long as it runs. The detached finisher
+        // is the process that can, and it starts as this request ends, so the
+        // honest thing is to say so and reload once rather than report a
+        // failure the user can do nothing about.
+        left.textContent = `The finisher takes over the moment this request ends — it is the process that can rename ${still.join(', ')}. Reloading… If this box is still here after that, run php install-update.php --finish.`;
+        setTimeout(() => location.reload(), 2200);
+      } catch (err) {
+        const msg = errText(err);
+        const left = document.getElementById('sbUpdateFinishHint');
+        if (left) {
+          // While api/index.php is the file still waiting, the OLD api answers
+          // these calls — and it may not have this route at all.
+          left.textContent = /404|not found/i.test(msg)
+            ? 'The running API is the older one and has no finish route yet. Reload the page: the new code retries the swap on load.'
+            : `Could not finish: ${msg} Run php install-update.php --finish.`;
+        }
+      } finally {
+        this._finishBusy = false;
+        // A successful finish replaces this node, so only restore a live one.
+        if (btn.isConnected) {
+          btn.disabled = false;
+          btn.textContent = was;
+        }
       }
     });
   }
