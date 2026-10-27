@@ -42,7 +42,8 @@ Everything below landed **after** the feature list further down this page was wr
 | 🌐 **Proxy, in the nav** | Hundreds of live HTTP proxies — **ELITE** and **ANONYMOUS** only — with ping and uptime on every row, favourites, and one **USE** that routes *all* of an agent's outbound traffic (models, web tools, the shell) through it. |
 | 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
 | 🧾 **An audit trail that holds up** | Two lines per command — `phase=start` *before* the spawn, `phase=end` after — sharing a `run=` id and naming the **agent** that asked. A run that never finished now shows as a start with no end, and `run_code` is audited too. |
-| 🔄 **Updates that explain themselves** | A load-time check against the published `VERSION` **and** cache-buster, a bell that names the release from its changelog, a **What's new** row you can expand, and a download that verifies and **diffs** without installing. |
+| 🔄 **Updates that explain themselves** | A load-time check against the published `VERSION` **and** cache-buster, a bell that names the release from its changelog, a **What's new** row you can expand, and a download that verifies and **diffs** before anything is written. |
+| ⬇️ **Updates that install themselves** | The check offers **back up then update**, **update without a backup**, or **cancel** — and either of the first two runs the whole chain: download, verify, install, reload. A rollback copy of the code lands in `storage/backups/` first, settings are never in scope, and `install-update.php` undoes it from a terminal when a button cannot. |
 | 🖥️ **Classic & Desktop 2026** | Two shells, one switch, **Classic the default**; narrow the window and either becomes the same mobile layout. |
 | 🎛️ **Config → Desktop** | The machine-room card: map detail, fog, bloom, floating floor + floor pin, auto-rotate, glass blur, chat background and frame cap — each individually adjustable, with a preset that only ever turns visuals **down**. |
 | 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
@@ -86,7 +87,7 @@ Jump straight to a section — every heading on this page is also clickable.
 - [💭 Thinking & reasoning](#-thinking--reasoning)
 - [🧠 Memory](#-memory)
 - [💾 Export & import](#-export--import)
-- [🔁 Updates — download, verified, never auto-installed](#-updates--download-verified-never-auto-installed)
+- [🔁 Updates — check, download, verify, install](#-updates--check-download-verify-install)
 
 **🔐 Security & guardrails**
 
@@ -139,7 +140,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🖥️ **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
 | 🎛️ **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
 | 🌐 **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes every agent's outbound traffic through it |
-| 🔄 **Self-updates, checked** | A load-time check that names what shipped, plus a verified download that shows the diff and never installs itself |
+| 🔄 **Self-updates, one click** | A load-time check that names what shipped, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
 | 📱 **Mobile-first** | Built for the phone in your pocket |
 
 ---
@@ -669,9 +670,9 @@ Take your work with you. 📦
 
 ---
 
-## 🔁 Updates — download, verified, never auto-installed
+## 🔁 Updates — check, download, verify, install
 
-The app can fetch its own published release and show you **exactly what would change**, without changing anything. 🧾
+The app checks its own published release, shows you **exactly what would change**, and then — if you say so — installs it, keeping a rollback copy of the code you had. 🧾
 
 ![The bell naming a newer release, read from the published changelog](screenshots/version-update.png)
 
@@ -683,7 +684,11 @@ The app can fetch its own published release and show you **exactly what would ch
 - 🔎 **That row opens.** *What's new* is a disclosure, not a teaser: closed it names the release and its opening sentence, opened it lists the entry's **own lines** — every bullet with its bold lead-in, sub-points indented — read from the same parse that produced the one-liner, so the two can never disagree. It is capped at 60 lines / 4000 characters and scrolls in place, because the text arrives over the network; when a cap bites it says so rather than pretending the entry ended. Every line is remote text and is placed as **text**, never as markup — the bold lead-in is a real element built around escaped content.
 - 🎛️ **The switch is in Config → Updates:** *Check for updates when the app loads*, **on by default**, with **CHECK NOW** to ask immediately and a one-line answer beneath it (*"Published v337, this copy v344 — this copy is the newer one"*). Both numbers are always shown, because the published copy can be **behind** a local one and an arrow would read as an upgrade that takes you backwards. Off silences the load-time check only — CHECK NOW and DOWNLOAD UPDATE always work.
 - 🔇 **A check that cannot run says nothing.** Offline, behind a proxy, or on a PHP with no curl, the load-time check stays quiet: it never blocks boot, never throws, and never claims you are out of date. A failed check is remembered briefly (15 minutes) so an offline machine is not retrying on every reload. The announcement names the *release*; the file-by-file **diff** still takes DOWNLOAD UPDATE.
-- 🚫 **Nothing is installed.** There is no apply button, in the UI *or* the API. The only thing written is `storage/updates/`; your app folder is read and never modified.
+- 🧭 **Ask once, then it runs.** The load-time announcement is a **prompt** with three answers: **BACK UP, THEN UPDATE** (your settings, saved to this machine's Downloads folder as `router-backup-<version>-<timestamp>.json` — that file holds your keys and token, so keep it safe), **UPDATE WITHOUT A BACKUP**, or **CANCEL**. Pick either of the first two and the whole chain runs unattended: download → verify → diff → install → reload. No second confirmation, because the click *was* the confirmation.
+- 🛠️ **The install.** **Config → Updates → INSTALL UPDATE…** copies the staged release over the app's own files. It refuses `storage/`, `.git`, `node_modules`, `.freebuff`, `screenshots/` and `sandbox/` **before it looks at any file**, never writes over a file in place (new bytes land in a dotfile sibling and are `rename()`d over the target, so a reader sees the old file or the new one and never half of either), and **deletes nothing** — a file the release dropped simply stays.
+- ↩️ **Always a way back.** Before the first write it copies the current tree to `storage/backups/<version>-<timestamp>/` with a `manifest.json` (path, size, sha256). **Config → Updates → ROLL BACK** restores it, and if the installed files report a different version than the release claimed, the installer **rolls itself back** and says so. Two rollback copies are kept, pruned oldest-first.
+- 🖥️ **`install-update.php` — the way in when the app can't help.** `php install-update.php` installs what is staged, `--rollback` undoes it, `--status` reports what is staged and what the last run did. It loads **one file**, uses no autoloader, refuses to run over HTTP, and exists for two cases a button cannot cover: a Linux host where `www-data` cannot write the app folder, and a tree that a half-finished update already broke — the code that would fix it is inside that tree.
+- 📓 **It says what it did.** `storage/updates/install.log` records every phase, and `install.json` carries the current one (`installing` / `done` / `failed` / `rolled-back`). Both are under `storage/`, so neither is reachable over HTTP.
 - 🔐 **Your data is out of scope by construction.** The published copy **ships a default `storage/` folder**, so a plain "unzip over the app" would replace your config, token and provider keys with defaults. Every `storage/*` entry is refused at *extraction* time — before any diff exists — and `storage/` never appears in the comparison.
 - 🧭 **What “not in this release” means.** Files on disk that the release doesn't contain (`cleancopy/`, screenshots, work you haven't pushed) are **listed, never deleted**.
 - 🛡️ **The archive is treated as hostile.** `https` only, on GitHub's release hosts — checked before the request *and* again after redirects — with a 64 MB / 20 000-entry cap, and every entry name resolved by hand: `..`, absolute paths, drive letters and `stream://` wrappers are refused rather than written.
@@ -1105,7 +1110,7 @@ All under `/router/api/…` (or `/api/…`). Every route is token-gated.
 | 🖥️ MCP server | `POST /mcp-server` (JSON-RPC), `GET·POST /mcp-server/config` |
 | 🧪 Lab / proxy | `POST /lab`, `GET /proxies`, `POST /proxy-ping`, `GET·PUT /proxy-active` |
 | 📈 Misc | `GET /topology`, `POST /diag`, `GET /backup`, `POST /import`, `GET /export/{id}`, `POST /audio/{speak,transcribe}` |
-| 🔁 Updates | `GET /update` (status + cached plan), `GET /update/check` (is a newer release published? cached six hours — `POST` asks now), `POST /update/download` (fetch, verify, diff), `POST /update/discard` — download-only: no endpoint applies anything |
+| 🔁 Updates | `GET /update` (status + cached plan + whether it can install), `GET /update/check` (is a newer release published? cached six hours — `POST` asks now), `POST /update/download` (fetch, verify, diff), `POST /update/discard`, `GET /update/state` (phase, preflight, backups, log tail), `POST /update/backup`, `POST /update/install` (replaces app files), `POST /update/rollback`. Only `check` and `download` need curl — the rest work offline on files already on disk |
 
 Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for the model, so a refused path reads as *"outside the allowed directories"* rather than a blank 500.
 

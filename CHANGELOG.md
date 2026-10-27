@@ -17,6 +17,73 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## ⬇️ The update installs itself, and there is a way back *(UI + PHP — `VERSION` 354, cache-buster v351 → v352)*
+
+**The updater stopped one step short of doing its job.** Everything up to the
+write was there — download, verify, extract, diff — and the whole feature ended
+at a note in the release page telling the operator to replace the files by hand
+and keep `storage/`. That is a fine instruction for the person who wrote the
+app and a wall for everybody else.
+
+**Asking once, then running.** The load-time announcement is now a prompt with
+three answers: **BACK UP, THEN UPDATE** (a full settings backup to the Downloads
+folder, named `router-backup-<version>-<timestamp>.json` so a restore six months
+later knows which release wrote it), **UPDATE WITHOUT A BACKUP**, or **CANCEL**.
+Either of the first two runs the rest unattended — download, verify, diff,
+install, reload — because four prompts for one decision is not an update, it is
+a questionnaire. The prompt waits for a clear screen: it will not open over
+another dialog or over a reply that is still streaming, retrying for a minute
+before leaving the news in the bell.
+
+**What the install is allowed to touch.** `Src\Install` refuses `storage`,
+`.git`, `node_modules`, `.freebuff`, `screenshots` and `sandbox` **before it
+looks at a single file**, so sessions, models, keys, the token and the allow/deny
+lists are unreachable by an update — not filtered out, out of scope. A plan.json
+that named `storage/config.json` is refused file by file and the refusal is
+written to the journal; `tests/php/install.test.php` asserts exactly that.
+
+**No file is ever written in place.** New bytes go to a hidden sibling
+(`.router-new-<name>`) and are `rename()`d over the target, so a reader sees the
+old file or the new one and never half of either. The hidden name is a dotfile,
+which every serving mode already refuses, so a crash cannot leave a fetchable
+half-written file behind. Nothing is ever **deleted**: a file the release dropped
+stays where it is, because a stale file is inert and a wrong delete is somebody's
+work gone.
+
+**The rollback copy, and the check that uses it.** Before the first write the
+current tree is copied to `storage/backups/<version>-<timestamp>/` with a
+`manifest.json` (path, size, sha256). A copy rather than a zip on purpose:
+XAMPP's PHP ships no `ZipArchive` and `phar.readonly` on, and a rollback that
+needs an extension the host may not have is not a rollback. After writing, the
+installer re-reads `VERSION`; if the tree does not call itself the release it was
+handed, it **restores the backup and says so**, and the marker records
+`rolled-back` rather than a bare `failed` — the tree is fine, the release was
+bad, and those are different messages. The lock that serialises all this is
+re-entrant, because without that the self-heal path deadlocks against its own
+install. Two rollback copies are kept, pruned oldest-first.
+
+**`install-update.php` is the way in when the app cannot help.** `php
+install-update.php`, `--rollback`, `--status`. It requires **one file**
+(`src/Install.php`), uses no autoloader, and refuses to do anything over HTTP. It
+exists for the two cases a button cannot cover: a Linux host where `www-data`
+cannot write the app folder, and a tree that a half-finished update already
+broke — the code that would fix it is inside the tree.
+
+**`update` left the curl-only gate.** It was in the blanket `$needsNet` list, so
+on a PHP with no `curl` every update route returned a 503 — including reading
+what was staged, backing up, installing and rolling back, none of which touch the
+network. A machine with no curl is exactly the machine most likely to be
+hand-fixing a release offline. Only `check` and `download` require curl now.
+
+**Verified.** `tests/php/install.test.php` — 43 assertions over a throwaway tree:
+a normal install, `storage/` unreachable including through a forged plan, rollback
+restores, rollback refuses a folder outside `storage/backups`, a version mismatch
+rolls back by itself, a stale lock is ignored and a fresh one is respected,
+snapshots are pruned. Then the same path end to end over HTTP against a copy of
+the app: install reported `{"ok":true,"installed":2,"from":"353","to":"354"}`,
+206 files backed up, config untouched, `/storage/config.json` still **403**, and
+`POST /update/rollback` put it back to 353 with 205 of 206 files already correct.
+
 ## ⏱️ Replies that land when they land, and an Always-On switch that goes both ways *(UI — `VERSION` 353, cache-buster v350 → v351)*
 
 **A finished reply is finished now, not when the slowest agent is done.** Every
