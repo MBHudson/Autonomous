@@ -129,6 +129,11 @@ passes, because the commit will not contain it. Enable it once per clone with `g
 refused for the wrong reason, and the hook says in its own header to add it executable
 (`git add --chmod=+x`), or a fresh clone gets a hook git silently skips.
 
+The hook's own stated cost was wrong in the direction that matters: it said *about two minutes*, and it
+measures **39–42 seconds** over five runs on a warm machine — the number a reader uses to decide whether to
+leave the hook on at all. A cold machine, or a scanner reading 280 fresh files, is slower; the copy is real
+work, so the figure is stated with its conditions rather than as a promise.
+
 Covered by the new `php tests/php/secrets.test.php` (66 assertions: mask/restore round-trips, the
 friend-token lifecycle, the local-only gate, and the live routes with the real handlers running against a
 throwaway config), by the new `tests/php/setupToken.test.php` (56, above), and by additions to
