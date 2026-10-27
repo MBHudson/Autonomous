@@ -161,7 +161,7 @@ $body = json_decode(file_get_contents('php://input'), true);
 // call then dies with a fatal error AFTER the stream headers went out, which
 // the browser could only report as "the model returned an empty response".
 // Say what is actually wrong instead.
-$needsNet = ['llm', 'audio', 'sandbox', 'diag', 'lab', 'proxy-ping', 'proxy-ping-all', 'mcp', 'catalog', 'browser'];
+$needsNet = ['llm', 'audio', 'sandbox', 'diag', 'lab', 'proxy-ping', 'proxy-ping-all', 'mcp', 'catalog', 'browser', 'update'];
 if (in_array($segments[0] ?? '', $needsNet, true) && !function_exists('curl_init')) {
     http_response_code(503);
     echo json_encode([
@@ -242,6 +242,9 @@ try {
             break;
         case 'browser':
             handleBrowser($method, $segments, $body);
+            break;
+        case 'update':
+            handleUpdate($method, $segments, $body);
             break;
         case 'exec':
             handleExec($method, $segments, $body);
@@ -1636,5 +1639,80 @@ function pingProxy($ip, $port) {
     curl_close($ch);
     if ($err || $code !== 200) return null;
     return (int)round($elapsed);
+}
+
+/**
+ * Updates: fetch a published release into storage/updates and report the diff.
+ *
+ *   GET  /api/update            -> { ok, currentVersion, staged, plan, source }
+ *   GET  /api/update/check      -> { ok, updateAvailable, remoteVersion, ... }
+ *   POST /api/update/check      -> the same, but never from the cache
+ *   POST /api/update/download   -> the plan
+ *   POST /api/update/discard    -> { ok, discarded }
+ *
+ * Deliberately no "apply". This route writes only inside storage/updates:
+ * the archive lands there, is verified there, is extracted there, and is
+ * diffed against the app tree READ-ONLY. Nothing in the app folder is replaced,
+ * and storage/ itself is never read for the comparison nor written at all --
+ * the published repo ships a default storage/ folder, and Update refuses every
+ * one of those entries so it can never shadow the operator's real config.
+ */
+function handleUpdate($method, $segments, $body) {
+    $action = $segments[1] ?? '';
+    try {
+        if ($action === '' || $action === 'status') {
+            if ($method !== 'GET') {
+                http_response_code(405);
+                echo json_encode(['error' => 'GET only']);
+                return;
+            }
+            echo json_encode(Src\Update::status());
+            return;
+        }
+        if ($action === 'check') {
+            // GET respects the cache; POST asks GitHub now. This is the cheap
+            // probe the UI runs at page load: it reads only the published
+            // ui/js/store.js and parses APP_VERSION out of it, so the check
+            // costs a few kilobytes instead of an 11 MB archive. It reports
+            // whether a newer release exists, never what changed inside one.
+            if ($method !== 'GET' && $method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'GET or POST only']);
+                return;
+            }
+            echo json_encode(Src\Update::check($method === 'POST'));
+            return;
+        }
+        if ($action === 'download') {
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'POST only']);
+                return;
+            }
+            // A release is tens of megabytes; PHP's default 30s limit would
+            // cut the transfer off halfway and look like a broken connection.
+            @set_time_limit(300);
+            @ini_set('memory_limit', '256M');
+            $url = is_array($body) ? ($body['url'] ?? null) : null;
+            echo json_encode(Src\Update::download($url));
+            return;
+        }
+        if ($action === 'discard') {
+            if ($method !== 'POST' && $method !== 'DELETE') {
+                http_response_code(405);
+                echo json_encode(['error' => 'POST only']);
+                return;
+            }
+            echo json_encode(Src\Update::discard());
+            return;
+        }
+        http_response_code(404);
+        echo json_encode(['error' => 'Unknown update action']);
+    } catch (\Throwable $e) {
+        // 400, not 500: a refusal (bad host, not our archive, no write access)
+        // is a normal outcome with a message meant for the operator.
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    }
 }
 ?>

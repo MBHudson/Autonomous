@@ -1,0 +1,28 @@
+# Release number for the whole app.
+#
+# BUMP THIS ON EVERY RELEASE - including one that changes no browser file at
+# all, such as a PHP fix or a docs fix. That is the point of this file:
+#
+#   VERSION                  -> this number. Moves on ANY release.
+#   ui/js/store.js           -> APP_VERSION. The browser cache-buster; moves
+#                               only when a file the browser caches changes.
+#
+# The update check at Config -> Updates reads BOTH from the published copy and
+# announces a release when either is newer than this copy's. Before this file
+# existed the check could only see the cache-buster, so a release that changed
+# PHP and left the browser files alone was invisible and reported as "up to
+# date" - the failure this file exists to remove.
+#
+# Rules:
+#   * a PLAIN INTEGER, no dots - the comparison is numeric, so "2026.10.26"
+#     would never read as newer.
+#   * only ever increase.
+#   * the first non-comment line is the number; blank lines and lines starting
+#     with # or // are ignored, which is why this comment can live here.
+#
+# A copy with no readable number here still works: the check falls back to the
+# cache-buster, exactly as it did before.
+#
+# The full routine, including the three places APP_VERSION has to change
+# together, is in RELEASING.md next to this file.
+349

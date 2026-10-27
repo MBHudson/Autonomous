@@ -210,6 +210,7 @@ class Sandbox {
      * program from stdin", which is inline code with extra steps.
      */
     private static function interpreterInlineFlags($program) {
+        $program = self::policyName($program);
         $common = ['-'];   // stdin, every one of these
         $byProg = [
             'python'  => ['-c'], 'python2' => ['-c'], 'python3' => ['-c'],
@@ -275,6 +276,28 @@ class Sandbox {
             'sh','bash','zsh','ksh','dash','fish','csh','tcsh','ash',
             'python','python2','python3','perl','php','node','ruby','lua','tclsh',
             'env','xargs','eval','exec','find','nc','ncat','socat','telnet',
+            // Windows command hosts and script launchers: the local spelling of
+            // `sh -c`. Once one of these runs, every other list here is
+            // advisory, because the payload sits inside an argument and the
+            // host executes it. They belong in the same category as the
+            // interpreters above, not in the approval queue where one careless
+            // "Always allow" hands back a permanent shell.
+            //
+            // Nothing here is permanent: this is the DEFAULT list, and an
+            // explicit sandbox.exec_deny in storage/config.json REPLACES it
+            // wholesale. Delete a name there and it becomes approvable again.
+            'cmd','powershell','pwsh','wscript','cscript','mshta',
+            'rundll32','regsvr32','msiexec','wmic',
+            // Scheduled / service execution outlives the session and the jail,
+            // exactly like crontab and at below.
+            'schtasks','sc',
+            // Registry writes can add a Run key: persistence with no process
+            // left to notice.
+            'reg','regedit',
+            // The desktop shell launches whatever it is handed, so it is a
+            // launcher rather than a file manager: `explorer .` is convenient,
+            // `explorer thing.exe` is execution.
+            'explorer',
             // Reboot / service control
             'shutdown','reboot','halt','poweroff','init','systemctl','service','insmod',
             // Raw device and disk access bypasses the filesystem jail entirely
@@ -492,10 +515,10 @@ class Sandbox {
         // the same power as a shell. Still subject to the cwd jail, the path
         // guard and the timeout, and it must be in the allowlist like anything
         // else, so it stays a deliberate, visible, reversible setting.
-        $fullInterpreter = in_array($program, $cfg['exec_interpreters_full'], true);
+        $fullInterpreter = self::inPolicyList($program, $cfg['exec_interpreters_full']);
 
         $scriptedInterpreter = false;
-        if (!$fullInterpreter && in_array($program, $cfg['exec_interpreters'], true)) {
+        if (!$fullInterpreter && self::inPolicyList($program, $cfg['exec_interpreters'])) {
             $scriptedInterpreter = true;
             $inline = self::interpreterInlineFlags($program);
             $script = null;
@@ -563,13 +586,20 @@ class Sandbox {
             $program = basename($argv[0]);
             // Already validated above (script inside the jail, no inline code),
             // so it skips the allowlist and approval path entirely.
-        } elseif (!$fullInterpreter && in_array($program, $cfg['exec_deny'], true)) {
-            // The denylist is absolute. Checked before the allowlist and the
-            // approval path, so it cannot be undone by an allowlist entry or by
-            // a grant the operator approved earlier.
+        } elseif (!$fullInterpreter && self::inPolicyList($program, $cfg['exec_deny'])) {
+            // The denylist wins over the allowlist and over approvals: checked
+            // here, before either, so a past "Always allow" cannot reach around
+            // it. That is the whole point of it. It is NOT permanent, though --
+            // the list is config the operator owns, so the refusal says exactly
+            // how to take the name back off it. Whoever reads this message (often
+            // a model relaying it to the person who can edit it) needs the undo
+            // path in the text, not a rule number they would have to look up.
             return ['ok' => false, 'exit' => -1, 'stdout' => '',
-                'stderr' => "Refused: \"$program\" is on the command denylist and cannot be "
-                    . 'approved. Remove it under Config → Allow/Deny list if you really mean it.',
+                'stderr' => "Refused: \"$program\" is on the shell denylist, which is checked "
+                    . 'before approvals, so "Always allow" cannot override it. The list is yours, '
+                    . "not a rule in code: delete the \"$program\" line under "
+                    . 'Config → Shell access → Allow / Deny (section 4), add it to section 2, '
+                    . 'and it runs like any other command.',
                 'denied' => true, 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
 
@@ -581,7 +611,7 @@ class Sandbox {
         // would still ask for approval, which contradicts what it says.
         // Everything else (cwd jail, path guard, timeout, audit log) still applies.
         if (!$scriptedInterpreter && !$fullInterpreter
-            && !in_array($program, $cfg['exec_allow'], true) && !self::alreadyGranted($argv)) {
+            && !self::inPolicyList($program, $cfg['exec_allow']) && !self::alreadyGranted($argv)) {
             // Operator approval is on: ask, rather than refusing outright.
             if (!empty($cfg['exec_approval'])) {
                 $id = self::requestApproval($argv, $cwd ?? null, $opts['agent'] ?? '');
@@ -787,6 +817,30 @@ class Sandbox {
 
 
     /**
+     * The name every policy list compares against.
+     *
+     * `cmd` and `cmd.exe` are one decision, not two, and Windows does not care
+     * about case. Without this the allowlist entry for `grep` silently failed
+     * to match the `grep.exe` that Git for Windows actually ships, and -- the
+     * dangerous direction -- a deny entry for `bash` did not match `bash.exe`,
+     * which is the WSL launcher and a real shell. One normalisation covers
+     * both directions instead of asking every operator to list both spellings.
+     */
+    private static function policyName($name) {
+        $n = strtolower(basename((string)$name));
+        return (string)preg_replace('/\.(exe|com)$/', '', $n);
+    }
+
+    /** Is $program in this list, under either Windows spelling? */
+    private static function inPolicyList($program, $list) {
+        $want = self::policyName($program);
+        foreach ((array)$list as $entry) {
+            if (self::policyName($entry) === $want) { return true; }
+        }
+        return false;
+    }
+
+    /**
      * Which argv positions hold filesystem paths, per command.
      *
      * Kept as an explicit table rather than guessed: `grep` leads with a
@@ -796,6 +850,7 @@ class Sandbox {
      * commands where that is harmless.
      */
     private static function pathArgSpec($program) {
+        $program = self::policyName($program);
         $pathsFrom = [
             'cat' => 1, 'head' => 1, 'tail' => 1, 'ls' => 1, 'stat' => 1,
             'file' => 1, 'du' => 1, 'wc' => 1, 'realpath' => 1, 'basename' => 1,
@@ -919,7 +974,7 @@ class Sandbox {
         $current = $listKey === 'exec_deny'
             ? self::execDenyList($cfg['sandbox'])
             : self::execAllowList($cfg['sandbox']);
-        if (in_array($program, $current, true)) return null;
+        if (self::inPolicyList($program, $current)) return null;
         $current[] = $program;
         $cfg['sandbox'][$listKey] = array_values($current);
         // false = already handled by the caller as a hard error, never as a
@@ -936,8 +991,10 @@ class Sandbox {
         $current = $listKey === 'exec_deny'
             ? self::execDenyList($cfg['sandbox'])
             : self::execAllowList($cfg['sandbox']);
-        if (!in_array($program, $current, true)) return false;
-        $cfg['sandbox'][$listKey] = array_values(array_filter($current, fn($c) => $c !== $program));
+        if (!self::inPolicyList($program, $current)) return false;
+        $want = self::policyName($program);
+        $cfg['sandbox'][$listKey] = array_values(array_filter(
+            $current, fn($c) => self::policyName($c) !== $want));
         if (!Config::saveConfig($cfg)) return false;
         return true;
     }
@@ -1207,7 +1264,7 @@ class Sandbox {
      * which then follows the normal "not installed" path.
      */
     private static function runBuiltin($argv, $cwd, $opts, $timeout, $maxBytes) {
-        $program = strtolower(basename((string)$argv[0]));
+        $program = self::policyName($argv[0] ?? '');
         $args = array_slice($argv, 1);
         $t0 = microtime(true);
         $stdout = '';
@@ -1700,6 +1757,12 @@ class Sandbox {
             // the UI must not imply the built-in defaults are still in force.
             'custom_allow' => array_key_exists('exec_allow', self::sandboxBlock()),
             'custom_deny'  => array_key_exists('exec_deny', self::sandboxBlock()),
+            // The BUILT-IN denylist, always, even when a custom one is active.
+            // Without it an operator who replaced the defaults has no way to see
+            // what they replaced -- so "put it back the way it shipped" was
+            // reachable only by reinstalling. Sent for the UI's restore control;
+            // it says nothing about the running policy.
+            'deny_defaults' => self::execDenyList([]),
         ];
     }
 

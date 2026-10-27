@@ -10,17 +10,18 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=337';
-import { K } from '../storage.js?v=337';
-import { persistence } from '../persistence.js?v=337';
-import { api } from '../api.js?v=337';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=337';
-import { TOOL_REGISTRY } from '../tools.js?v=337';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=337';
-import { snapshot } from '../rateGovernor.js?v=337';
-import { resetBrowserEnabled } from '../toolManifest.js?v=337';
-import { perf } from '../perf.js?v=337';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=337';
+import { store } from '../store.js?v=348';
+import { K } from '../storage.js?v=348';
+import { persistence } from '../persistence.js?v=348';
+import { api } from '../api.js?v=348';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=348';
+import { errText } from '../api.js?v=348';
+import { TOOL_REGISTRY } from '../tools.js?v=348';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=348';
+import { snapshot } from '../rateGovernor.js?v=348';
+import { resetBrowserEnabled } from '../toolManifest.js?v=348';
+import { perf } from '../perf.js?v=348';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=348';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -206,7 +207,11 @@ export class Sidebar {
     document.body.appendChild(el);
     el.style.position = 'fixed';
     el.style.right = 'auto';
-    el.style.zIndex = '3000';
+    // The menus layer, not a number picked to "look high enough". This clone is
+    // body-level, so its z-index competes with the dialogs directly: at 3000 an
+    // agent's ⋮ menu painted over an open dialog (and over the approval veil it
+    // is supposed to defer to). See the ladder in css/modals.css.
+    el.style.zIndex = '1000';
     const r = btn.getBoundingClientRect();
     const mw = el.offsetWidth || 160;
     const mh = el.offsetHeight || 96;
@@ -1716,6 +1721,30 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <div class="form-hint" id="sbMcpSrvStatus"></div>
       `)}
 
+      ${this._cfgSection('updates', 'Updates', this._updatePlan
+        ? { text: `PUBLISHED v${esc(this._updatePlan.targetVersion?.label || '?')}`, cls: 'warn' }
+        : { text: '' }, `
+        <div class="form-hint">Fetches the published release into <code>storage/updates/</code>,
+          checks the archive, and lists what is different. <b>Nothing is replaced and nothing is
+          installed.</b> Nothing under <code>storage/</code> is read or written — sessions, agents,
+          models and keys stay exactly as they are.</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Check for updates when the app loads</span>
+          <div class="toggle ${settings.checkUpdatesOnStartup === false ? '' : 'active'}" id="sbUpdateAuto"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-hint">Reads one small file from the published copy and compares version
+          numbers — never the archive, so it cannot cost a download at startup. The server remembers
+          the answer for six hours. Off: the bell stays quiet, and CHECK NOW still works.</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <button class="btn btn-ghost" id="sbUpdateNow" style="white-space:nowrap">CHECK NOW</button>
+          <div class="form-hint" id="sbUpdateSeen" style="flex:1;margin:0"></div>
+        </div>
+        <div class="change-notes-host" id="sbUpdateChange"></div>
+        <button class="btn btn-ghost btn-block" id="sbUpdateCheck" style="margin-top:8px">DOWNLOAD UPDATE…</button>
+        <div class="form-hint" id="sbUpdateStatus"></div>
+        <div id="sbUpdatePlan"></div>
+      `)}
+
       <div class="cfg-cluster">
         <div class="form-group" style="margin-top:0">
           <label class="form-label">Access token</label>
@@ -1921,6 +1950,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbLiveBg', (val) => store.set('settings.browserLiveBackground', val));
     this._initBrowserToggle();
     this._loadLabsStatus();
+    this._initUpdates();
 
     // Resource Manager: every switch defaults off; turning one on lets the
     // 3D graph rest. The gauges read live values from ui/js/perf.js.
@@ -3000,10 +3030,16 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           </div>
 
           <div class="form-group">
-            <label class="form-label">4. Shell commands denied</label>
-            <div class="policy-hint ok">Enforced SERVER-SIDE and absolute: checked before the
-              allowlist and before approvals, so these can never run and no past approval can bring
-              them back. Use it for interpreters and destructive verbs.</div>
+            <div class="form-label-row">
+              <span class="form-label">4. Shell commands denied</span>
+              <button class="btn btn-ghost btn-sm" id="policyDenyDefaults" type="button">Restore built-in defaults</button>
+            </div>
+            <div class="policy-hint ok">Enforced SERVER-SIDE, and checked <i>before</i> the
+              allowlist and before approvals &mdash; so a name here wins over both, and a past
+              &ldquo;Always allow&rdquo; cannot reach around it. It is <b>not</b> permanent: this
+              box <i>is</i> the list, so a line you delete here is an ordinary command again
+              (refused as &ldquo;not allowed&rdquo;, or queued for approval). Use it for
+              interpreters and destructive verbs.</div>
             <textarea class="form-textarea" id="policyDeny" rows="5"
               placeholder="one command per line, e.g.&#10;sh&#10;python3&#10;rm"></textarea>
             <div class="form-hint" id="policyDenyHint"></div>
@@ -3122,22 +3158,51 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       allowHint.textContent = `Using the built-in default list (${(info.allow || []).length} commands). Anything you type here replaces it entirely.`;
     }
 
-    if (info.custom_deny && Array.isArray(info.deny)) {
-      denyTa.value = info.deny.join('\n');
-      denyHint.textContent = `Custom denylist active (${info.deny.length} commands).`;
+    // The denylist is the operator's, so the box always says how to take a name
+    // back off it. A refusal that reads "denied" with no visible undo path is
+    // what makes a list feel permanent, which it is not.
+    const parseList = ta => String(ta.value || '')
+      .split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
+    const paintDenyHint = (custom) => {
+      const n = parseList(denyTa).length;
+      if (!n) {
+        denyHint.textContent = 'Empty box = the built-in denylist comes back on Save, so '
+          + 'clearing it does not deny nothing. For an empty deny list, set "exec_deny": [] '
+          + 'in storage/config.json.';
+        return;
+      }
+      denyHint.textContent = `${custom ? 'Custom' : 'Built-in'} denylist (${n} commands).`
+        + ' Delete a line and press Save to un-deny that program \u2014 it becomes an ordinary '
+        + 'command again, still subject to section 2 and to approvals.'
+        + (custom ? '' : ' Editing this box turns it into a custom list.');
+    };
+    // The built-in list is sent even when a custom one is active, so an operator
+    // who replaced the defaults can still see and restore what shipped instead
+    // of being stuck with a list they can no longer read.
+    const denyDefaultsBtn = modal.querySelector('#policyDenyDefaults');
+    if (Array.isArray(info.deny_defaults) && info.deny_defaults.length) {
+      denyDefaultsBtn.addEventListener('click', () => {
+        denyTa.value = info.deny_defaults.join('\n');
+        // Its own message rather than paintDenyHint + a suffix: "editing this
+        // box turns it into a custom list" directly above "loaded, press Save"
+        // reads like a warning about what the button just did.
+        denyHint.textContent = `Built-in defaults loaded (${info.deny_defaults.length}`
+          + ' commands) \u2014 press Save to apply. Lines you delete after that stay deleted.';
+      });
     } else {
-      denyTa.value = (info.deny || []).join('\n');
-      denyHint.textContent = `Showing the built-in denylist (${(info.deny || []).length} commands). Saving replaces it with whatever is in the box.`;
+      denyDefaultsBtn.remove();
     }
+    denyTa.value = (info.deny || []).join('\n');
+    paintDenyHint(!!info.custom_deny);
+    denyTa.addEventListener('input', () => paintDenyHint(true));
 
     // --- save ---
     modal.querySelector('#policySave').addEventListener('click', async () => {
       try {
         const newDenied = [...toolsBox.querySelectorAll('input')]
           .filter(i => !i.checked).map(i => i.value);
-        const parse = ta => ta.value.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
-        const allow = parse(allowTa);
-        const deny = parse(denyTa);
+        const allow = parseList(allowTa);
+        const deny = parseList(denyTa);
         const level = n => (interpBox.querySelector(`[data-interp="${n}"]`) || {}).value || 'off';
         const interps = KNOWN_INTERPRETERS.filter(n => level(n) === 'scripts');
         const interpsFull = KNOWN_INTERPRETERS.filter(n => level(n) === 'full');
@@ -3203,6 +3268,348 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     } catch {
       el.textContent = '';
     }
+  }
+
+  /**
+   * Config → Updates: fetch the published release and show what differs.
+   *
+   * Read-only by design. The server writes only inside storage/updates, and this
+   * panel renders the plan it returns — there is no apply path in the UI or the
+   * API, so a mis-click cannot replace a file. The plan is kept on the instance
+   * (not in storage) so re-rendering the Config tab does not re-download tens of
+   * megabytes or hit GitHub again.
+   */
+  _initUpdates() {
+    const btn = document.getElementById('sbUpdateCheck');
+    const statusEl = document.getElementById('sbUpdateStatus');
+    if (!btn || !statusEl) return;
+
+    this._renderUpdatePlan();
+
+    // Adopt whatever is already staged from an earlier session.
+    if (!this._updateLoaded) {
+      this._updateLoaded = true;
+      api.updateStatus()
+        .then((s) => {
+          this._updatePlan = s?.plan || null;
+          // "This copy" is read live: a staged plan is a snapshot, and the
+          // version here moves every time the UI is bumped.
+          if (this._updatePlan && s?.currentVersion) {
+            this._updatePlan.currentVersion = s.currentVersion;
+          }
+          this._renderUpdatePlan();
+        })
+        .catch(() => { /* offline is not an error worth a toast here */ });
+    }
+
+    // The startup toggle. Client-side on purpose: the BROWSER is what decides
+    // to ask at load, so the switch travels with the browser that loads the app.
+    //
+    // _initToggle is the shared helper, and it is used here rather than a
+    // hand-rolled click handler for one specific reason: it persists the
+    // settings blob. `store.set` alone updates memory and nothing else, so a
+    // switch wired with it alone flips, toasts, and is forgotten by the next
+    // load -- it looks saved and is not.
+    this._initToggle('sbUpdateAuto', (on) => {
+      store.set('settings.checkUpdatesOnStartup', on);
+      // Both directions stay available: off silences the load-time check only.
+      // CHECK NOW and DOWNLOAD UPDATE are never switched off, so nothing is
+      // lost — and the toggle is right here to put back.
+      store.emit('toast', {
+        message: on
+          ? 'Updates: the app will check for a newer release at every load'
+          : 'Updates: no check at load. CHECK NOW and DOWNLOAD UPDATE still work',
+        type: 'info',
+      });
+    });
+
+    // The last answer, shown without asking the operator to press anything.
+    // Only once per instance: the server caches, but there is no reason to
+    // re-request it every time the Config tab re-renders.
+    if (document.getElementById('sbUpdateSeen')) {
+      if (this._lastCheck) {
+        this._paintCheckLine();
+      } else if (!this._checkLoaded) {
+        this._checkLoaded = true;
+        this._refreshCheckLine(false);
+      }
+    }
+
+    const nowBtn = document.getElementById('sbUpdateNow');
+    if (nowBtn) {
+      nowBtn.addEventListener('click', async () => {
+        if (this._checkBusy) return;
+        this._checkBusy = true;
+        const was = nowBtn.textContent;
+        nowBtn.disabled = true;
+        nowBtn.textContent = 'CHECKING…';
+        try {
+          // force=true: a hand-pressed check must never return a cached answer.
+          await this._refreshCheckLine(true);
+        } finally {
+          this._checkBusy = false;
+          nowBtn.disabled = false;
+          nowBtn.textContent = was;
+        }
+      });
+    }
+
+    btn.addEventListener('click', async () => {
+      if (this._updateBusy) return;
+      this._updateBusy = true;
+      const was = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'DOWNLOADING…';
+      statusEl.textContent = 'Fetching the published archive and comparing it. This can take a minute on a slow link.';
+      try {
+        const plan = await api.updateDownload();
+        this._updatePlan = plan || null;
+        this._renderUpdatePlan();
+        const n = (plan?.counts?.new || 0) + (plan?.counts?.changed || 0);
+        // "this copy / published" rather than "vA → vB": the published number
+        // can be LOWER than this one, and an arrow then reads as an upgrade
+        // when the release would actually take the install backwards.
+        statusEl.textContent = `Compared this copy v${plan?.currentVersion?.label ?? '?'} `
+          + `with published v${plan?.targetVersion?.label ?? '?'} · ${n} file(s) differ. `
+          + 'Nothing has been changed.';
+        store.emit('toast', {
+          message: `Update downloaded and compared — ${n} file(s) differ`,
+          type: 'success',
+        });
+      } catch (err) {
+        statusEl.textContent = `Not downloaded: ${errText(err)}`;
+        store.emit('toast', { message: `Update download failed: ${errText(err)}`, type: 'error' });
+      } finally {
+        this._updateBusy = false;
+        btn.disabled = false;
+        btn.textContent = was;
+      }
+    });
+  }
+
+  /**
+   * Paint the one-line answer of the load-time check.
+   *
+   * Every wording here is built from BOTH numbers, because either can be the
+   * larger one: this install can be ahead of the published release (it is,
+   * during development), and "v344 → v337" would then read as an upgrade when
+   * it is the opposite. `force` asks the server to skip its cache.
+   */
+  async _refreshCheckLine(force) {
+    const el = document.getElementById('sbUpdateSeen');
+    if (el) el.textContent = 'Checking…';
+    try {
+      const r = force ? await api.updateCheckNow() : await api.updateCheck();
+      this._lastCheck = r || null;
+    } catch (e) {
+      // Keep the failure on the instance too: re-rendering the tab should not
+      // make "could not reach GitHub" silently turn back into a blank line.
+      this._lastCheck = { ok: false, error: errText(e), localVersion: null };
+    }
+    this._paintCheckLine();
+  }
+
+  /**
+   * Draw the remembered check answer. Split from the request so a Config
+   * re-render repaints the line instead of paying for another round trip.
+   */
+  _paintCheckLine() {
+    const out = document.getElementById('sbUpdateSeen');
+    if (!out) return;
+    const r = this._lastCheck;
+    if (!r) {
+      out.textContent = '';
+      return;
+    }
+    const local = r.localVersion?.label ?? '?';
+    if (r.ok === false) {
+      out.textContent = `Could not check${r.error ? `: ${r.error}` : ''} — this copy is v${local}.`;
+      return;
+    }
+    const remote = String(r.remoteVersion?.label ?? '?');
+    const when = r.checkedAt ? new Date(r.checkedAt * 1000).toLocaleTimeString() : '';
+    const tail = `${when ? ` · checked ${when}` : ''}${r.cached ? ' (cached)' : ''}`;
+
+    // What shipped, from the top of the published CHANGELOG. Shown here as well
+    // as in the bell because a notification is raised ONCE per release and the
+    // bell list is in memory only -- reload the page and an announcement that
+    // lived only there is gone. This is where it can still be read later.
+    this._paintChangeNotes(r.updateAvailable ? r.remoteChange : null);
+    if (r.updateAvailable) {
+      out.textContent = `Update available: published v${remote}, this copy v${local}${tail}`;
+    } else if (Number(remote) < Number(local)) {
+      out.textContent = `Published v${remote}, this copy v${local} — this copy is the newer one${tail}`;
+    } else {
+      out.textContent = `Up to date at v${local}${tail}`;
+    }
+  }
+
+  /**
+   * "What's new" as a disclosure: one line closed, the whole entry open.
+   *
+   * A notification can only ever carry a sentence, and the entry behind it is a
+   * bullet list — so the row says what shipped and opens onto every line of it.
+   * The server sends the lines already split (`items`), each with its bold
+   * lead-in separated out, so this only has to place text; it never parses
+   * markdown and never assigns remote text to innerHTML.
+   *
+   * Open/closed is remembered on the instance because the Config tab is rebuilt
+   * from an HTML string: without it, any repaint — a CHECK NOW, a toggle — would
+   * slam the reader shut mid-sentence.
+   */
+  _paintChangeNotes(c) {
+    const host = document.getElementById('sbUpdateChange');
+    if (!host) return;
+    // Read the live state BEFORE replacing the node; a stale instance field
+    // would lose a click that happened since the last paint.
+    const live = host.querySelector('details');
+    if (live) this._changeOpen = live.open;
+    const opened = !!this._changeOpen;
+
+    host.innerHTML = '';
+    if (!c || !c.title) return;
+
+    const details = document.createElement('details');
+    details.className = 'change-notes';
+    details.open = opened;
+    details.addEventListener('toggle', () => { this._changeOpen = details.open; });
+
+    const head = document.createElement('summary');
+    head.className = 'change-notes-head';
+    const chev = document.createElement('span');
+    chev.className = 'cfg-chevron';
+    chev.textContent = '›';
+    const label = document.createElement('span');
+    label.className = 'change-notes-label';
+    label.textContent = `What's new:`;
+    const title = document.createElement('span');
+    title.className = 'change-notes-title';
+    title.textContent = c.title;
+    head.append(chev, label, title);
+
+    // The one-line summary while closed — and it lives INSIDE the <summary> on
+    // purpose. A closed <details> renders none of its other children, so the
+    // same text placed beside it disappeared exactly when it was the only thing
+    // worth reading. It hides once open, because the first line of `items` is
+    // that sentence without the trim: showing both would print it twice.
+    if (c.summary) {
+      const peek = document.createElement('span');
+      peek.className = 'change-notes-peek';
+      peek.textContent = c.summary;
+      head.append(peek);
+    }
+    details.append(head);
+
+    const items = Array.isArray(c.items) && c.items.length
+      ? c.items
+      : (c.summary ? [{ lead: '', body: c.summary, depth: 0 }] : []);
+    if (items.length) {
+      const body = document.createElement('div');
+      body.className = 'change-notes-body';
+      const list = document.createElement('ul');
+      for (const it of items) {
+        const li = document.createElement('li');
+        if (Number(it.depth) > 0) li.className = 'sub';
+        if (it.lead) {
+          const b = document.createElement('b');
+          b.textContent = it.lead;
+          li.append(b);
+          if (it.body) li.append(document.createTextNode(' '));
+        }
+        if (it.body) li.append(document.createTextNode(it.body));
+        list.append(li);
+      }
+      body.append(list);
+      if (c.truncated) {
+        const more = document.createElement('div');
+        more.className = 'change-notes-more';
+        more.textContent = '…the rest of this entry is not shown.';
+        body.append(more);
+      }
+      details.append(body);
+    }
+
+    host.append(details);
+  }
+
+  /** Paint the downloaded plan. Nothing here writes to disk. */
+  _renderUpdatePlan() {
+    const el = document.getElementById('sbUpdatePlan');
+    if (!el) return;
+    const p = this._updatePlan;
+    if (!p) { el.innerHTML = ''; return; }
+
+    const cur = p.currentVersion?.label ?? '?';
+    const next = p.targetVersion?.label ?? '?';
+    const c = p.counts || {};
+    const rows = (p.files || []).filter(f => f.status !== 'same');
+    const shown = rows.slice(0, 30);
+    const removed = (p.removed || []);
+    const mb = p.bytes ? `${(p.bytes / 1048576).toFixed(1)} MB` : '';
+    const size = f => (f.from == null ? `${f.to} B` : `${f.from} → ${f.to} B`);
+
+    // Keep the collapsed header honest: "PUBLISHED v337" is visible without
+    // opening the section, which is where a pending download is usually noticed.
+    const sec = el.closest('details.cfg-section');
+    if (sec) {
+      const head = sec.querySelector('.cfg-section-head');
+      let badge = head?.querySelector('.cfg-section-badge');
+      const label = p.targetVersion?.label;
+      if (label && head) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'cfg-section-badge warn';
+          head.appendChild(badge);
+        }
+        badge.textContent = `PUBLISHED v${label}`;
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+
+    el.innerHTML = `
+      <div class="policy-hint ok">
+        <b>Published v${esc(String(next))}</b> · this copy v${esc(String(cur))}
+        ${mb ? ` · ${esc(mb)} archive` : ''}
+        ${p.sha256 ? ` · sha256 ${esc(String(p.sha256).slice(0, 12))}…` : ''}
+      </div>
+      <div class="form-hint">
+        ${c.new || 0} new · ${c.changed || 0} changed · ${c.same || 0} unchanged ·
+        ${c.removed || 0} not in this release
+      </div>
+      ${rows.length ? `
+        <div class="form-hint" style="margin-top:6px">What would change:</div>
+        <div style="max-height:200px;overflow:auto;margin:4px 0">
+          ${shown.map(f => `<div class="form-hint" style="display:flex;gap:6px;align-items:baseline">
+            <span style="color:${f.status === 'new' ? 'var(--accent-green)' : 'var(--accent-orange)'}">${f.status === 'new' ? '+' : '~'}</span>
+            <span style="word-break:break-all;flex:1">${esc(f.path)}</span>
+            <span style="opacity:.7;white-space:nowrap">${esc(size(f))}</span>
+          </div>`).join('')}
+          ${rows.length > shown.length ? `<div class="form-hint">…and ${rows.length - shown.length} more</div>` : ''}
+        </div>` : '<div class="form-hint">No code differences — the published copy matches this one.</div>'}
+      ${removed.length ? `
+        <div class="form-hint" style="margin-top:6px">On disk but not in this release
+          (listed only — nothing is ever deleted):</div>
+        <div style="max-height:120px;overflow:auto;margin:4px 0">
+          ${removed.slice(0, 20).map(r => `<div class="form-hint" style="word-break:break-all">${esc(r)}</div>`).join('')}
+          ${removed.length > 20 ? `<div class="form-hint">…and ${removed.length - 20} more</div>` : ''}
+        </div>` : ''}
+      <div class="form-hint" style="margin-top:6px">
+        ${(p.notes || []).map(n => esc(n)).join('<br>')}
+      </div>
+      <button class="btn btn-ghost btn-block" id="sbUpdateDiscard" style="margin-top:8px">DISCARD THE DOWNLOAD</button>`;
+
+    el.querySelector('#sbUpdateDiscard')?.addEventListener('click', async () => {
+      try {
+        await api.updateDiscard();
+        this._updatePlan = null;
+        this._renderUpdatePlan();
+        const s = document.getElementById('sbUpdateStatus');
+        if (s) s.textContent = 'Discarded. storage/updates is empty again; nothing else was touched.';
+      } catch (e) {
+        store.emit('toast', { message: `Could not discard: ${errText(e)}`, type: 'error' });
+      }
+    });
   }
 
   /**

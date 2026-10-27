@@ -10,16 +10,16 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=337';
-import { K } from './storage.js?v=337';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=337';
-import { startStateSync } from './stateSync.js?v=337';
-import { api } from './api.js?v=337';
-import { themeManager } from './themes.js?v=337';
-import { Sidebar } from './components/sidebar.js?v=337';
-import { Chat } from './components/chat.js?v=337';
-import { TopologyGraph } from './components/topology.js?v=337';
-import { initTopoPanel } from './components/topoPanel.js?v=337';
+import { store, APP_VERSION } from './store.js?v=348';
+import { K } from './storage.js?v=348';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=348';
+import { startStateSync } from './stateSync.js?v=348';
+import { api } from './api.js?v=348';
+import { themeManager } from './themes.js?v=348';
+import { Sidebar } from './components/sidebar.js?v=348';
+import { Chat } from './components/chat.js?v=348';
+import { TopologyGraph } from './components/topology.js?v=348';
+import { initTopoPanel } from './components/topoPanel.js?v=348';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -28,32 +28,32 @@ import { initTopoPanel } from './components/topoPanel.js?v=337';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=337')
+  return import('./components/topology3d/index.js?v=348')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=337';
-import { AgentEditor } from './components/agentEditor.js?v=337';
-import { ProviderEditor } from './components/providerEditor.js?v=337';
-import { Microphone } from './components/microphone.js?v=337';
-import { ConfigPanel } from './components/configPanel.js?v=337';
-import { ExportPanel } from './components/export.js?v=337';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=337';
-import { TerminalPanel } from './components/terminalPanel.js?v=337';
-import { MetricsPanel } from './components/metricsPanel.js?v=337';
-import { TracePanel } from './components/tracePanel.js?v=337';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=337';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=337';
-import { initApprovals } from './approvals.js?v=337';
-import * as memory from './memory.js?v=337';
-import { audio } from './audio.js?v=337';
-import { AlwaysOn } from './alwaysOn.js?v=337';
-import { ApiLab } from './apiLab.js?v=337';
-import { BrainLab } from './brainlab.js?v=337';
-import { BrowserView } from './components/browserView.js?v=337';
+import { RoutingChart } from './components/routingChart.js?v=348';
+import { AgentEditor } from './components/agentEditor.js?v=348';
+import { ProviderEditor } from './components/providerEditor.js?v=348';
+import { Microphone } from './components/microphone.js?v=348';
+import { ConfigPanel } from './components/configPanel.js?v=348';
+import { ExportPanel } from './components/export.js?v=348';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=348';
+import { TerminalPanel } from './components/terminalPanel.js?v=348';
+import { MetricsPanel } from './components/metricsPanel.js?v=348';
+import { TracePanel } from './components/tracePanel.js?v=348';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=348';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=348';
+import { initApprovals } from './approvals.js?v=348';
+import * as memory from './memory.js?v=348';
+import { audio } from './audio.js?v=348';
+import { AlwaysOn } from './alwaysOn.js?v=348';
+import { ApiLab } from './apiLab.js?v=348';
+import { BrainLab } from './brainlab.js?v=348';
+import { BrowserView } from './components/browserView.js?v=348';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -576,6 +576,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       type: type || 'info',
       message: message,
     });
+  });
+
+  // --- Update check at load ------------------------------------------------
+  //
+  // Runs AFTER the toast bridge above is wired, because a notification raised
+  // before that listener exists goes nowhere: toasts are not popups in this
+  // app, they land in the topology notification bell, and the bell has to be
+  // listening before the news arrives.
+  //
+  // The check is the cheap server-side one: it reads the published version out
+  // of a single small file, and the SERVER caches the answer for six hours, so
+  // a reload usually costs no network call at all. It only ever compares
+  // VERSION NUMBERS -- what actually changed inside a release needs the full
+  // archive, which is Config → Updates → DOWNLOAD UPDATE.
+  //
+  // Everything here is silent on failure. This app is meant to be dragged onto
+  // a web root and used on a machine that may well be offline; "GitHub did not
+  // answer" is not news the operator needs, and it must never interrupt boot.
+  safeInit('updateCheck', () => {
+    if (store.get('settings.checkUpdatesOnStartup') === false) return;
+    api.updateCheck().then((res) => {
+      if (!res || !res.updateAvailable) return;
+      const remote = res.remoteVersion?.label;
+      const local = res.localVersion?.label;
+      if (!remote) return;
+      // One notification per published version, not one per reload: the bell
+      // keeps up to 100 entries, and the same news every page load would bury
+      // the things actually happening. A NEWER release re-notifies.
+      if (String(store.get('settings.updateNotifiedVersion') || '') === String(remote)) return;
+      store.set('settings.updateNotifiedVersion', String(remote));
+      // store.set is memory-only; without this the marker is gone by the next
+      // load and the same release is announced again on every single reload.
+      try { persistence.set('settings', store.get('settings')); } catch { /* private mode */ }
+      // Name what shipped, from the top of the published CHANGELOG. The
+      // server asks for that file ONLY when an update exists, so it is normally
+      // here; when it could not be read the notification simply says less,
+      // which is better than not announcing the release at all.
+      const headline = res.remoteChange?.title;
+      store.emit('toast', {
+        message: `Update available — published v${remote}${headline ? ` · ${headline}` : ''}. `
+          + `This copy is v${local}. Open Config → Updates to compare it.`,
+        type: 'info',
+      });
+    }).catch(() => { /* offline, or no curl on this PHP. Not the operator's problem at load. */ });
   });
 
   // Initial stats update

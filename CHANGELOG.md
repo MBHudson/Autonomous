@@ -9,8 +9,395 @@
 # Changelog
 
 All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v337**, in `ui/js/store.js` → `APP_VERSION`).
+`?v=` cache-buster bumped (v281 → **v348**, in `ui/js/store.js` → `APP_VERSION`).
 PHP changes need only the usual file deploy.
+
+`VERSION` at the repo root carries the release number, which the update check now
+reads and compares alongside that cache-buster — see the first entry below.
+
+---
+
+## 🔎 "What's new" opens: the release note is readable *(PHP + UI — `VERSION` 349, cache-buster v348)*
+
+- **What it does.** **Config → Updates** used to show a release title and one
+  trimmed line of its CHANGELOG entry — *"What's new:"* plus an opening
+  sentence, and the rest of the entry was not read at all. That row is now a
+  **disclosure**: closed it still says what shipped, and opened it lists the
+  entry's own lines — every bullet, each with its bold lead-in and its wrapped
+  text, sub-points indented.
+- **One pass, not two.** The parser returns the whole entry (`items`, each with
+  `lead` / `body` / `depth`) alongside the one-line `summary` the bell uses, both
+  built in the same walk — so what you expand can never disagree with what you
+  clicked. `changelogHead()` stays a two-key wrapper, so every existing caller
+  and assertion kept its contract.
+- **The collapsed line nearly vanished.** A closed `<details>` renders *none* of
+  its children but the `<summary>`, so the trimmed opening line, sitting next to
+  the details, disappeared at exactly the moment it was the only thing worth
+  reading. It lives inside the `<summary>` now, and hides only once open, since
+  the first bullet is that same sentence without the cut. Found by looking at the
+  panel, not by reasoning about it.
+- **Bounded anyway.** This text arrives over the network, so an entry is capped at
+  **60 lines / 4000 characters** and the expanded body scrolls in place rather
+  than pushing DOWNLOAD UPDATE out of reach. When a cap bites, the view says the
+  entry is not shown in full instead of pretending it ended.
+- **Still text, never markup.** Every line is placed as a text node with the
+  lead-in bolded by a real `<b>`, so a changelog title cannot become HTML. The
+  same holds for the trim: only the ellipsis is added, never the remote text.
+- **Cache-buster:** `v347` → `v348` (both UI files changed); `VERSION` → `349`.
+- **Tests:** `tests/php/update.test.php` 112 → **129** assertions — whole-entry
+  parsing, lead/body split, sub-bullet depth, both caps, blank-line vs wrapped
+  line, non-UTF-8 refusal, and the two-key `changelogHead` contract. Eight
+  mutations of the new parser were run and all eight were caught.
+
+---
+
+## 📰 The update notice names what shipped *(PHP + UI — `VERSION` 348, cache-buster v347)*
+
+- **What it does.** When the check finds a newer release it now also reads the
+  **top entry of the published `CHANGELOG.md`** and puts its title in the
+  notification: *"Update available — published v348 · RELEASING.md: the
+  two-number checklist. This copy is v347."* **Config → Updates** keeps a
+  *What's new:* line with the entry's opening paragraph.
+- **Asked for only when it is needed.** The CHANGELOG is the largest file in the
+  repo (six figures of bytes and growing), so it is fetched **only when an
+  update exists** — while the two copies match, every byte of it would be
+  wasted. The transfer is capped at 64 KB and stopped early, because only the
+  newest entry matters and it is at the top; that abort is expected and handled,
+  not treated as a failure.
+- **A failure there cannot fail the check.** A release that cannot be *named* is
+  still a release: an unreachable or unparseable CHANGELOG returns null and the
+  notification falls back to naming the versions alone.
+- **Remote text is treated as text.** The title is escaped before it reaches the
+  panel and built as a DOM node in the bell, so a `<img onerror=…>` planted in
+  a changelog title is displayed rather than executed — checked in the browser,
+  not assumed.
+- **Two real bugs, and two tests that could not fail.** The summary ran on
+  through every bullet of the entry (entries are a bullet list with NO blank
+  line between bullets, so "stop at the first blank line" produced
+  "… - **What.** …"), and the UTF-8 guard never actually ran because the
+  invalid bytes were being dropped by a failing regex first. Mutation testing
+  then showed the truncation fixtures were **even-split** — a byte-counted cut
+  landed on a character boundary and looked identical to a correct one — and
+  the emphasis check looked for `**` while the italic rule had already eaten one
+  of the two stars. All four are fixed and now fail as intended.
+- **Cache-buster:** `v346` → `v347` (both UI files changed); `VERSION` → `348`.
+- **Tests:** `tests/php/update.test.php` 94 → 112 assertions, and all seven
+  mutations of the new reader are caught by it.
+
+---
+
+## 📋 RELEASING.md: the two-number checklist *(docs — no cache-buster bump)*
+
+- **Why.** Two numbers now decide whether a running copy sees a new release,
+  and the failure mode is a release that bumps one and forgets the other — which
+  is quiet: a missed `VERSION` hides the release entirely, and a missed
+  cache-buster serves a new module next to an old one in the browser.
+- **What.** `RELEASING.md` says which number to bump when, gives the exact
+  commands for the **three** places `APP_VERSION` has to change together, and
+  states the one caveat: a copy that predates `VERSION` can only see the
+  cache-buster, so a release that has to reach those copies needs that bump too.
+- **Cache-buster: `v346`, NOT bumped.** No browser-cached file changed, which is
+  exactly the distinction this split exists to make — and this is the first
+  release to exercise it: `VERSION` moved to `347` on its own.
+- **Nothing else changed.** Pointers added from `VERSION` itself, the README
+  table of contents, and the README's Tests section, so the checklist is
+  reachable from the places the numbers actually live.
+
+---
+
+## 🏷️ VERSION: a release number the update check reads too *(PHP + cache-buster — v345 → v346)*
+
+- **Why.** The load-time check compared exactly one thing: `APP_VERSION`, the
+  browser cache-buster. That number correctly does **not** move when a release
+  changes no browser-cached file — so a PHP-only (or docs-only) release was
+  invisible, and the check reported *"up to date"* for a release that had shipped.
+- **What.** A `VERSION` file at the repo root carries the *release* number, and
+  the check reads **both** signals from the published copy, announcing a release
+  when **either** is newer. The rule: bump `VERSION` on every release; bump
+  `APP_VERSION` when a file the browser caches changes. `VERSION` is the file that
+  says *"something shipped"*, including when the browser files are untouched.
+- **Rules the code enforces.** A plain integer — a dotted date could never compare
+  as newer, because the comparison is numeric — and never behind `APP_VERSION`;
+  `tests/php/update.test.php` fails if it is, so a release cannot quietly make
+  itself invisible again.
+- **Backward compatible, both directions.** A published copy with no `VERSION`
+  yet is judged on its cache-buster alone, and a `check.json` written before this
+  change is still read (its `remoteVersion` *was* the cache-buster). Both were
+  verified against the real published repo, which has no `VERSION` yet:
+  `ok: true`, `remoteRelease: null`, `remoteApp: 337`.
+- **Cache-buster:** `v345` → `v346`, even though no browser-cached file changed.
+  Deliberate, once: an install that predates `VERSION` can only ever see the
+  cache-buster, and this is the release that introduces `VERSION` — so bumping it
+  here is what makes THIS release visible to those installs instead of shipping
+  it silently. From the next release on, `VERSION` alone is enough and a PHP-only
+  release needs no bump here at all.
+- **Tests:** `tests/php/update.test.php` went from 71 to 94 assertions, and eight
+  mutations of the new logic were each caught by them (either signal dropped,
+  comment skipping, first-line parsing, the old cache shape, the drift guard).
+
+---
+
+## 🔔 Update check at load, with a notification *(PHP + UI — v344 → v345)*
+
+- **What it does.** Every page load now asks the server whether a *newer* release
+  is published, and puts the answer in the notification bell. Config → Updates
+  gains **Check for updates when the app loads** (on by default), **CHECK NOW**,
+  and a one-line answer under them.
+- **Cheap on purpose.** The check is not the 11 MB download: it reads the
+  published `ui/js/store.js` (a few KB) and compares `APP_VERSION`. The server
+  caches the answer for **six hours**, so a reload is usually one local request
+  and no network at all. Forcing it is a `POST`.
+- **Silent on failure.** Offline, behind a proxy, or on a PHP without curl, the
+  check returns `ok: false` **instead of throwing** — it runs at boot, so it must
+  never block it. Failures are cached for 15 minutes rather than six hours, so an
+  offline machine does not pay a connect timeout on every reload, and an unknown
+  version is never read as "you are out of date".
+- **Announced once per version.** The version already announced is remembered,
+  so the same release cannot fill the bell on every reload; a *newer* release
+  re-notifies. Both numbers are shown, because the published copy can be behind a
+  local one — "v345 → v337" would read as an upgrade that moves you backwards.
+- **Both bugs found while building it, and what they were.** (1) `store.set` is
+  memory-only in this app; a toggle wired with it alone flips, toasts, and is
+  forgotten by the next load. The switch uses the shared `_initToggle`, which
+  persists the settings blob. (2) The "announced" marker had the same problem,
+  which would have re-notified on every load — it now persists too.
+- **Cache-buster:** `v345`. Tests: `tests/php/update.test.php` (version parsing,
+  the numeric compare in both directions, and every cache-expiry rule) and five
+  cases in `tests/php/guards.test.php` for the new `storage/updates/*` files
+  being refused over HTTP.
+
+---
+
+## 📥 Updates: download, verify and diff a release — without installing it *(PHP + UI — v342 → v344)*
+
+- **What it does.** Config → Updates → **DOWNLOAD UPDATE…** fetches the
+  published archive into `storage/updates/`, verifies it, extracts a staging copy
+  and returns a plan: new / changed / unchanged / not-in-release, the version each
+  side calls itself, archive size and SHA-256. **DISCARD** removes the lot.
+- **There is no apply path.** Not in the UI, not in the API. `POST
+  /api/update/download` writes only inside `storage/updates/`; the app tree is
+  read-only input to the diff.
+- **The bug this feature is defined by.** The published repo **ships a
+  `storage/` folder** (a default config and empty logs), so "replace the folder"
+  would overwrite the operator's config, token and provider keys with defaults.
+  The first implementation *looked* right and was not: GitHub wraps every entry in
+  `Autonomous-master/`, so `Autonomous-master/storage/config.json` never matched
+  the "skip storage" rule, was staged, and got diffed against the real config.
+  Caught by listing the staging tree after a real download. Fixed by stripping the
+  wrapper prefix **before** the rule runs, plus a hard refusal if a staged
+  `storage/` ever appears. `tests/php/update.test.php` pins both.
+- **Verification is not decorative.** https only, GitHub release hosts only
+  (checked before the request *and* on the final URL after redirects), credentials
+  and non-443 ports refused, 64 MB and 20 000-entry caps, and every entry name
+  resolved by hand — `..`, absolute paths, drive letters and `stream://` wrappers
+  are refused; each write is re-checked to be inside the staging folder.
+- **Diff honesty.** Data folders (`screenshots/`, `sandbox/`) are excluded from the
+  comparison entirely; files on disk the release lacks are listed as *not in this
+  release* and never called deletions; and a copy that is **ahead** of the
+  published version says so ("downloading it would take you backwards") instead of
+  implying an upgrade.
+- **No ZipArchive here.** Stock XAMPP does not enable it, so archives are read
+  through PharData, which is compiled in; ZipArchive is still preferred when
+  present. That difference is why the extraction path has two readers.
+- **Tests:** new `tests/php/update.test.php` — 45 assertions covering entry-name
+  refusals, wrapper stripping before the storage rule, diff classification,
+  data-folder exclusion, and the source guard. Suite: **10 files / 447 assertions**
+  (was 9 / 402). README gained an Updates section, its TOC entry and the API rows.
+- **Cache-buster:** `v344`.
+
+---
+
+## 🧪 The layer ladder is now enforced by a test *(tests only — still v341)*
+
+- **New `tests/php/layers.test.php`.** It parses every `z-index` in `ui/css/*.css`
+  with a real bracket/selector walker (grouped selectors and `@media` blocks
+  included — a "match up to the brace" regex gets both wrong, and getting them
+  wrong is how an audit quietly passes), then the literals set from `ui/js` and
+  the inline ones in `index.html`, and fails if any **surface** ties or outranks
+  the dialog layer.
+- **Notices are exempt by name, with a reason**, never by a threshold: the fatal
+  banner, the boot watchdog strip, `?debug=1` HUD, the boot splash, the CRT
+  scanline overlay, toasts and the approval veil. A separate assertion fails if a
+  listed notice has drifted *below* dialogs, so the exemption list cannot rot into
+  a pile of stale names that hides a future regression.
+- **Nothing is hardcoded that the code already states.** The dialog number is read
+  from the `.modal-bg`/`.modal-overlay` rule, and the ladder comment in
+  `modals.css` is checked against it, so moving the layer without updating the note
+  fails the build rather than the next reader.
+- **The surfaces that broke once are asserted by name** — Browser pane, API Lab
+  drawer, terminal panel, notif dropdown, the floated agent menu, the 3D label
+  base — so a regression reports *which* one came back, not "something did".
+- **Mutation-tested, because a guard that cannot fail is decoration.** Four changes
+  were applied and reverted: `.browser-screen` to 1400 → *"the built-in Browser pane
+  sits below dialogs (z=1400 vs 1300)"*; the menu back to 3000 → *"the floated agent
+  menu stays under dialogs (z=3000)"*; `.notif-dropdown` (inside `@media`) to 1500
+  → caught with its media query named; a brand-new `.new-floating-thing` at 2000 →
+  caught as an undeclared surface. All four exited `1`; the clean tree exits `0`.
+- **Suite:** 9 PHP files, **402 assertions**, 0 failed (was 8 files / 384).
+  `README.md`'s test table now names the audit.
+
+---
+
+## 🔍 z-index audit — nothing but notices outranks a dialog now *(CSS + 1 JS line — v340 → v341)*
+
+- **Method.** Every `z-index` in `ui/css/*.css`, plus every one set from JS or an
+  inline attribute, was listed; the ones at or above the dialog layer were then
+  checked for being body-mounted (a number inside a lower stacking context cannot
+  outrank anything) and for actually rendering.
+
+  | z | surface | verdict |
+  |---|---|---|
+  | 99999 | boot-watchdog strip (`index.html`), `#bootError` (`app.js`) | notice, only when boot fails |
+  | 60000 | `.api-locked-banner` | notice, only on a 401 |
+  | 9999 | `.app-loader`, `body::after` scanlines (`pointer-events: none`) | boot / decoration |
+  | 2000 | `.toast-container`, `.approve-veil` | above dialogs on purpose |
+  | **1300** | **`.modal-bg`, `.modal-overlay`** | **dialogs** |
+  | 1250 | `.browser-screen` | below dialogs, correct |
+  | 1200 | `.lab-drawer` | below dialogs, correct |
+  | 1000 | `.notif-dropdown` (`!important`, <=1024px) | below dialogs, correct |
+  | **3000 → 1000** | **agent/provider .agent-menu clone** | **was the one violation — fixed** |
+
+- **The violation.** `sidebar.js` clones a card's `.agent-menu` onto `<body>` so it
+  can escape the card's `overflow`, and stamped it `z-index: 3000`. Body-level, so
+  that number competed with dialogs *directly*: with a menu open, a dialog (1300)
+  and even the approval veil (2000) could be painted over by a menu that was
+  already on screen. It is now 1000 — the documented menus layer, still above the
+  cards (40), the chart drawer (950) and the terminal (100).
+- **Verified by A/B on the live page.** A menu clone overlapping an open dialog is
+  hit at `1000` and `3000`: at 1000 the probe returns dialog content, at 3000 it
+  returns `agent-menu`. With nothing open the real menu still receives clicks
+  (`agent-menu-item`), so the fix costs no interactivity.
+- **Stacking-context check.** All ten modal constructors mount on
+  `document.body` (brainlab ×2, agentEditor ×3, export, metricsPanel,
+  providerEditor, sidebar ×2, tracePanel), so 1300 always competes at the root and
+  no dialog is trapped beneath a lower context.
+- **Deliberately unchanged:** the notices above (a fatal banner or an approval must
+  be seen), and the 3D labels' per-frame 1000, which lives inside the chart
+  container and never reaches a dialog's pixels.
+- **Cache-buster:** `v341`.
+
+---
+
+## 🗂️ Dialogs now sit above every app surface *(CSS only — v339 → v340)*
+
+- **The terminal was a false alarm.** Measured rather than eyeballed:
+  `.terminal-panel` is `z-index: 100`, `.modal-bg` is 1000, and a hit test in the
+  region where they overlap returns dialog content. What looked like the terminal
+  drawing *over* the dialog was the terminal behind it, dimmed by the overlay.
+- **Two steps up the ladder, it really was broken.** `.browser-screen` (1250) and
+  `.lab-drawer` (1200) both outranked dialogs at 1000, and `.notif-dropdown` tied
+  with them at 1000 with `!important` (DOM order deciding) on narrow windows. Open
+  the built-in Browser pane and then Config: the dialog painted underneath the
+  pane, so the click read as dead rather than covered.
+- **Dialogs moved to 1300**, between the app surfaces and the notice layer, and the
+  whole ladder is now written down in `modals.css`: 100 floating panels · 1000
+  menus/dropdowns · 1200 API Lab drawer · 1250 Browser pane · **1300 dialogs** ·
+  2000 toasts + approval veil · 60000 API-locked banner. Approvals stay above
+  dialogs deliberately — a blocking prompt has to be visible even over one.
+- **Verified by A/B hit test on the live page.** With a dialog open over a visible
+  Browser pane, probing a point both cover returned `bsImg` (pane content) at the
+  old 1000 and dialog content at 1300. The earlier terminal overlap returns dialog
+  content at both values, which is what ruled the report out.
+- **Cache-buster:** `v340`.
+
+---
+
+## 🧹 Section 3 of Allow / Deny stops overlapping *(CSS only — v338 → v339)*
+
+- **What was wrong.** The interpreters block was a 3-up
+  `repeat(auto-fill, minmax(190px, 1fr))` grid, but each `.interp-row` inside it
+  spends `82px + 132px` plus two 8px gaps *before* the description gets a single
+  pixel. At the modal's width a cell was ~212px, so every row was wider than the
+  cell containing it: the next column's interpreter name and picker printed
+  straight over it, and the overflow widened the modal body enough to put a
+  horizontal scrollbar across the whole panel.
+- **The fix.** `grid-template-columns: minmax(0, 1fr)` — one full-width row per
+  interpreter. Ten rows, so the card grid bought nothing; the description column
+  went from 0px to ~400px, which is what makes "scripts only vs full access"
+  legible in the first place. Added `min-width: 0` on the row's children and
+  `overflow-wrap: anywhere` on the description, because grid children default to
+  `min-width: auto` and one long unbroken token would have re-created the same
+  overflow. The existing ≤560px stacking rule now uses `minmax(0, 1fr)` too.
+- **Verified on the live panel**, not just in CSS: modal body `scrollWidth ===
+  clientWidth` (643px), zero rows whose content exceeds their box, description
+  column 401px, and no horizontal scrollbar in the screenshot.
+- **Cache-buster:** `v339` (root shell + `ui/`), since the fix lives in
+  `components.css`.
+
+---
+
+## ↩️ Denials now show their own undo path *(PHP + UI — v337 → v338)*
+
+- **The problem was legibility, not policy.** A refused command said *"is on the
+  command denylist and cannot be approved"* and pointed at an "Allow/Deny list"
+  that is actually called **Shell access**. Nothing said the name could be
+  removed, or which box to remove it from — so a list you own read as a wall.
+- **The refusal carries the fix.** It now names the program, says the list is
+  yours rather than a rule in code, and gives the exact path: *delete the
+  `explorer` line under Config → Shell access → Allow / Deny (section 4), add it
+  to section 2.* The model relays it verbatim, so the person who can edit the
+  list does not have to go looking.
+- **Section 4 of the panel stopped calling itself absolute.** It now says the
+  list wins over the allowlist *and* approvals (unchanged behaviour) while
+  stating plainly that it is not permanent, and the hint under the box always
+  explains how to un-deny a line.
+- **New: Restore built-in defaults.** `execAllowListPublic()` now sends
+  `deny_defaults` — the shipped list — *even when a custom list is active*.
+  Previously, once you replaced the defaults you could not see what you had
+  replaced without opening `config.json`, so "put it back" was effectively a
+  reinstall. The button loads the shipped list into the box; Save still applies it.
+- **An empty box is not "deny nothing".** It falls back to the built-in defaults,
+  deliberately — otherwise clearing the field would silently un-deny `rm`,
+  `sudo` and the Windows hosts in one click. The hint says so and names the real
+  escape hatch, `"exec_deny": []` in `storage/config.json`.
+- **Tests:** 3 more assertions in `tests/php/sandbox.test.php` — the refusal text
+  must name the undo path and the reason approval can't override it; policy info
+  must expose the built-in defaults while a custom list is active; and an
+  explicit empty array must deny *nothing* (so the hint's advice is true).
+  Suite: **97 passed, 0 failed**.
+- **Cache-buster:** `v338` across `ui/` (52 files) **and the served root
+  `index.html`** (19 links) — the panel lives in `sidebar.js`, so a stale cache
+  would hide the button. The root shell is the one `/` actually serves; bumping
+  only `ui/` left the browser asking for `?v=337` and quietly running the old
+  file.
+
+---
+
+## 🛡️ Windows command hosts closed in the default denylist *(PHP only — v337)*
+
+- **The gap.** The denylist named `bash`, `sh`, `python`, `node` and friends — but
+  policy compared the **literal** program name, so `bash.exe` (the WSL launcher)
+  matched nothing. Worse, `cmd` and `powershell` were on *neither* list: an
+  "Always allow" on one careless approval handed back a permanent shell, with the
+  payload hidden inside an argument where the allowlist, the path guard and the
+  jail cannot see it.
+- **The fix is one normalisation.** New `Sandbox::policyName()` folds case and
+  drops a trailing `.exe`/`.com`, and `inPolicyList()` compares through it. Every
+  decision now goes through that pair — allowlist, denylist, both interpreter
+  levels, the approval grants and the per-command path table — so one entry
+  covers both spellings **in both directions**: `grep` matches the `grep.exe` Git
+  for Windows ships, and `bash` finally stops `bash.exe`.
+- **New default denials (all removable):** `cmd`, `powershell`, `pwsh`,
+  `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`, `msiexec`, `wmic`,
+  `schtasks`, `sc`, `reg`, `regedit`, `explorer`. Scheduled/service execution and
+  registry writes are here for the same reason `crontab` and `at` already were:
+  they outlive the session. `explorer` is a launcher, not just a file manager
+  (`explorer thing.exe` runs it).
+- **Nothing is permanent, by design.** These are *defaults*. An explicit
+  `sandbox.exec_deny` replaces the defaults wholesale, the list is editable in
+  **Config → Shell access**, and removing a name makes that command ordinary
+  again — refused as "not allowed" and back in the approval queue. No program is
+  refused by name anywhere in the code, and README §3 no longer claims otherwise.
+- **Your own install was not covered by the code alone.** A config that has ever
+  saved its list keeps its own copy, so the 15 names were appended to the live
+  `storage/config.json` (86 → 101 entries, order preserved, backup written to
+  `storage/config.json.bak`). Nothing was added to any allowlist, and **shell
+  access stays off** — this changes what happens the day it is switched on, not
+  what happens today.
+- **Tests:** `tests/php/sandbox.test.php` gains 20 assertions — every host refused
+  by default in either spelling (`CMD.EXE`, `PowerShell.EXE`), `echo.exe` still
+  reaching the allowlisted `echo`, and the one that matters most: with a deny list
+  that omits `cmd`, `cmd` is ordinary again. Full suite: **94 passed, 0 failed**.
 
 ---
 

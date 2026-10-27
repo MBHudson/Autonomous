@@ -346,6 +346,74 @@ $pcOut = $norm(trim($pc['stdout'] ?? ''));
 ok(($pc['exit'] === 0) && ($pcOut === $norm($readOnly) || $pcOut === $norm($writeDir)),
     'exec defaults cwd to an allowed root');
 
+// 38g. exec: Windows command hosts are on the DEFAULT denylist, in either
+// spelling. `bash.exe` is here too: it was the reason the lists needed to stop
+// caring about extensions, because `bash` was denied while `bash.exe` was not.
+$hosts = ['cmd', 'cmd.exe', 'powershell', 'PowerShell.EXE', 'pwsh', 'wscript.exe',
+    'cscript', 'mshta.exe', 'rundll32.exe', 'regsvr32', 'msiexec', 'wmic',
+    'schtasks', 'sc', 'reg', 'regedit.exe', 'explorer.exe', 'bash.exe'];
+foreach ($hosts as $host) {
+    $d = Sandbox::execCommand([$host, 'x'], ['cwd' => $writeDir]);
+    ok(($d['denied'] ?? false) === true && stripos($d['stderr'], 'denylist') !== false,
+        "exec refuses $host by default");
+}
+
+// 38h. exec: the deny list is the operator's, not the code's. Replacing it with
+// a list that does not mention `cmd` makes `cmd` ordinary again -- refused as
+// "not allowed" (allowlist/approval), never as permanently denied.
+$savedCfg = $cfg;
+$cfg['sandbox']['exec_deny'] = ['nothing-here'];
+$cfg['sandbox']['exec_allow'] = ['echo'];
+file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));
+$free = Sandbox::execCommand(['cmd', '/c', 'echo', 'hi'], ['cwd' => $writeDir]);
+ok(!isset($free['denied']) && stripos($free['stderr'], 'not allowed') !== false,
+    'removing a name from the deny list makes it approvable again');
+
+// 38i. exec: policy lists match either Windows spelling, so one entry covers
+// both. `echo` is allowlisted by default; `echo.exe` must reach the same place.
+$exeSpelling = Sandbox::execCommand(['echo.exe', 'spelling'], ['cwd' => $writeDir]);
+ok(($exeSpelling['exit'] === 0) && trim($exeSpelling['stdout']) === 'spelling',
+    'allowlist matches program.exe for a program entry');
+
+$cfg = $savedCfg;
+file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));
+
+// 38j. The refusal carries its own undo path. A message that only says
+// "denied" is what makes a list feel permanent, and this one is config the
+// operator owns -- so the text has to name where to remove the name, and say
+// why an approval cannot do it for them.
+$denyMsg = (string)(Sandbox::execCommand(['cmd', '/c', 'echo', 'hi'], ['cwd' => $writeDir])['stderr'] ?? '');
+ok(strpos($denyMsg, 'shell denylist') !== false
+    && strpos($denyMsg, 'Config → Shell access') !== false
+    && stripos($denyMsg, 'Always allow') !== false,
+    'deny refusal names the undo path and why approval cannot override it');
+
+// 38k. The UI is sent the BUILT-IN denylist even while a custom one is in
+// force, so "Restore built-in defaults" has something real to restore instead
+// of asking the operator to remember what shipped.
+$cfg['sandbox']['exec_deny'] = ['nothing-here'];
+file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));
+$pub = Sandbox::execAllowListPublic();
+ok(($pub['custom_deny'] ?? false) === true
+    && in_array('cmd', $pub['deny_defaults'] ?? [], true)
+    && in_array('sudo', $pub['deny_defaults'] ?? [], true)
+    && !in_array('cmd', array_map('strtolower', $pub['deny'] ?? []), true),
+    'policy info offers the built-in denylist alongside a custom one');
+
+// 38l. Denying NOTHING stays expressible, because the panel's hint sends the
+// operator to `"exec_deny": []` for exactly that. An empty array must mean
+// empty, not "fall back to the defaults" -- otherwise that advice is a lie.
+$cfg['sandbox']['exec_deny'] = [];
+file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));
+$noneDenied = Sandbox::execCommand(['sudo', '-n', 'true'], ['cwd' => $writeDir]);
+ok(($noneDenied['denied'] ?? false) !== true
+    && stripos((string)($noneDenied['stderr'] ?? ''), 'denylist') === false
+    && stripos((string)($noneDenied['stderr'] ?? ''), 'not allowed') !== false,
+    'an explicit empty deny list denies nothing');
+
+$cfg = $savedCfg;
+file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));
+
 // 38f. list_dir on a file path answers with that entry, not "not a directory"
 $lf = Sandbox::listDir('test.txt', 200, $writeDir);
 ok(isset($lf['entries'][0]) && $lf['entries'][0]['name'] === 'test.txt'
