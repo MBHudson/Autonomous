@@ -690,6 +690,8 @@ The app can fetch its own published release and show you **exactly what would ch
 - 🗑️ **DISCARD** empties `storage/updates/` again; the download is ~11 MB and the staging copy goes with one click.
 - 🧪 Covered by `tests/php/update.test.php`: entry-name refusals, wrapper stripping **before** the storage rule (the bug it was written for), the diff classifications, the source guard, and the CHANGELOG parsers (which line is the title, one bullet only as the summary, markdown stripped, truncation counted in **characters** so an em dash or emoji cannot make the response un-encodable, and the whole-entry reader behind *What's new* — lead-in split, nesting depth, and both caps).
 
+![Config → Updates: the archive hash, the file-by-file diff, and the What's new row](screenshots/updates-panel.png)
+
 > ⚠️ **Install is deliberately not implemented yet.** Choosing what to overwrite — and merging new config keys into a config that already exists — is a separate decision from *knowing* what changed, and this step only does the knowing.
 
 ---
@@ -717,6 +719,8 @@ The app can fetch its own published release and show you **exactly what would ch
 - **📥 A single Pending-approvals queue** collects everything waiting (from every agent **and** every remote MCP friend) so nothing slips through unseen.
 
 ### 🧾 3. Allow / Deny lists — an argv-level bouncer
+
+![The Allow / Deny panel: per-interpreter levels, the editable denylist, and Restore built-in defaults](screenshots/deny-interpreters-fixed.png)
 - **✅ An allowlist you own** decides which programs may run at all. Each command is matched **argument by argument** — no glob fuzz.
 - **⛔ A denylist that wins over approvals.** It is checked *before* the allowlist and before the approval prompt, so a name on it can never be waved through with "Always allow". `reboot`, `shutdown`, `rm`, `sudo`, `cmd`, `powershell` and the classic foot-guns live here.
 - **🔁 …but nothing is denied *forever*.** The list is a **default**, not a law: an explicit `sandbox.exec_deny` in `storage/config.json` **replaces it wholesale**, and the same list is editable inline under **Config → Shell access** (or an MCP card's *Permissions* tab). Remove a name and it becomes an ordinary command again — refused as *"not allowed"* and back in the approval queue, exactly like everything else. No program is refused by name anywhere in code.
