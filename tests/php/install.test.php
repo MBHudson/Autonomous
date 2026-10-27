@@ -291,6 +291,76 @@ ok(!is_file($script), 'it deleted itself when it was done');
 ok(strpos((string) file_get_contents($app . '/storage/updates/install.log'), 'finish:') !== false,
     'it wrote to the same journal');
 
+// --- 6d. a stuck hand-off is retried by the next request --------------
+//
+// The live case this exists for: a v355 copy installing v356 under XAMPP. The
+// installer running is the OLD copy's, whose PHP lookup is PHP_BINDIR only, so
+// the finisher never starts and api/index.php waits as .router-new-index.php.
+// Nothing retried, ever — the app reported the new version and the last file
+// sat there until a human ran install-update.php --finish.
+build($app, '362');
+@unlink($app . '/ui/js/store.js');
+@mkdir($app . '/ui/js/store.js', 0777, true);
+Install::apply();                       // leaves phase=finishing
+ok(Install::pendingSwaps() !== [], 'setup: a file is waiting for its swap');
+
+$markerFile = $app . '/storage/updates/install.json';
+$logFile = $app . '/storage/updates/install.log';
+$marker = json_decode((string) file_get_contents($markerFile), true);
+ok(($marker['phase'] ?? '') === 'finishing', 'setup: the marker says finishing');
+
+// INSTALL_NO_SPAWN is on in this file, so the attempt is recorded rather than a
+// real child being started; the marker and the journal are the evidence.
+Install::resume();
+$marker = json_decode((string) file_get_contents($markerFile), true);
+ok(($marker['resumeTries'] ?? 0) === 1, 'resume records that it tried');
+ok(($marker['phase'] ?? '') === 'finishing', 'resume does not claim a swap it did not make');
+ok(strpos((string) file_get_contents($logFile), 'resume:') !== false,
+    'resume writes what it did to the journal');
+
+// A page that polls must not restart the finisher on every tick.
+Install::resume();
+$marker = json_decode((string) file_get_contents($markerFile), true);
+ok(($marker['resumeTries'] ?? 0) === 1, 'a second request inside the window is a no-op');
+Install::resume(0);
+$marker = json_decode((string) file_get_contents($markerFile), true);
+ok(($marker['resumeTries'] ?? 0) === 2, 'the throttle is a floor, not a fuse');
+
+// A finished install is left completely alone.
+clearstatcache();
+$before = (int) filesize($logFile);
+$marker['phase'] = 'done';
+file_put_contents($markerFile, json_encode($marker, JSON_PRETTY_PRINT));
+ok(Install::resume() === false, 'resume ignores an install that finished');
+clearstatcache();
+ok((int) filesize($logFile) === $before, 'and writes nothing at all');
+
+// "finishing" with nothing waiting is a stale marker, not a job: close it.
+@unlink($app . '/ui/js/.router-new-store.js');
+$marker['phase'] = 'finishing';
+unset($marker['resumeAt'], $marker['resumeTries']);
+file_put_contents($markerFile, json_encode($marker, JSON_PRETTY_PRINT));
+ok(Install::pendingSwaps() === [], 'setup: nothing is waiting any more');
+Install::resume();
+$marker = json_decode((string) file_get_contents($markerFile), true);
+ok(($marker['phase'] ?? '') === 'done', 'resume closes a marker whose files are already in place');
+
+// No marker: no work, and no journal created for a tree that never updated.
+build($app, '363');
+ok(Install::resume() === false, 'resume is a no-op with no install history');
+ok(!is_file($app . '/storage/updates/install.log'), 'and creates no journal');
+
+// --- 6e. the hook that makes 6d reachable -----------------------------
+//
+// Nothing in the app polls for a pending finish, so the retry only exists if a
+// request calls it. autoload.php is the file an install always replaces — the
+// old entry script loads it — which is what makes the new installer run here.
+$autoload = (string) file_get_contents(__DIR__ . '/../../autoload.php');
+ok(strpos($autoload, 'Install::resume()') !== false, 'autoload.php retries a pending finish');
+ok(strpos($autoload, "PHP_SAPI !== 'cli'") !== false, 'and only on a web request');
+ok(strpos($autoload, "storage/updates/install.json") !== false,
+    'the retry is gated on an install marker existing');
+
 // --- 7. a stale lock does not wedge the installer ---------------------
 build($app, '357');
 // The lock ages by its mtime, not by what it contains — writing an old

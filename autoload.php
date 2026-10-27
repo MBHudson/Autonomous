@@ -35,6 +35,26 @@ spl_autoload_register(function($class) {
     }
 });
 
+// A hand-off that failed gets another go here.
+//
+// An install that could not replace the file it was running from leaves
+// storage/updates/install.json on "finishing". The installer that got there is
+// the copy being replaced, so on a host where THAT copy cannot find the PHP CLI
+// nothing ever retried: the entry script waited as .router-new-index.php, the app
+// reported the new version, and a human had to run install-update.php --finish.
+//
+// This file is one of the ones an install replaces, which makes it the right
+// place to try again: by the next request, Src\Install on disk is the new one,
+// with a phpCli() that can actually find PHP. One stat on a normal request, and
+// a failure here can never break the request it is repairing after.
+if (PHP_SAPI !== 'cli' && is_file(__DIR__ . '/storage/updates/install.json')) {
+    try {
+        \Src\Install::resume();
+    } catch (\Throwable $e) {
+        // Silence: the request still has to answer.
+    }
+}
+
 // Helper functions
 function jsonResponse($data, $status = 200) {
     http_response_code($status);
