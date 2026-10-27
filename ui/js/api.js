@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=337';
-import { acquire, note429 } from './rateGovernor.js?v=337';
-import { latency } from './latency.js?v=337';
-import { detectFamily } from './harness.js?v=337';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=337';
+import { store } from './store.js?v=348';
+import { acquire, note429 } from './rateGovernor.js?v=348';
+import { latency } from './latency.js?v=348';
+import { detectFamily } from './harness.js?v=348';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=348';
 
 latency.bindStore(store);
 
@@ -274,6 +274,37 @@ class ApiClient {
   /** decision: 'once' | 'always' | 'deny' */
   execDecide(id, decision) {
     return this.request('POST', '/exec/decide', { id, decision });
+  }
+
+  // --- Updates ---
+  //
+  // Download-only on purpose: the server fetches the published release into
+  // storage/updates, verifies it and diffs it against the app. There is no
+  // "apply" endpoint, so nothing here can replace a file.
+  updateStatus() {
+    return this.request('GET', '/update');
+  }
+
+  // The cheap probe: reads only the published ui/js/store.js and compares its
+  // APP_VERSION with this copy's. The server caches the answer, so calling
+  // this on every page load is one small request and usually no network at all.
+  // It reports THAT a newer release exists, never what changed inside one.
+  updateCheck() {
+    return this.request('GET', '/update/check');
+  }
+
+  // Force a fresh probe. "Check now" in Config uses this, so a hand-pressed
+  // check never returns a cached answer.
+  updateCheckNow() {
+    return this.request('POST', '/update/check', {});
+  }
+
+  updateDownload() {
+    return this.request('POST', '/update/download', {});
+  }
+
+  updateDiscard() {
+    return this.request('POST', '/update/discard', {});
   }
 
   // --- Export ---

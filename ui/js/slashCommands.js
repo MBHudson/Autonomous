@@ -20,10 +20,10 @@
 //
 // Commands are plain data in COMMANDS: adding one is a single entry.
 
-import { store } from './store.js?v=337';
-import { agentCode } from './utils.js?v=337';
-import { share } from './memory.js?v=337';
-import { matchesQuery, agentTokens } from './agentSearch.js?v=337';
+import { store } from './store.js?v=348';
+import { agentCode } from './utils.js?v=348';
+import { share } from './memory.js?v=348';
+import { matchesQuery, agentTokens } from './agentSearch.js?v=348';
 
 /**
  * @typedef {object} Command

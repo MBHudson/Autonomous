@@ -9,6 +9,27 @@
 /* Modal styles */
 /* NOTE: editors create .modal-overlay dynamically (always visible).
    .modal-bg is the static variant toggled with .open. Both supported. */
+
+/* The layer ladder, in paint order (higher wins). Every fixed surface in the
+   app is one of these, and a dialog has to outrank every surface that can be
+   open at the same time:
+
+     100    floating panels      .terminal-panel, .thinking-panel
+     1000   menus / dropdowns    .notif-dropdown (fixed, <=1024px), and the
+                                 agent/provider .agent-menu clone that
+                                 sidebar.js floats onto <body> (inline z-index,
+                                 so it does not live in this ladder's CSS)
+     1200   API Lab drawer       .lab-drawer
+     1250   built-in Browser     .browser-screen
+     1300   DIALOGS              .modal-bg, .modal-overlay   <-- this file
+     2000   toasts + approvals   .toast-container, .approve-veil
+     60000  API-locked banner
+
+   Dialogs used to sit at 1000: level with the notif dropdown (so DOM order
+   decided it) and *below* the Browser pane and the API Lab drawer, which meant
+   opening Config while either was up drew the dialog underneath it and the UI
+   looked unresponsive rather than covered. Approvals (2000) deliberately stay
+   above dialogs -- a blocking prompt must be visible even over one. */
 .modal-overlay,
 .modal-bg {
   position: fixed;
@@ -17,7 +38,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 1300;
 }
 
 .modal-bg {

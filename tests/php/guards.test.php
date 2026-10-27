@@ -193,6 +193,18 @@ try {
         '/storage/config.json.bak' => 'a backup left in storage',
         '/STORAGE/state.json' => 'a case variant of storage',
 
+        // The update feature's own working folder. Every one of these is a
+        // REAL file on a machine that has checked for a release or staged a
+        // download: plan.json lists the operator's whole file tree, check.json
+        // their version, and staging/ is a full copy of the app. Being one
+        // directory deeper than the storage rule's usual examples, they are
+        // exactly the sort of path a narrowed rule would start serving.
+        '/storage/updates/check.json' => 'the update check cache',
+        '/storage/updates/plan.json' => 'a staged update plan',
+        '/storage/updates/pending.zip' => 'a downloaded release archive',
+        '/storage/updates/staging/index.html' => 'a staged copy of the app',
+        '/storage/updates/' => 'the update folder itself',
+
         // --- the same names at any depth ----------------------------------
         // Dropping a copy of the app inside the web root (an archive of an
         // older version, a backup taken before a redesign) brings its own

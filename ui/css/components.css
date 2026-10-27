@@ -567,6 +567,8 @@ body.agent-reordering .agent-editor:hover {
   padding: 12px;
   max-height: 250px;
   overflow-y: auto;
+  /* A floating panel, so it stays under menus and dialogs -- see the layer
+     ladder in modals.css. Raising it would let it paint over an open dialog. */
   z-index: 100;
   font-size: 11px;
   line-height: 1.6;
@@ -1210,6 +1212,124 @@ body.agent-reordering .agent-editor:hover {
   transform: rotate(90deg);
 }
 
+/* ---- Config → Updates: "What's new", closed and open ----------------------
+   The same native <details> as the sections above, one level down, so the
+   chevron, the tap target and the keyboard behaviour are already familiar. It
+   closed carries the release title and the opening line; opened it shows the
+   entry's lines. The body scrolls rather than growing without limit: a long
+   entry must not push DOWNLOAD UPDATE out of reach. */
+.change-notes-host {
+  margin-top: 4px;
+}
+
+.change-notes {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.change-notes-head {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  list-style: none;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.change-notes-head::-webkit-details-marker {
+  display: none;
+}
+
+.change-notes-head:hover {
+  background: rgba(0, 229, 255, 0.05);
+}
+
+.change-notes[open] > .change-notes-head {
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+
+.change-notes[open] > .change-notes-head .cfg-chevron {
+  transform: rotate(90deg);
+}
+
+.change-notes-label {
+  flex-shrink: 0;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+}
+
+.change-notes-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* The trimmed opening line, on its own row under the title (hence the 100%
+   basis, not a width). Hidden once open, because the first line of the expanded
+   entry is that same sentence without the ellipsis. */
+.change-notes-head .change-notes-peek {
+  flex: 1 0 100%;
+  padding-top: 2px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.change-notes[open] .change-notes-peek {
+  display: none;
+}
+
+.change-notes-body {
+  padding: 8px 10px 10px;
+  max-height: 42vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.change-notes-body ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.change-notes-body li {
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.change-notes-body li:last-child {
+  margin-bottom: 0;
+}
+
+.change-notes-body li.sub {
+  margin-left: 12px;
+  list-style: circle;
+}
+
+.change-notes-body li b {
+  color: var(--text-primary);
+}
+
+.change-notes-more {
+  margin-top: 6px;
+  font-size: 9.5px;
+  opacity: 0.7;
+}
+
 .cfg-section-badge {
   font-size: 8px;
   letter-spacing: 1px;
@@ -1446,10 +1566,17 @@ body.agent-reordering .agent-editor:hover {
 .policy-hint.warn { border-left-color: var(--accent-orange); }
 .policy-hint.ok   { border-left-color: var(--accent-green); }
 
-/* ---- Interpreter opt-ins in the allow/deny editor ---- */
+/* ---- Interpreter opt-ins in the allow/deny editor ----
+   One column, not a 3-up card grid. `.interp-row` spends 82px + 132px + two
+   gaps before the description gets a single pixel, so a `minmax(190px, 1fr)`
+   cell (212px at this modal's width) was always narrower than its own row:
+   each name/select printed straight over the next column and the overflow
+   pushed a horizontal scrollbar onto the whole modal. Full-width rows cost
+   nothing here -- there are ten of them, and the "what this level grants"
+   text finally has room to be read instead of squeezed to 0. */
 .policy-interpreters {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px;
   margin-bottom: 6px;
 }
@@ -1457,17 +1584,20 @@ body.agent-reordering .agent-editor:hover {
 /* ---- Per-interpreter level picker ---- */
 .interp-row {
   display: grid;
-  grid-template-columns: 82px 132px 1fr;
+  grid-template-columns: 82px 132px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   padding: 5px 6px;
   border-radius: 4px;
 }
+/* Grid children default to min-width:auto, which lets a long unbroken token
+   widen the row instead of wrapping inside it. */
+.interp-row > * { min-width: 0; }
 .interp-row:nth-child(odd) { background: rgba(255, 255, 255, 0.03); }
-.interp-level { padding: 3px 6px; font-size: 11px; }
-.interp-row .tool-desc { font-size: 10px; line-height: 1.4; }
+.interp-level { padding: 3px 6px; font-size: 11px; width: 100%; }
+.interp-row .tool-desc { font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
 @media (max-width: 560px) {
-  .interp-row { grid-template-columns: 1fr; gap: 3px; }
+  .interp-row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
 }
 
 /* ---- Always-on ("AUTO") messages ----

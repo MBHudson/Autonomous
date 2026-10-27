@@ -14,7 +14,7 @@
 // The width lives in a CSS variable (--topo-w) that the app grid reads, and is
 // remembered per app copy.
 
-import { k } from '../storage.js?v=337';
+import { k } from '../storage.js?v=348';
 
 const WIDTH_KEY = k('topoWidth');
 const MIN_W = 300;

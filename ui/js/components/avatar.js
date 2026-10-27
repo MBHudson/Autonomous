@@ -18,7 +18,7 @@
 // The robot's eyes scan side to side ONLY while that agent is working
 // (.avatar-agent.thinking) — at rest the pupils sit centered.
 
-import { store } from '../store.js?v=337';
+import { store } from '../store.js?v=348';
 
 const SRC_USER = new URL('../../img/avatar-user.svg', import.meta.url).href;
 const SRC_AGENT = new URL('../../img/avatar-agent.svg', import.meta.url).href;

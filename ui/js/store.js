@@ -23,7 +23,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 337;
+export const APP_VERSION = 348;
 
 class Store {
   constructor() {
@@ -112,6 +112,17 @@ class Store {
       // hidden (default) or pause it and resume on return. The Live on/off
       // choice itself is a separate, persisted preference.
       browserLiveBackground: true,
+      // Config → Updates: ask the server, once per page load, whether a newer
+      // release is published, and put the answer in the notification bell.
+      // ON by default because it is the whole point of the feature, and cheap
+      // -- the server caches the probe for six hours and the comparison is a
+      // version number. Turning it off leaves the manual CHECK NOW and
+      // DOWNLOAD UPDATE in Config working exactly the same.
+      checkUpdatesOnStartup: true,
+      // The published version already announced in the bell, so the same news
+      // is not repeated on every reload. Set by the boot check; a newer
+      // release re-notifies. Not a user setting.
+      updateNotifiedVersion: '',
     };
   }
 

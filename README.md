@@ -73,6 +73,7 @@ Jump straight to a section — every heading on this page is also clickable.
 - [💭 Thinking & reasoning](#-thinking--reasoning)
 - [🧠 Memory](#-memory)
 - [💾 Export & import](#-export--import)
+- [🔁 Updates — download, verified, never auto-installed](#-updates--download-verified-never-auto-installed)
 
 **🔐 Security & guardrails**
 
@@ -86,6 +87,7 @@ Jump straight to a section — every heading on this page is also clickable.
 - [📱 Android & mobile](#-android--mobile)
 - [🧩 Architecture](#-architecture)
 - [🧪 Tests](#-tests)
+- [📋 Releasing a version](RELEASING.md)
 - [🔗 API endpoints](#-api-endpoints)
 - [🧯 Troubleshooting](#-troubleshooting)
 - [📜 License](#-license)
@@ -632,6 +634,29 @@ Take your work with you. 📦
 
 ---
 
+## 🔁 Updates — download, verified, never auto-installed
+
+The app can fetch its own published release and show you **exactly what would change**, without changing anything. 🧾
+
+- 📥 **Config → Updates → DOWNLOAD UPDATE…** fetches the published archive from GitHub into `storage/updates/`, verifies it, extracts a staging copy and diffs it against your install: *N new · N changed · N unchanged · N not in this release* — plus the version each copy calls itself and the archive's SHA-256.
+- 🔔 **It checks by itself at load.** The server reads two small files from the published copy (`VERSION` and `ui/js/store.js`) and compares version numbers, so the app knows a release exists **without downloading one**. If the published version is *newer*, one notification lands in the bell (🔔, right panel): *"Update available — published v337, this copy v344. Open Config → Updates to compare it."* Announced **once per published version**, not once per reload, and the answer is cached for **six hours** — so a reload usually costs no network call at all.
+- 🎞️ **Two numbers, not one.** A release is announced by **either** of two signals, both read from the published copy: **`VERSION`** (repo root — the *release* number, bumped on every release, including one that changes no browser file) and **`APP_VERSION`** in `ui/js/store.js` (the browser *cache-buster*, which moves only when a file the browser caches changes). Before the release number existed the check could see only the cache-buster, so a **PHP-only release was invisible** — it reported *"up to date"* for a release that had shipped.
+- 🏷️ **`VERSION` is a plain integer** (`347`, not `2026.10.26`): the comparison is numeric, so a dotted date would never read as newer. It also must never be *behind* `APP_VERSION`, and `tests/php/update.test.php` fails if it is — that is what stops a release from quietly making itself invisible. A published copy with no `VERSION` at all is judged on its cache-buster instead, so older releases keep working.
+- 📰 **The notification names what shipped.** When a newer release exists, the server also reads the **top entry of the published `CHANGELOG.md`** — and only then, because that file is the largest in the repo and every byte of it is worthless while the two copies match. The bell says *"Update available — published v349 · RELEASING.md: the two-number checklist"*, and **Config → Updates** keeps a *What's new:* row, so the news survives a reload — a bell entry is raised **once per release** and its list lives only in memory. If the CHANGELOG cannot be read, the release is still announced, just without a name.
+- 🔎 **That row opens.** *What's new* is a disclosure, not a teaser: closed it names the release and its opening sentence, opened it lists the entry's **own lines** — every bullet with its bold lead-in, sub-points indented — read from the same parse that produced the one-liner, so the two can never disagree. It is capped at 60 lines / 4000 characters and scrolls in place, because the text arrives over the network; when a cap bites it says so rather than pretending the entry ended. Every line is remote text and is placed as **text**, never as markup — the bold lead-in is a real element built around escaped content.
+- 🎛️ **The switch is in Config → Updates:** *Check for updates when the app loads*, **on by default**, with **CHECK NOW** to ask immediately and a one-line answer beneath it (*"Published v337, this copy v344 — this copy is the newer one"*). Both numbers are always shown, because the published copy can be **behind** a local one and an arrow would read as an upgrade that takes you backwards. Off silences the load-time check only — CHECK NOW and DOWNLOAD UPDATE always work.
+- 🔇 **A check that cannot run says nothing.** Offline, behind a proxy, or on a PHP with no curl, the load-time check stays quiet: it never blocks boot, never throws, and never claims you are out of date. A failed check is remembered briefly (15 minutes) so an offline machine is not retrying on every reload. The announcement names the *release*; the file-by-file **diff** still takes DOWNLOAD UPDATE.
+- 🚫 **Nothing is installed.** There is no apply button, in the UI *or* the API. The only thing written is `storage/updates/`; your app folder is read and never modified.
+- 🔐 **Your data is out of scope by construction.** The published copy **ships a default `storage/` folder**, so a plain "unzip over the app" would replace your config, token and provider keys with defaults. Every `storage/*` entry is refused at *extraction* time — before any diff exists — and `storage/` never appears in the comparison.
+- 🧭 **What “not in this release” means.** Files on disk that the release doesn't contain (`cleancopy/`, screenshots, work you haven't pushed) are **listed, never deleted**.
+- 🛡️ **The archive is treated as hostile.** `https` only, on GitHub's release hosts — checked before the request *and* again after redirects — with a 64 MB / 20 000-entry cap, and every entry name resolved by hand: `..`, absolute paths, drive letters and `stream://` wrappers are refused rather than written.
+- 🗑️ **DISCARD** empties `storage/updates/` again; the download is ~11 MB and the staging copy goes with one click.
+- 🧪 Covered by `tests/php/update.test.php`: entry-name refusals, wrapper stripping **before** the storage rule (the bug it was written for), the diff classifications, the source guard, and the CHANGELOG parsers (which line is the title, one bullet only as the summary, markdown stripped, truncation counted in **characters** so an em dash or emoji cannot make the response un-encodable, and the whole-entry reader behind *What's new* — lead-in split, nesting depth, and both caps).
+
+> ⚠️ **Install is deliberately not implemented yet.** Choosing what to overwrite — and merging new config keys into a config that already exists — is a separate decision from *knowing* what changed, and this step only does the knowing.
+
+---
+
 ## 🔐 Security & guardrails — safe by construction 🛡️
 
 > **The short version:** giving a language model a shell, a filesystem and the web
@@ -656,7 +681,9 @@ Take your work with you. 📦
 
 ### 🧾 3. Allow / Deny lists — an argv-level bouncer
 - **✅ An allowlist you own** decides which programs may run at all. Each command is matched **argument by argument** — no glob fuzz.
-- **⛔ An *absolute* denylist** that **cannot be approved away** from the UI. If it's denied, it's denied. `reboot`, `shutdown`, `rm`, `sudo` and the classic foot-guns live here for good.
+- **⛔ A denylist that wins over approvals.** It is checked *before* the allowlist and before the approval prompt, so a name on it can never be waved through with "Always allow". `reboot`, `shutdown`, `rm`, `sudo`, `cmd`, `powershell` and the classic foot-guns live here.
+- **🔁 …but nothing is denied *forever*.** The list is a **default**, not a law: an explicit `sandbox.exec_deny` in `storage/config.json` **replaces it wholesale**, and the same list is editable inline under **Config → Shell access** (or an MCP card's *Permissions* tab). Remove a name and it becomes an ordinary command again — refused as *"not allowed"* and back in the approval queue, exactly like everything else. No program is refused by name anywhere in code.
+- **↩️ The undo path is on screen, not in the docs.** A refusal names the exact place to fix it — *"delete the `explorer` line under **Config → Shell access → Allow / Deny** (section 4), add it to section 2"* — and says why an approval can't do it (the denylist is checked first). In that panel, **Restore built-in defaults** reloads the shipped list even after a custom one replaced it, so you can always see what you replaced. An empty box falls back to the built-in defaults on purpose: clearing it must not silently un-deny `rm` and `sudo`. For a genuinely empty denylist, set `"exec_deny": []` in `storage/config.json` — which is what the panel's hint tells you.
 - **🧨 Tripwires for metacharacters** — `|`, `&&`, `eval`, `xargs`, `env` and friends are refused, so a model can't smuggle a second command through a "harmless" one.
 - **🎚️ Per-interpreter levels** — Blocked / Scripts only / Full — so `run_code` can be dialled from "no" to "quiet scripts" to "go wild" independently of `exec`.
 
@@ -668,6 +695,8 @@ Take your work with you. 📦
 ### 🐚 5. No shell to hijack
 - **🧩 `exec` takes an *argv array*, not a string.** There is **no `sh -c`, no pipes, no redirects, no `$(...)`** — so there is no second command to inject, ever. The dangerous parts of "running a command" simply don't exist here.
 - **🪟/🐧 Windows-aware** — builtins are implemented in PHP where no `.exe` exists, `.cmd`/`.bat` shims are never shelled, and the prompt is told the truth about the host so it stops guessing.
+- **🔤 One entry covers both spellings.** Policy comparisons fold case and ignore a trailing `.exe`/`.com`, so `exec_allow: [grep]` matches the `grep.exe` Git for Windows actually ships, and a deny entry for `bash` also stops `bash.exe` (the WSL launcher). Without this the lists only protected the spelling you happened to type.
+- **🪟 The Windows command hosts are denied by default.** `cmd`, `powershell`, `pwsh`, `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`, `msiexec`, `wmic`, `schtasks`, `sc`, `reg`, `regedit` and `explorer` are each the local spelling of `sh -c` — the payload rides inside an argument, so the allowlist, the path guard and the jail never see it. They are **defaults you can remove**, not permanent refusals: that is the difference between a policy and a hardcoded block.
 
 ### 🧬 6. Edits are atomic, or they don't happen
 - **🧷 `apply_patch` (V4A) and `multi_edit` are all-or-nothing.** Every hunk must match its context **exactly once**; one miss and **nothing is written** — no half-applied file, no corrupted source.
@@ -992,9 +1021,10 @@ Either half runs on its own, which is what you want while working on one of them
 | Command | What it runs |
 | --- | --- |
 | 🧪 `node tests/run.mjs` | Both suites, PHP then JS |
-| 🐘 `php tests/php/run.php` | PHP only — sandbox, harness, MCP client/server, HTTP guards (`serve.php`, Apache `.htaccess`, and the nginx rules via PCRE) |
+| 🐘 `php tests/php/run.php` | PHP only — sandbox, harness, MCP client/server, HTTP guards (`serve.php`, Apache `.htaccess`, and the nginx rules via PCRE), and the CSS/JS **layer audit** |
 | 🟨 `node tests/js/run.mjs` | JS only — context, curl, drawer state, harness, interface mode, latency, native tools, tool-markup stripping |
 
+- **The layer audit is a stylesheet test.** `tests/php/layers.test.php` parses `ui/css/*.css` (and the handful of `z-index` values set from `ui/js` and `index.html`) and fails if any **surface** — panel, drawer, pane, menu — ties or outranks a dialog. Notices are exempt by name with a reason: the fatal banners, the boot splash, the CRT scanline overlay, toasts and the approval prompt, which must be visible over a dialog. It reads the dialog's number and the ladder comment in `modals.css` rather than hardcoding them, so moving the layer means updating both. It exists because dialogs once sat *below* the built-in Browser pane and an agent's ⋮ menu at 3000, and nothing failed.
 - **Each test file is its own process**, exactly as if you had run it by hand, so one file's globals or a failed import cannot colour another's result.
 - **Naming is the registration.** A `*.test.mjs` in `tests/js/` or a `*.test.php` in `tests/php/` is picked up automatically — there is no list to update. Helpers (like `tests/php/mcp-mock-server.php`, which `mcp.test.php` spawns itself) simply don't use the `.test.` name.
 - **A file passes by exiting `0`.** A failure prints that file's full output — stdout and stderr — and the runner exits `1` if anything failed, so CI or a pre-commit hook can just check the status.
@@ -1003,6 +1033,8 @@ Either half runs on its own, which is what you want while working on one of them
 - **End a test file with its own count**, e.g. `58 passed, 0 failed`. The runners read that last line for the per-file summary and the total, and never trust the count of a file that failed.
 
 > ⚠️ Some tests **skip** instead of pass, and each prints a `SKIP:` line when it does: `sandbox.test.php` skips its git checks when git is missing or its commands are refused in the temporary directory; `guards.test.php` skips if `proc_open` is disabled, no loopback port can be bound, or a checkout has no `storage/sessions/*.json` yet; and `apacheGuards.test.php` skips when there is no Apache to boot — point `ROUTER_HTTPD` at one to run it (its nested-copy checks also skip when no second copy of the app is present). A green run therefore does not cover those cases — read the line, it is not a pass.
+
+> 📋 **Cutting a release?** [RELEASING.md](RELEASING.md) is the checklist: which of the two version numbers to bump, and the **three** places `APP_VERSION` has to change together so a browser cannot mix a new module with an old one.
 
 ---
 
@@ -1021,6 +1053,7 @@ All under `/router/api/…` (or `/api/…`). Every route is token-gated.
 | 🖥️ MCP server | `POST /mcp-server` (JSON-RPC), `GET·POST /mcp-server/config` |
 | 🧪 Lab / proxy | `POST /lab`, `GET /proxies`, `POST /proxy-ping`, `GET·PUT /proxy-active` |
 | 📈 Misc | `GET /topology`, `POST /diag`, `GET /backup`, `POST /import`, `GET /export/{id}`, `POST /audio/{speak,transcribe}` |
+| 🔁 Updates | `GET /update` (status + cached plan), `GET /update/check` (is a newer release published? cached six hours — `POST` asks now), `POST /update/download` (fetch, verify, diff), `POST /update/discard` — download-only: no endpoint applies anything |
 
 Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for the model, so a refused path reads as *"outside the allowed directories"* rather than a blank 500.
 
