@@ -1,0 +1,78 @@
+#!/bin/sh
+# Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+#
+# Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+#
+# BryceFromIndiana@gmail.com
+
+# Pre-commit: run both suites in a FRESH COPY of the tree being committed, so a
+# commit cannot go out with a suite that only passes in this checkout.
+#
+# `--index` is deliberate: the copy is the staged snapshot, which is what the
+# commit will contain. Checking the working tree instead would test a half-staged
+# commit as if it were whole.
+#
+# It takes about two minutes, which is what the check costs. `git commit
+# --no-verify` skips it once; the copy is kept when a suite fails, so the failure
+# can be looked at where it happened.
+#
+# Enable it in a clone (it is not automatic -- nothing in a repo can install a
+# hook into someone's .git):
+#
+#     git config core.hooksPath .githooks
+#
+# Turn it off again with:
+#
+#     git config --unset core.hooksPath
+#
+# Needs php; set FRESH_CHECK_PHP=/path/to/php if it is not on PATH.
+#
+# When this file is first added to git, add it EXECUTABLE, or a fresh clone gets
+# a hook git skips ("hook was ignored because it is not set as executable"):
+#
+#     git add --chmod=+x .githooks/pre-commit
+
+set -u
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    # Not in a work tree (a bare repo, or a stray invocation): nothing to check.
+    exit 0
+}
+cd "$root" || exit 1
+
+if [ ! -f tests/freshClone.php ]; then
+    # An older clone with core.hooksPath pointed here. Say so and stay out of the
+    # way rather than blocking every commit in it.
+    echo "pre-commit: tests/freshClone.php is not in this tree, so there is nothing to run" >&2
+    exit 0
+fi
+
+php_bin="${FRESH_CHECK_PHP:-}"
+if [ -z "$php_bin" ]; then
+    if command -v php >/dev/null 2>&1; then
+        php_bin=php
+    elif [ -x /c/xampp/php/php.exe ]; then
+        php_bin=/c/xampp/php/php.exe
+    fi
+fi
+
+if [ -z "$php_bin" ]; then
+    echo "pre-commit: no php found, so the suites cannot run." >&2
+    echo "  Put php on PATH, or set FRESH_CHECK_PHP to it, then commit again." >&2
+    echo "  (git commit --no-verify skips this check.)" >&2
+    exit 1
+fi
+
+echo "pre-commit: both suites, in a fresh copy of the staged tree"
+echo "            about two minutes -- git commit --no-verify skips this"
+echo ""
+
+if ! "$php_bin" tests/freshClone.php --index; then
+    echo ""
+    echo "pre-commit: the suites do not pass on the tree you are committing." >&2
+    echo "  The fresh copy is kept where the output above says, so the failure can be" >&2
+    echo "  looked at in place. Bypass this once with: git commit --no-verify" >&2
+    exit 1
+fi
+
+exit 0

@@ -228,15 +228,18 @@ try {
         refused($base, $path, $label, $pass, $fail, $errors);
     }
 
-    // A real session transcript, by its real name: the strongest version of the
-    // rule, skipped cleanly on a checkout that has no sessions yet.
-    $transcripts = glob($root . '/storage/sessions/*.json');
-    if ($transcripts) {
-        refused($base, '/storage/sessions/' . basename($transcripts[0]),
-            'a real session transcript', $pass, $fail, $errors);
-    } else {
-        echo "  SKIP: no storage/sessions/*.json to request\n";
-    }
+    // A file that really exists inside storage/, by its real name. A refusal
+    // that only held for paths with nothing behind them would not be a refusal
+    // at all, and this one is served by the same router as everything else: it
+    // has to come back as the refusal, with none of its own bytes in the body.
+    // storage/models.json ships with the app, so this runs on a fresh clone too
+    // -- the session-transcript version of it needed the operator's own history,
+    // and a checkout with no history is exactly where the coverage vanished.
+    refused($base, '/storage/models.json', 'a real file in storage/, by its real name', $pass, $fail, $errors);
+    // A transcript by name, for the folder-inside-a-folder spelling the rule has
+    // to cover whether or not this checkout has any history.
+    refused($base, '/storage/sessions/sess_00000000_00000000000000.00000000.json',
+        'a session transcript by its full name', $pass, $fail, $errors);
 
     // --- dotfiles: the rule that covers .htaccess, .env, .git, .htpasswd ---
     $dotfiles = array(

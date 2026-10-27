@@ -106,8 +106,37 @@ class Mcp {
         return null;
     }
 
-    /** Replace the whole server list. Operator action only. */
+    /**
+     * The operator's servers with every credential replaced by the mask.
+     *
+     * GET /mcp/servers used to answer with the headers and env values verbatim,
+     * so an Authorization bearer or a GITHUB_TOKEN for a server a friend runs
+     * was readable by anything that could reach the route -- and this route is
+     * only behind the web-token gate, which is off on a copy running without
+     * one. The editor still round-trips them (see saveServers, which puts them
+     * back); they are simply not readable on the way out any more.
+     */
+    public static function uiServers() {
+        return array_map(fn($s) => Config::maskServerSecrets($s), self::servers());
+    }
+
+    /**
+     * Replace the whole server list. Operator action only.
+     *
+     * The card (and the topology's MCP editor) reads the list back through
+     * uiServers(), which masks credentials, and sends the whole list back --
+     * including the rows it never touched. So a masked value here means
+     * "unchanged", not "set my token to eight asterisks", and it is resolved
+     * against what is stored before anything is normalised. Skipping that step
+     * is what makes a save silently break every server that needs a header.
+     *
+     * @return array{ok:bool,restored:int,dropped:array}
+     */
     public static function saveServers(array $servers) {
+        $stored = self::servers();
+        [$servers, $restored, $dropped] = Config::restoreServerSecrets(
+            array_values(array_filter($servers, 'is_array')), $stored);
+
         $clean = [];
         foreach ($servers as $s) {
             if (!is_array($s)) { continue; }
@@ -117,7 +146,8 @@ class Mcp {
         $cfg = Config::loadConfig();
         if (!is_array($cfg)) { $cfg = []; }
         $cfg['mcp'] = ['servers' => $clean];
-        return Config::saveConfig($cfg);
+        $ok = Config::saveConfig($cfg);
+        return ['ok' => $ok, 'restored' => $restored, 'dropped' => $dropped];
     }
 
     /** Reachability + tool count for every configured server. */

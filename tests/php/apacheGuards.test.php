@@ -28,6 +28,10 @@ $root = dirname(__DIR__, 2);
 $pass = 0;
 $fail = 0;
 $errors = array();
+// One legitimate skip: a checkout that cannot be written to cannot hold the
+// nested-copy fixture, and skipping is more honest than asserting against a path
+// that does not exist.
+$skips = 0;
 
 function ok($cond, $name, &$pass, &$fail, &$errors)
 {
@@ -321,50 +325,99 @@ try {
     $code = http_status($base . '/.well-known/acme-challenge/token');
     ok($code !== 403, 'the ACME folder is not refused (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
 
-    // --- a second copy of the app kept inside the web root ----------------
+    // --- a second copy of the app dropped inside the web root -------------
     //
-    // The archive at the repo root is reference material, and it carries its own
-    // storage/.htaccess -- but its tests/ predates tests/.htaccess, so it has
-    // none. A rule that only denied the app's own folders left that copy's
-    // tooling (and every other nested copy's) readable. Skipped on a checkout
-    // that does not have the archive.
-    $copyName = 'the-copy-before-the-huge-ui-change';
-    if (is_dir($root . '/' . $copyName . '/storage')) {
+    // A copy sitting in the web root brings its own storage/ (the same token,
+    // the same keys) and its own tests/, so a rule that only denied the app's
+    // OWN folders served both. That is not hypothetical: an archive of an older
+    // version beside the app is how this was found, and its tests/ predated
+    // tests/.htaccess entirely.
+    //
+    // The fixture is BUILT here rather than looked for on disk. The archive is
+    // git-ignored and absent from every fresh clone, so looking for it meant
+    // skipping these assertions exactly where nobody would notice they had gone
+    // -- and the leak checks became vacuous anyway, because "the body contains
+    // no secret" passed trivially against a file that never existed. Every file
+    // below carries a probe string, so a 403 that still returned the body is a
+    // failure now.
+    $copyName = 'nested-copy-probe-' . getmypid();
+    $copyRoot = $root . '/' . $copyName;
+    $removeCopy = function () use ($copyRoot) {
+        if (!is_dir($copyRoot)) {
+            return;
+        }
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($copyRoot, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($items as $item) {
+            if ($item->isDir()) { @rmdir($item->getPathname()); } else { @unlink($item->getPathname()); }
+        }
+        @rmdir($copyRoot);
+    };
+    // A fatal in the middle of this must not leave a fake copy of the app in the
+    // operator's web root.
+    register_shutdown_function($removeCopy);
+    foreach (array(
+        'storage/config.json' => '{"apiKey":"PROBE-NESTED-KEY","sandbox":{"token":"PROBE-NESTED-TOKEN"}}',
+        'storage/state.json' => '{"agents":[{"name":"PROBE-NESTED-AGENT"}]}',
+        'storage/browser-profile/Cookies' => "PROBE-NESTED-COOKIE\n",
+        'tests/php/probe.test.php' => "<?php // PROBE-NESTED-PHP\n",
+        'tests/js/probe.test.mjs' => "import x from 'PROBE-NESTED-JS';\n",
+        'ui/js/store.js' => "// PROBE-NESTED-UI\n",
+    ) as $rel => $content) {
+        if (!is_dir(dirname($copyRoot . '/' . $rel))) {
+            @mkdir(dirname($copyRoot . '/' . $rel), 0777, true);
+        }
+        @file_put_contents($copyRoot . '/' . $rel, $content);
+    }
+
+    // A checkout that cannot be written to -- a read-only deploy, an unpacked
+    // tarball -- cannot hold the fixture. Said out loud and counted, rather than
+    // asserted against paths that never existed (the denial assertions would
+    // pass on those, which is exactly the trap this replaced).
+    if (!is_file($copyRoot . '/ui/js/store.js') || !is_file($copyRoot . '/storage/config.json')) {
+        echo "  SKIP: could not build a nested copy in the web root (read-only?)\n";
+        $skips++;
+        $removeCopy();
+    } else {
         denied($base, '/' . $copyName . '/storage/config.json',
-            'the nested config (token + keys)', 'apiKey', $pass, $fail, $errors);
+            'the nested config (token + keys)', 'PROBE-NESTED-KEY', $pass, $fail, $errors);
         denied($base, '/' . $copyName . '/storage/state.json',
-            'the nested state bundle', '"agents"', $pass, $fail, $errors);
-        foreach (array('/' . $copyName . '/storage', '/' . $copyName . '/storage/') as $path) {
+            'the nested state bundle', 'PROBE-NESTED-AGENT', $pass, $fail, $errors);
+        foreach (array('/' . $copyName . '/storage', '/' . $copyName . '/storage/',
+                       '/' . $copyName . '/tests', '/' . $copyName . '/tests/') as $path) {
             $code = http_status($base . $path);
             ok($code === 403, $path . ' is denied (got ' . var_export($code, true) . ', want 403)', $pass, $fail, $errors);
         }
         // Real files from that copy: it predates tests/run.mjs and tests/.htaccess,
         // which is exactly why a root-only rule left it readable.
-        denied($base, '/' . $copyName . '/tests/php/sandbox.test.php',
-            'nested PHP tooling', '<?php', $pass, $fail, $errors);
-        denied($base, '/' . $copyName . '/tests/js/context.test.mjs',
-            'nested JS tooling', 'import', $pass, $fail, $errors);
-        foreach (array('/' . $copyName . '/tests', '/' . $copyName . '/tests/') as $path) {
-            $code = http_status($base . $path);
-            ok($code === 403, $path . ' is denied (got ' . var_export($code, true) . ', want 403)', $pass, $fail, $errors);
-        }
+        denied($base, '/' . $copyName . '/tests/php/probe.test.php',
+            'nested PHP tooling', 'PROBE-NESTED-PHP', $pass, $fail, $errors);
+        denied($base, '/' . $copyName . '/tests/js/probe.test.mjs',
+            'nested JS tooling', 'PROBE-NESTED-JS', $pass, $fail, $errors);
+        // The cookie jar under browser-profile/ has no extension, so nothing but
+        // the folder rule protects it.
+        denied($base, '/' . $copyName . '/storage/browser-profile/Cookies',
+            'a nested cookie jar', 'PROBE-NESTED-COOKIE', $pass, $fail, $errors);
 
         // The guard is case-insensitive: on Windows/macOS these resolve to the
         // real folder, and on Linux Apache answers 404, which is also a refusal.
-        $code = http_status($base . '/' . strtoupper($copyName) . '/tests/php/sandbox.test.php');
+        $code = http_status($base . '/' . strtoupper($copyName) . '/tests/php/probe.test.php');
         ok($code === 403 || $code === 404,
             'an upper-case nested tooling path is refused (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
 
-        // The cookie jar under browser-profile/ has no extension, so nothing but
-        // the folder rule protects it.
-        if (is_dir($root . '/' . $copyName . '/storage/browser-profile')) {
-            $code = http_status($base . '/' . $copyName . '/storage/browser-profile/Cookies');
-            ok($code === 403 || $code === 404,
-                'a nested cookie jar is refused (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
-        }
-    } else {
-        echo "  SKIP: no nested copy of the app at " . $copyName . "\n";
+        // And the copy's own UI still loads: the rule is about the data folders,
+        // not about the copy as a whole.
+        $body = '';
+        $code = http_status($base . '/' . $copyName . '/ui/js/store.js', $body);
+        ok($code === 200,
+            'a nested copy\'s UI module still serves (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
+        ok(strpos($body, 'PROBE-NESTED-UI') !== false,
+            'and what it serves is that file', $pass, $fail, $errors);
     }
+
+    $removeCopy();
 
     // --- what must keep working -------------------------------------------
     $body = '';
@@ -394,21 +447,15 @@ try {
         ok($code !== 403, $path . ' is not blocked (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
     }
 
-    // And a real asset inside a nested copy still loads, so the rule is about the
-    // data folders, not about the copy as a whole.
-    if (is_dir($root . '/' . $copyName . '/ui')) {
-        $code = http_status($base . '/' . $copyName . '/ui/js/store.js');
-        ok($code === 200,
-            'a nested copy\'s UI module still serves (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
-    }
 } finally {
     $stop();
 }
 
 echo str_repeat('-', 60) . "\n";
+$tail = $skips ? ", {$skips} skipped" : '';
 if ($fail) {
     echo implode("\n", $errors) . "\n";
-    echo "{$fail} failed, {$pass} passed\n";
+    echo "{$fail} failed, {$pass} passed{$tail}\n";
     exit(1);
 }
-echo "{$pass} passed, 0 failed\n";
+echo "{$pass} passed, 0 failed{$tail}\n";

@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=358';
-import { asText, compactText } from './utils.js?v=358';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=358';
-import { settingFor } from './agentConfig.js?v=358';
-import { trace } from './trace.js?v=358';
+import { store } from './store.js?v=360';
+import { asText, compactText } from './utils.js?v=360';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=360';
+import { settingFor } from './agentConfig.js?v=360';
+import { trace } from './trace.js?v=360';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -361,6 +361,40 @@ export const TOOL_REGISTRY = {
     run: () => 'browser tools are not bound yet',
   },
 
+  // --- Desktop programs: real windows on this machine ---
+  // NOT the built-in browser screen. The operator configures a list in
+  // Config → Shell access → Programs and names it there; the agent may only
+  // NAME one of those programs. It never supplies a path or a command line,
+  // which is what makes a launcher safe to hand to a model at all. Off unless
+  // the operator turns it on, and the server refuses regardless of what this
+  // page believes — so listing the tools is harmless.
+  //
+  // A launch is detached: the window outlives the reply, so the agent does not
+  // sit in a blocking call while somebody looks at it.
+  window_list: {
+    label: 'window_list',
+    arg: '{}',
+    describe: 'List the desktop programs this install can open — their names, whether each is running, '
+      + 'and anything wrong with its path. Call this first.',
+    run: () => 'program tools are not bound yet',
+  },
+  window_open: {
+    label: 'window_open',
+    arg: '{"name":"notepad"}',
+    describe: 'Open one configured desktop program as a real window on this machine (asks you first). '
+      + 'It stays open after your reply.',
+    needsApproval: true,
+    run: () => 'program tools are not bound yet',
+  },
+  window_close: {
+    label: 'window_close',
+    arg: '{"name":"notepad","force":false}',
+    describe: 'Close a configured desktop program\u2019s running windows (asks you first). Graceful by '
+      + 'default, so it may ask about unsaved work; "force":true ends the process outright.',
+    needsApproval: true,
+    run: () => 'program tools are not bound yet',
+  },
+
   // --- Always-on agents ---
   // The stop signal for an autonomous run. A tool rather than a phrase match,
   // because an agent that writes "this is nearly done" should not be taken at
@@ -498,6 +532,7 @@ export function initCustomTools() {
 export const SANDBOX_TOOLS = [
   'web_search', 'fetch_url', 'read_file', 'list_dir', 'glob_files', 'grep_code', 'write_file',
   'str_replace_editor', 'edit_file', 'apply_patch', 'git', 'git_commit', 'multi_edit', 'run_code', 'http_request',
+  'window_list', 'window_open', 'window_close',
 ];
 
 /** Tools that let an agent talk to the other agents. */
@@ -1032,6 +1067,70 @@ export function bindSandboxTools(api) {
     }
     return parts.join('\n');
   };
+
+  // --- Desktop programs: real windows on this machine ----------------------
+  // The server owns the policy (sandbox.programs_enabled + the operator's list)
+  // and it is the only thing consulted: nothing here decides what may open.
+  // The agent supplies a NAME; the path and arguments come from config, so
+  // there is no string from a model anywhere near the OS launcher.
+  const programCall = (action, params) => api.sandbox('program', { action, ...(params || {}) });
+
+  TOOL_REGISTRY.window_list.run = async () => {
+    const res = await programCall('list');
+    const apps = res.apps || [];
+    const head = `Desktop programs on this ${res.platform} host${res.enabled ? '' : ' — OPENING IS OFF'}`;
+    if (!apps.length) {
+      return `${head}: none configured.`
+        + (res.enabled ? ' The operator adds them in Config → Shell access → Programs.'
+          : ' The operator turns them on, and adds them, in Config → Shell access → Programs.');
+    }
+    const rows = apps.map((a) => {
+      const bits = [a.name, '—', a.resolved || a.path];
+      if (a.error) bits.push(`| NOT USABLE: ${a.error}`);
+      else if ((a.running || []).length) bits.push(`| running, pid ${a.running.join(', ')}`);
+      else bits.push('| not running');
+      if ((a.args || []).length) bits.push(`| args: ${a.args.join(' ')}`);
+      return '- ' + bits.join(' ');
+    });
+    return `${head}:\n${rows.join('\n')}${res.notes ? `\n${res.notes}` : ''}`;
+  };
+
+  TOOL_REGISTRY.window_open.run = async (arg, _note, ctx) => {
+    const name = programArgName(arg, _note);
+    if (!name) return 'error: window_open needs a "name" — one of the program names window_list shows';
+    const res = await programCall('open', { name, agent: ctx && ctx.agentId });
+    const pids = (res.running || []).length ? ` (pid ${res.running.join(', ')})` : '';
+    return `opened "${res.name}"${pids} — ${res.path}\n${res.note}`;
+  };
+
+  TOOL_REGISTRY.window_close.run = async (arg, _note, ctx) => {
+    const name = programArgName(arg, _note);
+    if (!name) return 'error: window_close needs a "name" — one of the program names window_list shows';
+    // Graceful is the default so a program can still ask about unsaved work;
+    // an explicit force is what ends the process outright.
+    const force = !!(arg && typeof arg === 'object' && arg.force);
+    const res = await programCall('close', { name, force, agent: ctx && ctx.agentId });
+    const tail = (res.still_running || []).length
+      ? ` Still running: pid ${res.still_running.join(', ')}.` : '';
+    return `${res.note}${tail}${res.error ? `\n[error] ${res.error}` : ''}`;
+  };
+}
+
+/**
+ * The program name out of whatever shape the model sent.
+ *
+ * `{"name":"notepad"}`, `{"program":"notepad"}`, a bare `"notepad"`, and a
+ * bare name in the note slot all turn up in practice. Refusing two of those
+ * makes a model retry the identical call instead of fixing it.
+ */
+function programArgName(arg, note) {
+  if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+    const n = String(arg.name ?? arg.program ?? '').trim();
+    if (n) return n.slice(0, 60);
+  }
+  const s = String(typeof arg === 'string' ? arg : '').trim()
+    || String(note == null ? '' : note).trim();
+  return s ? s.slice(0, 60) : '';
 }
 
 function readNotes() {
@@ -1254,6 +1353,15 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       + 'need Playwright, Selenium, Puppeteer or a browser extension, and you should never tell the user you '
       + 'lack browser access. Workflow: browser_open a URL, browser_read to see the page, browser_click / '
       + 'browser_type to act (target fields with a CSS selector), then browser_read again to check the result.'
+    );
+  }
+  if (names.some(t => String(t).startsWith('window_'))) {
+    notes.push(
+      'window_open / window_close act on REAL desktop programs on the machine this app runs on. '
+      + 'Call window_list FIRST: it names the programs the operator configured, so a name it does not '
+      + 'list does not exist and you cannot supply a path or a command line. Prefer this over exec for '
+      + 'starting an app — the window outlives your reply, nothing blocks waiting for it, and it is '
+      + 'recorded. It is not the built-in browser (browser_*), which drives a web page instead.'
     );
   }
   if (names.includes('web_search') || names.includes('fetch_url')) {

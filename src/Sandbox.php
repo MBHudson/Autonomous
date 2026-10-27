@@ -405,6 +405,11 @@ class Sandbox {
             'exec_enabled' => !empty($c['exec_enabled']),
             'code_enabled' => !empty($c['code_enabled']),
             'exec_allow' => $c['exec_allow'],
+            // Desktop programs: cheap summary only (no path resolution, no
+            // process lookup) because this is polled by the Config card and by
+            // every agent turn's environment header. The full list, with
+            // running state, is POST /sandbox/program.
+            'programs' => Programs::status(),
             'binaries' => self::binaryAvailability($c['exec_allow'], 40),
         ];
     }
@@ -424,6 +429,34 @@ class Sandbox {
             $n++;
         }
         return $out;
+    }
+
+    /**
+     * Did this request arrive from the machine this app is running on?
+     *
+     * Used by the API's front gate to enforce the documented posture of
+     * `setup-token.sh --off` ("only do this if the server is unreachable from
+     * the internet"): with no token configured there is nothing to check, so a
+     * request that came from another machine is refused. Without that, a copy
+     * with the gate off behind a web server bound to all interfaces answers
+     * anything on the network -- and the API includes a program launcher and the
+     * config route that holds this very token.
+     *
+     * Only two forms count as local: a loopback peer address, and the
+     * IPv4-mapped spelling of it that some Windows stacks report. The Host
+     * header is deliberately NOT consulted -- it is client-supplied, so a rule
+     * like "the Host matched the peer address" would let anyone in by naming
+     * their own address in the request. A request through a local reverse proxy
+     * passes, because the proxy is what connects; that is the operator's own
+     * configuration, not a stranger's.
+     */
+    public static function isLocalRequest($server = null) {
+        $server = is_array($server) ? $server : (array)$_SERVER;
+        $remote = trim((string)($server['REMOTE_ADDR'] ?? ''));
+        // No peer address at all (the CLI, or PHP's built-in server before it
+        // has bound): nothing to refuse, and no network path to refuse it on.
+        if ($remote === '') { return true; }
+        return in_array(strtolower($remote), ['127.0.0.1', '::1', '::ffff:127.0.0.1'], true);
     }
 
     /**
@@ -1183,7 +1216,12 @@ class Sandbox {
      * and `.com` are accepted: `.cmd`/`.bat` need cmd.exe to interpret them,
      * which is exactly the shell this worker is designed not to have.
      */
-    private static function resolveProgram($program) {
+    /**
+     * Public since the Programs launcher landed: it resolves a bare program
+     * name against the same directories this allowlist uses, and duplicating
+     * that list in a second class is how the two drift apart.
+     */
+    public static function resolveProgram($program) {
         if (strpbrk($program, self::isWindows() ? '/\\' : '/') !== false) {
             return null;  // no paths from the caller
         }
@@ -1754,26 +1792,60 @@ class Sandbox {
      * the command allowlist from the code interpreter. Older one-line records
      * (ts exit=.. ms=.. cwd=.. :: prog args) still parse -- see readExecLog() --
      * so the existing log stays readable.
+     *
+     * Public so the Programs launcher writes the same two-phase record with a
+     * different `kind` -- a GUI window that stays open is one of the cases this
+     * format was built for, and it must not be invisible in TRACE -> EXEC.
      */
-    private static function audit($program, $argv, $cwd, $exit, $ms, array $meta = []) {
+    public static function audit($program, $argv, $cwd, $exit, $ms, array $meta = []) {
         try {
             $dir = self::appDir() . '/storage';
             if (!is_dir($dir)) { return; }
-            $safe = implode(' ', array_map(function ($a) {
+            // ONE line per record, which makes a newline a forged record: the
+            // agent name arrives in the tool call and an argv element can hold
+            // anything a model sent, so "\n" plus a hand-written line that
+            // looks exactly like this one would land in the trace as a command
+            // that never ran (or hide one that did). Control characters are
+            // stripped HERE, at the one place every audited action passes
+            // through, rather than at each of the callers -- and before the
+            // quoting decision below, so a quote-escaped value cannot carry a
+            // line break through it either.
+            // Two shapes, because the line carries two kinds of field. The ones
+            // the parser reads as a SINGLE token (run, phase, kind, agent) lose
+            // the control characters entirely -- a space would split the field
+            // and make the whole line unparseable, which loses a real record
+            // while stopping a forged one. cwd, the program and the argv are
+            // free text and read better with the break turned into a space.
+            $token = function ($s) {
+                // Everything from the first break on is dropped. A field the
+                // parser reads as ONE token cannot carry a second record, and
+                // keeping the first token is more recognisable than mangling
+                // the whole string into one run-together word.
+                $s = (string)(preg_split('/[\s\x00-\x1f\x7f]+/', (string)$s)[0] ?? '');
+                $s = (string)preg_replace('/[^\w.:@-]/', '', $s);
+                if ($s === '') { return '-'; }   // an empty token breaks the regex
+                return strlen($s) > 120 ? substr($s, 0, 120) . '...' : $s;
+            };
+            $text = function ($s) {
+                $s = (string)preg_replace('/[\x00-\x1f\x7f]+/', ' ', (string)$s);
+                return strlen($s) > 240 ? substr($s, 0, 240) . '...' : $s;
+            };
+            $safe = implode(' ', array_map(function ($a) use ($text) {
+                $a = $text($a);
                 return preg_match('/^[\w\.\/:=-]+$/', $a) ? $a : escapeshellarg($a);
             }, array_slice($argv, 0, 12)));
             $line = sprintf(
                 "%s run=%s phase=%s kind=%s agent=%s exit=%s ms=%s timeout=%s cwd=%s :: %s %s\n",
                 gmdate('Y-m-d\TH:i:sZ'),
-                (string)($meta['run'] ?? '-'),
-                (string)($meta['phase'] ?? 'end'),
-                (string)($meta['kind'] ?? 'exec'),
-                (string)($meta['agent'] ?? '-'),
+                $token($meta['run'] ?? '-'),
+                $token($meta['phase'] ?? 'end'),
+                $token($meta['kind'] ?? 'exec'),
+                $token($meta['agent'] ?? '-'),
                 $exit === null ? '-' : (string)(int)$exit,
                 $ms === null ? '-' : (string)(int)$ms,
                 empty($meta['timeout']) ? '0' : '1',
-                $cwd,
-                $program,
+                $text($cwd),
+                $text($program),
                 $safe
             );
             file_put_contents($dir . '/exec.log', $line, FILE_APPEND | LOCK_EX);
