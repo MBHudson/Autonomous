@@ -56,6 +56,16 @@ class Install
     /** A lock older than this is from a run that died, not one in progress. */
     const LOCK_TTL = 900;
 
+    /**
+     * How many times a later request will try to restart a stuck hand-off.
+     *
+     * Twenty attempts, ten seconds apart, is a couple of minutes of trying
+     * before it stops and points at install-update.php. A retry loop that never
+     * gives up would write to the journal on every page load for as long as the
+     * host cannot spawn a process, which is noise, not persistence.
+     */
+    const RESUME_LIMIT = 20;
+
     /** @var string|null Test/side-by-side override for the app root. */
     private static $root = null;
 
@@ -562,6 +572,81 @@ class Install
             self::log('install done — every file is now in place');
         }
         return array('ok' => !$still, 'swapped' => $swapped, 'pending' => $still ?: array());
+    }
+
+    /**
+     * Try again to finish an install that a previous request could not.
+     *
+     * The installer that runs an update is the copy being replaced, so on a
+     * host where THAT copy cannot find the PHP CLI — v354 and v355 under XAMPP,
+     * where PHP_BINDIR is a folder that does not exist — the entry script is
+     * written beside its target and the finisher that would swap it never
+     * starts. Nothing retried: the marker stayed on "finishing", the app
+     * reported the new version, and the only way out was a command line.
+     *
+     * This is the retry. autoload.php calls it on a web request, and autoload.php
+     * is one of the files the install replaced — so the code doing the retrying
+     * is the new installer, whose phpCli() can actually find PHP.
+     *
+     * Cheap and quiet on purpose: one stat on a normal request, and while
+     * something is pending, one attempt every $throttle seconds. Never throws,
+     * never echoes, and writes nothing outside storage/updates.
+     *
+     * @return bool true when a finisher was started.
+     */
+    public static function resume($throttle = 10)
+    {
+        if (!is_file(self::markerPath())) {
+            return false;
+        }
+        $marker = self::readMarker();
+        if (!is_array($marker) || ($marker['phase'] ?? '') !== 'finishing') {
+            return false;
+        }
+
+        $pending = self::pendingSwaps();
+        if (!$pending) {
+            // Everything landed: swapped by hand, or by a finisher that died
+            // before it could close the marker. Say so instead of leaving a
+            // marker that claims work is outstanding.
+            $marker['phase'] = 'done';
+            $marker['finished'] = time();
+            unset($marker['deferred']);
+            self::mark($marker);
+            self::log('resume: nothing was waiting — the install is complete');
+            return false;
+        }
+
+        // A page that polls twice a second must not start a finisher twice a
+        // second. The timestamp lives in the marker, so it survives the request
+        // that wrote it.
+        $last = (int) ($marker['resumeAt'] ?? 0);
+        if ($last > 0 && (time() - $last) < (int) $throttle) {
+            return false;
+        }
+
+        $tries = (int) ($marker['resumeTries'] ?? 0);
+        if ($tries >= self::RESUME_LIMIT) {
+            if ($tries === self::RESUME_LIMIT) {
+                self::log('resume: gave up after ' . $tries
+                    . ' attempts — run install-update.php --finish');
+                $marker['resumeTries'] = $tries + 1;   // say it once, then stay quiet
+                self::mark($marker);
+            }
+            return false;
+        }
+
+        $marker['resumeAt'] = time();
+        $marker['resumeTries'] = $tries + 1;
+        self::mark($marker);
+
+        $script = self::spawnFinisher();
+        self::log($script
+            ? 'resume: a later request restarted the finisher (' . basename($script)
+                . ') for ' . implode(', ', $pending)
+            : 'resume: still cannot start the finisher — run install-update.php --finish');
+
+        return $script !== null;
     }
 
     /** Files waiting as `.router-new-<name>` anywhere in the app tree. */

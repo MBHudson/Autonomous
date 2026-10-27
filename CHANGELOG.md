@@ -17,6 +17,37 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔁 A hand-off that failed retries itself *(PHP — `VERSION` 357, no cache-buster bump)*
+
+**The installer that runs an update is the copy being replaced.** Harmless until
+the copy being replaced is one whose `phpCli()` cannot find PHP — v354 and v355
+under XAMPP. Those installs write every other file, defer the entry script, and
+then cannot start the finisher. Nothing ever tried again: the tree reported the
+new version, so the prompt was gone, and the last swap waited for a human with
+`install-update.php --finish`.
+
+Found by running it rather than reasoning about it — a copy extracted from the
+`v355-open-testing` tag, installing the published v356 over Apache: 252 files
+backed up, **176 written**, `api/index.php` deferred, `could not start the
+finisher automatically` in the journal, and `storage/` intact byte for byte.
+
+`Src\Install::resume()` is the retry, and `autoload.php` calls it on every web
+request. That file is one of the ones an install replaces, which is the whole
+trick: by the next request the new installer is on disk, and its `phpCli()` can
+find PHP. One `stat` on a normal request; ten seconds between attempts; twenty
+attempts before it stops and points at `install-update.php`; a marker whose
+files are already in place is closed rather than retried forever; and a failed
+retry can never break the request it is repairing after.
+
+**It cannot rescue the v354/v355 → v356 hop**, because that install is driven by
+the old code and the hook only exists in the new tree. From v357 on the hand-off
+repairs itself on the next page load.
+
+Guarded by sixteen new assertions in `tests/php/install.test.php` (83 now): the
+attempt is recorded, a polling page does not restart it, a finished install is
+left alone, a stale marker is closed, no marker means no journal, and the hook
+in `autoload.php` is wiring-checked so it cannot quietly disappear.
+
 ## 🧭 Finding the PHP CLI on a host that lies about where it is *(PHP — `VERSION` 356, no cache-buster bump)*
 
 **`PHP_BINDIR` is a compile-time prefix, not where XAMPP put PHP.** On the
