@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=349';
-import { acquire, note429 } from './rateGovernor.js?v=349';
-import { latency } from './latency.js?v=349';
-import { detectFamily } from './harness.js?v=349';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=349';
+import { store } from './store.js?v=350';
+import { acquire, note429 } from './rateGovernor.js?v=350';
+import { latency } from './latency.js?v=350';
+import { detectFamily } from './harness.js?v=350';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=350';
 
 latency.bindStore(store);
 
@@ -237,6 +237,22 @@ class ApiClient {
       cwd: opts.cwd || null,
       timeout: opts.timeout || null,
       max_bytes: opts.maxBytes || null,
+      // Who asked. The audit line is the only record a command ran at all, so
+      // without this the log can say WHAT ran but never WHOSE turn it was.
+      agent: opts.agent || null,
+    });
+  }
+
+  /**
+   * Read back storage/exec.log, parsed server-side.
+   *
+   * `lines` bounds how far back to look; `agent` narrows to one agent's runs for
+   * the per-agent drawer. Read-only: this never writes or clears the log.
+   */
+  execLog(opts = {}) {
+    return this.sandbox('exec-log', {
+      lines: opts.lines || 300,
+      agent: opts.agent || '',
     });
   }
 

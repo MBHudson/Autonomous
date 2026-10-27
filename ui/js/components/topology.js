@@ -10,9 +10,9 @@
 // TOPOLOGY.JS — SVG network graph
 // ============================================
 
-import { store } from '../store.js?v=349';
-import { api } from '../api.js?v=349';
-import { esc, agentCode } from '../utils.js?v=349';
+import { store } from '../store.js?v=350';
+import { api } from '../api.js?v=350';
+import { esc, agentCode } from '../utils.js?v=350';
 
 // How long a hop stays bright while in flight, and how long it then lingers as
 // a faint record of the exchange before it fades out and is dropped.
@@ -120,6 +120,10 @@ export class TopologyGraph {
     // line comes back the other way) from an order, which is one-way.
     store.on('flow:speak', (d) => this._flowAdd({
       from: d?.from, to: d?.to, kind: d?.kind === 'tell' ? 'tell' : 'agent',
+      // The words too, not only the fact that they spoke. The line keeps the
+      // text so hovering it can say what was said, and the 3D card's history
+      // reads it back.
+      text: d?.text,
     }));
     store.on('flow:respond', (d) => this._flowRespond(d?.from));
     store.on('flow:fail', (d) => this._flowFadeTo(d?.to));
@@ -599,7 +603,7 @@ export class TopologyGraph {
     return (node && node.color) || '#00e5ff';
   }
 
-  _flowAdd({ from, to, kind, holdMs } = {}) {
+  _flowAdd({ from, to, kind, holdMs, text } = {}) {
     if (!from || !to) return;
     // A repeated hop on a pair we already recorded just refreshes that line
     // instead of stacking a duplicate on top of it.
@@ -609,13 +613,14 @@ export class TopologyGraph {
       existing.phase = 'active';
       existing.stamp = Date.now();
       if (holdMs) existing.holdMs = holdMs;
+      if (text) existing.text = text;
       clearTimeout(existing._timer);
       this._renderFlows();
       this._scheduleSettle(existing);
       return existing;
     }
     const flow = { id: ++this._flowSeq, from, to, kind: kind || 'message',
-      phase: 'active', stamp: Date.now() };
+      phase: 'active', stamp: Date.now(), text: text || '' };
     // A request aimed at a model holds until that model answers (or the safety
     // cap trips), so the dots keep flowing for the whole request rather than
     // only 6s. One-way agent-to-agent messages keep the short default.
@@ -920,9 +925,16 @@ export class TopologyGraph {
         extra = `<animate attributeName="stroke-dashoffset" from="${dashTotal(dash)}" to="0" `
           + `dur="${dur}" repeatCount="indefinite"/>`;
       }
+      // Hovering a beam says who spoke and what was said. The chart used to be
+      // mute: a line proved a conversation happened but not a word of it.
+      const fromLabel = fromNode?.label || (f.from === 'user' ? 'You' : f.from);
+      const toLabel = toNode?.label || (f.to === 'user' ? 'You' : f.to);
+      const spoken = f.text ? String(f.text).replace(/\s+/g, ' ').trim().slice(0, 240) : '';
+      const tip = spoken ? `${fromLabel} → ${toLabel}: ${spoken}` : `${fromLabel} → ${toLabel}`;
       lines += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" `
         + `class="flow-line" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="${dash}" `
-        + `stroke-linecap="round" opacity="${opacity}" marker-end="url(#${mid})">${extra}</line>`;
+        + `stroke-linecap="round" opacity="${opacity}" marker-end="url(#${mid})">`
+        + `<title>${esc(tip)}</title>${extra}</line>`;
     });
     g.innerHTML = (defs ? `<defs>${defs}</defs>` : '') + lines;
   }

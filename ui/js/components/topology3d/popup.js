@@ -10,10 +10,10 @@
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=349';
-import { esc } from '../../utils.js?v=349';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=349';
-import { McpPanel } from './mcpPanel.js?v=349';
+import { store } from '../../store.js?v=350';
+import { esc, escAttr } from '../../utils.js?v=350';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=350';
+import { McpPanel } from './mcpPanel.js?v=350';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',
@@ -115,6 +115,7 @@ export class PopupCard {
       const act = btn.dataset.act;
       if (act === 'close') this.close();
       else if (act === 'ask') this.ctx.onAsk?.(this.nodeId);
+      else if (act === 'talk') store.emit('comms:showAgent', { agentId: this.nodeId });
       else if (act === 'mcp-probe') this.ctx.onProbeMcp?.();
       else if (act === 'report') {
         const n = this.ctx.nodeById(this.nodeId);
@@ -321,11 +322,16 @@ export class PopupCard {
       const otherName = otherId === 'user' ? 'You' : (other?.label || otherId || '—');
       const otherColor = otherId === 'user' ? '#ff4757' : (other?.color || '#64748b');
       const arrow = h.kind === 'fail' ? '✕' : (outbound ? '→' : '←');
+      // What was actually said, when the hop carried words. Clamped because a
+      // model's opening paragraph can be longer than the card.
+      const said = String(h.text || '').replace(/\s+/g, ' ').trim();
+      const saidShort = said.length > 220 ? said.slice(0, 219) + '…' : said;
       return `<div class="t3d-msg ${h.kind === 'fail' ? 'fail' : ''}">
         <span class="t3d-msg-dir ${outbound ? 'out' : 'in'}">${arrow}</span>
         <span class="t3d-msg-who" style="color:${esc(otherColor)}">${esc(h.kind === 'fail' ? 'call failed' : otherName)}</span>
         <span class="t3d-msg-kind">${esc(KIND_LABEL[h.kind] || h.kind)}</span>
         <span class="t3d-msg-t">${esc(ago(h.at))}</span>
+        ${saidShort ? `<div class="t3d-msg-said" title="${escAttr(said)}">${esc(saidShort)}</div>` : ''}
       </div>`;
     }).join('');
     return `<div class="t3d-sec"><div class="t3d-sec-h">Recent messages</div>${rows}</div>`;
@@ -363,6 +369,7 @@ export class PopupCard {
       ${this._recentBlock(n.id)}
       <div class="t3d-pop-foot">
         <button class="t3d-ask" data-act="ask" title="Ask this model directly — nobody else is consulted">ASK</button>
+        <button class="t3d-link" data-act="talk" title="Every exchange this agent sent or received, with the text">Messages →</button>
         <button class="t3d-link" data-act="report">Full token report →</button>
       </div>`;
   }

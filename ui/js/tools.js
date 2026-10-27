@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=349';
-import { asText, compactText } from './utils.js?v=349';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=349';
-import { settingFor } from './agentConfig.js?v=349';
-import { trace } from './trace.js?v=349';
+import { store } from './store.js?v=350';
+import { asText, compactText } from './utils.js?v=350';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=350';
+import { settingFor } from './agentConfig.js?v=350';
+import { trace } from './trace.js?v=350';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -970,6 +970,7 @@ export function bindSandboxTools(api) {
       code,
       cwd: scopeOf(ctx),
       root: scopeOf(ctx),
+      agent: ctx && ctx.agentId,
     });
     const parts = [];
     if (res.stdout) parts.push(res.stdout);
@@ -1003,7 +1004,7 @@ export function bindSandboxTools(api) {
         + '("pwd"), but shell syntax (|, ;, &&, $()) never runs -- there is no shell.';
     }
     const cwd = scopeOf(ctx);
-    const res = await api.execCommand(argv, { cwd });
+    const res = await api.execCommand(argv, { cwd, agent: ctx && ctx.agentId });
     // Fast path for the approval watcher: the server parked this exact argv
     // and handed back a pending id. Emit it now so the prompt can appear
     // immediately instead of waiting for the next poll.

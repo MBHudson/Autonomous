@@ -843,6 +843,15 @@ function handleSandbox($method, $segments, $body) {
 
     try {
         switch ($action) {
+            // Read-only view of storage/exec.log for Config -> TRACE -> EXEC and
+            // the per-agent drawer. Parsed server-side so the browser never reads
+            // the file itself, and bounded so a large log is not pulled whole.
+            case 'exec-log':
+                echo json_encode(Sandbox::readExecLog(
+                    $body['lines'] ?? 300,
+                    $body['agent'] ?? ''
+                ));
+                break;
             case 'search':
                 echo json_encode(Sandbox::webSearch($body['query'] ?? '', $body['limit'] ?? 8));
                 break;
@@ -939,6 +948,7 @@ function handleSandbox($method, $segments, $body) {
                         'cwd' => $body['cwd'] ?? null,
                         'root' => $body['root'] ?? null,
                         'timeout' => $body['timeout'] ?? null,
+                        'agent' => $body['agent'] ?? '',
                     ]
                 ));
                 break;

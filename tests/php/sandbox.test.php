@@ -501,6 +501,98 @@ throws(function () use ($writeDir) {
 }, 'run_code disabled by default', 'disabled');
 file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));   // restore
 
+// 51a. audit log: two lines per run, who asked, and a readable pairing
+//
+// The trail used to be one line written AFTER the process exited, with no
+// attribution -- so a command killed mid-run left no record at all, and a line
+// could not be tied to the turn that asked for it. These assertions are the
+// contract the Config -> TRACE -> EXEC view and the per-agent drawer read: a
+// start line exists before the run, an end line closes it, both carry the same
+// run id and the asking agent, and the pair parses back into one finished run.
+$execLogPath = Sandbox::appDir() . '/storage/exec.log';
+clearstatcache(true, $execLogPath);
+$logBefore = is_file($execLogPath) ? (int)@filesize($execLogPath) : 0;
+
+// A builtin (`echo`, `pwd`, `dir`) is handled in PHP and never spawned, so it
+// writes ONE end line, tagged kind=builtin. The two-phase pair this test is
+// about needs a command that really starts a process, and which of those exist
+// depends on the machine -- so the first one that runs wins.
+$audited = null;
+foreach (['hostname', 'sha256sum', 'date', 'grep'] as $probe) {
+    $try = Sandbox::execCommand([$probe], ['cwd' => $writeDir, 'agent' => 'agent_audit_probe']);
+    if (($try['exit'] ?? null) === 0) { $audited = $try; break; }
+}
+if ($audited === null) {
+    echo "  SKIP: no spawnable allowlisted command (audit)\n";
+} else {
+    clearstatcache(true, $execLogPath);
+    $tail = is_file($execLogPath)
+        ? (string)@file_get_contents($execLogPath, false, null, $logBefore)
+        : '';
+    $lines = array_values(array_filter(preg_split('/\r?\n/', $tail) ?: [], fn($l) => trim($l) !== ''));
+    $count = count($lines);
+    $startLine = $count >= 2 ? $lines[$count - 2] : '';
+    $endLine = $count >= 2 ? $lines[$count - 1] : '';
+    ok($count >= 2, 'audit: a spawned run writes a start line and an end line');
+    ok(strpos($startLine, 'phase=start') !== false, 'audit: the run begins with a start line');
+    ok(strpos($endLine, 'phase=end') !== false, 'audit: the run closes with an end line');
+    ok(strpos($startLine, 'agent=agent_audit_probe') !== false, 'audit: the start line names the agent');
+    ok(strpos($endLine, 'agent=agent_audit_probe') !== false, 'audit: the end line names the agent');
+    ok(strpos($endLine, 'kind=exec') !== false, 'audit: a spawned run is kind=exec');
+    ok(preg_match('/run=(\S+)/', $startLine, $m1) === 1
+        && preg_match('/run=(\S+)/', $endLine, $m2) === 1
+        && $m1[1] === $m2[1] && $m1[1] !== '-',
+        'audit: both halves share one run id');
+    // The start line is the whole reason this exists: it is written before the
+    // spawn, so it cannot know an exit code yet.
+    ok(preg_match('/phase=start .*exit=-/', $startLine) === 1,
+        'audit: the start line has no exit code yet');
+    ok(strpos($endLine, 'exit=0') !== false, 'audit: the end line records the exit code');
+
+    $runs = Sandbox::readExecLog(20, 'agent_audit_probe');
+    $first = $runs['entries'][0] ?? null;
+    ok(is_array($first), 'audit: readExecLog returns the run');
+    ok(($first['finished'] ?? false) === true, 'audit: the pair parses as one finished run');
+    ok(($first['exit'] ?? null) === 0, 'audit: the parsed run keeps its exit code');
+    ok(($first['agent'] ?? '') === 'agent_audit_probe', 'audit: the parsed run is attributed');
+    ok(strpos((string)($first['command'] ?? ''), 'probe') === false
+        && ($first['command'] ?? '') !== '', 'audit: the parsed run keeps the command');
+    ok(is_int($first['ms'] ?? null), 'audit: the parsed run has a duration');
+    ok(($first['startedAt'] ?? 0) > 0 && ($first['endedAt'] ?? 0) >= ($first['startedAt'] ?? 0),
+        'audit: both timestamps parse');
+}
+
+// Filtering is what the per-agent drawer is built on: no match means an empty
+// list, never the whole log.
+$others = Sandbox::readExecLog(20, 'agent_that_never_ran');
+ok(($others['entries'] ?? null) === [], 'audit: filtering by an unknown agent returns nothing');
+
+// run_code had no audit call at all. It must be recorded too, as kind=code.
+try {
+    clearstatcache(true, $execLogPath);
+    $logBeforeCode = (int)@filesize($execLogPath);
+    Sandbox::runCode('python', 'print(1)', [
+        'cwd' => $writeDir, 'root' => $writeDir, 'agent' => 'agent_audit_code',
+    ]);
+    $tailCode = (string)@file_get_contents($execLogPath, false, null, $logBeforeCode);
+    ok(strpos($tailCode, 'kind=code') !== false, 'audit: run_code is audited as kind=code');
+    ok(strpos($tailCode, 'agent=agent_audit_code') !== false, 'audit: run_code is attributed');
+    $codeRuns = Sandbox::readExecLog(20, 'agent_audit_code');
+    ok(($codeRuns['entries'][0]['finished'] ?? false) === true, 'audit: the run_code pair closes');
+} catch (\RuntimeException $e) {
+    echo "  SKIP: python not installed (run_code audit)\n";
+}
+
+// Put the operator's log back the way it was. These are test runs, not work,
+// and the trail is meant to be read as history rather than as test output.
+if (is_file($execLogPath)) {
+    $fh = @fopen($execLogPath, 'r+');
+    if ($fh !== false) {
+        @ftruncate($fh, $logBefore);
+        @fclose($fh);
+    }
+}
+
 // 52. git_commit: stages and commits when git is available
 try {
     Sandbox::gitRun(['init'], $writeDir, $writeDir);

@@ -736,6 +736,15 @@ class Sandbox {
             2 => ['pipe', 'w'],
         ];
         $t0 = microtime(true);
+        // Audited BEFORE the spawn. If this request dies while the command is
+        // still running -- a GUI app that stays open, a force-stopped turn, a
+        // server restart -- this line is already on disk, so the run shows up
+        // as started-and-never-finished instead of leaving no trace at all.
+        $runId = substr(bin2hex(random_bytes(6)), 0, 12);
+        self::audit($program, $argv, $cwd, null, null, [
+            'run' => $runId, 'phase' => 'start', 'kind' => 'exec',
+            'agent' => (string)($opts['agent'] ?? ''),
+        ]);
         $proc = @proc_open($argv, $descriptors, $pipes, $cwd, $env);
         if (!is_resource($proc)) {
             return ['ok' => false, 'exit' => -1, 'stdout' => '',
@@ -802,7 +811,10 @@ class Sandbox {
         if (strlen($stderr) > 65536) { $stderr = substr($stderr, 0, 65536); }
 
         $ms = (int)round((microtime(true) - $t0) * 1000);
-        self::audit($program, $argv, $cwd, $exit, $ms);
+        self::audit($program, $argv, $cwd, $exit, $ms, [
+            'run' => $runId, 'phase' => 'end', 'kind' => 'exec',
+            'agent' => (string)($opts['agent'] ?? ''), 'timeout' => $timedOut,
+        ]);
 
         return [
             'ok' => ($exit === 0 && !$timedOut),
@@ -1440,7 +1452,13 @@ class Sandbox {
         }
         if (strlen($stderr) > 65536) { $stderr = substr($stderr, 0, 65536); }
         $ms = (int)round((microtime(true) - $t0) * 1000);
-        self::audit($program, $argv, $cwd, $exit, $ms);
+        // Handled internally, never spawned -- still one audited run, tagged so
+        // the log does not imply a process was started for `dir` or `echo`.
+        self::audit($program, $argv, $cwd, $exit, $ms, [
+            'run' => substr(bin2hex(random_bytes(6)), 0, 12),
+            'phase' => 'end', 'kind' => 'builtin',
+            'agent' => (string)($opts['agent'] ?? ''),
+        ]);
         return [
             'ok' => $exit === 0,
             'exit' => $exit,
@@ -1721,20 +1739,188 @@ class Sandbox {
         return [$out, $err, $exit];
     }
 
-    /** Append one line per run to storage/exec.log. */
-    private static function audit($program, $argv, $cwd, $exit, $ms) {
+    /**
+     * Append one audit line to storage/exec.log.
+     *
+     * Two lines per run: `phase=start` BEFORE the process is spawned, and
+     * `phase=end` once it has been reaped. The start line is the whole point --
+     * the end line can only be written after the wait, so a request killed
+     * mid-command (the operator force-stops, the server restarts, a GUI app
+     * stays open) used to leave no record at all. A run that never reported back
+     * is now visible as a start with no end, which is the question "did
+     * anything actually run?" needs answered.
+     *
+     * `run` joins the pair, `agent` says who asked for it, and `kind` separates
+     * the command allowlist from the code interpreter. Older one-line records
+     * (ts exit=.. ms=.. cwd=.. :: prog args) still parse -- see readExecLog() --
+     * so the existing log stays readable.
+     */
+    private static function audit($program, $argv, $cwd, $exit, $ms, array $meta = []) {
         try {
             $dir = self::appDir() . '/storage';
             if (!is_dir($dir)) { return; }
             $safe = implode(' ', array_map(function ($a) {
                 return preg_match('/^[\w\.\/:=-]+$/', $a) ? $a : escapeshellarg($a);
             }, array_slice($argv, 0, 12)));
-            $line = sprintf("%s exit=%d ms=%d cwd=%s :: %s %s\n",
-                gmdate('Y-m-d\TH:i:sZ'), $exit, $ms, $cwd, $program, $safe);
+            $line = sprintf(
+                "%s run=%s phase=%s kind=%s agent=%s exit=%s ms=%s timeout=%s cwd=%s :: %s %s\n",
+                gmdate('Y-m-d\TH:i:sZ'),
+                (string)($meta['run'] ?? '-'),
+                (string)($meta['phase'] ?? 'end'),
+                (string)($meta['kind'] ?? 'exec'),
+                (string)($meta['agent'] ?? '-'),
+                $exit === null ? '-' : (string)(int)$exit,
+                $ms === null ? '-' : (string)(int)$ms,
+                empty($meta['timeout']) ? '0' : '1',
+                $cwd,
+                $program,
+                $safe
+            );
             file_put_contents($dir . '/exec.log', $line, FILE_APPEND | LOCK_EX);
         } catch (\Throwable $e) {
             // Auditing must never be the reason a command fails to run.
         }
+    }
+
+    /**
+     * Tail storage/exec.log and turn it into runs, newest first.
+     *
+     * Read-only and bounded: only the last chunk of the file is read and only
+     * the last `$limit` lines are parsed, so a large log cannot be dragged into
+     * a request. Start and end lines are paired by their `run` id; a start with
+     * no end comes back as `finished: false`, which is the case worth seeing.
+     */
+    public static function readExecLog($limit = 300, $agent = '') {
+        $limit = max(1, min(1000, (int)$limit));
+        $path = self::appDir() . '/storage/exec.log';
+        $out = ['entries' => [], 'path' => 'storage/exec.log', 'size' => 0, 'truncated' => false];
+        if (!is_file($path)) { return $out; }
+
+        $size = (int)@filesize($path);
+        $out['size'] = $size;
+        $fh = @fopen($path, 'rb');
+        if ($fh === false) { return $out; }
+        $chunk = 262144;
+        $from = max(0, $size - $chunk);
+        @fseek($fh, $from);
+        $raw = (string)@stream_get_contents($fh);
+        @fclose($fh);
+
+        // A chunk boundary can slice a line in half; the partial first line is
+        // dropped rather than parsed into nonsense.
+        if ($from > 0) {
+            $nl = strpos($raw, "\n");
+            $raw = $nl === false ? '' : substr($raw, $nl + 1);
+            $out['truncated'] = true;
+        }
+
+        $lines = preg_split('/\r?\n/', $raw) ?: [];
+        $lines = array_values(array_filter($lines, function ($l) { return trim($l) !== ''; }));
+        $lines = array_slice($lines, -$limit);
+
+        $runs = [];
+        $synthetic = 0;
+        foreach ($lines as $line) {
+            $e = self::parseAuditLine($line);
+            if ($e === null) { continue; }
+            $key = $e['run'] !== '-' ? $e['run'] : 'legacy-' . (++$synthetic);
+            if (!isset($runs[$key])) {
+                $runs[$key] = [
+                    'id' => $key,
+                    'startedAt' => null,
+                    'endedAt' => null,
+                    'finished' => false,
+                    'kind' => $e['kind'],
+                    'agent' => $e['agent'],
+                    'command' => $e['command'],
+                    'cwd' => $e['cwd'],
+                    'exit' => null,
+                    'ms' => null,
+                    'timeout' => false,
+                ];
+            }
+            $r =& $runs[$key];
+            if ($e['phase'] === 'start') {
+                $r['startedAt'] = $e['ts'];
+            } else {
+                $r['endedAt'] = $e['ts'];
+                $r['finished'] = true;
+                $r['exit'] = $e['exit'] === '-' ? null : (int)$e['exit'];
+                $r['ms'] = $e['ms'] === '-' ? null : (int)$e['ms'];
+                $r['timeout'] = $e['timeout'] === '1';
+            }
+            // Both halves carry the same command; the later one wins so the
+            // resolved program path from the end line replaces the raw name.
+            if ($e['command'] !== '') { $r['command'] = $e['command']; }
+            if ($e['cwd'] !== '') { $r['cwd'] = $e['cwd']; }
+            if ($e['agent'] !== '-') { $r['agent'] = $e['agent']; }
+            unset($r);
+        }
+
+        $entries = array_values($runs);
+        if ($agent !== '') {
+            $want = (string)$agent;
+            $entries = array_values(array_filter($entries, function ($e) use ($want) {
+                return $e['agent'] === $want;
+            }));
+        }
+        usort($entries, function ($a, $b) {
+            return ($b['endedAt'] ?: $b['startedAt'] ?: 0) <=> ($a['endedAt'] ?: $a['startedAt'] ?: 0);
+        });
+        $out['entries'] = array_slice($entries, 0, $limit);
+        return $out;
+    }
+
+    /** One parsed audit line, or null when it is not one. Both shapes. */
+    private static function parseAuditLine($line) {
+        $line = rtrim((string)$line, "\r\n");
+        $new = '/^(\S+)\s+run=(\S+)\s+phase=(\S+)\s+kind=(\S+)\s+agent=(\S+)\s+exit=(\S+)\s+ms=(\S+)\s+timeout=(\S+)\s+cwd=(.*?)\s+::\s*(.*)$/';
+        if (preg_match($new, $line, $m)) {
+            return [
+                'ts' => self::auditTime($m[1]),
+                'run' => $m[2],
+                'phase' => $m[3],
+                'kind' => $m[4],
+                'agent' => $m[5],
+                'exit' => $m[6],
+                'ms' => $m[7],
+                'timeout' => $m[8],
+                'cwd' => $m[9],
+                'command' => $m[10],
+            ];
+        }
+        // Older lines: written after the process exited, so they are a finished
+        // run with no start half and no agent attribution.
+        $old = '/^(\S+)\s+exit=(-?\d+)\s+ms=(\d+)\s+cwd=(.*?)\s+::\s*(.*)$/';
+        if (preg_match($old, $line, $m)) {
+            return [
+                'ts' => self::auditTime($m[1]),
+                'run' => '-',
+                'phase' => 'end',
+                'kind' => 'exec',
+                'agent' => '-',
+                'exit' => $m[2],
+                'ms' => $m[3],
+                'timeout' => '0',
+                'cwd' => $m[4],
+                'command' => $m[5],
+            ];
+        }
+        return null;
+    }
+
+    /**
+     * Epoch seconds from the log's UTC stamp; 0 when it cannot be read.
+     *
+     * `gmdate('Y-m-d\TH:i:sZ')` ends with the numeric UTC offset ("0"), NOT a
+     * literal Z -- so the stamp reads `2026-10-27T04:12:250`. The first 19
+     * characters are the real ISO stamp; everything after them is that offset.
+     * Both the old and new line shapes use it, so this is the only reader.
+     */
+    private static function auditTime($stamp) {
+        $iso = substr(trim((string)$stamp), 0, 19);
+        $dt = \DateTime::createFromFormat('Y-m-d\TH:i:s', $iso, new \DateTimeZone('UTC'));
+        return $dt === false ? 0 : $dt->getTimestamp();
     }
 
     /** Which commands this install would permit. Safe to show in the UI. */
@@ -2554,11 +2740,23 @@ class Sandbox {
         $timeout = max(5, min(600, (int)($opts['timeout'] ?? $cfg['code_timeout'])));
         $maxBytes = (int)($opts['max_bytes'] ?? $cfg['exec_max_bytes']);
         $t0 = microtime(true);
+        // The interpreter path was never audited at all, which is how a snippet
+        // could launch something and leave `exec.log` with no record of it. Same
+        // two-phase treatment as exec: start before the spawn, end after it.
+        $runId = substr(bin2hex(random_bytes(6)), 0, 12);
+        self::audit($interp, [$tmp], $cwd, null, null, [
+            'run' => $runId, 'phase' => 'start', 'kind' => 'code',
+            'agent' => (string)($opts['agent'] ?? ''),
+        ]);
         try {
             $run = self::procRun([$program, $tmp], $cwd, $env, $timeout, $maxBytes);
         } finally {
             @unlink($tmp);
         }
+        self::audit($interp, [$tmp], $cwd, $run['exit'], (int)round((microtime(true) - $t0) * 1000), [
+            'run' => $runId, 'phase' => 'end', 'kind' => 'code',
+            'agent' => (string)($opts['agent'] ?? ''), 'timeout' => !empty($run['timed_out']),
+        ]);
         return [
             'language' => $interp,
             'exit' => $run['exit'],
