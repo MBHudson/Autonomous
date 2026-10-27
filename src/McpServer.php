@@ -527,7 +527,7 @@ class McpServer {
      */
     private static function audit($token, $tool, $args, $ok, $err = '', $result = '') {
         try {
-            $dir = self::appDirSafe() . '/storage';
+            $dir = Sandbox::logDir();
             if (!is_dir($dir)) { return; }
             $entry = [
                 'at' => date('c'),
@@ -566,7 +566,7 @@ class McpServer {
      */
     public static function activity($limit = 80) {
         try {
-            $path = self::appDirSafe() . '/storage/mcp.log';
+            $path = Sandbox::logDir() . '/mcp.log';
             if (!is_file($path)) { return []; }
             $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             if (!is_array($lines)) { return []; }
@@ -579,10 +579,5 @@ class McpServer {
             }
             return $out;
         } catch (\Throwable $e) { return []; }
-    }
-
-    private static function appDirSafe() {
-        $dir = realpath(__DIR__ . '/..');
-        return $dir === false ? '' : rtrim(str_replace('\\', '/', $dir), '/');
     }
 }

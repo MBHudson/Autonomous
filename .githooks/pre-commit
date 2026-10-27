@@ -12,11 +12,13 @@
 # commit will contain. Checking the working tree instead would test a half-staged
 # commit as if it were whole.
 #
-# It takes about 40 seconds, which is what the check costs: 39-42s measured
-# over five runs on a warm machine. An earlier note here said "about two
-# minutes", which is three times the price and enough to make a reader turn the
-# hook off. A cold machine, or a virus scanner reading 280 fresh files, is
-# slower -- the copy is real work, not a delay. `git commit
+# It takes about 17 seconds, which is what the check costs: 16.8-17.5s measured
+# over six runs on a warm machine. An earlier note here said "about two
+# minutes", which is seven times the price and enough to make a reader turn the
+# hook off; it then said 40 seconds, which was true until the PHP suite started
+# running its files at the same time -- that work was real, it was just being
+# waited on one file at a time. A cold machine, or a virus scanner reading 281
+# fresh files, is slower -- the copy is real work, not a delay. `git commit
 # --no-verify` skips it once; the copy is kept when a suite fails, so the failure
 # can be looked at where it happened.
 #
@@ -73,7 +75,7 @@ if [ -z "$php_bin" ]; then
 fi
 
 echo "pre-commit: both suites, in a fresh copy of the staged tree"
-echo "            about 40 seconds -- git commit --no-verify skips this"
+echo "            about 17 seconds -- git commit --no-verify skips this"
 echo ""
 
 # Timed so the printed figure is the measured one, not the estimate above. Kept
