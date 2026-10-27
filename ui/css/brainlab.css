@@ -1263,6 +1263,21 @@
 
 .bl-sandbox-actions .btn { flex: 1; }
 
+/* "Add a sandbox": the path box and its button share one row, and the input
+   takes the slack so the button keeps its real width on a phone. */
+.bl-addroot {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.bl-addroot .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.bl-addroot .btn { flex: 0 0 auto; }
+
 /* ------------------------------------------------------------ phone */
 
 @media (max-width: 820px) {

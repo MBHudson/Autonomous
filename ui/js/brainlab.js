@@ -6,19 +6,20 @@
  * BryceFromIndiana@gmail.com
  */
 
-import { store } from './store.js?v=348';
-import { persistence } from './persistence.js?v=348';
-import { esc, escAttr, agentCode } from './utils.js?v=348';
-import * as memory from './memory.js?v=348';
+import { store } from './store.js?v=349';
+import { persistence } from './persistence.js?v=349';
+import { esc, escAttr, agentCode } from './utils.js?v=349';
+import { api } from './api.js?v=349';
+import * as memory from './memory.js?v=349';
 import {
   profiles, newProfileId, alwaysAppendFor,
   settingFor, isLocked, lockSetting, unlockSetting, setSetting, sandboxRootFor,
-} from './agentConfig.js?v=348';
+} from './agentConfig.js?v=349';
 import {
   customToolDefs, defaultTools, loadCustomTools, validateCustomTool,
-} from './tools.js?v=348';
-import { SandboxFiles } from './sandboxFiles.js?v=348';
-import { TOOL_PROTOCOLS, toolProtocolFor, protocolLabel, protocolHint, harnessFor } from './toolProtocol.js?v=348';
+} from './tools.js?v=349';
+import { SandboxFiles } from './sandboxFiles.js?v=349';
+import { TOOL_PROTOCOLS, toolProtocolFor, protocolLabel, protocolHint, harnessFor } from './toolProtocol.js?v=349';
 
 const ZOOM_KEY = 'als.brainLab.zoom.v1';
 const ZOOM_STEPS = [130, 160, 190, 225, 270, 320];
@@ -295,6 +296,74 @@ export class BrainLab {
     }
     if (this.apiLab?.open && this.apiLab.placement === 'brainlab') this.apiLab.close();
     this.sandboxFiles.show(this.selectedId);
+  }
+
+  /**
+   * Add a folder to the sandbox from here, then hand it to the open agent.
+   *
+   * The jail is enforced server-side, so a root an agent can pick has to be in
+   * storage/config.json -> sandbox. Adding one therefore appends to those SAME
+   * global lists that Config -> Sandbox edits (no second, parallel list to keep
+   * in sync), and then re-reads them: that re-read is what makes the folder show
+   * up in the picker above and in every other agent's picker. Assigning is still
+   * per agent, as before.
+   */
+  async _addSandboxRoot() {
+    const input = this.rail.querySelector('#blSandboxNew');
+    const typed = String(input?.value || '').trim();
+    if (!typed) {
+      store.emit('toast', { message: 'Type a folder path first', type: 'error' });
+      input?.focus();
+      return;
+    }
+    const btn = this.rail.querySelector('[data-bl-act="sandbox-add"]');
+    if (btn?.disabled) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'ADDING…'; }
+    try {
+      // Seed from the EFFECTIVE roots, not just what is stored: a fresh install
+      // has no sandbox block at all and is running on the app-directory default.
+      // Writing only the new path would silently drop that default.
+      const status = await api.getSandboxStatus();
+      const read = new Set(status.read_roots || []);
+      const write = new Set(status.write_roots || []);
+      read.add(typed);
+      write.add(typed);
+      const cfg = await api.getConfig();
+      await api.saveConfig({
+        ...cfg,
+        sandbox: { ...(cfg.sandbox || {}), read_roots: [...read], write_roots: [...write] },
+      });
+      await this.sandboxFiles?.prefetch();
+
+      // The server realpaths every root and drops anything that is not an
+      // existing folder, so "saved" and "usable" are different questions.
+      // Answer the second one instead of claiming success on the first.
+      const fold = (p) => String(p || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      const found = (this.sandboxFiles?.roots || []).find(r => fold(r.path) === fold(typed));
+      if (!found) {
+        // Deliberately no re-render: the rail is not redrawn, so what was typed
+        // stays in the box to be corrected instead of vanishing.
+        store.emit('toast', {
+          message: `\"${typed}\" was saved but the server did not accept it: it has to be a folder that exists on the machine running the app.`,
+          type: 'error', duration: 9000,
+        });
+        return;
+      }
+
+      // Point the agent being edited at it — that is the reason to add a jail
+      // from here rather than walking over to Config.
+      this._updateAgent(agent => { agent.sandboxRoot = found.path; });
+      this.render();
+      store.emit('toast', {
+        message: `${found.path} added${found.write ? '' : ' (read only)'} and assigned to this agent`,
+        type: 'success',
+      });
+    } catch (err) {
+      store.emit('toast', { message: `Could not add sandbox: ${err.message}`, type: 'error' });
+    } finally {
+      const b = this.rail.querySelector('[data-bl-act="sandbox-add"]');
+      if (b) { b.disabled = false; b.textContent = 'ADD'; }
+    }
   }
 
   _openApiLab() {
@@ -591,6 +660,15 @@ export class BrainLab {
           <select class="form-select" data-bl-field="sandboxRoot">${rootOpts}</select>
           <div class="form-hint" title="${escAttr(effectiveRoot)}">${esc(effectiveRoot || 'No sandbox root configured.')}</div>
         </div>
+        <div class="form-group">
+          <label class="form-label">Add a sandbox</label>
+          <div class="bl-addroot">
+            <input class="form-input" id="blSandboxNew" spellcheck="false" autocomplete="off"
+              placeholder="C:\\work\\project or /var/www/site">
+            <button class="btn btn-ghost" data-bl-act="sandbox-add">ADD</button>
+          </div>
+          <div class="form-hint">Adds the folder to the picker above, for this agent and every other one. It joins the same list Config &rarr; Sandbox edits, so it is still one allowlist &mdash; just editable from here. The folder has to already exist on the machine running the app.</div>
+        </div>
         <div class="bl-sandbox-actions">
           <button class="btn btn-ghost" data-bl-act="sandbox-open">OPEN FILES</button>
           <button class="btn btn-ghost" data-bl-act="sandbox-all">USE FOR ALL</button>
@@ -598,7 +676,7 @@ export class BrainLab {
         <div class="form-hint">This is the root for read_file, list_dir, glob_files, grep_code and write_file, and the working directory for exec. The server still enforces the global allowlist.</div>
         <div class="form-hint">${sandboxRoots.length > 1
           ? 'Assign a different root to each agent; the file manager follows the selected card.'
-          : 'Add more paths under Config &rarr; Sandbox to give agents separate jails.'}</div>
+          : 'Add a second folder above (or under Config &rarr; Sandbox) to give agents separate jails.'}</div>
       `)}
 
       ${this._sec('memory', 'Memory', {
@@ -927,6 +1005,7 @@ export class BrainLab {
     if (action === 'notes') { this._toggleNotes(); return; }
     if (action === 'sandbox-open') { this._openSandbox(); return; }
     if (action === 'sandbox-all') { this.sandboxFiles?._useForAll(); return; }
+    if (action === 'sandbox-add') { this._addSandboxRoot(); return; }
     if (action === 'delete-agent') {
       const agent = this._agent();
       if (!agent) return;
