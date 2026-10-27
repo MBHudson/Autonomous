@@ -643,16 +643,45 @@ class Install
      */
     private static function phpCli()
     {
+        $isWin = DIRECTORY_SEPARATOR === '\\';
+        $exe = $isWin ? 'php.exe' : 'php';
         $candidates = array();
+
         if (PHP_SAPI === 'cli' && defined('PHP_BINARY')) {
-            $candidates[] = PHP_BINARY;
+            $candidates[] = PHP_BINARY;                       // already the CLI
         }
         if (defined('PHP_BINDIR')) {
-            $candidates[] = rtrim(str_replace('\\', '/', PHP_BINDIR), '/')
-                . (DIRECTORY_SEPARATOR === '\\' ? '/php.exe' : '/php');
+            $candidates[] = rtrim(str_replace('\\', '/', PHP_BINDIR), '/') . '/' . $exe;
         }
+
+        // XAMPP (and every layout where the CLI does not sit at PHP_BINDIR):
+        // PHP_BINARY is apache/bin/httpd.exe and PHP_BINDIR is the COMPILE-TIME
+        // prefix, which on XAMPP is C:\php — a directory that does not exist.
+        // The CLI is a sibling of the apache folder, two levels up.
+        if (defined('PHP_BINARY')) {
+            $binDir = str_replace('\\', '/', dirname(PHP_BINARY));
+            $candidates[] = $binDir . '/' . $exe;                 // bundled beside it
+            $candidates[] = $binDir . '/../../php/' . $exe;       // xampp/apache/bin -> xampp/php
+            $candidates[] = $binDir . '/../php/' . $exe;
+        }
+
+        // Last resort: ask the OS. Harmless when exec is disabled — the spawn
+        // is impossible on such a host anyway, and the caller says so.
+        if (function_exists('exec')) {
+            $out = array();
+            $code = 1;
+            @exec(($isWin ? 'where php' : 'which php') . ' 2>&1', $out, $code);
+            if ($code === 0 && !empty($out[0])) {
+                $candidates[] = trim((string) $out[0]);
+            }
+        }
+
         foreach ($candidates as $candidate) {
-            if (is_string($candidate) && $candidate !== '' && @is_file($candidate)) {
+            if (!is_string($candidate) || $candidate === '') {
+                continue;
+            }
+            $candidate = str_replace('\\', '/', $candidate);
+            if (preg_match('#/php(\.exe)?$#i', $candidate) && @is_file($candidate)) {
                 return $candidate;
             }
         }

@@ -17,6 +17,26 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧭 Finding the PHP CLI on a host that lies about where it is *(PHP — `VERSION` 356, no cache-buster bump)*
+
+**`PHP_BINDIR` is a compile-time prefix, not where XAMPP put PHP.** On the
+install this was tested against it is `C:\php` — a directory that does not
+exist — while the CLI lives at `C:\xampp\php\php.exe` and `PHP_BINARY` points at
+`httpd.exe`. So `phpCli()` found nothing, the finisher was never started, and an
+install left `api/.router-new-index.php` waiting with `could not start the
+finisher automatically` in the journal: correct, honest, and no use to anybody.
+
+The candidates now include the layouts hosts actually have — the CLI beside the
+binary, `apache/bin/../../php/php.exe` (XAMPP), `../php`, `PHP_BINDIR`, then a
+`where php` / `which php` lookup — each accepted only if it is a real file whose
+name is `php`/`php.exe`.
+
+**Verified end to end against Apache with a real download.** A copy at v350,
+whose `api/index.php` differed from the release: 208 files backed up, **120
+replaced**, the entry script deferred and swapped in **one second later** by the
+generated finisher, the finisher deleted itself, `/` and `/api/update` still 200,
+`/storage/config.json` still **403**, and `storage/` untouched throughout.
+
 ## 🩹 The installer survives being installed *(PHP + UI — `VERSION` 355, cache-buster v352 → v353)*
 
 **The first real run of v354's installer ate `api/index.php`.** Two faults, both
