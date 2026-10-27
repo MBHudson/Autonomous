@@ -77,18 +77,11 @@ function denied($base, $path, $label, $leak, &$pass, &$fail, &$errors)
     ok(stripos($body, $leak) === false, $label . ' leaks no content', $pass, $fail, $errors);
 }
 
-/** A port nobody is using right now. */
-function free_port()
-{
-    $sock = @stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
-    if (!$sock) {
-        return 0;
-    }
-    $name = stream_socket_get_name($sock, false);
-    fclose($sock);
-    $pos = strrpos($name, ':');
-    return $pos === false ? 0 : (int) substr($name, $pos + 1);
-}
+// A port for this file's own server, shared with the other files that start
+// one. Not "any port the OS will give me" any more -- see free-port.php: with
+// the suite running its files at the same time, two files asking that question
+// in the same moment is exactly how they end up on the same port.
+require_once __DIR__ . '/free-port.php';
 
 /**
  * The Apache binary: ROUTER_HTTPD, the usual XAMPP spots, then PATH.

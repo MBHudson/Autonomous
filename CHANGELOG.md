@@ -17,6 +17,102 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## ⚡ Fourteen test files, four at a time: the fresh-copy check drops from 41 seconds to 17 *(tests only — `VERSION` 360 and the cache-buster are unchanged)*
+
+*2026-10-27. The suite that checks the app, not the app: no runtime file changed except two inert seams, and no
+version or cache-buster moved.*
+
+**How it turned up.** Not from anyone complaining about the suite: from the phase breakdown and the per-file
+timings added in the entry below, which put **26 of the PHP half's 39.4s in two files** (`programs.test.php`
+~14s, `setupToken.test.php` ~13s) and showed that the servers everyone suspected of being the cost were about two
+seconds *between them*. That same measurement produced the note the entry below ends on — the next lever is a
+parallel runner, deliberately **not** taken, because "several files bind loopback ports and two of them write
+`storage/exec.log`". This entry is that deferral being taken, and that one sentence turned out to be the complete
+list of what had to be fixed first.
+
+**Finding the hazards, rather than trusting the note.** Two greps over `tests/php` — who starts a server, and who
+writes the install's `storage/` — turned the sentence into a list of three and a list of two: three files carried
+their own copy of the same port helper (`guards`, `apacheGuards`, `secrets`), and two files wrote `exec.log`
+(`programs.test.php` and `sandbox.test.php`), each of them remembering its size on entry and truncating it back on
+the way out. Nothing else in the suite touches either one: the other `proc_open` callers speak stdio (the MCP
+mock), run the recovery script, or spawn nothing at all, and no test binds a fixed port number anywhere. So the
+hazard list in that note was accurate and also complete — which is the only reason the rest of this could be
+mechanical.
+
+**The suite was never slow because of its work. It was slow because it waited.** Fourteen files, each its own
+process, run one after another: 39.4s of PHP, of which two files were 26s while twelve others sat runnable
+behind them. They now run **four at a time** (`--jobs N`, and `--jobs 1` for the old behaviour), and the PHP
+half is what the slowest single file costs: **15.4–16.1s**, measured over six full fresh-copy checks that
+came in at **16.8–17.5s** end to end — each of them green, with the same `840 assertions, 5 skipped` and the
+same `296 assertions` in JS. The whole check went 41.0s → 16.8–17.5s, and nothing was weakened to get there:
+the same fourteen files ran the same assertions from the same fixtures.
+
+**Two hazards had to be designed away first, and both were real rather than theoretical.** The note in this
+file below said the parallel runner was deliberately not taken because "several files bind loopback ports and
+two of them write `storage/exec.log`", and that was indeed the whole reason:
+
+- **The port each server binds.** All three files that start one (guards, apacheGuards, secrets) carried their
+own copy of the same helper: ask the OS for `tcp://127.0.0.1:0`, read the number, close the socket, then
+start a server on it. Serially that is correct and always was, because there is only ever one server. The
+instant two files run at once it is a race by construction: the number goes back in the pool the moment the
+socket closes, so both files can be handed the same one — and one of them is then binding an occupied port
+or, worse, sending requests to **the other file's server**. There is now one helper,
+[tests/php/free-port.php](tests/php/free-port.php), and it does not ask for any free port: the walk starts at
+`21000 + pid % 4000`, below the OS's own ephemeral range, and takes the first port that binds, so two files
+in the same run start from different numbers. It cannot make the handover atomic — nothing can — so every
+caller keeps the retry loop it already had.
+- **The log each file writes.** `exec.log` (Sandbox) and `mcp.log` (McpServer) are appends in the install's
+`storage/`, and two files write each. The dangerous one is `exec.log`: `programs.test.php` and
+`sandbox.test.php` each remember its size on entry and **truncate it back on the way out**, which is tidy when
+you are the only writer and is a deletion of another file's lines the moment you are not — while that other
+file is part-way through reading its own audit lines back. `Sandbox::logDir()` now honours `ROUTER_LOG_DIR`,
+and the runner sets it to a directory per file, so a file's trace is its own. The two tests ask the code for
+the path (`Sandbox::execLogPath()`) rather than rebuilding `dirname(__DIR__, 2) . '/storage/exec.log'`
+themselves, which is how they would otherwise have gone on asserting against a file nobody was writing.
+
+**Why this is a security change and not only a fast one.** `storage/exec.log` is the audit trail — the two-phase
+`run=… phase=start|end` record the README's **§22** rests on, and the answer to *"did anything actually run?"*.
+Running the test suite used to write into that trail and then **truncate it back to the size it found**, and two
+files doing that at the same time means each can delete the other's lines while that other file is reading them
+back. A test run could therefore be mistaken for real commands, and a real record could be lost under one. The
+suite now writes its trace to a directory of its own, and `ROUTER_LOG_DIR` — read from the **process
+environment**, so no request, header, query string or model can set it — is what points it there. The port half is
+the same story in miniature: every server the suite starts is bound to **`127.0.0.1`** only (the generated Apache
+config is `Listen 127.0.0.1`), and the walk now stays in 21000–25200, below the OS's own ephemeral range, so a
+test can no longer be handed a port another process on the machine is using — or end up talking to another file's
+server. Full account in the README's security section, **§23**.
+
+**The runner does the rest.** `proc_open` replaces the `exec()` it used to call, because the children have to
+overlap — and its array form, because on Windows a string command line is handed to `cmd.exe`, which would
+read a path's own characters as its grammar. Both streams are opened in **append** mode on the same file: two
+descriptors from zero, one `w` and one `a`, would leave the second stream overwriting the first's bytes
+rather than joining them. Output is buffered per file and printed **in file-name order** as soon as the head
+of that order is known, so a concurrent run reads exactly like a serial one, failures included. Which file is
+*started* next is a different question, and there the longest files go first (line count as a poor but free
+stand-in for runtime), which is what keeps `programs` and `setupToken` from being the last two to begin. A
+failing run keeps its directory of per-file logs and prints where it is, because the one thing the printed
+output cannot carry is the other files' logs.
+
+**What was checked rather than assumed.** Six consecutive parallel runs, plus `--jobs 8` and `--jobs 2`, all
+green with identical counts (15.1–18.2s); `--jobs 0` and an unknown argument exit 2 with a message instead of
+silently running four-wide. The port fix was seen working rather than inferred: sampling `netstat` during a
+run caught **seven simultaneous listeners, all inside the pid-derived band (22462–24688) and none of them
+repeated**. The log isolation was checked the same way — run by itself with `ROUTER_LOG_DIR` set,
+`sandbox.test.php` writes its 9 audit lines into that directory while the install's `storage/exec.log` is
+byte-identical before and after — which is also the first time the suite has not written the operator's trace
+at all. Six full fresh-copy checks then confirmed the end-to-end figure.
+
+**What is left, honestly.** Concurrency removed the waiting, not the work: `programs.test.php` is still ~13s
+because every look at the process table is a PowerShell start, and `setupToken.test.php` is still ~12.7s
+because it really does run the recovery script 16 times. `--jobs 8` costs the same as `--jobs 4` for exactly
+that reason, and it is why 4 is the default rather than the widest width that fits. The next lever is those
+two files' real invocations, not more parallelism. One thing is deliberately left shared: the operator's
+`storage/exec-approvals.json`, which `mcpServer.test.php` queues one approval into and restores from a backup
+— redirecting it would be tidier, but that file is also what a *running* app writes, so it is a question for
+its own change rather than a passenger on this one.
+
+---
+
 ## 🔐 The keys stopped leaving, and a close can no longer end the wrong program *(`VERSION` 360, cache-buster v359 → v360)*
 
 **Every read route was answering with the secrets it exists to protect.** `GET /api/config` returned
@@ -169,7 +265,8 @@ newly written files plus everything the suites create, and Windows' file scannin
 ~0.8s to run, and ~15 genuine observations of process state at ~0.65s each. The remaining lever is a parallel
 runner, and it is deliberately **not** taken here — several files bind loopback ports and two of them write
 `storage/exec.log`, so concurrency needs those hazards designed away first, and an intermittently failing
-hook is worse than a slow one.
+hook is worse than a slow one. (Taken in the entry at the top of this file: both hazards were designed away
+first, and the check came down to 17s.)
 
 Covered by the new `php tests/php/secrets.test.php` (66 assertions: mask/restore round-trips, the
 friend-token lifecycle, the local-only gate, and the live routes with the real handlers running against a

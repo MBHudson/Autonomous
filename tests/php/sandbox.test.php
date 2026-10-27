@@ -18,6 +18,10 @@
  *
  * Environment:
  *   ROUTER_CONFIG  — set by the harness to a temp config; Config.php reads it.
+ *   ROUTER_LOG_DIR — set by tests/php/run.php to a log directory of this file's
+ *                    own, so the exec trace written and truncated below is not
+ *                    one another file is writing to at the same time. Unset,
+ *                    the trace is the install's storage/exec.log, as before.
  */
 
 // --- bootstrap --------------------------------------------------------
@@ -509,7 +513,7 @@ file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));   // resto
 // contract the Config -> TRACE -> EXEC view and the per-agent drawer read: a
 // start line exists before the run, an end line closes it, both carry the same
 // run id and the asking agent, and the pair parses back into one finished run.
-$execLogPath = Sandbox::appDir() . '/storage/exec.log';
+$execLogPath = Sandbox::execLogPath();
 clearstatcache(true, $execLogPath);
 $logBefore = is_file($execLogPath) ? (int)@filesize($execLogPath) : 0;
 

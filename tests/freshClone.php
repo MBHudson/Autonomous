@@ -50,7 +50,7 @@
  * on the way past whether it passed or failed. The README and the pre-commit
  * hook both quote a figure for this check so a reader can decide whether to pay
  * it: printing the real one is what keeps a quoted number from drifting, which
- * it had (`about two minutes` for a check that runs in 40 seconds).
+ * it had (`about two minutes` for a check that now runs in 17).
  *
  * Exits 0 when both suites pass, 1 otherwise.
  */

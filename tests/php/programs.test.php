@@ -227,7 +227,7 @@ ok(isset(Programs::handle([])['apps']), 'handle() defaults to list');
 if ($runner === '') {
     echo "  SKIP: no long-running program to copy on this host\n";
 } else {
-    $execLogPath = dirname(__DIR__, 2) . '/storage/exec.log';
+    $execLogPath = Sandbox::execLogPath();
     $logBefore = is_file($execLogPath) ? (int)@filesize($execLogPath) : 0;
 
     $opened = Programs::open('sleeper', ['agent' => 'agent_progs_probe']);

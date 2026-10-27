@@ -374,6 +374,28 @@ class Sandbox {
         return $custom ? array_values(array_unique($custom)) : $default;
     }
 
+    /**
+     * Where this install's logs live: storage/, unless a suite run says otherwise.
+     *
+     * ROUTER_LOG_DIR exists for the test runner. exec.log and mcp.log are
+     * appends that every test file writes to, and one of the tests truncates
+     * exec.log back to the size it found it at -- tidy when it is the only
+     * writer, and a deletion of another file's lines the moment two files run
+     * at once. The runner hands each file a directory of its own, which is what
+     * makes a concurrent run unable to have one file's log read as another's.
+     * Unset on any real install, where this is storage/ exactly as it was.
+     */
+    public static function logDir() {
+        $dir = (string) @getenv('ROUTER_LOG_DIR');
+        if ($dir === '') { return self::appDir() . '/storage'; }
+        return rtrim(str_replace('\\', '/', $dir), '/');
+    }
+
+    /** The exec trace: what audit() writes and readExecLog() reads. */
+    public static function execLogPath() {
+        return self::logDir() . '/exec.log';
+    }
+
     /** This app's own directory: the parent of src/, resolved. */
     public static function appDir() {
         $dir = realpath(__DIR__ . '/..');
@@ -1799,7 +1821,7 @@ class Sandbox {
      */
     public static function audit($program, $argv, $cwd, $exit, $ms, array $meta = []) {
         try {
-            $dir = self::appDir() . '/storage';
+            $dir = self::logDir();
             if (!is_dir($dir)) { return; }
             // ONE line per record, which makes a newline a forged record: the
             // agent name arrives in the tool call and an argv element can hold
@@ -1864,7 +1886,7 @@ class Sandbox {
      */
     public static function readExecLog($limit = 300, $agent = '') {
         $limit = max(1, min(1000, (int)$limit));
-        $path = self::appDir() . '/storage/exec.log';
+        $path = self::execLogPath();
         $out = ['entries' => [], 'path' => 'storage/exec.log', 'size' => 0, 'truncated' => false];
         if (!is_file($path)) { return $out; }
 
