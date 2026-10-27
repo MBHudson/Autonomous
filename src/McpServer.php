@@ -85,43 +85,84 @@ class McpServer {
         return $out;
     }
 
-    /** GET shape for the Config UI (operator-only; includes the secrets). */
+    /**
+     * GET shape for the Config UI.
+     *
+     * Friend tokens come back MASKED. A token is a credential a friend holds
+     * and authenticates with (authenticate() compares it with hash_equals), so
+     * serving it back turned the operator-only config route into a copy of the
+     * keys themselves -- and that route is behind the web-token gate, which is
+     * off on a copy running without one. A freshly issued token IS returned in
+     * plaintext, exactly once, by saveConfig's `issued` map: that is the moment
+     * it has to be handed to the friend, and the only one.
+     */
     public static function uiConfig() {
         $c = self::config();
+        $tokens = [];
+        foreach ($c['tokens'] as $t) {
+            $t['token'] = Config::SECRET_MASK;
+            $tokens[] = $t;
+        }
         return [
             'enabled' => $c['enabled'],
             'root' => $c['root'],
             'protect' => $c['protect'] === null ? self::defaultProtect() : $c['protect'],
-            'tokens' => $c['tokens'],
+            'tokens' => $tokens,
             'defaultProtect' => self::defaultProtect(),
         ];
     }
 
-    /** Replace the whole config. Returns the saved shape. */
+    /**
+     * Replace the whole config. Returns the saved shape plus `issued`.
+     *
+     * `issued` maps a token id to the plaintext of a token that was generated
+     * by THIS save (a new friend, or a ROTATE): the one and only time the value
+     * can be handed over. Everything else comes back masked.
+     */
     public static function saveConfig($incoming) {
         if (!is_array($incoming)) { return self::uiConfig(); }
         $cfg = Config::loadConfig();
         if (!is_array($cfg)) { $cfg = []; }
+        $stored = isset($cfg['mcp_server']) && is_array($cfg['mcp_server']) ? $cfg['mcp_server'] : [];
+        $storedTokens = self::normaliseTokens($stored['tokens'] ?? []);
 
         $tokens = [];
-        foreach ((array)($incoming['tokens'] ?? []) as $t) {
+        $issued = [];
+        foreach ((array)($incoming['tokens'] ?? []) as $i => $t) {
             if (!is_array($t)) { continue; }
             $label = trim((string)($t['label'] ?? '')) ?: 'friend';
             $token = trim((string)($t['token'] ?? ''));
-            if ($token === '') { $token = bin2hex(random_bytes(32)); }
+            $isNew = false;
+            if (Config::isMask($token)) {
+                // The row came back through uiConfig(), so the mask means
+                // "unchanged". Resolve it against what is stored -- by id, then
+                // label, then position -- and only if it cannot be resolved
+                // (a hand-edited config, a restore from another machine) issue a
+                // new one rather than storing the mask and locking the friend
+                // out with a token no client could ever match.
+                $found = Config::matchStoredToken($storedTokens, $t, (int)$i);
+                $token = $found !== null ? $found : bin2hex(random_bytes(32));
+                $isNew = $found === null;
+            } elseif ($token === '') {
+                // A new row, or ROTATE: the operator asked for a new secret.
+                $token = bin2hex(random_bytes(32));
+                $isNew = true;
+            }
             $scope = array_values(array_intersect(
                 is_array($t['scope'] ?? null) ? $t['scope'] : [],
                 ['read', 'write', 'exec']
             ));
+            $id = trim((string)($t['id'] ?? '')) ?: ('t_' . substr(md5($label . $token), 0, 8));
             $tokens[] = [
-                'id' => trim((string)($t['id'] ?? '')) ?: ('t_' . substr(md5($label . $token), 0, 8)),
+                'id' => $id,
                 'label' => $label,
                 'token' => $token,
                 'scope' => $scope,
                 'ips' => array_values(array_filter(array_map(
-                    fn($i) => trim((string)$i), (array)($t['ips'] ?? [])
-                ), fn($i) => $i !== '')),
+                    fn($i2) => trim((string)$i2), (array)($t['ips'] ?? [])
+                ), fn($i2) => $i2 !== '')),
             ];
+            if ($isNew) { $issued[$id] = $token; }
         }
 
         $root = trim((string)($incoming['root'] ?? ''));
@@ -138,7 +179,7 @@ class McpServer {
             'tokens' => $tokens,
         ];
         Config::saveConfig($cfg);
-        return self::uiConfig();
+        return self::uiConfig() + ['issued' => $issued];
     }
 
     /**

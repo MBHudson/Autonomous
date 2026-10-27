@@ -17,6 +17,182 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔐 The keys stopped leaving, and a close can no longer end the wrong program *(`VERSION` 360, cache-buster v359 → v360)*
+
+**Every read route was answering with the secrets it exists to protect.** `GET /api/config` returned
+`storage/config.json` verbatim — the access token, every MCP client's `Authorization` header, every friend
+token — and `GET /api/mcp/servers` and `GET /api/mcp-server/config` did the same for their half. Those are
+exactly the values the *other* gates compare against, so one read disclosed the keys to every other door;
+the route sits behind the web-token gate, which a copy running `setup-token.sh --off` does not have.
+
+Reads now **mask** those values (`********`) and the write paths **put them back**. Every panel here reads
+the config, changes one key and posts the whole thing back, so a masked value reaching disk would have wiped
+a credential and shown up only as a server answering 401. Restore matches by identity — a server by its id,
+then its URL, then its command line; a friend by id, then label — and a mask with nothing behind it is
+dropped or reissued, **never stored**. A new or rotated friend token comes back in plaintext **once**, in an
+`issued` map, because that is the only moment it can be handed over; `COPY` on a stored token now says so
+instead of copying eight asterisks.
+
+**With no token set, only this machine is answered.** `setup-token.sh --off` documents itself as safe on "a
+machine nothing else can reach" and nothing enforced it: behind a web server bound to all interfaces, the
+agent-reachable launcher and the config route above were open to the network. A request whose peer address is
+not loopback now gets **403** while `require_token` is off. The MCP RPC route stays exempt — friends on other
+machines are its whole point, and it authenticates with its own per-friend Bearer token.
+
+**`window_close` matches the binary, not its name.** The lookup was `tasklist /FI "IMAGENAME eq …"`, so a
+configured `notepad.exe` was "the same program" as every other copy of that file on the machine — closing
+could end a process the operator never opened. Processes are found by the file they are running from
+(`/proc/<pid>/exe` on Linux, one `Get-CimInstance Win32_Process` query on Windows, `ps` elsewhere, absolute
+paths only) and compared as resolved paths, case-folded on Windows. A host that will not give up a process
+list makes `close` **refuse**, because name matching is the only thing left and that is the bug.
+
+Getting that table is also what exposed a hang in the command runner it uses: `stream_select()` on a pipe from
+`proc_open` **ignores its own timeout on Windows** and waited on the handle, so a script that answers in half a
+second became a request that never answered at all (and `proc_close()` then waited on it for good measure).
+The reader is now a bounded poll loop that cannot outlive its deadline, and the timeout path no longer calls
+`proc_close()` on a process it could not terminate — a bounded reply beats a leaked handle that dies with the
+request.
+
+**A kill reports what actually happened.** `terminate()` returned `ok: true` for everything — a kill that
+never happened, a pid that was already gone, a refusal whose output it never read — so "closed" could be said
+about a program still on screen. The command's **exit status** decides (taskkill's own message is localised),
+`ok` now means *nothing of it is running any more*, and the reply names each pid that survived and why
+("access denied (it runs as another user, or elevated)", "it had already exited").
+
+**Three smaller repairs in the same paths.** An argument ending in a backslash is **doubled** on the Windows
+command line (`"C:\dir\\"`), because `"…\"` is read by the program as an *escaped quote* — a configured path
+silently corrupted into a different argument. The exec trace can no longer be forged: `Sandbox::audit()`
+strips control characters from every field it writes, so an agent name or argv element carrying a newline
+cannot add a record of a command that never ran (or hide one that did). And `POST /config` stopped reporting
+success for a write that failed — a config that could not be written now says so.
+
+**The way back in no longer depends on the one interpreter this app does not need.** `./setup-token.sh`
+required `python3` for everything it did — including `--show`, which is the command you reach for *because*
+you are locked out. On Windows that name is usually the Microsoft Store's execution alias: a stub that prints
+"Python was not found…" and exits 49, so `--show` printed its heading and no token, and generating one failed
+the same way. PHP is not optional on a copy of this app, so it is the fallback; `python` is tried as well as
+`python3`, and no candidate is trusted by name — each has to prove itself by returning `1` from a one-line
+program. `--show` now ends by naming the engine it used ("Read with: …" / "… (no working python3 or python
+here)"), so a fallback is a fact in the output rather than a guess. With neither engine present, and with
+`PHP_BIN` pointing at something that is not a working php, the script says which of the two it could not do
+instead of failing silently.
+
+The same rewrite had also dropped the call that re-creates `storage/.htaccess` — the guard that stops
+`storage/` from being served — leaving it **defined and never called**, which is a folder quietly becoming
+readable rather than a visible error. Restored, and covered.
+
+Both are held down by the new `php tests/php/setupToken.test.php` (56 assertions), which plants a stub
+`python3` **and** `python` at the front of PATH, ahead of any real python the machine has — the Windows
+symptom, made portable — and drives all four modes against throwaway copies. A fixture assertion proves the
+stub really is what PATH resolves to, so a green run cannot be one that skipped the interesting case; the
+regression itself was re-introduced to check that the suite catches it (it does, on the engine line and on
+the guard). `--show` on this install is asserted read-only, `storage/config.json` byte-identical after.
+
+**A fresh clone runs the same suite as the operator's checkout, assertion for assertion.** Not "passes too
+— with a few bits skipped": an identical `14 files, 14 passed, 0 failed, 840 assertions, 5 skipped`, where
+all five skips are things this machine cannot do (no symlinks on Windows, no python for the two audit
+checks, no `curl` extension in this PHP) rather than things the checkout does not have.
+
+It was not like that. A fresh clone ran **18 fewer assertions** and reported an ordinary green line, because
+a file's `SKIP:` lines were visible only when that file *failed*, so nobody saw them. Three blocks needed the
+operator's own install — the archived copy of the app that the nested-folder rule exists for, a real session
+transcript — and the leak checks inside them had gone vacuous anyway: *"the body contains no secret"* passes
+trivially against a file that does not exist. The tests build their own fixtures now. `apacheGuards.test.php`
+writes a throwaway copy of the app into the web root — its own `storage/config.json`, `state.json`, a cookie
+jar, `tests/` in two languages and a `ui/` module, each carrying a probe string — asserts against it and
+removes it, so a 403 that still returned the body is a failure now; `guards.test.php` uses `storage/models.json`,
+which ships with the app, instead of a transcript only the operator has; and `nginxGuards.test.php` uses a
+transcript name in the shape `SessionManager` actually mints, since those rules match a path and never the
+disk. Deleting the rule in a copy of the app fails exactly those 15 assertions, which is the coverage that
+used to be skipped.
+
+The runner re-prints a passing file's `SKIP:` lines under its result and totals them, and a file that skips
+reports it in its own count line (`58 passed, 0 failed, 2 skipped`), which is also what you see when you run
+one by hand. That is what surfaced the five environmental skips above — nobody had noticed those either.
+
+Doing that by hand is now one command. `php tests/freshClone.php` copies the tree to the system temp dir —
+every tracked file at its working content plus files that are new and not ignored, so **uncommitted work is
+included**, which is the usual state of a change under development and the state a `git clone` cannot see —
+runs both suites inside the copy, and prints their numbers side by side: `PHP 14 files, 14 passed, 0 failed,
+840 assertions, 5 skipped` / `JS 10 files, 10 passed, 0 failed, 296 assertions`. The ignored runtime files are
+left behind on purpose, since they are the operator state whose presence used to mask the difference, and
+nothing reads or writes the operator's own `storage/`. The copy is deleted when both suites pass and **kept,
+with its path printed, when one fails** — a failure in a copy should be looked at in the copy. `--head`
+clones the last commit instead, for the other question: what does someone who clones the repo right now get?
+
+`.githooks/pre-commit` runs that same check on **what you are committing**: it calls the command with
+`--index`, so the copy is the staged snapshot rather than the working tree, and a half-staged commit is
+verified as the commit it will actually be — a test file that is broken on disk but not staged correctly
+passes, because the commit will not contain it. Enable it once per clone with `git config core.hooksPath
+.githooks`; `git commit --no-verify` skips it once, and a failing run keeps its copy for inspection.
+`.gitattributes` pins `.githooks/*` to LF, because bash refuses a CRLF hook and every commit would then be
+refused for the wrong reason, and the hook says in its own header to add it executable
+(`git add --chmod=+x`), or a fresh clone gets a hook git silently skips.
+
+Covered by the new `php tests/php/secrets.test.php` (66 assertions: mask/restore round-trips, the
+friend-token lifecycle, the local-only gate, and the live routes with the real handlers running against a
+throwaway config), by the new `tests/php/setupToken.test.php` (56, above), and by additions to
+`tests/php/programs.test.php` (61): a **second copy of the same file
+name** is started from another folder and must be invisible to the configured entry — and must survive a
+close of it — plus the kill verdict, the trailing-backslash quoting and the audit-injection guard. Both
+suites green: **840 PHP assertions across 14 files** (the same 840 in a fresh clone), 296 JS.
+
+**The docs carry the whole account.** The README gained a *What's new* block (v360 at the top, v359 below
+it), its Contents entry, three rows in *What's inside*, and **four new security subsections** — **§19**
+opening programs, **§20** masked reads, **§21** local-only with no token set, **§22** the un-forgeable trace
+— each written as the argument for the design rather than as a feature note, since that section is what a
+reader actually checks before handing this thing a shell. `RELEASE-NOTES.md` is now the v360 release page:
+the new work in its own tables, the security measures listed row by row, and two host-specific limits added
+under *Known limits* — a program opens in the session the server runs in, and a POSIX close is a signal
+(`TERM`) rather than a window request (`WM_CLOSE`). All 67 anchors on the page resolve.
+
+`VERSION` 359 → **360**; cache-buster v359 → **v360** (all 275 `?v=` references in `ui/**` plus the two
+`<script>`/`<link>` pages, and `APP_VERSION` in `ui/js/store.js`).
+
+---
+
+## 🖥️ Agents can open real programs — and the window stays open *(UI + API — `VERSION` 359, cache-buster v358 → v359)*
+
+**The capability already existed and was unusable.** An agent could start a GUI program through `exec`,
+but `execCommand` waits for the process, force-kills it at the timeout, and holds the whole turn open
+while it runs — so "open Notepad" produced a window that closed itself a minute later inside a stalled
+chat. It left no usable record either: the run ended as a timeout, indistinguishable from a command that
+hung.
+
+**Config → Shell access → Programs** changes the shape of it. The operator lists programs — a name, a path,
+optional arguments — and an agent may only **name** one. It never supplies a path or a command line, so the
+only text a model controls is a name that must already exist in your config. That is what makes this safe to
+give a model where a raw `cmd /c` would not be: the launcher's input is operator data, not model output.
+
+The launch is **detached** — `cmd /c start` with the empty title token on Windows (the mechanism the
+built-in browser has used for Chrome/Edge since it landed), a backgrounded process on POSIX — so the window
+outlives the reply and no timeout closes it behind you. It is audited as `kind=program phase=start` with
+**no end line**: exactly the "started and still running" record the two-phase log was built for. Closing
+writes the end.
+
+`window_open`, `window_close` and `window_list` are the tools, behind the same Ask/Allow/Deny policy as
+everything else, with **Opening programs** and **Closing programs** added to the per-tool list. Closing is
+graceful first (`taskkill /PID` posts WM_CLOSE; POSIX sends TERM) so an editor can still ask about unsaved
+work, and `force` ends the process outright — the result says which one it took, and a console program with
+no window has nothing to receive a close request, so it needs force. Processes are found by the program they
+are running from (`/proc` on Linux, `tasklist` on Windows, `ps` elsewhere) because `start` hands off and
+never reports the pid it produced.
+
+Refused as launch targets: anything that is not `.exe`/`.com` on Windows, so starting a `.bat`, `.cmd` or
+`.ps1` can never hand back the command shell or script host the rest of this design keeps away from a model.
+That refusal is by extension and is **not** overridable from the list — `exec_interpreters` is the door for
+script files, where the script is jailed and inline code is refused.
+
+**Off by default** (`sandbox.programs_enabled`, empty list), so an install that updates gains nothing until
+the operator adds it. Each row shows its verdict — the resolved path, *not running* or *pid …*, or the reason
+it would be refused — and the platform caveat that decides whether this works at all: Apache started as a
+console process opens windows on your desktop, while Apache installed as a **service** lands in session 0
+and nothing is ever visible. `php tests/php/programs.test.php` covers the policy, the normalisation, every
+refusal message, the process lookup, the detach and the two-phase audit — and really launches and closes a
+process of its own (`ping` on Windows, a private copy of `sleep` on POSIX).
+
+---
+
 ## 🧩 An unfinished install says so, and finishes from the panel *(UI — `VERSION` 358, cache-buster v353 → v358)*
 
 **The panel had a sentence about a stuck install and no way to act on it.**

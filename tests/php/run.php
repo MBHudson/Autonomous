@@ -17,6 +17,13 @@
  * another. A file fails if it exits non-zero; its full output is printed when
  * it does. The runner's own exit code is 1 if any file failed.
  *
+ * A file that cannot run part of itself -- because the operator's install has no
+ * session transcripts, or the archive that used to sit beside the app is not
+ * there -- prints `SKIP:` with the reason. Those lines are repeated here for a
+ * PASSING file as well, and counted, because otherwise "this file skipped two of
+ * its checks" is indistinguishable from "this file had two checks", and a fresh
+ * clone quietly runs fewer assertions than the machine they were written on.
+ *
  * mcp-mock-server.php is a helper, not a test: it does not match `*.test.php`
  * and is spawned by mcp.test.php itself.
  */
@@ -48,6 +55,7 @@ function last_line(array $lines): string
 $failures = [];
 $assertions = 0;
 $counted = 0;
+$skips = 0;
 
 foreach ($files as $file) {
     $name = basename($file);
@@ -75,13 +83,22 @@ foreach ($files as $file) {
         $counted++;
     }
     echo "ok    {$name}  --  {$summary}\n";
+    // A passing file's own SKIP lines, under its result. Only passing files are
+    // counted: when one fails the whole output is already on screen above.
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*SKIP:/', $line)) {
+            echo '      ' . rtrim($line) . "\n";
+            $skips++;
+        }
+    }
 }
 
 echo str_repeat('=', 60) . "\n";
 $total = count($files);
 $passed = $total - count($failures);
 $tally = $counted === $total ? ", {$assertions} assertions" : '';
-echo "{$total} files, {$passed} passed, " . count($failures) . " failed{$tally}\n";
+$skipTally = $skips ? ", {$skips} skipped" : '';
+echo "{$total} files, {$passed} passed, " . count($failures) . " failed{$tally}{$skipTally}\n";
 
 if ($failures) {
     fwrite(STDERR, "\nFailed: " . implode(', ', $failures) . "\n");

@@ -4,6 +4,10 @@
 *.bat  text eol=crlf
 *.ps1  text eol=crlf
 
+# Git hooks have no extension, and bash refuses a CRLF script: a converted hook
+# fails with "bad interpreter" and every commit is refused for the wrong reason.
+.githooks/*  text eol=lf
+
 # Vendored / binary
 ui/vendor/** -diff
 tools/cacert.pem -diff

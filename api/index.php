@@ -58,6 +58,7 @@ use Src\Audio;
 use Src\Sandbox;
 use Src\Mcp;
 use Src\McpServer;
+use Src\Programs;
 use Src\Browser;
 use Src\SessionManager;
 use Src\TopologyGraph;
@@ -139,7 +140,33 @@ if (!empty($routerSandbox['require_token']) && !$isMcpRpc) {
         echo json_encode(['error' => 'unauthorized']);
         exit(0);
     }
+} elseif (!$isMcpRpc && !Sandbox::isLocalRequest($_SERVER)) {
+    // The gate is OFF (setup-token.sh --off), which its own output documents as
+    // safe only on "a machine nothing else can reach". Enforce exactly that
+    // rather than trusting a memory of which command was run: with no token to
+    // check, a request that arrived from another machine is refused.
+    //
+    // This is not theoretical for this app: the API includes an agent-reachable
+    // program launcher (POST /sandbox/program) and a config route, so on a copy
+    // running with the gate off behind a web server bound to all interfaces,
+    // window_open was reachable from anywhere on the network -- and GET /config
+    // answered with the token that guards the endpoints which ARE protected.
+    //
+    // The MCP RPC route stays exempt: friends on other machines connecting to
+    // /api/mcp-server is the entire point of it, and it authenticates with its
+    // own per-friend Bearer token.
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'error' => 'local requests only',
+        'detail' => 'This copy has no access token set, so it only answers requests from the '
+            . 'machine it runs on. Run ./setup-token.sh (or start.bat -Token on Windows) to set '
+            . 'one, paste it into Config -> Access token on each device, and this address will '
+            . 'work from anywhere again.',
+    ]);
+    exit(0);
 }
+
 
 // Extract path after the api/ directory (works at any mount point)
 $scriptDir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
@@ -787,14 +814,23 @@ function handleBrowser($method, $segments, $body) {
 function handleMcp($method, $segments, $body) {    $action = $segments[1] ?? '';
     try {
         if ($action === 'servers') {
+            $report = ['restored' => 0, 'dropped' => []];
             if ($method === 'POST' || $method === 'PUT') {
                 $servers = $body['servers'] ?? [];
-                Mcp::saveServers(is_array($servers) ? $servers : []);
+                $report = Mcp::saveServers(is_array($servers) ? $servers : []);
             }
-            // Full config (incl. command/args/url/headers) so the editor can
-            // round-trip an existing server. This endpoint is behind the web
-            // token gate, so it is operator-only.
-            echo json_encode(['success' => true, 'servers' => Mcp::servers()]);
+            // Full config (incl. command/args/url) so the editor can round-trip
+            // an existing server -- but headers and env come back MASKED: this
+            // route is behind the web token gate, which is off entirely on a
+            // copy running without one, and those values are the credentials
+            // that let this app act as the operator on a friend's server.
+            // Mcp::saveServers() puts them back on the way in.
+            echo json_encode([
+                'success' => !isset($report['ok']) || $report['ok'],
+                'servers' => Mcp::uiServers(),
+                'restored' => (int)($report['restored'] ?? 0),
+                'dropped' => $report['dropped'] ?? [],
+            ]);
             return;
         }
         if ($action === 'status') {
@@ -855,6 +891,12 @@ function handleSandbox($method, $segments, $body) {
                     $body['lines'] ?? 300,
                     $body['agent'] ?? ''
                 ));
+                break;
+            // Desktop programs the operator configured: open one (detached, so
+            // the window outlives this request), close one, or list them with
+            // their resolved paths and running state.
+            case 'program':
+                echo json_encode(Programs::handle($body));
                 break;
             case 'search':
                 echo json_encode(Sandbox::webSearch($body['query'] ?? '', $body['limit'] ?? 8));
@@ -1137,13 +1179,33 @@ function handleTopology($method, $segments, $body) {    $sessions = SessionManag
 function handleConfig($method, $segments, $body) {
     switch ($method) {
         case 'GET':
-            echo json_encode(Config::loadConfig());
+            // MASKED, never verbatim. This file holds the access token, every
+            // MCP client's Authorization header and every friend token -- and
+            // the values it was handing out were exactly the ones the other
+            // gates compare against, so one read disclosed the keys to every
+            // other door. See Config::maskSecrets: the editor still round-trips
+            // them, because the write path below puts back whatever arrived as
+            // a mask.
+            echo json_encode(Config::maskSecrets(Config::loadConfig()));
             break;
         case 'PUT':
         case 'POST':
             if ($body) {
-                Config::saveConfig($body);
-                echo json_encode(['success' => true]);
+                // Restore first: a masked value means "unchanged", not "set my
+                // token to eight asterisks". Every panel here reads the config
+                // back through GET before changing one key and posting the lot,
+                // so without this a single toggle would wipe every credential.
+                [$next, $restored, $dropped] = Config::restoreSecrets($body, Config::loadConfig());
+                $ok = Config::saveConfig($next);
+                // The truth about the write, not a hopeful 'success': a config
+                // that could not be written used to report that it was, which
+                // is how a UI save of a secret can silently do nothing.
+                echo json_encode([
+                    'success' => $ok,
+                    'restored' => $restored,
+                    'dropped' => $dropped,
+                    'error' => $ok ? '' : 'storage/config.json could not be written.',
+                ]);
             }
             break;
     }

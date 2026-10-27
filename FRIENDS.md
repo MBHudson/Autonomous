@@ -66,7 +66,10 @@ Then your agents can reach my tools with `mcp_list` / `mcp_call`.
 
 ## A couple of ground rules
 
-- Keep the token private; tell me if you think it leaked and I'll rotate it.
+- Keep the token private; tell me if you think it leaked and I'll rotate it —
+  the moment I do, the old one stops working and you get the new one from me.
+  I can't look yours up and re-send it: it is stored on my side and never shown
+  again, so a lost token is always replaced, not re-read.
 - Files you create land in your own scratch folder, not my app.
 - If a command comes back saying it is "waiting for the operator", that's me —
   I'll approve it and you can retry.

@@ -35,7 +35,6 @@ $confPath = $root . '/nginx.example.conf';
 
 $pass = 0;
 $fail = 0;
-$skips = 0;
 $errors = array();
 
 function ok($cond, $name, &$pass, &$fail, &$errors)
@@ -163,15 +162,13 @@ foreach ($refused as $uri => $label) {
     ok(denied($locations, $uri), $label . ' is refused (' . $uri . ')', $pass, $fail, $errors);
 }
 
-// A real session transcript by its real name: the strongest form of the rule.
-$transcripts = glob($root . '/storage/sessions/*.json');
-if ($transcripts) {
-    $uri = '/router/storage/sessions/' . basename($transcripts[0]);
-    ok(denied($locations, $uri), 'a real session transcript is refused', $pass, $fail, $errors);
-} else {
-    $skips++;
-    echo "  SKIP: no storage/sessions/*.json to name\n";
-}
+// A session transcript, in the shape the app itself writes: SessionManager mints
+// `sess_` + 8 hex + `_` + uniqid(). The file does not have to exist -- these are
+// the nginx location patterns, matched against a URI, so the path is the thing
+// under test, not the disk. Asking for the operator's own transcript meant this
+// assertion skipped on every fresh clone, which is where it was needed most.
+$sessionUri = '/router/storage/sessions/sess_05efc08c_6ac00ecc237fd7.48630237.json';
+ok(denied($locations, $sessionUri), 'a session transcript by its real name-shape is refused', $pass, $fail, $errors);
 
 // ---------------------------------------------------------------- served
 // The other direction, which is just as important: an over-eager pattern that
@@ -205,7 +202,7 @@ foreach ($served as $uri => $label) {
 echo str_repeat('-', 60) . "\n";
 if ($fail) {
     echo implode("\n", $errors) . "\n";
-    echo $fail . ' failed, ' . $pass . ' passed' . ($skips ? ', ' . $skips . ' skipped' : '') . "\n";
+    echo $fail . ' failed, ' . $pass . ' passed' . "\n";
     exit(1);
 }
-echo $pass . ' passed' . ($skips ? ', ' . $skips . ' skipped' : '') . "\n";
+echo $pass . ' passed' . "\n";

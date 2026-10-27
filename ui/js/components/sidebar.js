@@ -10,18 +10,18 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=358';
-import { K } from '../storage.js?v=358';
-import { persistence } from '../persistence.js?v=358';
-import { api } from '../api.js?v=358';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=358';
-import { errText } from '../api.js?v=358';
-import { TOOL_REGISTRY } from '../tools.js?v=358';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=358';
-import { snapshot } from '../rateGovernor.js?v=358';
-import { resetBrowserEnabled } from '../toolManifest.js?v=358';
-import { perf } from '../perf.js?v=358';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=358';
+import { store } from '../store.js?v=360';
+import { K } from '../storage.js?v=360';
+import { persistence } from '../persistence.js?v=360';
+import { api } from '../api.js?v=360';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=360';
+import { errText } from '../api.js?v=360';
+import { TOOL_REGISTRY } from '../tools.js?v=360';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=360';
+import { snapshot } from '../rateGovernor.js?v=360';
+import { resetBrowserEnabled } from '../toolManifest.js?v=360';
+import { perf } from '../perf.js?v=360';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=360';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -50,6 +50,11 @@ export class Sidebar {
     this._mcpServers = null;
     // MCP *server* config (this app AS a server): tokens, scopes, root, protect.
     this._mcpSrv = null;
+    // Plaintext of friend tokens THIS page had issued by a save, keyed by token
+    // id. The server never sends a stored token back (Config::maskSecrets), so
+    // this is the only place a value lives after it is created -- which is what
+    // "shown once" means in practice: reload, and it is gone.
+    this._mcpSrvFresh = {};
     // Agents with a standing goal that are mid-tick right now, so the ALWAYS ON
     // badge can show it and offer the stop control only when it would do
     // something.
@@ -1570,6 +1575,8 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <label class="form-label">Per-tool approval</label>
           ${[
             ['exec', 'Shell commands'],
+            ['window_open', 'Opening programs'],
+            ['window_close', 'Closing programs'],
             ['write_file', 'File writes'],
             ['write_note', 'Notes'],
             ['remember', 'Private memory'],
@@ -1606,6 +1613,23 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <div class="toggle" id="sbCodeOn"><div class="toggle-knob"></div></div>
         </div>
         <div class="form-hint">Runs a Python/Node/bash snippet in the sandbox working directory as the web user. Stronger than the command allowlist, so it is off by default and separate from shell access. The agent asks before each run.</div>
+
+        <div class="cfg-sublabel">Programs <span class="form-hint-inline">open real apps on this machine</span></div>
+        <div id="sbProgBlock" style="margin-top:6px">
+          <div class="toggle-row">
+            <span class="toggle-label">Allow agents to open programs</span>
+            <div class="toggle" id="sbProgOn"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="form-hint">Opens a real window on the machine this server runs on — detached, so it stays
+            open after the agent's reply, and nothing waits on it. An agent may only <b>name</b> a program
+            from the list below; it can never supply a path or a command line. Off by default, your copy only.</div>
+          <div id="sbProgList" style="margin-top:8px"></div>
+          <button class="btn btn-ghost btn-block" id="sbProgAdd" style="margin-top:8px">+ ADD PROGRAM</button>
+          <button class="btn btn-primary btn-block" id="sbProgSave" style="margin-top:8px">VERIFY &amp; SAVE</button>
+          <div class="form-hint" id="sbProgStatus"></div>
+          <div class="form-hint" id="sbProgNote"></div>
+        </div>
+
         <button class="btn btn-ghost btn-block" id="sbPolicyBtn" style="margin-top:12px">ALLOW / DENY LIST</button>
         <div class="form-hint" id="sbPolicyHint" style="margin:4px 0 0"></div>
       `)}
@@ -1694,12 +1718,13 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <div class="form-hint">Connect OUT to other MCP servers. Each gives your agents extra tools (filesystem, git, fetch, a company API…). Agents call them with <code>mcp_list</code> / <code>mcp_call</code>. To let someone else use <b>your</b> tools, see the MCP Server section.</div>
         <div id="sbMcpList"></div>
         <button class="btn btn-ghost btn-block" id="sbMcpAdd" style="margin-top:8px">+ ADD SERVER</button>
+        <div class="form-hint">Values under <code>env</code> and <code>headers</code> are stored on the server and read back masked — a row of dots means a value is saved and will be kept. Type over it to replace it.</div>
         <button class="btn btn-primary btn-block" id="sbMcpSave" style="margin-top:8px">SAVE MCP CLIENT</button>
         <div class="form-hint" id="sbMcpStatus"></div>
       `)}
 
       ${this._cfgSection('mcpserver', 'MCP Server', { text: this._mcpSrv?.enabled ? 'ON' : '', cls: this._mcpSrv?.enabled ? 'ok' : '' }, `
-        <div class="form-hint">Let someone else's MCP client — a friend's local model, Claude Desktop, Cursor — use tools on THIS machine. Each friend gets their own token and scope. Nothing here is permanent; it is all your switch.</div>
+        <div class="form-hint">Let someone else's MCP client — a friend's local model, Claude Desktop, Cursor — use tools on THIS machine. Each friend gets their own token and scope. A token is shown once, when it is created or rotated; after that only ROTATE can hand you a new one. Nothing here is permanent; it is all your switch.</div>
         <div class="toggle-row">
           <span class="toggle-label">Enable the MCP server</span>
           <div class="toggle ${this._mcpSrv?.enabled ? 'active' : ''}" id="sbMcpSrvOn"><div class="toggle-knob"></div></div>
@@ -2447,7 +2472,14 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     const toks = this._mcpSrv?.tokens || [];
     if (!toks.length) { el.innerHTML = '<div class="form-hint">No friends yet.</div>'; return; }
     const sc = (t, s) => ((t.scope || []).includes(s) ? ' checked' : '');
-    el.innerHTML = toks.map((t, i) => `
+    el.innerHTML = toks.map((t, i) => {
+      // A stored token is not readable from this screen any more, so the field
+      // shows the plaintext only for a token this page just had issued, and the
+      // mask otherwise.
+      const fresh = t.id ? (this._mcpSrvFresh[t.id] || '') : '';
+      const shown = fresh || t.token || '';
+      const pending = !t.token;   // '' means "issue a new one when you save"
+      return `
       <div data-mcpsrv-row="${i}" style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px">
         <div style="display:flex;gap:6px;align-items:center">
           <input class="form-input" data-mcpsrv="label" value="${escAttr(t.label || '')}" placeholder="friend name" style="flex:1">
@@ -2459,11 +2491,15 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <label class="form-hint-inline"><input type="checkbox" data-mcpsrv-scope="exec" data-i="${i}"${sc(t, 'exec')}> exec</label>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
-          <input class="form-input" data-mcpsrv="token" value="${escAttr(t.token || '')}" readonly style="flex:1;font-family:var(--font-mono);font-size:11px" title="Share this token with the friend">
+          <input class="form-input" data-mcpsrv="token" value="${escAttr(shown)}" readonly style="flex:1;font-family:var(--font-mono);font-size:11px" title="${fresh ? 'Just issued — copy it to your friend now' : 'Stored on the server. Only a token issued in this session can be shown.'}">
           <button class="btn btn-ghost" data-mcpsrv-copy="${i}">COPY</button>
+          <button class="btn btn-ghost" data-mcpsrv-rotate="${i}" title="Issue a new token for this friend">ROTATE</button>
         </div>
         <input class="form-input" data-mcpsrv="ips" value="${escAttr((t.ips || []).join(', '))}" placeholder="optional IP allowlist, comma-separated" style="margin-top:6px">
-      </div>`).join('');
+        ${fresh ? '<div class="form-hint">New token — copy it now. It is stored on the server and this is the only time it is shown.</div>' : ''}
+        ${pending && !fresh ? '<div class="form-hint">A new token is issued when you save, and shown once. The old one stops working then.</div>' : ''}
+      </div>`;
+    }).join('');
 
     el.querySelectorAll('[data-mcpsrv]').forEach(inp => {
       const set = () => {
@@ -2500,12 +2536,35 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     });
     el.querySelectorAll('[data-mcpsrv-copy]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const t = this._mcpSrv.tokens[Number(btn.dataset.mcpsrvCopy)];
-        if (!t?.token) return;
-        copyToClipboard(t.token).then(ok => store.emit('toast', {
+        const t = this._mcpSrv?.tokens?.[Number(btn.dataset.mcpsrvCopy)];
+        if (!t) return;
+        // Only a token issued in this session can be copied. Copying the field
+        // anyway would hand the friend "********", which authenticates as a
+        // wrong token -- and the failure would look like the server's fault.
+        const value = t.id ? (this._mcpSrvFresh[t.id] || '') : '';
+        if (!value) {
+          store.emit('toast', {
+            message: 'That token is stored on the server and is not shown again. ROTATE to issue a new one.',
+            type: 'info',
+          });
+          return;
+        }
+        copyToClipboard(value).then(ok => store.emit('toast', {
           message: ok ? 'Token copied' : 'Could not reach the clipboard',
           type: ok ? 'success' : 'error',
         }));
+      });
+    });
+    el.querySelectorAll('[data-mcpsrv-rotate]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.mcpsrvRotate);
+        const t = this._mcpSrv?.tokens?.[i];
+        if (!t) return;
+        // '' is what tells the server to issue a new one on the next save (and
+        // it is also what tells this page a value is pending).
+        if (t.id) delete this._mcpSrvFresh[t.id];
+        t.token = '';
+        this._renderMcpSrvTokens();
       });
     });
   }
@@ -2528,12 +2587,25 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         enabled: !!res.enabled, root: res.root || '',
         protect: res.protect || [], tokens: res.tokens || [],
       };
+      // `issued` carries the plaintext of every token THIS save generated, and
+      // only this save: keep those (keyed by id) so the card can show and copy
+      // them, and drop every other id so a stale value can never be shown
+      // against a token that has since been rotated.
+      const issued = (res && res.issued) || {};
+      const fresh = {};
+      (res.tokens || []).forEach(t => {
+        if (t && t.id && issued[t.id]) fresh[t.id] = issued[t.id];
+      });
+      this._mcpSrvFresh = fresh;
+      const issuedCount = Object.keys(fresh).length;
       const pEl = document.getElementById('sbMcpSrvProtect');
       if (pEl) pEl.value = (this._mcpSrv.protect || []).join('\n');
       this._renderMcpSrvTokens();
       if (status) {
         status.textContent = `Saved. ${this._mcpSrv.tokens.length} token(s). Endpoint: /api/mcp-server. `
-          + 'Tokens never expire — revoke one with ×, then save.';
+          + (issuedCount
+            ? `${issuedCount} new token(s) issued — copy each one now, it is not shown again. `
+            : 'Tokens never expire — revoke one with ×, or ROTATE to reissue, then save.');
       }
       store.emit('toast', { message: 'MCP server saved', type: 'success' });
     } catch (err) {
@@ -2801,6 +2873,33 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       });
     }
 
+    // --- Programs (real windows on this machine) ---------------------------
+    // Bound the same way as the shell toggle above: the switch saves itself and
+    // the load only ever reports what the server kept.
+    const progToggle = document.getElementById('sbProgOn');
+    if (progToggle && !progToggle.dataset.bound) {
+      progToggle.dataset.bound = '1';
+      progToggle.addEventListener('click', () => {
+        progToggle.classList.toggle('active');
+        this._savePrograms({ settingsOnly: true });
+      });
+    }
+    const progAdd = document.getElementById('sbProgAdd');
+    if (progAdd && !progAdd.dataset.bound) {
+      progAdd.dataset.bound = '1';
+      progAdd.addEventListener('click', () => this._addProgramRow({}));
+    }
+    const progSave = document.getElementById('sbProgSave');
+    if (progSave && !progSave.dataset.bound) {
+      progSave.dataset.bound = '1';
+      progSave.addEventListener('click', () => this._savePrograms({}));
+    }
+
+    // Programs live server-side too (config.json), and their rows are the
+    // launcher's allowlist, so they are rendered from the server's own view of
+    // them rather than from the config file.
+    this._loadPrograms();
+
     try {
       const info = await api.execAllowlist();
       const cfg = await api.getConfig();
@@ -2885,6 +2984,134 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     } catch (err) {
       if (st) st.textContent = `Not saved: ${err.message}`;
       store.emit('toast', { message: `Shell access not saved: ${err.message}`, type: 'error' });
+    }
+  }
+
+  // --- Programs (Config -> Shell access -> Programs) ---------------------
+  //
+  // Rendered from the SERVER's view of the list (POST /sandbox/program,
+  // action:list) rather than from the raw config, so a row the launcher would
+  // drop or refuse cannot sit here looking configured. The verdicts under each
+  // row are the only place an operator finds out that a path is wrong.
+
+  async _loadPrograms() {
+    const host = document.getElementById('sbProgList');
+    if (!host) return;
+    try {
+      const res = await api.sandbox('program', { action: 'list' });
+      this._progPlatform = res.platform || '';
+      this._progCount = (res.apps || []).length;
+      const set = (id, v) => document.getElementById(id)?.classList.toggle('active', v);
+      set('sbProgOn', !!res.enabled);
+      host.innerHTML = '';
+      (res.apps || []).forEach(a => host.appendChild(this._progRow(a)));
+      if (!(res.apps || []).length) this._addProgramRow({});
+      const st = document.getElementById('sbProgStatus');
+      if (st) st.textContent = this._progSummary(res);
+      const note = document.getElementById('sbProgNote');
+      if (note) note.textContent = res.notes || '';
+    } catch (err) {
+      const st = document.getElementById('sbProgStatus');
+      if (st) st.textContent = `Could not read the program list: ${err.message}`;
+    }
+  }
+
+  /** One line saying whether this list would actually work. */
+  _progSummary(res) {
+    const apps = res.apps || [];
+    if (!res.enabled) return `Off - ${apps.length} program(s) configured, and agents cannot open any of them.`;
+    if (!apps.length) return 'On, but nothing is configured yet, so an agent has nothing to open.';
+    const bad = apps.filter(a => a.error);
+    if (bad.length) {
+      return `${apps.length} program(s). Not usable: ` + bad.map(a => `${a.name} (${a.error})`).join('; ');
+    }
+    const running = apps.filter(a => (a.running || []).length).length;
+    return `${apps.length} program(s), all usable${running ? `, ${running} running now` : ''}.`;
+  }
+
+  /** One editable launcher row. The name is what a model types, so it matters. */
+  _progRow(p = {}) {
+    const row = document.createElement('div');
+    row.dataset.prog = '1';
+    row.style.cssText = 'margin-top:8px';
+    const win = this._progPlatform === 'windows';
+    const pathHint = win ? 'C:/Windows/System32/notepad.exe'
+      : '/usr/bin/gedit';
+    row.innerHTML = `
+      <input class="form-input prog-name" maxlength="40" spellcheck="false"
+        placeholder="name the agent types" value="${esc(p.name || '')}">
+      <input class="form-input prog-path" spellcheck="false" style="margin-top:6px"
+        placeholder="full path, e.g. ${esc(pathHint)}" value="${esc(p.path || '')}">
+      <textarea class="form-textarea prog-args" rows="2" spellcheck="false" style="margin-top:6px"
+        placeholder="arguments, one per line (optional)">${esc((p.args || []).join('\n'))}</textarea>
+      <div class="form-hint prog-verdict" style="margin:4px 0 0"></div>
+      <button type="button" class="btn btn-ghost prog-del" style="margin-top:6px">REMOVE</button>
+    `;
+    const verdict = row.querySelector('.prog-verdict');
+    if (p.error) verdict.textContent = `Not usable: ${p.error}`;
+    else if ((p.running || []).length) verdict.textContent = `Running now (pid ${p.running.join(', ')}).`;
+    else if (p.resolved) verdict.textContent = `Ready - ${p.resolved}`;
+    else verdict.textContent = 'Not saved yet - press VERIFY & SAVE.';
+    row.querySelector('.prog-del').addEventListener('click', () => row.remove());
+    return row;
+  }
+
+  _addProgramRow(p = {}) {
+    const host = document.getElementById('sbProgList');
+    if (host) host.appendChild(this._progRow(p));
+  }
+
+  /**
+   * Save the launcher list, then read it back and report what the server kept.
+   *
+   * The read-back is the point: the server drops a row with an unusable name and
+   * refuses a path it cannot resolve or a .bat/.cmd target, so "saved" and "will
+   * actually open" are different claims. Reporting only the first is how the MCP
+   * card used to say Saved 6 when nothing was reachable.
+   */
+  async _savePrograms(opts = {}) {
+    const host = document.getElementById('sbProgList');
+    const st = document.getElementById('sbProgStatus');
+    const on = document.getElementById('sbProgOn')?.classList.contains('active');
+    const rows = host ? Array.from(host.querySelectorAll('[data-prog]')) : [];
+    const typed = rows.map((r) => {
+      const name = (r.querySelector('.prog-name')?.value || '').trim();
+      const path = (r.querySelector('.prog-path')?.value || '').trim();
+      const args = (r.querySelector('.prog-args')?.value || '')
+        .split('\n').map(s => s.trim()).filter(Boolean);
+      return { name, path, args };
+    }).filter(p => p.name || p.path);
+
+    const half = typed.filter(p => !p.name || !p.path);
+    if (half.length) {
+      if (st) st.textContent = `Not saved: ${half.length} row(s) need both a name and a path.`;
+      return;
+    }
+
+    try {
+      await this._patchServerConfig((cfg) => {
+        cfg.sandbox = cfg.sandbox || {};
+        cfg.sandbox.programs_enabled = !!on;
+        if (typed.length) cfg.sandbox.programs = typed;
+        else delete cfg.sandbox.programs;
+      });
+      await this._loadPrograms();
+      const kept = this._progCount || 0;
+      const dropped = typed.length - kept;
+      const line = document.getElementById('sbProgStatus');
+      if (dropped > 0 && line) {
+        line.textContent += ` ${dropped} row(s) were dropped: a name must start with a letter or digit `
+          + 'and hold only letters, digits, spaces, dot, dash or underscore.';
+      }
+      if (!opts.settingsOnly) {
+        store.emit('toast', {
+          message: dropped > 0 ? `Programs saved - ${dropped} row(s) dropped` : 'Programs saved',
+          type: dropped > 0 ? 'error' : 'success',
+        });
+      }
+    } catch (err) {
+      if (st) st.textContent = `Not saved: ${err.message}`;
+      store.emit('toast', { message: `Programs not saved: ${err.message}`, type: 'error' });
     }
   }
 
