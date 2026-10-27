@@ -41,6 +41,20 @@ Autonomous.zip
 # copy, the diff and the cached check answer. All runtime data, all re-creatable.
 storage/updates/
 
+# Working notes: findings, hand-offs, session journals. The README is the
+# documentation -- these are scratch, and while a cleanup is in progress they
+# quote keys, tokens and account addresses that must not be published. Add a
+# name here when you start one. `git check-ignore -v <file>` says which rule
+# caught a file, so nothing has to be guessed.
+/STATUS.md
+/README-HANDOVER.md
+/scratch/
+
+# Screenshots ARE tracked -- the README embeds them by path. A capture that
+# shows a BUG rather than the fixed surface misrepresents the app, so it is
+# scratch too: name it here (and keep the fixed one, which is published).
+/screenshots/deny-undo-panel.png
+
 # Editor / OS junk
 .idea/
 .vscode/

@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=350';
-import { acquire, note429 } from './rateGovernor.js?v=350';
-import { latency } from './latency.js?v=350';
-import { detectFamily } from './harness.js?v=350';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=350';
+import { store } from './store.js?v=351';
+import { acquire, note429 } from './rateGovernor.js?v=351';
+import { latency } from './latency.js?v=351';
+import { detectFamily } from './harness.js?v=351';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=351';
 
 latency.bindStore(store);
 
@@ -266,6 +266,23 @@ class ApiClient {
    */
   diagnoseProviders(providers) {
     return this.request('POST', '/diag', { providers: providers || [] });
+  }
+
+  /**
+   * How this copy is being served, and whether it can answer more than one
+   * request at a time.
+   *
+   * PHP's built-in server (start-php.bat) takes ONE request at a time: while a
+   * streamed reply is open, the next agent's call waits outside in the kernel's
+   * backlog, so a fan-out runs in single file and every agent looks hung until
+   * the one ahead of it lands. That is the server, not the loop, and there is
+   * nothing a page can do about it -- so the operator is told which server they
+   * are on instead of being left to guess.
+   *
+   * Apache (start.bat) and php-fpm answer many at once and report nothing.
+   */
+  serverInfo() {
+    return this.request('GET', '/diag');
   }
 
   /**

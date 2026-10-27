@@ -1295,6 +1295,44 @@ function handleImport($method, $segments, $body) {
 }
 
 /**
+ * Can this copy answer two calls at once — and if not, what should be done?
+ *
+ * PHP's built-in server (`php -S`, which start-php.bat uses) accepts ONE
+ * request at a time. While a streamed model reply is open, every other request
+ * — the next agent in a fan-out, the state poll, a Stop click — waits outside
+ * in the kernel's backlog. A team of agents therefore runs in single file, and
+ * each one looks hung until the answer in front of it lands. Nothing in the
+ * browser can fix that: it is the server, not the loop.
+ *
+ * Apache (start.bat) and php-fpm answer many requests at once, which is what
+ * this app is built for. PHP_CLI_SERVER_WORKERS lifts the built-in server above
+ * one request on Unix; PHP ignores it on Windows, where start.bat is the answer.
+ */
+function serverFacts() {
+    $sapi = PHP_SAPI;
+    $isCliServer = ($sapi === 'cli-server');
+    $workers = (int)(getenv('PHP_CLI_SERVER_WORKERS') ?: 1);
+    $windows = DIRECTORY_SEPARATOR === '\\';
+    // On Windows the built-in server cannot fork, so it is single-request there
+    // no matter what the environment variable claims.
+    $concurrent = !$isCliServer || (!$windows && $workers > 1);
+    $out = [
+        'sapi' => $sapi,
+        'workers' => $isCliServer ? $workers : null,
+        'concurrent' => $concurrent,
+    ];
+    if (!$concurrent) {
+        $out['detail'] = 'This server handles one request at a time, so agents take turns: '
+            . 'no reply starts until the one before it finishes.';
+        $out['fix'] = $windows
+            ? 'Start the app with start.bat instead: it serves this folder with Apache, which answers '
+                . 'many requests at once. Settings, sessions and keys stay where they are — they live in storage/, not in the server.'
+            : 'Start it with ./start.sh (it runs several workers), or serve the folder with Apache or nginx.';
+    }
+    return $out;
+}
+
+/**
  * Why can't this app reach a provider?
  *
  * The browser can only ever report "NetworkError when attempting to fetch
@@ -1327,6 +1365,9 @@ function handleDiag($method, $segments, $body) {
             'php' => PHP_VERSION,
             'server_software' => isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : 'cli-server',
             'docroot' => __DIR__ . '/..',
+            // Whether two calls can be in flight at once. The UI asks this at
+            // load, and says so when the answer is no — see serverFacts().
+            'concurrency' => serverFacts(),
         ]);
         return;
     }
@@ -1437,6 +1478,7 @@ function handleDiag($method, $segments, $body) {
             'software' => isset($_SERVER['SERVER_SOFTWARE']) ? $_SERVER['SERVER_SOFTWARE'] : 'cli-server',
             'php' => PHP_VERSION,
             'path' => realpath(__DIR__ . '/..') ?: (__DIR__ . '/..'),
+            'concurrency' => serverFacts(),
         ],
     ]);
 }

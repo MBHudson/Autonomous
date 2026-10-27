@@ -21,7 +21,22 @@
 // its own module, and commsLog imports store that way. Importing the bare path
 // here would give this test a SECOND store instance, and the change events it
 // listens for would be emitted into the other one.
-import { store } from '../../ui/js/store.js?v=350';
+//
+// The version is READ from store.js rather than written here, because the
+// cache-buster moves on every UI release: a hardcoded copy silently split this
+// test from the module under test the first time it did (three change-event
+// assertions failed while nothing at all was wrong with the code).
+import { readFileSync } from 'node:fs';
+const version = /APP_VERSION\s*=\s*(\d+)/.exec(
+  readFileSync(new URL('../../ui/js/store.js', import.meta.url), 'utf8'),
+)?.[1];
+if (!version) {
+  console.error('commsLog tests\n' + '-'.repeat(60));
+  console.error('Cannot read APP_VERSION from ui/js/store.js, so the store this');
+  console.error('test imports cannot be proven to be the same instance commsLog uses.');
+  process.exit(1);
+}
+const { store } = await import(`../../ui/js/store.js?v=${version}`);
 import * as comms from '../../ui/js/commsLog.js';
 
 let pass = 0, fail = 0;
