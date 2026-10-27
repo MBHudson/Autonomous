@@ -23,6 +23,24 @@ sandbox/*
 # Local-only files
 .htpasswd
 
+# A second copy of the app kept for reference or comparison (a clean copy, an
+# archive of an older version). Each carries its own storage/ with the same
+# token and keys, and it is not part of the app -- never commit one.
+cleancopy/
+the-copy-before-the-huge-ui-change/
+
+# A packaged copy of the whole app (220 MB of the same files).
+Autonomous.zip
+
+# Backups of anything tracked, storage/config.json included: a `config.json.bak`
+# holds the access token and every API key in clear, and the ignore rule above
+# only covers the exact name.
+*.bak
+
+# The update feature's own working folder: the downloaded archive, the staging
+# copy, the diff and the cached check answer. All runtime data, all re-creatable.
+storage/updates/
+
 # Editor / OS junk
 .idea/
 .vscode/

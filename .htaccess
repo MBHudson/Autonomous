@@ -28,8 +28,26 @@ RewriteEngine On
 # in .htaccess in later 2.4 releases. The <IfModule> wrapper only means a host
 # without mod_alias skips this rule instead of failing to parse the file.
 RewriteRule (^|/)(storage|logs|tmp|sessions|tests)(/|$) - [F,L,NC]
+
+# The app root is a git checkout, so .git/ sits INSIDE the web root: it holds
+# the whole history and the remote config, and Apache serves any file it can
+# read. `.git/config` alone can carry a credentialed URL, and `.git/objects`
+# reconstructs every file ever committed -- including one that was removed
+# later for being a secret. This is the same class of leak as storage/, so it
+# gets the same rule: refuse any path whose SEGMENT starts with a dot, at any
+# depth, which also covers a `.git` inside a second copy of the app.
+#
+# `.well-known` stays reachable: it is the ACME / Let's Encrypt challenge folder
+# and refusing it breaks certificate renewal. It is matched by name, not by the
+# leading dot.
+#
+# Both layers, for the reason described above: mod_rewrite alone is skipped once
+# a nested folder supplies its own .htaccess, and mod_alias alone is absent on a
+# host that does not load it.
+RewriteRule (^|/)\.(?!well-known) - [F,L,NC]
 <IfModule mod_alias.c>
     RedirectMatch 403 (?i)^/(?!(?:.*/)?api/)(?:.*/)?(?:storage|logs|tmp|sessions|tests)(?:/|$)
+    RedirectMatch 403 (?i)/(?:.*/)?\.(?!well-known)
 </IfModule>
 
 # Never cache HTML entry points (JS/CSS already carry ?v= cache busters)

@@ -17,6 +17,38 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🗂️ The checkout moved to the app root — and Apache was serving `.git` *(Apache + tests + docs — `VERSION` 350, cache-buster unchanged)*
+
+- **What changed.** `git` now lives in the project root, which is also the web
+  root. Before this the repository sat one folder down, inside `cleancopy/`, and
+  every change had to be mirrored into that copy before it could be pushed — a
+  manual step with no feedback, and the only way it fails is silently.
+- **The consequence nobody asked about.** Putting `.git/` behind the same URL
+  prefix as the app puts the whole history on the web. `.git/config` can carry a
+  remote URL with a token in it, and `.git/objects` reconstructs **every file ever
+  committed** — including one removed later *because* it held a secret.
+  `serve.php` and `nginx.example.conf` have always refused dotfiles; Apache's own
+  `.ht*` default does not cover them, and it answered `.git/config` with a **200**
+  and the real `[core]` body. Measured before the fix, not assumed from the docs.
+- **The fix is one rule, in the mode that lacked it.** The root `.htaccess` now
+  refuses any path segment starting with a dot, at any depth, in both layers it
+  already uses (mod_rewrite and `RedirectMatch`, so neither a nested `.htaccess`
+  nor a host without mod_alias can slip past). `/.well-known` is the one
+  exception, matched by name, because refusing it breaks ACME renewal.
+- **`.gitignore` grew teeth.** With the repo in the root, one `git add -A` was
+  enough to commit `Autonomous.zip` (220 MB), `storage/config.json.bak` — the
+  access token and every provider key, under a filename the old rules did not
+  match — the update feature's working folder (`storage/updates/`, a cached answer
+  and a full staged copy of the app), and two complete extra copies of the app.
+- **Verified.** `apacheGuards.test.php` gained assertions over `.git/config`,
+  `.git/HEAD`, `.git/objects/pack/`, a nested `.git`, and the ACME exception:
+  **11 assertions fail** when the new rule is removed, and all 62 pass with it.
+  `serve.php` and nginx already had the policy *and* the tests, which is why only
+  Apache needed a change.
+- **Cache-buster:** unchanged at `v348` — no browser file moved this time.
+
+---
+
 ## 🔎 "What's new" opens: the release note is readable *(PHP + UI — `VERSION` 349, cache-buster v348)*
 
 - **What it does.** **Config → Updates** used to show a release title and one
