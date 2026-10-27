@@ -66,10 +66,11 @@ way you answer it, the whole thing runs from there — download, verify, install
 reload. Your settings, agents, sessions and keys live in `storage/` and no update
 can reach them.
 
-**If you are on v354, update by hand once.** That release's installer has two
-faults this one fixes — it could delete `api/index.php` instead of replacing it,
-and its hand-off step couldn't start on Windows. Re-extract the release over your
-copy, keeping `storage/`, and updates work themselves out from here on.
+**If you are on v354 or v355, update by hand once.** The installers in those two
+releases have faults this one fixes: v354 could delete `api/index.php` instead of
+replacing it, and the hand-off step that finishes a file the running server still
+holds open could not start under XAMPP. Re-extract this release over your copy,
+keeping `storage/`, and updates work themselves out from here on.
 
 ### ▶️ Five minutes to running
 
@@ -128,10 +129,10 @@ localhost), and type in the composer.
 5. **`/storage`.** After install, request
    `http://your-host/router/storage/config.json`. You must get **403**. If you get
    JSON, stop everything and tell us — that is the finding we care about most.
-6. **An update, in place.** Run it once when v355 or later exists and tell us
-   what the prompt said, whether the install finished, and whether your agents,
-   sessions and keys were still there afterwards. If it stops part way, the
-   message it stopped with is the report.
+6. **An update, in place.** If you are on an earlier build, this is the release to
+   run it on. Tell us what the prompt said, whether the install finished, and
+   whether your agents, sessions and keys were still there afterwards. If it
+   stops part way, the message it stopped with is the report.
 
 ### ⚠️ Known limits — read before filing
 
