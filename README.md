@@ -33,9 +33,21 @@
 
 **Autonomous Loop Studio** (the "Router") is a single-folder PHP app — 🚫 no database, 🚫 no build step, 🚫 no external service. It runs on plain PHP (or Apache via XAMPP), keeps everything in JSON files, and drops a whole team of AI agents into your browser with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both directions**.
 
-> 🆕 **Recently added** — ♾️ an **always-on loop** with per-agent standing goals, spend caps, **hold/release** and a master kill switch · ❝ a **global pre-prompt** that **prepends or replaces** every agent's prompt, with a live toggle · 🧠 a **context assembler** sized to each model's *real* window · 🔧 **native tool calling** · 🌐 a **built-in browser** over CDP with a **domain block list** · 🕸️ **MCP servers and friends as live graph nodes** · 🧮 a **Resource Manager** so the 3D graph can rest · and a **security pass** that made every dangerous capability **opt-in**. 🛡️ · 🖥️ a **choice of shells** — Classic by default, Desktop 2026 on request · 🎛️ a **Config → Desktop card** that tunes the topography and the glass for a weak GPU, with **every knob still individually adjustable** · 📌 a **floor that stays put** · 🌫️ a **screen-space haze** that can no longer travel with the map
+### 🆕 What's new
 
-Made with 💙 by [MBHudson](https://github.com/mbhudson/)
+Everything below landed **after** the feature list further down this page was written. That list is still true — these are the things that are new. 🧭
+
+| | |
+|---|---|
+| 🌐 **Proxy, in the nav** | Hundreds of live HTTP proxies — **ELITE** and **ANONYMOUS** only — with ping and uptime on every row, favourites, and one **USE** that routes *all* of an agent's outbound traffic (models, web tools, the shell) through it. |
+| 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
+| 🧾 **An audit trail that holds up** | Two lines per command — `phase=start` *before* the spawn, `phase=end` after — sharing a `run=` id and naming the **agent** that asked. A run that never finished now shows as a start with no end, and `run_code` is audited too. |
+| 🔄 **Updates that explain themselves** | A load-time check against the published `VERSION` **and** cache-buster, a bell that names the release from its changelog, a **What's new** row you can expand, and a download that verifies and **diffs** without installing. |
+| 🖥️ **Classic & Desktop 2026** | Two shells, one switch, **Classic the default**; narrow the window and either becomes the same mobile layout. |
+| 🎛️ **Config → Desktop** | The machine-room card: map detail, fog, bloom, floating floor + floor pin, auto-rotate, glass blur, chat background and frame cap — each individually adjustable, with a preset that only ever turns visuals **down**. |
+| 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
+| 🔒 **Allow / Deny, with an undo** | The argv bouncer gained a **restore-defaults** button, a visible per-agent override path, and the `cmd` / `powershell` interpreter gap is closed — by list, never by hard-coding a refusal. |
+| 🧪 **One command per suite** | `node tests/run.mjs` and `php tests/php/run.php` run everything, including the guards that prove `/storage` and `/tests` are refused at any depth. |
 
 ---
 
@@ -67,6 +79,7 @@ Jump straight to a section — every heading on this page is also clickable.
 - [🧠 Dynamic tools & the learned dialect](#-dynamic-tools--the-learned-dialect)
 - [⏱️ Throttle / limiter / pacer](#️-throttle--limiter--pacer)
 - [🔑 API pool](#-api-pool--rotate-your-keys)
+- [🌐 Proxy](#-proxy--route-every-agents-outbound-traffic)
 - [📊 Metrics & 🔎 Run trace](#-metrics---run-trace)
 - [🕸️ Network & topology](#️-network--topology)
 - [🧮 Resource Manager](#-resource-manager--let-the-3d-graph-rest-)
@@ -125,6 +138,8 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🕸️ **MCP on the graph** | Outgoing calls and incoming friends drawn as live nodes with editable access |
 | 🖥️ **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
 | 🎛️ **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
+| 🌐 **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes every agent's outbound traffic through it |
+| 🔄 **Self-updates, checked** | A load-time check that names what shipped, plus a verified download that shows the diff and never installs itself |
 | 📱 **Mobile-first** | Built for the phone in your pocket |
 
 ---
@@ -563,10 +578,30 @@ It stacks with the pacer: every key is counted in its **own** bucket 📈, so a 
 
 ---
 
+## 🌐 Proxy — route every agent's outbound traffic
+
+![The Proxy tab: ELITE and ANONYMOUS rows, ping, uptime, favourite, USE and clear](screenshots/proxy.png)
+
+Agents leak. 🕵️ By default every model call, every `web_search`, every `fetch_url` and every `curl` an agent runs in the shell leaves from **your** IP. The **Proxy** tab — in the top nav, beside Providers — puts a checkpoint in front of all of it.
+
+- 🔄 **REFRESH LIST pulls hundreds at once.** The server reads a live public proxy feed — the kind of list that rotates daily — and keeps only what is usable: alive, HTTP, **IPv4** (this host dials IPv4 for `CURLOPT_PROXY`, so an IPv6 entry would look selected while traffic quietly went direct) and **identity-hiding only**. The header tells you what you got — *340 IPv4 proxies (elite + anonymous)* — and the drop counters explain a short list instead of leaving you to guess.
+- 🥇 **Two grades of hiding, and nothing below them.** **ELITE** *(best)* never announces itself and never forwards your address, so the far end sees a stranger. **ANONYMOUS** *(better)* strips your address, but the request may still be identifiable as proxied. Transparent proxies are refused at the source: they are your real IP with extra steps.
+- 📡 **Ping and uptime, per row.** **PING** measures a real round-trip through that proxy to `https://httpbin.org/ip`; **PING ALL** sweeps the whole list in one server request with `curl_multi`, so 300 rows take seconds instead of the better part of an hour. **Uptime** comes from the feed's own history — how much of the recent past that endpoint answered — and *Working only* hides the rows that stopped answering.
+- ⭐ **Favourites stick.** Star a row and it is kept with your settings rather than in the feed, so a proxy that worked yesterday is one click away after the list rotates.
+- ✅ **USE routes everything, server-side.** The choice is saved in `config.json`, because the **server** is what makes the call — a browser-only setting is invisible to it, which is exactly why picking a proxy once changed nothing. From then on: model relays, `web_search`, `fetch_url` and every shell command that honours proxy variables (`curl`, `wget`, `nmap`) go through it, while `localhost` and `127.0.0.1` stay direct via `NO_PROXY`. A per-request proxy in an agent's own spec still wins over the global choice.
+- ⚠️ **It does not fail closed — deliberately.** Free lists rot; when the selected proxy dies, calls fail with a curl error and its row says so. That is a consequence you can *see*, not a silent fall back to your real address. **CLEAR SELECTION** returns everything to the direct route.
+
+---
+
 ## 📊 Metrics & 🔎 Run trace
 
 - **Agent cards** show a live line: `⚡ tokens/budget · N req · up 2h · 40/min` — with a tooltip of in/out tokens, billed calls, output cap, context window and last call. Set a **token budget** (Config → Limits) and it shows `used/limit (%)`.
-- **🔎 Run trace** (Config → TRACE) is a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals.
+- **🔎 Run trace** (Config → TRACE) is one viewer with three tabs:
+  - **RUNS** — a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals.
+  - **COMMS** — what the agents actually *said* to each other, with the text: the question, the answer that came back, one-way orders and pings, each with its duration and a failure marker. Kept in memory (300 exchanges) for the page-load; agent chat is never written to `storage/`.
+  - **EXEC** — `storage/exec.log` parsed into runs, newest first: time, agent, command, working directory, duration, exit code, and a **no end** marker for a run that started and never reported back. Read-only — the UI has no button that can clear evidence.
+- **🗣️ Per-agent, from the map** — an agent's card on the chart shows *Recent messages* with what was said, and **Messages →** opens a drawer scoped to that agent (**Talk** / **Runs**). Hovering a beam reads *"Agent A → Agent B: …"*.
+- **🧾 The audit trail is two-phase** — each `exec`/`run_code` run writes `phase=start` *before* the process spawns and `phase=end` afterwards, sharing one `run=` id and carrying `agent=<id>`. A command killed mid-run therefore leaves a visible start with no end instead of no record at all, and every line can be tied to the turn that asked for it.
 
 ---
 
@@ -637,6 +672,8 @@ Take your work with you. 📦
 ## 🔁 Updates — download, verified, never auto-installed
 
 The app can fetch its own published release and show you **exactly what would change**, without changing anything. 🧾
+
+![The bell naming a newer release, read from the published changelog](screenshots/version-update.png)
 
 - 📥 **Config → Updates → DOWNLOAD UPDATE…** fetches the published archive from GitHub into `storage/updates/`, verifies it, extracts a staging copy and diffs it against your install: *N new · N changed · N unchanged · N not in this release* — plus the version each copy calls itself and the archive's SHA-256.
 - 🔔 **It checks by itself at load.** The server reads two small files from the published copy (`VERSION` and `ui/js/store.js`) and compares version numbers, so the app knows a release exists **without downloading one**. If the published version is *newer*, one notification lands in the bell (🔔, right panel): *"Update available — published v337, this copy v344. Open Config → Updates to compare it."* Announced **once per published version**, not once per reload, and the answer is cached for **six hours** — so a reload usually costs no network call at all.
