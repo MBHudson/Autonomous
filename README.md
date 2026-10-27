@@ -772,12 +772,12 @@ The app can fetch its own published release and show you **exactly what would ch
 | The bare folders (`/storage`, `/tests/`) — no listing either | **403** | **403** | **404** | **404** |
 | **Any depth**: `<copy>/storage/config.json`, `<copy>/tests/…` | **403** | **403** | **404** | **404** |
 | `…/STORAGE/state.json` (case variant) | **403** | **403** | **404** | **404** |
-| Dotfiles (`.htaccess`, `.git`, `.env`, `.htpasswd`) | **403** | `.ht*` denied by Apache itself ¹ | **404** | deny ¹ |
+| Dotfiles at **any depth** (`.git/…`, `.htaccess`, `.env`, `.htpasswd`) | **403** | **403** | **404** | deny ¹ |
 | Loose `.json` `.log` `.ini` `.bak` `.key` `.pem` outside `storage/` | served ² | served ² | **404** | served ² |
 | `/api`, `/api/sessions`, `/api/config` | **served** | **served** | **served** | **served** |
 | `ui/js/tests.js`, `ui/js/storage.js`, `/testsuite/` | **served** | **served** | **served** | **served** |
 
-<sub>¹ Apache's own default config blocks `.ht*`; `.git`/`.env` in a web root need a rule of their own, which `nginx.example.conf` already carries for nginx. ² These only exist if something wrote them there — `storage/` never is.</sub>
+<sub>¹ IIS has no `.htaccess` equivalent: its refusal comes from `web.config`, the way nginx's comes from `nginx.example.conf`. Apache's own `.ht*` default is **not** a substitute — it covers `.htaccess` and `.htpasswd` and serves `.git/config` quite happily — which is why the root `.htaccess` carries the same dot rule as the other two modes. ² These only exist if something wrote them there — `storage/` never is.</sub>
 
 - **🪆 Why “any depth” matters.** A second copy of the app — a backup, an
   archive of an older version, a folder kept for comparison — brings its **own**
@@ -786,6 +786,17 @@ The app can fetch its own published release and show you **exactly what would ch
   **segment** rule, not a prefix rule: anything named `storage` anywhere in the path
   is refused, which is why `https://host/router/old-copy/storage/config.json`
   answers `403` instead of a token.
+- **🗂️ The checkout sits in the web root, so `.git/` is part of the surface.**
+  This folder is the repository *and* the thing being served, which puts `.git/`
+  behind the same door as everything else: `.git/config` can carry a remote URL
+  with a token in it, and `.git/objects` reconstructs **every file ever
+  committed** — including one removed later for holding a secret. `serve.php` and
+  `nginx.example.conf` always refused dotfiles; Apache did not, and served
+  `.git/config` with the real `[core]` section as a **200**. The root
+  `.htaccess` now refuses any path segment starting with a dot, at any depth,
+  with `/.well-known` as the single exception so ACME renewal still works — and
+  `apacheGuards.test.php` requests `.git/config`, `.git/HEAD`, `.git/objects/pack/`
+  and a nested `.git` so it cannot quietly reopen.
 - **🧠 Why Apache needs `RedirectMatch`, not just a `RewriteRule`.** In
   per-directory context a child `.htaccess` **replaces** its parent's rewrite rules
   unless it opts into `RewriteOptions Inherit` — and every copy of this app ships
@@ -833,7 +844,7 @@ that **makes the real request** and fails loudly when a path comes back:
 | Test | What it actually does |
 | --- | --- |
 | 🧪 `guards.test.php` | Boots `serve.php` on a loopback port and requests the live paths — files, bare folders, case variants, dotfiles, the `/api/*` exemption and lookalike names |
-| 🟡 `apacheGuards.test.php` | Boots the local Apache with this folder as `DocumentRoot` and `AllowOverride All`, so the **shipped `.htaccess` files themselves** are what answer |
+| 🟡 `apacheGuards.test.php` | Boots the local Apache with this folder as `DocumentRoot` and `AllowOverride All`, so the **shipped `.htaccess` files themselves** are what answer — `/tests`, `/storage`, the archived copy, and the dotfile rule over `.git/config`, `.git/HEAD`, `.git/objects/` and a nested `.git` |
 | 🔴 `nginxGuards.test.php` | Lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE — the engine nginx matches with — so a rule that reopens a hole fails without nginx installed |
 | 🪆 nested-copy checks | `guards.test.php` requests nested paths directly; `apacheGuards.test.php` does the same against the archived copy when one is present — the case a root-anchored rule misses |
 

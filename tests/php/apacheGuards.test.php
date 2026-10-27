@@ -295,6 +295,32 @@ try {
         ok($code === 403, $path . ' is denied (got ' . var_export($code, true) . ', want 403)', $pass, $fail, $errors);
     }
 
+    // --- the repository itself -------------------------------------------
+    //
+    // The app root IS the checkout now, so .git/ sits in the web root and Apache
+    // serves any file in it it can read: `.git/config` can carry a credentialed
+    // remote URL, and `.git/objects` reconstructs every file ever committed --
+    // including one removed later for holding a secret. serve.php and nginx have
+    // always refused dotfiles; Apache did not, and this file is the only place
+    // that would have noticed. Measured before the rule existed: 200, with the
+    // real `[core]` section as the body.
+    denied($base, '/.git/config', 'the repository config', '[core]', $pass, $fail, $errors);
+    denied($base, '/.git/HEAD', 'the repository HEAD', 'ref:', $pass, $fail, $errors);
+    denied($base, '/.gitignore', 'the ignore file', 'storage/config.json', $pass, $fail, $errors);
+    foreach (array('/.git', '/.git/', '/.git/objects/', '/.git/objects/pack/') as $path) {
+        $code = http_status($base . $path);
+        ok($code === 403, $path . ' is denied (got ' . var_export($code, true) . ', want 403)', $pass, $fail, $errors);
+    }
+    // The dot rule is on the SEGMENT, at any depth -- a clone made inside a copy
+    // of the app would otherwise sit behind the same door.
+    $code = http_status($base . '/any-copy/.git/config');
+    ok($code === 403, 'a nested .git is denied (got ' . var_export($code, true) . ', want 403)', $pass, $fail, $errors);
+    // ...but not on a dot that is merely part of a filename, or on the ACME
+    // folder, which is the one dot-directory that has to stay reachable or
+    // certificate renewal breaks. 404 is expected: the file does not exist.
+    $code = http_status($base . '/.well-known/acme-challenge/token');
+    ok($code !== 403, 'the ACME folder is not refused (got ' . var_export($code, true) . ')', $pass, $fail, $errors);
+
     // --- a second copy of the app kept inside the web root ----------------
     //
     // The archive at the repo root is reference material, and it carries its own
