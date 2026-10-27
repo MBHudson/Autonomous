@@ -33,10 +33,10 @@
 //    above the apps drop-down; panels tuck away while a node card is open
 //  - chat: drag-to-widen, expand-to-screen, adjustable background alpha
 
-import { store } from './store.js?v=354';
-import { persistence } from './persistence.js?v=354';
-import { planDrawer } from './drawerState.js?v=354';
-import { resolveIface, normalizeIface, IFACE_EVENT } from './ifaceMode.js?v=354';
+import { store } from './store.js?v=358';
+import { persistence } from './persistence.js?v=358';
+import { planDrawer } from './drawerState.js?v=358';
+import { resolveIface, normalizeIface, IFACE_EVENT } from './ifaceMode.js?v=358';
 
 const MQ = window.matchMedia('(min-width: 1025px)');
 const root = document.documentElement;
@@ -84,7 +84,7 @@ function ensureCss() {
   if (document.querySelector('link[data-d26]')) return;
   const l = document.createElement('link');
   l.rel = 'stylesheet';
-  l.href = 'ui/css/desktop2026.css?v=354';
+  l.href = 'ui/css/desktop2026.css?v=358';
   l.dataset.d26 = '1';
   document.head.appendChild(l);
 }
