@@ -17,7 +17,7 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
-## 🧩 An unfinished install says so, and finishes from the panel *(UI — `VERSION` 358, cache-buster v353 → v354)*
+## 🧩 An unfinished install says so, and finishes from the panel *(UI — `VERSION` 358, cache-buster v353 → v358)*
 
 **The panel had a sentence about a stuck install and no way to act on it.**
 `_paintInstall()` printed "Waiting to be swapped in: api/index.php" into a grey
