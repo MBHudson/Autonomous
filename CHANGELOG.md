@@ -17,6 +17,28 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧩 An unfinished install says so, and finishes from the panel *(UI — `VERSION` 358, cache-buster v353 → v354)*
+
+**The panel had a sentence about a stuck install and no way to act on it.**
+`_paintInstall()` printed "Waiting to be swapped in: api/index.php" into a grey
+hint underneath a hidden button, and `POST /update/finish` had existed since the
+installer landed with nothing in the UI calling it. So the honest answer to "one
+file is waiting" was still a terminal.
+
+Config → Updates now opens with a box that names the files — *1 file waiting —
+this update is unfinished* — and a **FINISH THE UPDATE** button that calls that
+route and reports what actually swapped. The section badge flips to
+**UNFINISHED** in red, because a collapsed section would otherwise still claim
+`PUBLISHED v…` while the tree was one rename short.
+
+A 404 is handled as the thing it is: while `api/index.php` is the file still
+waiting, the OLD api answers these calls and may not have the route at all, so
+the box says to reload — the retry added in v357 finishes it on load.
+
+The box should almost never appear, which is the point of having it: the retry
+runs before the panel is drawn, so it survives on screen only when the automatic
+path could not finish the job.
+
 ## 🔁 A hand-off that failed retries itself *(PHP — `VERSION` 357, no cache-buster bump)*
 
 **The installer that runs an update is the copy being replaced.** Harmless until
