@@ -134,6 +134,13 @@ measures **39–42 seconds** over five runs on a warm machine — the number a r
 leave the hook on at all. A cold machine, or a scanner reading 280 fresh files, is slower; the copy is real
 work, so the figure is stated with its conditions rather than as a promise.
 
+It is no longer stated at all, on trust: the check ends **every** run — passing or failing — with what it
+cost, `took: 43.0s (copy 0.4s, PHP 41.6s, JS 1.0s)`, and the hook prints its own end-to-end seconds next to
+it. A quoted cost that nobody re-measures is how *about two minutes* survived as long as it did. The
+breakdown also answers the question the total cannot: the **PHP half is the entire price** — it boots
+`serve.php` on a loopback port, boots Apache against a generated config and spawns an MCP mock server,
+which on Windows is a second of process startup per file — while the JS half runs in about a second.
+
 Covered by the new `php tests/php/secrets.test.php` (66 assertions: mask/restore round-trips, the
 friend-token lifecycle, the local-only gate, and the live routes with the real handlers running against a
 throwaway config), by the new `tests/php/setupToken.test.php` (56, above), and by additions to
