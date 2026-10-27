@@ -21,9 +21,9 @@
 // Toggle: Config → Labs → "Dynamic tools" (settings.dynamicTools). Off = the
 // exact classic toolInstructions() output, byte for byte.
 
-import { store } from './store.js?v=352';
-import { api } from './api.js?v=352';
-import { toolInstructions } from './tools.js?v=352';
+import { store } from './store.js?v=353';
+import { api } from './api.js?v=353';
+import { toolInstructions } from './tools.js?v=353';
 
 const TTL_MS = 5 * 60 * 1000;
 let _facts = null;

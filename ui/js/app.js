@@ -10,17 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=352';
-import { K } from './storage.js?v=352';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=352';
-import { esc, downloadFile } from './utils.js?v=352';
-import { startStateSync } from './stateSync.js?v=352';
-import { api } from './api.js?v=352';
-import { themeManager } from './themes.js?v=352';
-import { Sidebar } from './components/sidebar.js?v=352';
-import { Chat } from './components/chat.js?v=352';
-import { TopologyGraph } from './components/topology.js?v=352';
-import { initTopoPanel } from './components/topoPanel.js?v=352';
+import { store, APP_VERSION } from './store.js?v=353';
+import { K } from './storage.js?v=353';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=353';
+import { esc, downloadFile } from './utils.js?v=353';
+import { startStateSync } from './stateSync.js?v=353';
+import { api } from './api.js?v=353';
+import { themeManager } from './themes.js?v=353';
+import { Sidebar } from './components/sidebar.js?v=353';
+import { Chat } from './components/chat.js?v=353';
+import { TopologyGraph } from './components/topology.js?v=353';
+import { initTopoPanel } from './components/topoPanel.js?v=353';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -29,33 +29,33 @@ import { initTopoPanel } from './components/topoPanel.js?v=352';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=352')
+  return import('./components/topology3d/index.js?v=353')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=352';
-import { AgentEditor } from './components/agentEditor.js?v=352';
-import { ProviderEditor } from './components/providerEditor.js?v=352';
-import { Microphone } from './components/microphone.js?v=352';
-import { ConfigPanel } from './components/configPanel.js?v=352';
-import { ExportPanel } from './components/export.js?v=352';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=352';
-import { TerminalPanel } from './components/terminalPanel.js?v=352';
-import { MetricsPanel } from './components/metricsPanel.js?v=352';
-import { TracePanel } from './components/tracePanel.js?v=352';
-import { AgentRecord } from './components/agentRecord.js?v=352';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=352';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=352';
-import { initApprovals } from './approvals.js?v=352';
-import * as memory from './memory.js?v=352';
-import { audio } from './audio.js?v=352';
-import { AlwaysOn } from './alwaysOn.js?v=352';
-import { ApiLab } from './apiLab.js?v=352';
-import { BrainLab } from './brainlab.js?v=352';
-import { BrowserView } from './components/browserView.js?v=352';
+import { RoutingChart } from './components/routingChart.js?v=353';
+import { AgentEditor } from './components/agentEditor.js?v=353';
+import { ProviderEditor } from './components/providerEditor.js?v=353';
+import { Microphone } from './components/microphone.js?v=353';
+import { ConfigPanel } from './components/configPanel.js?v=353';
+import { ExportPanel } from './components/export.js?v=353';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=353';
+import { TerminalPanel } from './components/terminalPanel.js?v=353';
+import { MetricsPanel } from './components/metricsPanel.js?v=353';
+import { TracePanel } from './components/tracePanel.js?v=353';
+import { AgentRecord } from './components/agentRecord.js?v=353';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=353';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=353';
+import { initApprovals } from './approvals.js?v=353';
+import * as memory from './memory.js?v=353';
+import { audio } from './audio.js?v=353';
+import { AlwaysOn } from './alwaysOn.js?v=353';
+import { ApiLab } from './apiLab.js?v=353';
+import { BrainLab } from './brainlab.js?v=353';
+import { BrowserView } from './components/browserView.js?v=353';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -646,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * a streaming reply with `+398 −212` is how a good feature gets hated.
    */
   const offerUpdate = (info) => {
-    const { remote, local, headline } = info;
+    const { remote, local, headline, onShown } = info;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -716,6 +716,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         say(`${changed} file(s) to write. Backing up the app, then installing…`);
         const res = await api.updateInstall();
+        if (res.finishing) {
+          // The entry script cannot be renamed over while it is answering this
+          // very call. It is written and waiting; a detached finisher swaps it
+          // in as soon as this request ends, so the reload waits for that.
+          say(`Installed v${res.to}. Finishing the last file — reloading…`);
+          await new Promise((r) => setTimeout(r, 3000));
+          location.reload();
+          return;
+        }
         say(`Installed v${res.to}. Reloading…`);
         setTimeout(() => location.reload(), 1200);
       } catch (err) {
@@ -735,17 +744,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     document.addEventListener('keydown', onKey);
 
-    // Wait for a clear screen: no other dialog, no reply still streaming. A
-    // dozen tries is a minute — after that the bell still carries the news.
+    // Wait for a clear screen: no VISIBLE dialog, no reply still streaming.
+    // Hidden dialogs live in the DOM from first render (the setup panel, the
+    // ask box), so "an overlay exists" is almost always true and would keep
+    // this prompt off the screen forever.
     let tries = 0;
     (function place() {
-      const busy = document.querySelector('.modal-overlay')
-        || document.querySelector('.message-streaming');
+      const busy = [...document.querySelectorAll('.modal-overlay')]
+        .some((el) => el.offsetParent !== null)
+        || !!document.querySelector('.message-streaming');
       if (busy && ++tries < 12) {
         setTimeout(place, 5000);
         return;
       }
-      if (!busy) document.body.appendChild(overlay);
+      if (busy) return;          // gave up; onShown never fires, so the next
+                                 // load offers it again instead of going quiet
+      document.body.appendChild(overlay);
+      // "Announced" means SHOWN. Marking it before the dialog exists is how a
+      // reload between the two leaves a release that is never mentioned again.
+      if (typeof onShown === 'function') onShown();
     })();
   };
 
@@ -760,10 +777,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       // keeps up to 100 entries, and the same news every page load would bury
       // the things actually happening. A NEWER release re-notifies.
       if (String(store.get('settings.updateNotifiedVersion') || '') === String(remote)) return;
-      store.set('settings.updateNotifiedVersion', String(remote));
-      // store.set is memory-only; without this the marker is gone by the next
-      // load and the same release is announced again on every single reload.
-      try { persistence.set('settings', store.get('settings')); } catch { /* private mode */ }
       // Name what shipped, from the top of the published CHANGELOG. The
       // server asks for that file ONLY when an update exists, so it is normally
       // here; when it could not be read the notification simply says less,
@@ -771,7 +784,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       // The toast became a prompt: this is the one place the app can offer to
       // do the whole update, and a notification that only says "open Config"
       // asks the operator to find the feature before they can use it.
-      offerUpdate({ remote, local, headline: res.remoteChange?.title });
+      //
+      // The version marker is written by onShown, once the dialog is really on
+      // screen. store.set is memory-only, hence the persistence call; a reload
+      // between deciding to show it and showing it must NOT consume the news.
+      offerUpdate({
+        remote,
+        local,
+        headline: res.remoteChange?.title,
+        onShown: () => {
+          store.set('settings.updateNotifiedVersion', String(remote));
+          try { persistence.set('settings', store.get('settings')); } catch { /* private mode */ }
+        },
+      });
     }).catch(() => { /* offline, or no curl on this PHP. Not the operator's problem at load. */ });
   });
 

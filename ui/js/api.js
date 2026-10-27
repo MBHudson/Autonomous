@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=352';
-import { acquire, note429 } from './rateGovernor.js?v=352';
-import { latency } from './latency.js?v=352';
-import { detectFamily } from './harness.js?v=352';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=352';
+import { store } from './store.js?v=353';
+import { acquire, note429 } from './rateGovernor.js?v=353';
+import { latency } from './latency.js?v=353';
+import { detectFamily } from './harness.js?v=353';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=353';
 
 latency.bindStore(store);
 
@@ -365,6 +365,15 @@ class ApiClient {
   // Phase, preflight and the tail of storage/updates/install.log.
   updateState() {
     return this.request('GET', '/update/state');
+  }
+
+  // Swaps in files an install had to defer because the server was executing
+  // them. Usually unnecessary — a detached finisher does it a second after the
+  // install returns — but on a host where spawning a process is disabled this
+  // is the step that closes the gap. It may 404: during the window when
+  // api/index.php is the one file still waiting, the OLD api answers.
+  updateFinish() {
+    return this.request('POST', '/update/finish', {});
   }
 
   // --- Export ---
