@@ -3,6 +3,10 @@
 Two numbers tell the update check at **Config → Updates** that something new
 exists. Bump the right one and nothing else is needed.
 
+> Shipping a build? The GitHub release body — tag name, title, pre-release
+> checkbox and the notes themselves — lives in
+> [RELEASE-NOTES.md](RELEASE-NOTES.md).
+
 | # | Number | Lives in | Bump it when |
 | --- | --- | --- | --- |
 | 1 | **release number** | [`VERSION`](VERSION) (repo root) | **every** release — including one that changes no browser file, e.g. a PHP or docs fix |
@@ -36,10 +40,13 @@ no cached asset changed, so it cannot report one.
 3. **Add a [CHANGELOG](CHANGELOG.md) entry.** Say which numbers moved, and say
    *"no cache-buster bump"* plainly when you left it alone — that is information,
    not an omission.
-4. **Run both suites:** `php tests/php/run.php` and `node tests/run.mjs`.
+4. **Update [RELEASE-NOTES.md](RELEASE-NOTES.md)** if what shipped changed:
+   tag, title and body are what the release page will say. A release whose notes
+   still describe the previous build reads as an accident.
+5. **Run both suites:** `php tests/php/run.php` and `node tests/run.mjs`.
    `tests/php/update.test.php` fails when `VERSION` is behind `APP_VERSION`,
    which is the mistake this checklist exists to prevent.
-5. **Push.** Running copies get a notification in the bell on their next page
+6. **Push.** Running copies get a notification in the bell on their next page
    load; the check is cached server-side for six hours, and nothing installs
    itself — **Config → Updates → DOWNLOAD UPDATE…** is still a manual,
    compare-first step.
