@@ -7,22 +7,52 @@ not the published release.
 
 ## How to publish one
 
-1. **Tag** — name it after [`VERSION`](VERSION), e.g. `v353-open-testing`. That
+1. **Tag** — name it after [`VERSION`](VERSION), e.g. `v354-open-testing`. That
    sorts sanely and says what it is.
-2. **Title** — `v353 — Open testing` (or `— Release` once it is not a test).
+2. **Title** — `v354 — Open testing` (or `— Release` once it is not a test).
 3. **Tick “Set as a pre-release”** for any open-testing build. That keeps it out
    of *Latest release* so nobody treats it as the supported version.
-4. **Body** — copy everything inside the fence below.
+4. **Body** — copy the block under *Release body* at the end of this file, in
+   full. Nothing above or below it belongs on the page.
 5. **Push the branch too.** The in-app update check reads `VERSION` and
    `APP_VERSION` from **`master`** (`src/Update.php` → `RELEASE_PROBE`), not from
    tags. A tag alone notifies nobody; a moved `master` does. See
    [RELEASING.md](RELEASING.md).
 
-## Release body
+## Screenshots
+
+Paste these above *What's in this build* — or one section higher, after the intro
+paragraph, if you would rather lead with a picture. GitHub renders raw links
+inside release bodies, and they point at `master`, so they update themselves.
+
+The captions are not decoration: the glass shell is the striking one, but
+**Classic is the default**, so an unlabelled pair reads as if Desktop 2026 is
+what a new install opens. Keep the blank lines, or GitHub runs the images into
+the paragraph above.
 
 ```markdown
-## 🧠 Autonomous Loop Studio — open testing, v353
+![Desktop 2026 — the glass shell: edge rail, Config drawers, and the live network map](https://raw.githubusercontent.com/MBHudson/Autonomous/master/screenshots/new-ui-main.png)
 
+*Desktop 2026 — pick it in Config → Interface.*
+
+![Classic — the default: setup panel, chat and map side by side](https://raw.githubusercontent.com/MBHudson/Autonomous/master/screenshots/mainscreen01.png)
+
+*Classic — the default interface.*
+```
+
+Both are 1920×1080 and 1.3 MB / 885 KB, so each renders full width. If the page
+feels long, `new-ui-main.png` alone carries it.
+
+Do **not** link `main.png` or `main-motion.gif` — nothing references them any
+more and the GIF is 2.8 MB.
+
+## Release body
+
+The whole block below — opening fence to closing fence — is what goes in the
+**Describe this release** box. It is the last thing in this file so that a copy
+that runs to the end of the document is still correct.
+
+```markdown
 A self-hosted, universal multi-agent AI console. One folder of PHP, no database,
 no build step, no external service. You bring the API key; it brings the agents,
 the tools and the map.
@@ -30,6 +60,11 @@ the tools and the map.
 This is the first build going out beyond the machine it was written on. It runs,
 and it is **not finished** — the limits list near the bottom is the honest part,
 so read it before you file anything.
+
+**New in v354: it updates itself.** The load-time notice is a prompt now, and
+whichever way you answer it, the whole thing runs from there — download, verify,
+install, reload. Your settings, agents, sessions and keys live in `storage/` and
+no update can reach them.
 
 ### ▶️ Five minutes to running
 
@@ -66,10 +101,15 @@ localhost), and type in the composer.
   `cmd` / `powershell` interpreter gap is closed *by list*, never hard-coded, so
   you can always change your mind.
 - **Proxy** — hundreds of live proxies, ELITE and ANONYMOUS only, with ping and
-  uptime, favourites, and one click that routes all of an agent's outbound
+  uptime, favorites, and one click that routes all of an agent's outbound
   traffic.
 - **Updates that explain themselves** — a load-time check, a bell naming the
   release from its changelog, and a **What's new** row you can expand.
+- **Updates that install themselves** — three answers: *back up, then update*
+  (your settings saved to this machine's Downloads folder), *update without a
+  backup*, or *cancel*. Either of the first two runs the rest unattended. A
+  rollback copy of the code goes to `storage/backups/` before the first write, and
+  if the installed files come up on the wrong version it rolls back by itself.
 
 ### 🎯 Where we'd actually like your eyes
 
@@ -83,12 +123,17 @@ localhost), and type in the composer.
 5. **`/storage`.** After install, request
    `http://your-host/router/storage/config.json`. You must get **403**. If you get
    JSON, stop everything and tell us — that is the finding we care about most.
+6. **An update, in place.** Run it once when v355 or later exists and tell us
+   what the prompt said, whether the install finished, and whether your agents,
+   sessions and keys were still there afterwards. If it stops part way, the
+   message it stopped with is the report.
 
 ### ⚠️ Known limits — read before filing
 
 | | |
 |---|---|
-| **No installer** | Config → Updates detects a newer release, downloads it, verifies it and shows a file-by-file diff — then **stops**. Installing is manual: replace the app files, keep `storage/`. |
+| **The installer needs write access** | The in-app install works when the web server owns the app's files (the Windows/XAMPP path). On a host where the app folder is owned by someone else, it says so before downloading and points you at `install-update.php`, which does the same job from a terminal. |
+| **Rollbacks are kept, not archived** | The two most recent copies in `storage/backups/` are kept and older ones are pruned. That is code, not your data — `storage/` itself is never part of a rollback. |
 | **Comms log is in memory** | Bounded to 300 exchanges, cleared when the server restarts. It is for watching a run, not an archive. |
 | **One token, no accounts** | Fine on localhost or a LAN you trust. Put basic auth in front of it if it is ever reachable from outside. |
 | **Apache for a team** | `php -S` serves one request at a time. One agent is fine; five will queue. |
@@ -103,18 +148,5 @@ or Desktop 2026, whether you launched with `start.bat` or `start-php.bat`, and f
 a hang or a bad reply the **TRACE → RUNS** rows from that turn. A screenshot of
 the map beats a paragraph describing it.
 
-Thanks for kicking the tyres.
+Thanks for kicking the tires.
 ```
-
-## Screenshots
-
-Paste these above *What's in this build*; GitHub renders raw links inside release
-bodies. They point at `master`, so they update themselves.
-
-```markdown
-![Desktop 2026](https://raw.githubusercontent.com/MBHudson/Autonomous/master/screenshots/new-ui-main.png)
-![Classic — the default](https://raw.githubusercontent.com/MBHudson/Autonomous/master/screenshots/mainscreen01.png)
-```
-
-Do **not** link `main.png` or `main-motion.gif` — nothing references them any
-more and the GIF is 2.8 MB.

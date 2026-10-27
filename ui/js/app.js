@@ -10,16 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=351';
-import { K } from './storage.js?v=351';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=351';
-import { startStateSync } from './stateSync.js?v=351';
-import { api } from './api.js?v=351';
-import { themeManager } from './themes.js?v=351';
-import { Sidebar } from './components/sidebar.js?v=351';
-import { Chat } from './components/chat.js?v=351';
-import { TopologyGraph } from './components/topology.js?v=351';
-import { initTopoPanel } from './components/topoPanel.js?v=351';
+import { store, APP_VERSION } from './store.js?v=352';
+import { K } from './storage.js?v=352';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=352';
+import { esc, downloadFile } from './utils.js?v=352';
+import { startStateSync } from './stateSync.js?v=352';
+import { api } from './api.js?v=352';
+import { themeManager } from './themes.js?v=352';
+import { Sidebar } from './components/sidebar.js?v=352';
+import { Chat } from './components/chat.js?v=352';
+import { TopologyGraph } from './components/topology.js?v=352';
+import { initTopoPanel } from './components/topoPanel.js?v=352';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -28,33 +29,33 @@ import { initTopoPanel } from './components/topoPanel.js?v=351';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=351')
+  return import('./components/topology3d/index.js?v=352')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=351';
-import { AgentEditor } from './components/agentEditor.js?v=351';
-import { ProviderEditor } from './components/providerEditor.js?v=351';
-import { Microphone } from './components/microphone.js?v=351';
-import { ConfigPanel } from './components/configPanel.js?v=351';
-import { ExportPanel } from './components/export.js?v=351';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=351';
-import { TerminalPanel } from './components/terminalPanel.js?v=351';
-import { MetricsPanel } from './components/metricsPanel.js?v=351';
-import { TracePanel } from './components/tracePanel.js?v=351';
-import { AgentRecord } from './components/agentRecord.js?v=351';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=351';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=351';
-import { initApprovals } from './approvals.js?v=351';
-import * as memory from './memory.js?v=351';
-import { audio } from './audio.js?v=351';
-import { AlwaysOn } from './alwaysOn.js?v=351';
-import { ApiLab } from './apiLab.js?v=351';
-import { BrainLab } from './brainlab.js?v=351';
-import { BrowserView } from './components/browserView.js?v=351';
+import { RoutingChart } from './components/routingChart.js?v=352';
+import { AgentEditor } from './components/agentEditor.js?v=352';
+import { ProviderEditor } from './components/providerEditor.js?v=352';
+import { Microphone } from './components/microphone.js?v=352';
+import { ConfigPanel } from './components/configPanel.js?v=352';
+import { ExportPanel } from './components/export.js?v=352';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=352';
+import { TerminalPanel } from './components/terminalPanel.js?v=352';
+import { MetricsPanel } from './components/metricsPanel.js?v=352';
+import { TracePanel } from './components/tracePanel.js?v=352';
+import { AgentRecord } from './components/agentRecord.js?v=352';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=352';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=352';
+import { initApprovals } from './approvals.js?v=352';
+import * as memory from './memory.js?v=352';
+import { audio } from './audio.js?v=352';
+import { AlwaysOn } from './alwaysOn.js?v=352';
+import { ApiLab } from './apiLab.js?v=352';
+import { BrainLab } from './brainlab.js?v=352';
+import { BrowserView } from './components/browserView.js?v=352';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -626,6 +627,128 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Everything here is silent on failure. This app is meant to be dragged onto
   // a web root and used on a machine that may well be offline; "GitHub did not
   // answer" is not news the operator needs, and it must never interrupt boot.
+  /**
+   * The update prompt, raised once per published release.
+   *
+   * Three answers, and the whole install runs from whichever is picked: an
+   * optional backup of this copy to the Downloads folder, then the download,
+   * then the install, then a reload. Asking again between those steps would be
+   * four prompts for one decision.
+   *
+   * The order is not cosmetic. The backup is taken BEFORE the network call,
+   * because that is the last moment this copy is known-good; and the install
+   * only runs after the SERVER has written its own rollback copy of the app
+   * (Src\Install does that as its first step) — the browser's back up is for
+   * the operator's settings, the server's is for the code.
+   *
+   * Nothing here is shown over a modal that is already open, or over a live
+   * run: an update is patient, and covering somebody's half-written prompt or
+   * a streaming reply with `+398 −212` is how a good feature gets hated.
+   */
+  const offerUpdate = (info) => {
+    const { remote, local, headline } = info;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Update available — v${esc(String(remote))}</span>
+          <button class="modal-close" id="updClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div>This copy is <b>v${esc(String(local))}</b>. The published release is <b>v${esc(String(remote))}</b>.</div>
+          ${headline ? `<div class="form-hint" style="margin-top:6px">${esc(String(headline))}</div>` : ''}
+          <div class="form-hint" style="margin-top:10px">
+            Updating keeps everything of yours. Agents, sessions, models, keys and settings
+            live under <code>storage/</code>, and no update writes there — the installer
+            refuses that folder outright. A rollback copy of the app is written first, so
+            this is reversible.
+          </div>
+          <div class="form-hint" style="margin-top:8px">
+            The backup saves your settings to this machine's Downloads folder. It holds your
+            API keys and access token, so keep it somewhere safe or skip it.
+          </div>
+          <div class="form-hint" id="updStatus" style="margin-top:10px"></div>
+        </div>
+        <div class="modal-footer" style="flex-direction:column;gap:6px">
+          <button class="btn btn-primary btn-block" id="updBackup">BACK UP, THEN UPDATE</button>
+          <button class="btn btn-ghost btn-block" id="updNoBackup">UPDATE WITHOUT A BACKUP</button>
+          <button class="btn btn-ghost btn-block" id="updCancel">CANCEL</button>
+        </div>
+      </div>`;
+
+    const say = (text) => {
+      const el = overlay.querySelector('#updStatus');
+      if (el) el.textContent = text;
+    };
+    const buttons = ['updBackup', 'updNoBackup', 'updCancel']
+      .map((id) => overlay.querySelector('#' + id))
+      .filter(Boolean);
+    const lock = (on) => buttons.forEach((b) => { b.disabled = on; });
+    function onKey(e) {
+      if (e.key === 'Escape') close();
+    }
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
+
+    const run = async (withBackup) => {
+      lock(true);
+      try {
+        if (withBackup) {
+          say('Saving a backup of this copy…');
+          const data = await api.downloadBackup();
+          const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+          downloadFile(
+            JSON.stringify(data, null, 2),
+            `router-backup-${local}-${stamp}.json`,
+            'application/json'
+          );
+        }
+        say('Downloading the release — this can take a minute on a slow link.');
+        const plan = await api.updateDownload();
+        const changed = (plan?.counts?.new || 0) + (plan?.counts?.changed || 0);
+        if (!changed) {
+          say('The published copy matches this one — nothing to install.');
+          lock(false);
+          return;
+        }
+        say(`${changed} file(s) to write. Backing up the app, then installing…`);
+        const res = await api.updateInstall();
+        say(`Installed v${res.to}. Reloading…`);
+        setTimeout(() => location.reload(), 1200);
+      } catch (err) {
+        // The one message that has to be right: an install that failed part
+        // way is not a dead app, it is an app with a rollback copy waiting.
+        const msg = err?.message || String(err);
+        const hint = /install-update|rollback/i.test(msg) ? '' : ' Config → Updates can roll back.';
+        say(`Stopped: ${msg}${hint}`);
+        lock(false);
+      }
+    };
+
+    overlay.querySelector('#updBackup')?.addEventListener('click', () => run(true));
+    overlay.querySelector('#updNoBackup')?.addEventListener('click', () => run(false));
+    overlay.querySelector('#updCancel')?.addEventListener('click', close);
+    overlay.querySelector('#updClose')?.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', onKey);
+
+    // Wait for a clear screen: no other dialog, no reply still streaming. A
+    // dozen tries is a minute — after that the bell still carries the news.
+    let tries = 0;
+    (function place() {
+      const busy = document.querySelector('.modal-overlay')
+        || document.querySelector('.message-streaming');
+      if (busy && ++tries < 12) {
+        setTimeout(place, 5000);
+        return;
+      }
+      if (!busy) document.body.appendChild(overlay);
+    })();
+  };
+
   safeInit('updateCheck', () => {
     if (store.get('settings.checkUpdatesOnStartup') === false) return;
     api.updateCheck().then((res) => {
@@ -645,12 +768,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       // server asks for that file ONLY when an update exists, so it is normally
       // here; when it could not be read the notification simply says less,
       // which is better than not announcing the release at all.
-      const headline = res.remoteChange?.title;
-      store.emit('toast', {
-        message: `Update available — published v${remote}${headline ? ` · ${headline}` : ''}. `
-          + `This copy is v${local}. Open Config → Updates to compare it.`,
-        type: 'info',
-      });
+      // The toast became a prompt: this is the one place the app can offer to
+      // do the whole update, and a notification that only says "open Config"
+      // asks the operator to find the feature before they can use it.
+      offerUpdate({ remote, local, headline: res.remoteChange?.title });
     }).catch(() => { /* offline, or no curl on this PHP. Not the operator's problem at load. */ });
   });
 

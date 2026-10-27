@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=351';
-import { acquire, note429 } from './rateGovernor.js?v=351';
-import { latency } from './latency.js?v=351';
-import { detectFamily } from './harness.js?v=351';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=351';
+import { store } from './store.js?v=352';
+import { acquire, note429 } from './rateGovernor.js?v=352';
+import { latency } from './latency.js?v=352';
+import { detectFamily } from './harness.js?v=352';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=352';
 
 latency.bindStore(store);
 
@@ -311,9 +311,10 @@ class ApiClient {
 
   // --- Updates ---
   //
-  // Download-only on purpose: the server fetches the published release into
-  // storage/updates, verifies it and diffs it against the app. There is no
-  // "apply" endpoint, so nothing here can replace a file.
+  // Two halves. Downloading fetches the published release into storage/updates,
+  // verifies it and diffs it against the app without touching a single app
+  // file. Installing is a separate, explicit call, and it is the only thing in
+  // the client that can replace a file on the server.
   updateStatus() {
     return this.request('GET', '/update');
   }
@@ -338,6 +339,32 @@ class ApiClient {
 
   updateDiscard() {
     return this.request('POST', '/update/discard', {});
+  }
+
+  // A rollback copy of the current tree in storage/backups. Taken
+  // automatically by install, but offered on its own so it can be made (and
+  // copied somewhere else) before anything is replaced.
+  updateBackup() {
+    return this.request('POST', '/update/backup', {});
+  }
+
+  // Replaces the app files with the staged release. The fourth argument of
+  // request() is an AbortSignal, not an options bag, so there is deliberately
+  // none here: an install that the browser abandoned halfway is the one
+  // outcome this feature must not produce.
+  updateInstall() {
+    return this.request('POST', '/update/install', {});
+  }
+
+  // Undo: restores a copy from storage/backups. With no argument the server
+  // picks the newest one, which is what the button after a failed install does.
+  updateRollback(dir) {
+    return this.request('POST', '/update/rollback', dir ? { dir } : {});
+  }
+
+  // Phase, preflight and the tail of storage/updates/install.log.
+  updateState() {
+    return this.request('GET', '/update/state');
   }
 
   // --- Export ---

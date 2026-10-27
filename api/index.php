@@ -161,7 +161,11 @@ $body = json_decode(file_get_contents('php://input'), true);
 // call then dies with a fatal error AFTER the stream headers went out, which
 // the browser could only report as "the model returned an empty response".
 // Say what is actually wrong instead.
-$needsNet = ['llm', 'audio', 'sandbox', 'diag', 'lab', 'proxy-ping', 'proxy-ping-all', 'mcp', 'catalog', 'browser', 'update'];
+// `update` is deliberately absent: only its check and download actions reach
+// the internet. Reading what is staged, making a rollback copy, installing it
+// and rolling back are all local file work, and a machine with no curl is
+// exactly the machine most likely to be hand-fixing a release offline.
+$needsNet = ['llm', 'audio', 'sandbox', 'diag', 'lab', 'proxy-ping', 'proxy-ping-all', 'mcp', 'catalog', 'browser'];
 if (in_array($segments[0] ?? '', $needsNet, true) && !function_exists('curl_init')) {
     http_response_code(503);
     echo json_encode([
@@ -1701,16 +1705,38 @@ function pingProxy($ip, $port) {
  *   POST /api/update/check      -> the same, but never from the cache
  *   POST /api/update/download   -> the plan
  *   POST /api/update/discard    -> { ok, discarded }
+ *   GET  /api/update/state      -> phase, preflight, backups, last log lines
+ *   POST /api/update/backup     -> a rollback copy in storage/backups
+ *   POST /api/update/install    -> replaces the app files (Src\Install)
+ *   POST /api/update/rollback   -> restores a copy from storage/backups
  *
- * Deliberately no "apply". This route writes only inside storage/updates:
- * the archive lands there, is verified there, is extracted there, and is
- * diffed against the app tree READ-ONLY. Nothing in the app folder is replaced,
- * and storage/ itself is never read for the comparison nor written at all --
- * the published repo ships a default storage/ folder, and Update refuses every
- * one of those entries so it can never shadow the operator's real config.
+ * Downloading writes only inside storage/updates and never touches the app
+ * folder: the archive lands there, is verified there, is extracted there, and
+ * is diffed against the app tree READ-ONLY. storage/ itself is never read for
+ * that comparison nor written -- the published repo ships a default storage/
+ * folder, and Update refuses every one of those entries so it can never shadow
+ * the operator's real config.
+ *
+ * `install` is the one route in the app that replaces its own files. It is a
+ * separate, explicit POST rather than a side effect of downloading, every path
+ * it writes goes through Src\Install's refusals (storage/, .git and friends are
+ * unreachable), and the rollback copy is made before the first write. See the
+ * class note there for why each rule exists.
  */
 function handleUpdate($method, $segments, $body) {
     $action = $segments[1] ?? '';
+    // Only the two actions that talk to GitHub need curl. The rest work on
+    // files that are already here, so they must not inherit the gate above:
+    // "install the update you already downloaded" cannot require a network.
+    $needsCurl = function () {
+        if (function_exists('curl_init')) {
+            return;
+        }
+        throw new \RuntimeException("PHP's curl extension is not enabled, so this server cannot reach the internet. "
+            . 'Start the app with start.bat / start.sh (they switch it on), or enable '
+            . '"extension=curl" in php.ini' . (php_ini_loaded_file() ? ' (' . php_ini_loaded_file() . ')' : ' (this PHP has no php.ini at all)')
+            . ' and restart the server.');
+    };
     try {
         if ($action === '' || $action === 'status') {
             if ($method !== 'GET') {
@@ -1718,10 +1744,17 @@ function handleUpdate($method, $segments, $body) {
                 echo json_encode(['error' => 'GET only']);
                 return;
             }
-            echo json_encode(Src\Update::status());
+            $status = Src\Update::status();
+            // Whether it can be installed is part of "status": the UI decides
+            // between INSTALL and "run install-update.php" from this, and a
+            // caller that only discovers it cannot write halfway through an
+            // install is a caller holding a half-built tree.
+            $status['install'] = Src\Install::preflight();
+            echo json_encode($status);
             return;
         }
         if ($action === 'check') {
+            $needsCurl();
             // GET respects the cache; POST asks GitHub now. This is the cheap
             // probe the UI runs at page load: it reads only the published
             // ui/js/store.js and parses APP_VERSION out of it, so the check
@@ -1736,6 +1769,7 @@ function handleUpdate($method, $segments, $body) {
             return;
         }
         if ($action === 'download') {
+            $needsCurl();
             if ($method !== 'POST') {
                 http_response_code(405);
                 echo json_encode(['error' => 'POST only']);
@@ -1756,6 +1790,56 @@ function handleUpdate($method, $segments, $body) {
                 return;
             }
             echo json_encode(Src\Update::discard());
+            return;
+        }
+        if ($action === 'state') {
+            if ($method !== 'GET') {
+                http_response_code(405);
+                echo json_encode(['error' => 'GET only']);
+                return;
+            }
+            echo json_encode(Src\Install::state());
+            return;
+        }
+        if ($action === 'backup') {
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'POST only']);
+                return;
+            }
+            // A few hundred files; the default 30s is enough on a normal disk,
+            // but a slow external drive is exactly when you want the backup.
+            @set_time_limit(180);
+            $snap = Src\Install::snapshot();
+            echo json_encode(['ok' => true] + $snap);
+            return;
+        }
+        if ($action === 'install') {
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'POST only']);
+                return;
+            }
+            // The response is written by the code that is on disk RIGHT NOW,
+            // which is about to be replaced: already-parsed files keep working,
+            // so the reply survives the swap. Letting the client hang up would
+            // stop the install halfway, hence ignore_user_abort.
+            @ignore_user_abort(true);
+            @set_time_limit(0);
+            @ini_set('memory_limit', '256M');
+            echo json_encode(Src\Install::apply());
+            return;
+        }
+        if ($action === 'rollback') {
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'POST only']);
+                return;
+            }
+            @ignore_user_abort(true);
+            @set_time_limit(0);
+            $dir = is_array($body) && isset($body['dir']) ? (string) $body['dir'] : null;
+            echo json_encode(Src\Install::rollback($dir));
             return;
         }
         http_response_code(404);

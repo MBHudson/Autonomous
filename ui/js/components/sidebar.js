@@ -10,18 +10,18 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=351';
-import { K } from '../storage.js?v=351';
-import { persistence } from '../persistence.js?v=351';
-import { api } from '../api.js?v=351';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=351';
-import { errText } from '../api.js?v=351';
-import { TOOL_REGISTRY } from '../tools.js?v=351';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=351';
-import { snapshot } from '../rateGovernor.js?v=351';
-import { resetBrowserEnabled } from '../toolManifest.js?v=351';
-import { perf } from '../perf.js?v=351';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=351';
+import { store } from '../store.js?v=352';
+import { K } from '../storage.js?v=352';
+import { persistence } from '../persistence.js?v=352';
+import { api } from '../api.js?v=352';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=352';
+import { errText } from '../api.js?v=352';
+import { TOOL_REGISTRY } from '../tools.js?v=352';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=352';
+import { snapshot } from '../rateGovernor.js?v=352';
+import { resetBrowserEnabled } from '../toolManifest.js?v=352';
+import { perf } from '../perf.js?v=352';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=352';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1725,9 +1725,10 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         ? { text: `PUBLISHED v${esc(this._updatePlan.targetVersion?.label || '?')}`, cls: 'warn' }
         : { text: '' }, `
         <div class="form-hint">Fetches the published release into <code>storage/updates/</code>,
-          checks the archive, and lists what is different. <b>Nothing is replaced and nothing is
-          installed.</b> Nothing under <code>storage/</code> is read or written — sessions, agents,
-          models and keys stay exactly as they are.</div>
+          checks the archive, and lists what is different. <b>Downloading replaces nothing.</b>
+          INSTALL then copies the new files over the app's own — after writing a rollback copy to
+          <code>storage/backups/</code> first. Nothing under <code>storage/</code> is ever written, so
+          sessions, agents, models and keys stay exactly as they are.</div>
         <div class="toggle-row">
           <span class="toggle-label">Check for updates when the app loads</span>
           <div class="toggle ${settings.checkUpdatesOnStartup === false ? '' : 'active'}" id="sbUpdateAuto"><div class="toggle-knob"></div></div>
@@ -1743,6 +1744,9 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <button class="btn btn-ghost btn-block" id="sbUpdateCheck" style="margin-top:8px">DOWNLOAD UPDATE…</button>
         <div class="form-hint" id="sbUpdateStatus"></div>
         <div id="sbUpdatePlan"></div>
+        <button class="btn btn-primary btn-block" id="sbUpdateInstall" style="margin-top:8px;display:none">INSTALL UPDATE</button>
+        <div class="form-hint" id="sbUpdateInstallHint"></div>
+        <div id="sbUpdateRollback" style="margin-top:8px"></div>
       `)}
 
       <div class="cfg-cluster">
@@ -3297,12 +3301,14 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       api.updateStatus()
         .then((s) => {
           this._updatePlan = s?.plan || null;
+          this._installPre = s?.install || null;
           // "This copy" is read live: a staged plan is a snapshot, and the
           // version here moves every time the UI is bumped.
           if (this._updatePlan && s?.currentVersion) {
             this._updatePlan.currentVersion = s.currentVersion;
           }
           this._renderUpdatePlan();
+          this._paintInstall();
         })
         .catch(() => { /* offline is not an error worth a toast here */ });
     }
@@ -3369,7 +3375,12 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       try {
         const plan = await api.updateDownload();
         this._updatePlan = plan || null;
+        // Re-ask the server whether it can actually write over the app. It is
+        // a different question from "did the download work", and answering it
+        // here is what keeps INSTALL from failing halfway through.
+        this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
         this._renderUpdatePlan();
+        this._paintInstall();
         const n = (plan?.counts?.new || 0) + (plan?.counts?.changed || 0);
         // "this copy / published" rather than "vA → vB": the published number
         // can be LOWER than this one, and an arrow then reads as an upgrade
@@ -3388,6 +3399,104 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         this._updateBusy = false;
         btn.disabled = false;
         btn.textContent = was;
+      }
+    });
+
+    // INSTALL — the only control in the app that replaces app files.
+    const installBtn = document.getElementById('sbUpdateInstall');
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (this._installBusy) return;
+        const target = this._updatePlan?.targetVersion?.label ?? '?';
+        if (!confirm(`Install v${target} now?\n\n`
+          + 'Every app file this release carries is replaced, including the page you are looking at.\n'
+          + 'A rollback copy goes to storage/backups first, and nothing under storage/ is touched,\n'
+          + 'so agents, sessions, models, keys and settings stay exactly as they are.\n\n'
+          + 'One reload afterwards.')) return;
+        this._installBusy = true;
+        const was = installBtn.textContent;
+        installBtn.disabled = true;
+        installBtn.textContent = 'INSTALLING…';
+        const hint = document.getElementById('sbUpdateInstallHint');
+        if (hint) hint.textContent = 'Writing files. Do not close this tab.';
+        try {
+          const res = await api.updateInstall();
+          this._updatePlan = null;
+          this._renderUpdatePlan();
+          this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
+          this._paintInstall();
+          const done = document.getElementById('sbUpdateInstallHint');
+          if (done) {
+            done.textContent = `Installed ${res.installed} file(s) — this copy now reports v${res.to}. `
+              + 'Reload the page to use it.';
+          }
+          store.emit('toast', { message: `Installed v${res.to} — reload to use it`, type: 'success' });
+        } catch (err) {
+          const fail = document.getElementById('sbUpdateInstallHint');
+          if (fail) {
+            fail.textContent = `Install failed: ${errText(err)}`;
+          }
+          store.emit('toast', { message: `Install failed: ${errText(err)}`, type: 'error' });
+        } finally {
+          this._installBusy = false;
+          installBtn.disabled = false;
+          installBtn.textContent = was;
+        }
+      });
+    }
+  }
+
+  /**
+   * Show INSTALL only when there is something to install and the server says it
+   * can write the app folder. A disabled button with the reason beside it beats
+   * a button that dies at file 200 of 388.
+   */
+  _paintInstall() {
+    const btn = document.getElementById('sbUpdateInstall');
+    if (!btn) return;
+    const hint = document.getElementById('sbUpdateInstallHint');
+    const roll = document.getElementById('sbUpdateRollback');
+    const plan = this._updatePlan;
+    const pre = this._installPre;
+    const work = !!plan && ((plan.counts?.new || 0) + (plan.counts?.changed || 0)) > 0;
+
+    btn.style.display = work ? 'block' : 'none';
+    btn.disabled = !!(pre && !pre.ok);
+
+    if (hint) {
+      if (!work) {
+        hint.textContent = '';
+      } else if (pre && !pre.ok) {
+        hint.textContent = (pre.problems || []).join(' ');
+      } else {
+        const from = plan.currentVersion?.label ?? '?';
+        const to = plan.targetVersion?.label ?? '?';
+        hint.textContent = `Replaces this copy's v${from} files with v${to}. A rollback copy is written first.`;
+      }
+    }
+
+    if (!roll) return;
+    const snaps = pre?.snapshots || [];
+    if (!snaps.length) {
+      roll.innerHTML = '';
+      return;
+    }
+    const newest = snaps[0];
+    const label = newest.version ? `v${newest.version}` : 'the last copy';
+    roll.innerHTML = `
+      <div class="form-hint">Rollback available: <code>${esc(newest.name)}</code>
+        (${label}, ${newest.files} files).</div>
+      <button class="btn btn-ghost btn-block" id="sbUpdateRollbackBtn">ROLL BACK TO ${esc(label.toUpperCase())}</button>`;
+    roll.querySelector('#sbUpdateRollbackBtn')?.addEventListener('click', async () => {
+      if (!confirm(`Restore ${newest.name}?\n\nEvery app file it holds is written back over this copy.\n`
+        + 'Nothing under storage/ is touched.')) return;
+      try {
+        const res = await api.updateRollback(newest.dir);
+        this._installPre = (await api.updateStatus().catch(() => null))?.install || null;
+        this._paintInstall();
+        store.emit('toast', { message: `Rolled back to ${res.to ? 'v' + res.to : 'the backup'} — reload`, type: 'success' });
+      } catch (e) {
+        store.emit('toast', { message: `Rollback failed: ${errText(e)}`, type: 'error' });
       }
     });
   }

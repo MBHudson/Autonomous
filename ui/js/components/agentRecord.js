@@ -18,11 +18,11 @@
 // card. The renderers are the trace panel's, so there is one implementation of
 // each row and two doors to it.
 
-import { store } from '../store.js?v=351';
-import { esc } from '../utils.js?v=351';
-import { api } from '../api.js?v=351';
-import * as comms from '../commsLog.js?v=351';
-import { commsHtml, execHtml } from './tracePanel.js?v=351';
+import { store } from '../store.js?v=352';
+import { esc } from '../utils.js?v=352';
+import { api } from '../api.js?v=352';
+import * as comms from '../commsLog.js?v=352';
+import { commsHtml, execHtml } from './tracePanel.js?v=352';
 
 export class AgentRecord {
   constructor() {
