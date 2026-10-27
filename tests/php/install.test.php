@@ -21,8 +21,12 @@
 
 // --- bootstrap --------------------------------------------------------
 require_once __DIR__ . '/../../autoload.php';
-
 use Src\Install;
+
+// Never let an install in this file start a detached finisher: the tests below
+// run the generated script themselves, and a background child would race them
+// for the same temporary tree.
+define('INSTALL_NO_SPAWN', true);
 
 $pass = 0;
 $fail = 0;
@@ -217,6 +221,75 @@ ok(trim((string) file_get_contents($app . '/index.html')) === '<h1>old</h1>',
 $marker = json_decode((string) file_get_contents($app . '/storage/updates/install.json'), true);
 ok(is_array($marker) && ($marker['phase'] ?? '') === 'rolled-back',
     'the marker records that the tree was rolled back');
+
+// --- 6b. a file that cannot be swapped is deferred, never destroyed ----
+//
+// This is the bug the first real run found on Windows: api/index.php cannot be
+// renamed over while the request that is executing it holds the handle, and the
+// old fallback (unlink the target, try again) left the entry point simply gone.
+// A directory standing where the target should be makes the rename fail on any
+// platform, which is the same code path.
+build($app, '360');
+@unlink($app . '/ui/js/store.js');
+@mkdir($app . '/ui/js/store.js', 0777, true);
+$res = Install::apply();
+ok(in_array('ui/js/store.js', $res['deferred']), 'an unswappable file is deferred rather than fatal');
+ok(is_dir($app . '/ui/js/store.js'), 'the target that could not be replaced is still there');
+ok($res['finishing'] === true, 'the install reports itself as still finishing');
+ok(is_file($app . '/ui/js/.router-new-store.js'), 'the new copy is waiting beside it');
+ok(in_array('ui/js/store.js', Install::pendingSwaps()), 'the waiting swap is discoverable');
+ok(strpos((string) file_get_contents($app . '/storage/updates/install.log'), 'deferred') !== false,
+    'the deferral is written to the journal');
+$marker = json_decode((string) file_get_contents($app . '/storage/updates/install.json'), true);
+ok(($marker['phase'] ?? '') === 'finishing', 'the marker says finishing, not done');
+ok(trim((string) file_get_contents($app . '/VERSION')) === '360', 'the files that could be written were');
+ok(trim((string) file_get_contents($app . '/index.html')) === '<h1>new</h1>', 'other files still installed');
+
+// Once nothing holds it, finish() puts it in place and closes the marker.
+rmTree($app . '/ui/js/store.js');
+$fin = Install::finish(1);
+ok(in_array('ui/js/store.js', $fin['swapped']), 'finish swaps the deferred file in');
+ok(is_file($app . '/ui/js/store.js'), 'the swap produced the real file');
+ok(strpos((string) file_get_contents($app . '/ui/js/store.js'), '352') !== false,
+    'the swapped file is the release copy, not the old one');
+ok(Install::pendingSwaps() === [], 'nothing is left pending');
+$marker = json_decode((string) file_get_contents($app . '/storage/updates/install.json'), true);
+ok(($marker['phase'] ?? '') === 'done', 'the marker moves to done once the last file lands');
+ok(($fin['ok'] ?? false) === true, 'finish reports success');
+
+// --- 6c. the generated finisher stands alone --------------------------
+//
+// It has to: the release replaces src/ and install-update.php, so a finisher
+// that called back into either would be running code that no longer exists.
+// This runs it by hand, as its own process, and checks it does the swap, keeps
+// the journal and deletes itself.
+// The waiting swap is set up by hand rather than by running an install: an
+// install also SPAWNS the finisher, and a test that races a real child process
+// for the same file proves nothing about either of them.
+build($app, '361');
+put($app . '/ui/js/.router-new-store.js', "const APP_VERSION = 999;\n");
+
+$writer = new ReflectionMethod('Src\Install', 'writeFinisher');
+$writer->setAccessible(true);
+$script = $writer->invoke(null, Install::pendingSwaps());
+ok(is_string($script) && is_file($script), 'a standalone finisher script is generated');
+$body = (string) file_get_contents($script);
+ok(strpos($body, '.router-new-store.js') !== false && strpos($body, 'ui/js/store.js') !== false,
+    'the script carries its own list of swaps');
+ok(strpos($body, 'autoload.php') === false && strpos($body, 'require ') === false,
+    'it loads nothing from the app the update replaces');
+
+$out = [];
+$code = 0;
+exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($script) . ' 2>&1', $out, $code);
+ok($code === 0, 'the finisher runs clean as its own process (' . implode(' ', $out) . ')');
+ok(is_file($app . '/ui/js/store.js'), 'it swapped the deferred file in');
+ok(strpos((string) file_get_contents($app . '/ui/js/store.js'), '999') !== false,
+    'the swapped file is the waiting copy, not the old one');
+ok(Install::pendingSwaps() === [], 'nothing is left waiting');
+ok(!is_file($script), 'it deleted itself when it was done');
+ok(strpos((string) file_get_contents($app . '/storage/updates/install.log'), 'finish:') !== false,
+    'it wrote to the same journal');
 
 // --- 7. a stale lock does not wedge the installer ---------------------
 build($app, '357');

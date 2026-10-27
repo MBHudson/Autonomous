@@ -1830,6 +1830,18 @@ function handleUpdate($method, $segments, $body) {
             echo json_encode(Src\Install::apply());
             return;
         }
+        if ($action === 'finish') {
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'POST only']);
+                return;
+            }
+            // Swaps in files an install had to defer because they were being
+            // executed at the time. Retries briefly, so the one call that can
+            // arrive a second after an install published still lands.
+            echo json_encode(Src\Install::finish(4));
+            return;
+        }
         if ($action === 'rollback') {
             if ($method !== 'POST') {
                 http_response_code(405);

@@ -10,18 +10,18 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=352';
-import { K } from '../storage.js?v=352';
-import { persistence } from '../persistence.js?v=352';
-import { api } from '../api.js?v=352';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=352';
-import { errText } from '../api.js?v=352';
-import { TOOL_REGISTRY } from '../tools.js?v=352';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=352';
-import { snapshot } from '../rateGovernor.js?v=352';
-import { resetBrowserEnabled } from '../toolManifest.js?v=352';
-import { perf } from '../perf.js?v=352';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=352';
+import { store } from '../store.js?v=353';
+import { K } from '../storage.js?v=353';
+import { persistence } from '../persistence.js?v=353';
+import { api } from '../api.js?v=353';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=353';
+import { errText } from '../api.js?v=353';
+import { TOOL_REGISTRY } from '../tools.js?v=353';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=353';
+import { snapshot } from '../rateGovernor.js?v=353';
+import { resetBrowserEnabled } from '../toolManifest.js?v=353';
+import { perf } from '../perf.js?v=353';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=353';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -3428,7 +3428,10 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           const done = document.getElementById('sbUpdateInstallHint');
           if (done) {
             done.textContent = `Installed ${res.installed} file(s) — this copy now reports v${res.to}. `
-              + 'Reload the page to use it.';
+              + (res.finishing
+                ? 'One file is still held open by the server; the installer finishes it a second '
+                  + 'from now. Reload once it has.'
+                : 'Reload the page to use it.');
           }
           store.emit('toast', { message: `Installed v${res.to} — reload to use it`, type: 'success' });
         } catch (err) {
@@ -3473,6 +3476,14 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         const to = plan.targetVersion?.label ?? '?';
         hint.textContent = `Replaces this copy's v${from} files with v${to}. A rollback copy is written first.`;
       }
+    }
+
+    // A file that an install could not swap (the entry script, held open by the
+    // request doing the install) shows up here as work still to do.
+    if (hint && !work && (pre?.pending || []).length) {
+      hint.textContent = `Waiting to be swapped in: ${(pre.pending || []).join(', ')}. `
+        + 'It happens by itself a second after an install; if it does not, run '
+        + 'php install-update.php --finish.';
     }
 
     if (!roll) return;

@@ -7,9 +7,9 @@ not the published release.
 
 ## How to publish one
 
-1. **Tag** — name it after [`VERSION`](VERSION), e.g. `v354-open-testing`. That
+1. **Tag** — name it after [`VERSION`](VERSION), e.g. `v355-open-testing`. That
    sorts sanely and says what it is.
-2. **Title** — `v354 — Open testing` (or `— Release` once it is not a test).
+2. **Title** — `v355 — Open testing` (or `— Release` once it is not a test).
 3. **Tick “Set as a pre-release”** for any open-testing build. That keeps it out
    of *Latest release* so nobody treats it as the supported version.
 4. **Body** — copy the block under *Release body* at the end of this file, in
@@ -61,10 +61,15 @@ This is the first build going out beyond the machine it was written on. It runs,
 and it is **not finished** — the limits list near the bottom is the honest part,
 so read it before you file anything.
 
-**New in v354: it updates itself.** The load-time notice is a prompt now, and
-whichever way you answer it, the whole thing runs from there — download, verify,
-install, reload. Your settings, agents, sessions and keys live in `storage/` and
-no update can reach them.
+**New: it updates itself.** The load-time notice is a prompt now, and whichever
+way you answer it, the whole thing runs from there — download, verify, install,
+reload. Your settings, agents, sessions and keys live in `storage/` and no update
+can reach them.
+
+**If you are on v354, update by hand once.** That release's installer has two
+faults this one fixes — it could delete `api/index.php` instead of replacing it,
+and its hand-off step couldn't start on Windows. Re-extract the release over your
+copy, keeping `storage/`, and updates work themselves out from here on.
 
 ### ▶️ Five minutes to running
 

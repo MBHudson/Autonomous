@@ -11,6 +11,7 @@
  * Install (or undo) a downloaded update from the command line.
  *
  *   php install-update.php              install what is staged
+ *   php install-update.php --finish     swap in any file an install had to defer
  *   php install-update.php --rollback   restore the newest backup in storage/backups
  *   php install-update.php --status     what is staged, and what the last run did
  *
@@ -66,6 +67,8 @@ try {
         line('This copy:      v' . ($pre['currentVersion'] ?: '?'));
         line('Staged release: ' . ($pre['targetVersion'] ? 'v' . $pre['targetVersion'] : '(nothing downloaded)'));
         line('Can install:    ' . ($pre['ok'] ? 'yes' : 'no — ' . implode(' ', $pre['problems'])));
+        $pending = \Src\Install::pendingSwaps();
+        line('Waiting swaps:  ' . ($pending ? implode(', ', $pending) . '  (run --finish)' : '(none)'));
         $snaps = \Src\Install::snapshots();
         line('Backups:        ' . ($snaps ? count($snaps) . ' in storage/backups' : '(none)'));
         foreach ($snaps as $s) {
@@ -77,6 +80,28 @@ try {
             line('');
             line('Last lines of storage/updates/install.log:');
             line($log);
+        }
+        line('');
+        exit(0);
+    }
+
+    if ($arg === '--finish' || $arg === 'finish') {
+        // The web installer runs INSIDE api/index.php, and Windows will not let
+        // a process rename the script it is executing. That one file is written
+        // as .router-new-index.php and left for somebody who is not holding it:
+        // this command, spawned automatically at the end of a web install.
+        $res = \Src\Install::finish();
+        if ($res['swapped']) {
+            line('Swapped in: ' . implode(', ', $res['swapped']));
+        }
+        if (!$res['ok']) {
+            line('Still held by the running server: ' . implode(', ', $res['pending']));
+            line('Stop Apache, then run this again:  php install-update.php --finish');
+            line('');
+            exit(1);
+        }
+        if (!$res['swapped']) {
+            line('Nothing was waiting to be swapped in.');
         }
         line('');
         exit(0);

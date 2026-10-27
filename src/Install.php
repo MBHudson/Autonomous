@@ -198,6 +198,9 @@ class Install
             'staged' => (bool) ($staged && is_dir($staged)),
             'busy' => self::isLocked(),
             'snapshots' => self::snapshots(),
+            // Files written but not yet in place, from an install that had to
+            // defer them. Not a problem — a state the UI has to be able to name.
+            'pending' => self::pendingSwaps(),
         );
     }
 
@@ -323,6 +326,9 @@ class Install
             throw new \RuntimeException(implode(' ', $pre['problems']));
         }
 
+        // Clear anything an earlier run left half-swapped before adding to it.
+        self::finish(2);
+
         self::lock();
         $backup = null;
         try {
@@ -330,6 +336,7 @@ class Install
             $staged = self::stagedRoot($plan);
             $from = $pre['currentVersion'];
             $to = $pre['targetVersion'];
+            $deferred = array();
 
             $backup = self::snapshot();
             self::mark(array(
@@ -365,15 +372,44 @@ class Install
                         . ' from the downloaded copy. Nothing after this file was written; '
                         . 'install-update.php --rollback restores the backup.');
                 }
-                self::put($rel, $data);
-                $written++;
+                if (self::put($rel, $data)) {
+                    $written++;
+                } else {
+                    // Held open by another process — in practice the script that
+                    // is running this very request, which Windows will not let
+                    // anyone rename over. Written beside its target already;
+                    // finish() swaps it in from a process that is not holding it.
+                    $deferred[] = $rel;
+                    self::log('deferred (file is in use): ' . $rel);
+                }
                 if ($written % 50 === 0) {
                     self::log('written ' . $written . ' file(s)…');
                 }
             }
 
+            if ($deferred) {
+                // Everything else is in place; these are written and waiting for
+                // a moment when nothing is executing them. A separate process
+                // does it, because the only thing that cannot swap the entry
+                // script is the entry script.
+                self::mark(array(
+                    'phase' => 'finishing',
+                    'from' => $from,
+                    'to' => $to,
+                    'backup' => $backup['dir'],
+                    'deferred' => $deferred,
+                    'at' => time(),
+                ));
+                self::log('waiting on ' . count($deferred) . ' file(s) held by the running server');
+                $spawned = self::spawnFinisher();
+                self::log($spawned
+                    ? 'finisher started (' . basename($spawned) . '); it will swap them in when the request ends'
+                    : 'could not start the finisher automatically — run install-update.php --finish');
+            }
+
             $now = self::version();
             self::log('install wrote ' . $written . ' file(s), skipped ' . $skipped
+                . ', deferred ' . count($deferred)
                 . ' | tree now reports v' . ($now ?: '?'));
 
             // The one check that catches a half-broken tree: if the version we
@@ -385,14 +421,16 @@ class Install
                     . ' but the release is v' . $to . '. Rolled back to v' . ($from ?: 'the previous copy') . '.');
             }
 
-            self::mark(array(
-                'phase' => 'done',
-                'from' => $from,
-                'to' => $now ?: $to,
-                'backup' => $backup['dir'],
-                'files' => $written,
-                'at' => time(),
-            ));
+            if (!$deferred) {
+                self::mark(array(
+                    'phase' => 'done',
+                    'from' => $from,
+                    'to' => $now ?: $to,
+                    'backup' => $backup['dir'],
+                    'files' => $written,
+                    'at' => time(),
+                ));
+            }
             self::log('install done: now v' . ($now ?: '?') . ' (' . $written . ' file(s) replaced)');
             self::cleanupStaged();
 
@@ -400,6 +438,8 @@ class Install
                 'ok' => true,
                 'installed' => $written,
                 'skipped' => $skipped,
+                'deferred' => $deferred,
+                'finishing' => (bool) $deferred,
                 'from' => $from,
                 'to' => $now ?: $to,
                 'appVersion' => self::appVersion(),
@@ -448,21 +488,262 @@ class Install
 
         if (@file_put_contents($tmp, $data) !== strlen($data)) {
             @unlink($tmp);
-            throw new \RuntimeException('Could not write the new copy of ' . $rel . '.');
+            throw new \RuntimeException('Could not write the new copy of ' . $rel . '.'
+                . ' Check that the web server can write to ' . dirname($rel) . '/.');
         }
         if (!@rename($tmp, $target)) {
-            // Some Windows builds refuse to rename onto an existing file. The
-            // gap that creates is one unlink wide, and the alternative is
-            // leaving the new version on disk under a name nothing loads.
-            @unlink($target);
-            if (!@rename($tmp, $target)) {
-                @unlink($tmp);
-                throw new \RuntimeException('Could not replace ' . $rel . '.');
-            }
+            // There is deliberately NO unlink-and-retry here. That fallback
+            // existed and it destroyed api/index.php on Windows: the running
+            // script cannot be renamed over, so the unlink succeeded, the
+            // second rename failed too, and the entry point was simply gone.
+            // A file that cannot be swapped is left as .router-new-<name> for
+            // finish() to put in place when nothing is executing it.
+            return false;
         }
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($target, true);
         }
+        return true;
+    }
+
+    /**
+     * Swap in any `.router-new-<name>` sibling that is waiting, retrying briefly.
+     *
+     * Called by a process that is NOT the file it is replacing — the finisher
+     * spawned at the end of an install, `install-update.php --finish`, or the
+     * next install — so the lock that forced the deferral is gone by definition.
+     * The retry covers the second or two between a request ending and Windows
+     * releasing the handle on its script.
+     */
+    public static function finish($tries = 12)
+    {
+        $pending = self::pendingSwaps();
+        if (!$pending) {
+            return array('ok' => true, 'swapped' => array(), 'pending' => array());
+        }
+        self::log('finish: ' . count($pending) . ' file(s) to swap in');
+        $swapped = array();
+        for ($i = 0; $i < max(1, $tries); $i++) {
+            $still = array();
+            foreach ($pending as $rel) {
+                $target = self::appDir() . '/' . $rel;
+                $tmp = dirname($target) . '/.router-new-' . basename($target);
+                if (!is_file($tmp)) {
+                    continue;
+                }
+                $age = time() - (int) @filemtime($tmp);
+                if (@rename($tmp, $target)) {
+                    if (function_exists('opcache_invalidate')) {
+                        @opcache_invalidate($target, true);
+                    }
+                    $swapped[] = $rel;
+                    self::log('finish: swapped ' . $rel . ' (waited ' . ($age > 0 ? $age : 0) . 's)');
+                } else {
+                    $still[] = $rel;
+                }
+            }
+            if (!$still) {
+                break;
+            }
+            usleep(250000);
+        }
+
+        if (!$swapped && $still) {
+            self::log('finish: still held by the running server: ' . implode(', ', $still));
+            return array('ok' => false, 'swapped' => array(), 'pending' => $still);
+        }
+
+        $marker = self::readMarker();
+        if (is_array($marker) && ($marker['phase'] ?? '') === 'finishing' && !$still) {
+            $marker['phase'] = 'done';
+            $marker['finished'] = time();
+            unset($marker['deferred']);
+            self::mark($marker);
+            self::log('install done — every file is now in place');
+        }
+        return array('ok' => !$still, 'swapped' => $swapped, 'pending' => $still ?: array());
+    }
+
+    /** Files waiting as `.router-new-<name>` anywhere in the app tree. */
+    public static function pendingSwaps()
+    {
+        $out = array();
+        foreach (self::walk(true) as $rel) {
+            if (strpos(basename($rel), '.router-new-') === 0) {
+                // The sibling is named after the file it replaces, minus the
+                // dotfile prefix: .router-new-index.php -> index.php
+                $out[] = dirname($rel) === '.'
+                    ? substr(basename($rel), strlen('.router-new-'))
+                    : dirname($rel) . '/' . substr(basename($rel), strlen('.router-new-'));
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Ask a separate process to finish the swap.
+     *
+     * Detached and fire-and-forget: nothing here waits, because waiting would
+     * mean holding the very handle that is in the way. The child retries for a
+     * few seconds, which is more than enough for the parent request to end.
+     * Every failure is a returned false, never an exception — a host with
+     * proc_open disabled gets the manual instruction instead of a broken install.
+     */
+    public static function spawnFinisher()
+    {
+        // Test hook: the suite exercises writeFinisher() and the generated
+        // script directly, and a real detached child would race it for the
+        // same files (and outlive the temporary tree it was pointed at).
+        if (defined('INSTALL_NO_SPAWN') && INSTALL_NO_SPAWN) {
+            return null;
+        }
+        $pending = self::pendingSwaps();
+        if (!$pending) {
+            return null;
+        }
+        if (!function_exists('popen')) {
+            return null;
+        }
+        $php = self::phpCli();
+        if ($php === null) {
+            return null;
+        }
+        $script = self::writeFinisher($pending);
+        if ($script === null) {
+            return null;
+        }
+
+        // Detached on purpose: this runs while the request that called it is
+        // still holding api/index.php open, so it retries for a few seconds
+        // rather than expecting the handle to be gone immediately.
+        $cmd = escapeshellarg($php) . ' ' . escapeshellarg($script);
+        try {
+            if (DIRECTORY_SEPARATOR === '\\') {
+                $h = @popen('start /B "" ' . $cmd, 'r');
+            } else {
+                $h = @popen($cmd . ' > /dev/null 2>&1 &', 'r');
+            }
+            if ($h === false) {
+                return null;
+            }
+            @pclose($h);
+            return $script;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * The PHP command-line binary, or null.
+     *
+     * NOT PHP_BINARY: under Apache's mod_php that constant is the *web server*
+     * (`httpd.exe`), so the first version of this spawned Apache with a script
+     * path as an argument. It reported success and did nothing at all. Under
+     * the CLI, PHP_BINARY is right; everywhere else PHP_BINDIR is.
+     */
+    private static function phpCli()
+    {
+        $candidates = array();
+        if (PHP_SAPI === 'cli' && defined('PHP_BINARY')) {
+            $candidates[] = PHP_BINARY;
+        }
+        if (defined('PHP_BINDIR')) {
+            $candidates[] = rtrim(str_replace('\\', '/', PHP_BINDIR), '/')
+                . (DIRECTORY_SEPARATOR === '\\' ? '/php.exe' : '/php');
+        }
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && $candidate !== '' && @is_file($candidate)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Write a self-contained swap script under storage/updates and return it.
+     *
+     * Contained, because the thing that finishes an install must not be part of
+     * the install: `install-update.php` and `src/Install.php` are both replaced
+     * by the release being installed, so a finisher that required them would
+     * either run the NEW code (which may not have the method it calls) or die
+     * on a half-written tree. This file lives under storage/, which no update
+     * ever touches, carries its own list of pairs, deletes itself when done and
+     * appends to the same journal.
+     */
+    private static function writeFinisher(array $pending)
+    {
+        $pairs = array();
+        foreach ($pending as $rel) {
+            $target = self::appDir() . '/' . $rel;
+            $pairs[] = array(
+                'target' => $target,
+                'temp' => dirname($target) . '/.router-new-' . basename($target),
+                'rel' => $rel,
+            );
+        }
+        if (!$pairs) {
+            return null;
+        }
+
+        $script = self::workDir() . '/finish-' . bin2hex(random_bytes(4)) . '.php';
+        // Nowdoc: the generated file is PHP source, and nothing here should be
+        // interpreted on the way in.
+        $template = <<<'PHP'
+<?php
+// Written by Src\Install — do not edit, it deletes itself when it is done.
+//
+// Swaps in files an install could not replace while the request that was
+// installing them held them open (on Windows that is always the entry script).
+// Deliberately self-contained: see Src\Install::writeFinisher() for why it
+// cannot call back into the app it is patching.
+$pairs = %PAIRS%;
+$log = %LOG%;
+
+// Delete this file whatever happens — a fatally broken finisher that leaves
+// itself behind would be re-run by nothing, missed by nobody, and sit in
+// storage/ forever.
+register_shutdown_function(function () { @unlink(__FILE__); });
+
+$note = function ($line) use ($log) {
+    if (!is_string($log) || $log === '') { return; }
+    @file_put_contents($log, gmdate('Y-m-d\TH:i:s\Z') . '  ' . $line . "\n", FILE_APPEND);
+};
+
+for ($i = 0; $i < 40; $i++) {
+    $left = 0;
+    foreach ($pairs as $p) {
+        if (!is_file($p['temp'])) { continue; }
+        if (@rename($p['temp'], $p['target'])) {
+            $note('finish: swapped ' . $p['rel']);
+            // opcache is not always loaded (a CLI build, a bare PHP), and an
+            // unguarded call here is a fatal that skips the rest of the loop.
+            if (function_exists('opcache_invalidate')) {
+                @opcache_invalidate($p['target'], true);
+            }
+        } else {
+            $left++;
+        }
+    }
+    if (!$left) { break; }
+    usleep(250000);
+}
+
+$note($left
+    ? 'finish: still held — ' . $left . ' file(s) left for install-update.php --finish'
+    : 'finish: every file is in place');
+PHP;
+
+        $log = self::logPath();
+        $body = str_replace(
+            array('%PAIRS%', '%LOG%'),
+            array(var_export($pairs, true), var_export($log, true)),
+            $template
+        );
+
+        if (@file_put_contents($script, $body) === false) {
+            return null;
+        }
+        return $script;
     }
 
     // -------------------------------------------------------------- snapshot
@@ -634,8 +915,14 @@ class Install
             || in_array($first, self::$dataFolders, true);
     }
 
-    /** Every app file under the root, relative, forward-slashed. */
-    private static function walk($rel = '')
+    /**
+     * Every app file under the root, relative, forward-slashed.
+     *
+     * With $includeScratch, `.router-new-*` siblings are listed too — they are
+     * normally skipped (a snapshot must not back up scratch), but finding them
+     * again after a crash is exactly how a deferred swap is completed.
+     */
+    private static function walk($includeScratch = false, $rel = '')
     {
         $base = self::appDir();
         $path = $rel === '' ? $base : $base . '/' . $rel;
@@ -653,12 +940,12 @@ class Install
                 continue;
             }
             // A crashed install can leave these behind; never back them up.
-            if (strpos($entry, '.router-new-') === 0) {
+            if (!$includeScratch && strpos($entry, '.router-new-') === 0) {
                 continue;
             }
             $full = $base . '/' . $childRel;
             if (is_dir($full)) {
-                $out = array_merge($out, self::walk($childRel));
+                $out = array_merge($out, self::walk($includeScratch, $childRel));
             } elseif (is_file($full)) {
                 $out[] = $childRel;
             }

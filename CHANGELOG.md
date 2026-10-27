@@ -17,6 +17,44 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🩹 The installer survives being installed *(PHP + UI — `VERSION` 355, cache-buster v352 → v353)*
+
+**The first real run of v354's installer ate `api/index.php`.** Two faults, both
+only visible on a machine where Apache is actually serving the app, and both
+found by doing it rather than reasoning about it:
+
+1. **A request cannot replace the file it is executing.** On Windows the entry
+   script is held open for the life of the request, so `rename()` onto it fails.
+   The fallback then **deleted the target first and tried again** — so the second
+   failure left the app with no `api/index.php` at all. The API was simply gone
+   while `/` kept answering 200, which is the worst shape a breakage can take.
+2. **The finisher was spawned as `PHP_BINARY`.** Under mod_php that constant is
+   `httpd.exe`, not the CLI, so "start the finisher" started the web server with
+   a script path as an argument and reported success having done nothing.
+
+**Now: nothing is ever deleted to make room.** A file that cannot be swapped is
+written as a `.router-new-<name>` sibling and recorded as deferred; the install
+finishes every other file, journals the wait, and hands the rest to a
+**generated, self-contained script in `storage/updates/`** — which is the one
+place an update never writes. It carries its own list of swaps, retries for ten
+seconds while Apache releases its handle, appends to the same journal and deletes
+itself. The binary comes from `PHP_BINDIR`, falling back to `PHP_BINARY` only
+under the CLI. When nothing is holding the file, nothing is deferred at all.
+
+**Consequences for anyone on v354:** that release's installer predates both
+fixes, so an install run from it leaves `api/.router-new-index.php` waiting and
+the old entry script in place. Rename it over (`mv api/.router-new-index.php
+api/index.php`) or re-extract the release keeping `storage/`; from 355 on it
+takes care of itself.
+
+**Verified against a real Apache**, not a simulation: a copy at v350 with the
+real download, install and reload. 121 files replaced, `storage/` untouched,
+`api/index.php` deferred and then swapped in by the generated finisher, rollback
+copy of 208 files, `install.log` complete, and `/storage/config.json` still 403
+afterwards. `tests/php/install.test.php` grew to 67 assertions, including a test
+that runs the generated finisher as its own process and checks it needs nothing
+from the app.
+
 ## ⬇️ The update installs itself, and there is a way back *(UI + PHP — `VERSION` 354, cache-buster v351 → v352)*
 
 **The updater stopped one step short of doing its job.** Everything up to the
