@@ -22,7 +22,7 @@ localhost), and type in the composer.
 
 *Desktop 2026 — pick it in Config → Interface.*
 
-![Classic — the default: setup panel, chat and map side by side](https://raw.githubusercontent.com/MBHudson/Autonomous/master/screenshots/routing-three-workfows.png)
+![Orchestrate — agent swarms in parallel or sequentially, with loop, merge, delay and checkpoint nodes](https://raw.githubusercontent.com/MBHudson/Autonomous/master/screenshots/routing-three-workfows.png)
 
 *Orchestrate  —  agent swarms, in parallel or sequentially, with loop, merge, delay and checkpoint nodes.*
 
