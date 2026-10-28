@@ -1349,15 +1349,33 @@ function handleImport($method, $segments, $body) {
         return;
     }
 
-    // Config (allow/deny lists, sandbox roots, exec policy, token) and exec
-    // approval grants: replaced verbatim -- that is what makes this a restore.
-    Config::saveConfig($backup['config']);
+    // Config (allow/deny lists, sandbox roots, exec policy) and exec approval
+    // grants: restored, which is what makes this a restore -- EXCEPT the four
+    // keys that describe the machine this is being restored ONTO rather than
+    // the contents of the backup: the gate flag, the token guarding it, and the
+    // two absolute root paths. A backup taken with the gate off (or on another
+    // OS) used to disarm this install and point its file tools at /var/www.
+    // sanitizeImportedConfig() keeps this machine's own values and reports what
+    // it refused, so the operator can see the import was not blind.
+    [$importConfig, $keptLocal] = Config::sanitizeImportedConfig(
+        $backup['config'], Config::loadConfig());
+    $configSaved = Config::saveConfig($importConfig);
     if (isset($backup['approvals'])) {
         @file_put_contents(__DIR__ . '/../storage/exec-approvals.json',
             json_encode($backup['approvals'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
-    echo json_encode(['success' => true, 'sessions' => $sessionCount, 'rev' => $incoming['rev']]);
+    echo json_encode([
+        'success' => true,
+        'sessions' => $sessionCount,
+        'rev' => $incoming['rev'],
+        // `success` is about the state restore; say separately whether the
+        // config actually reached disk, and what the import was not allowed to
+        // change. A restore that silently kept the old gate is the point -- a
+        // restore that silently failed to write the config is not.
+        'config_saved' => $configSaved,
+        'kept_local' => $keptLocal,
+    ]);
 }
 
 /**
