@@ -295,7 +295,127 @@ class Config {
         // the operator cannot detect. This used to return void while the
         // storage file was root-owned and the web user could not write it, so
         // every UI save silently did nothing.
+        //
+        // Every write goes through the gate guard below. A config that does not
+        // MENTION require_token or token keeps the ones on disk, because both
+        // settings belong to this machine: the UI round-trips the config it
+        // read, and a backup import carries the config of wherever it came
+        // from. Writing such a payload verbatim is how a LAN-reachable install
+        // lost its access token and its gate -- the request looked like an
+        // ordinary save, and the only symptom was that every endpoint answered
+        // without a token. An explicit value (including false, or an empty
+        // token) is still honoured: turning the gate off is a decision, just
+        // not one a payload can make by leaving the key out.
+        $config = self::keepLocalGate($config);
         return file_put_contents(self::configPath(), json_encode($config, JSON_PRETTY_PRINT)) !== false;
+    }
+
+    /**
+     * Put back the keys that belong to this machine when a caller omitted them.
+     *
+     * Absent means "I am not changing this", never "clear it". Those four keys
+     * are the gate flag, the token guarding it, and the two sandbox roots: a
+     * payload that does not mention them is not making a statement about them,
+     * and a partial write used to erase all four (the roots went first, and the
+     * file tools were then scoped to nothing at all).
+     *
+     * An explicit value is still obeyed -- `require_token: false` disarms,
+     * `"token": ""` clears, `read_roots: []` means no roots -- so nothing here
+     * blocks a change somebody actually asked for. `setup-token.sh --off` writes
+     * the file directly and never comes through this path.
+     */
+    private static function keepLocalGate($config) {
+        if (!is_array($config)) { return $config; }
+        $path = self::configPath();
+        $stored = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
+        if (!is_array($stored) || !is_array($stored['sandbox'] ?? null)) { return $config; }
+        if (!isset($config['sandbox']) || !is_array($config['sandbox'])) { $config['sandbox'] = []; }
+        foreach (['require_token', 'token', 'read_roots', 'write_roots'] as $key) {
+            if (!array_key_exists($key, $config['sandbox']) && array_key_exists($key, $stored['sandbox'])) {
+                $config['sandbox'][$key] = $stored['sandbox'][$key];
+            }
+        }
+        return $config;
+    }
+
+    /**
+     * A backup's config, made safe for the machine restoring it.
+     *
+     * An import is a restore, so almost everything arrives verbatim on purpose
+     * -- exec allow/deny lists, timeouts, provider settings. Four keys are not
+     * settings but facts about THIS host, and a backup cannot know them:
+     *
+     *   * `require_token` and `token` -- this install's gate and the credential
+     *     guarding it. A backup from a machine with the gate off would disarm
+     *     this one; a backup from another machine carries a token no device here
+     *     has ever been given, which locks out every browser that was working.
+     *     Both stay exactly as they are on disk, whatever the archive says.
+     *   * `read_roots` / `write_roots` -- absolute paths, so a backup taken on
+     *     Linux restores `/var/www/...` onto a Windows box and every file tool
+     *     is scoped to somewhere the operator never chose. These are kept as
+     *     this machine has them whenever it has any, even if the imported path
+     *     happens to exist here (a `C:\var\www\...` mirror of a Linux layout
+     *     is exactly the kind of coincidence that would otherwise pass a
+     *     "does it exist" test). Only an install with NO roots of its own -- a
+     *     fresh restore onto a new machine -- adopts the backup's, and only the
+     *     ones that exist here.
+     *
+     * @return array{0:array,1:array} [config to save, notes for the operator]
+     */
+    public static function sanitizeImportedConfig($incoming, $current) {
+        $config = is_array($incoming) ? $incoming : [];
+        $current = is_array($current) ? $current : [];
+        $stored = is_array($current['sandbox'] ?? null) ? $current['sandbox'] : [];
+        if (!isset($config['sandbox']) || !is_array($config['sandbox'])) { $config['sandbox'] = []; }
+        $notes = [];
+
+        foreach (['require_token' => 'the access-token gate', 'token' => 'the access token'] as $key => $label) {
+            $changed = array_key_exists($key, $config['sandbox'])
+                && ($config['sandbox'][$key] ?? null) !== ($stored[$key] ?? null);
+            if (array_key_exists($key, $stored)) {
+                $config['sandbox'][$key] = $stored[$key];
+            } else {
+                // Never armed here: do not let a backup arm it either.
+                unset($config['sandbox'][$key]);
+            }
+            if ($changed) { $notes[] = $label . ' kept as this machine had it'; }
+        }
+
+        foreach (['read_roots', 'write_roots'] as $field) {
+            $local = [];
+            foreach ((array)($stored[$field] ?? []) as $root) {
+                if (is_scalar($root) && trim((string)$root) !== '') { $local[] = (string)$root; }
+            }
+            $incomingRoots = [];
+            foreach ((array)($config['sandbox'][$field] ?? []) as $root) {
+                if (is_scalar($root) && trim((string)$root) !== '') { $incomingRoots[] = (string)$root; }
+            }
+
+            if ($local) {
+                // This install has roots of its own: the backup does not get to
+                // move them, however plausible its paths look on this disk.
+                if ($incomingRoots !== $local) {
+                    $notes[] = $field . ' kept as this machine had it (the backup said '
+                        . ($incomingRoots ? implode(', ', $incomingRoots) : 'nothing') . ')';
+                }
+                $config['sandbox'][$field] = $local;
+                continue;
+            }
+
+            // No roots here (a restore onto a fresh machine): adopt the backup's,
+            // but only the ones that really are directories on this disk.
+            $kept = [];
+            $dropped = [];
+            foreach ($incomingRoots as $root) {
+                if (@is_dir($root)) { $kept[] = $root; } else { $dropped[] = $root; }
+            }
+            if ($dropped) {
+                $notes[] = $field . ' dropped ' . implode(', ', $dropped) . ' (not on this machine)';
+            }
+            $config['sandbox'][$field] = $kept;
+        }
+
+        return [$config, $notes];
     }
     
     private static function saveDefaultConfig() {
