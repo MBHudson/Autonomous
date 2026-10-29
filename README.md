@@ -5,8 +5,8 @@
 
   BryceFromIndiana@gmail.com
 -->
-
-# 🧠 Autonomous Loop Studio  [![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
+# 🧠 Autonomous Loop Studio 
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
 
