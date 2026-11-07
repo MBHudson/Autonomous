@@ -17,6 +17,27 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔔 The update prompt nags every load, and notices within the hour *(`VERSION` 365, cache-buster v364 → v365)*
+
+*2026-11-07. Two behaviors that kept releases invisible, and the version bump that carries the repair.*
+
+**The prompt opens on every load while a release is pending.** It used to show once per
+version and then go quiet -- a CANCEL read as "never", so a dismissed update was never
+mentioned again. Now CANCEL means "not now": the offer returns on each load until the
+release is installed. The deferral is unchanged -- it still waits for a clear screen rather
+than covering a dialog or a streaming reply.
+
+**A release is noticed within the hour.** A successful check was trusted for six hours, so
+a copy that had checked just before a push stayed blind to it all day, despite the release
+notes promising a notification on the next page load. The cache is now one hour: usually
+still no network per reload, never more than an hour from noticing. Failed checks still
+retry after 15 minutes, and offline or curl-less copies stay silent as before.
+
+Both suites green after the bump: PHP and JS runners all passing, with the existing
+TTL-boundary cases in `tests/php/update.test.php` covering the shorter window symbolically.
+
+---
+
 ## ⬇️ Scroll-to-latest button and a rail of your prompts *(`VERSION` 364, cache-buster v363 → v364)*
 
 *2026-11-07. The transcript stops being a one-way ride, and the version bump that carries it.*

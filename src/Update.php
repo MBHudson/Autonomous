@@ -90,12 +90,14 @@ class Update
     const CHANGELOG_BYTES = 65536;
 
     /**
-     * A successful check is trusted for six hours: the version number moves
+     * A successful check is trusted for one hour: the version number moves
      * when the maintainer ships, which is not an every-minute event, and a
-     * drag-and-drop app must not call out to GitHub on every single reload.
-     * A FAILED check is cached far more briefly -- see CHECK_FAIL_TTL.
+     * drag-and-drop app must not call out to GitHub on every single reload --
+     * but six hours meant a release could sit all day unannounced on a copy
+     * that had checked just before it shipped. A FAILED check is cached far
+     * more briefly -- see CHECK_FAIL_TTL.
      */
-    const CHECK_TTL = 21600;
+    const CHECK_TTL = 3600;
 
     /**
      * A failed check is remembered for 15 minutes. Without this, a machine

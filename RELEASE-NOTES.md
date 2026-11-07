@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v364
+# 🧠 Autonomous Loop Studio — v365
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,19 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v364** — a scroll button and a rail of your prompts ⬇️
+> ### 🆕 What's new in **v365** — the update prompt stops going quiet 🔔
+>
+> The release announcement used to show once and then never again, and a copy
+> that had checked just before a push stayed blind to it for six hours. Now
+> the offer returns on every load until the release is installed, and no
+> release goes more than an hour unnoticed.
+
+| | | |
+|---|---|---|
+| 🔔 | **Every load, until installed** | Dismissing the update prompt used to silence it for that whole version. CANCEL now means "not now": the offer comes back on each load while the release is pending. It still waits for a clear screen rather than covering a dialog or a streaming reply. |
+| ⏱️ | **Noticed within the hour** | The cached "up to date" answer lived for six hours. It now lives for one — reloads usually still cost no network, and a fresh release is never more than an hour from being announced. |
+
+> ### 🆕 …and in **v364** — a scroll button and a rail of your prompts ⬇️
 >
 > The transcript stops being a one-way ride: a scroll-to-latest button that
 > grants a temporary follow, a pause when you scroll up, and one tick per

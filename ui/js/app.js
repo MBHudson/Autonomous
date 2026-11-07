@@ -10,17 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=364';
-import { K } from './storage.js?v=364';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=364';
-import { esc, downloadFile } from './utils.js?v=364';
-import { startStateSync } from './stateSync.js?v=364';
-import { api } from './api.js?v=364';
-import { themeManager } from './themes.js?v=364';
-import { Sidebar } from './components/sidebar.js?v=364';
-import { Chat } from './components/chat.js?v=364';
-import { TopologyGraph } from './components/topology.js?v=364';
-import { initTopoPanel } from './components/topoPanel.js?v=364';
+import { store, APP_VERSION } from './store.js?v=365';
+import { K } from './storage.js?v=365';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=365';
+import { esc, downloadFile } from './utils.js?v=365';
+import { startStateSync } from './stateSync.js?v=365';
+import { api } from './api.js?v=365';
+import { themeManager } from './themes.js?v=365';
+import { Sidebar } from './components/sidebar.js?v=365';
+import { Chat } from './components/chat.js?v=365';
+import { TopologyGraph } from './components/topology.js?v=365';
+import { initTopoPanel } from './components/topoPanel.js?v=365';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -29,34 +29,34 @@ import { initTopoPanel } from './components/topoPanel.js?v=364';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=364')
+  return import('./components/topology3d/index.js?v=365')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=364';
-import { AgentEditor } from './components/agentEditor.js?v=364';
-import { ProviderEditor } from './components/providerEditor.js?v=364';
-import { Microphone } from './components/microphone.js?v=364';
-import { ConfigPanel } from './components/configPanel.js?v=364';
-import { ExportPanel } from './components/export.js?v=364';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=364';
-import { TerminalPanel } from './components/terminalPanel.js?v=364';
-import { MetricsPanel } from './components/metricsPanel.js?v=364';
-import { TracePanel } from './components/tracePanel.js?v=364';
-import { AgentRecord } from './components/agentRecord.js?v=364';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=364';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=364';
-import { initApprovals } from './approvals.js?v=364';
-import * as memory from './memory.js?v=364';
-import { audio } from './audio.js?v=364';
-import { AlwaysOn } from './alwaysOn.js?v=364';
-import { ApiLab } from './apiLab.js?v=364';
-import { BrainLab } from './brainlab.js?v=364';
-import { BrowserView } from './components/browserView.js?v=364';
-import { initKeyboardAvoid } from './keyboard.js?v=364';
+import { RoutingChart } from './components/routingChart.js?v=365';
+import { AgentEditor } from './components/agentEditor.js?v=365';
+import { ProviderEditor } from './components/providerEditor.js?v=365';
+import { Microphone } from './components/microphone.js?v=365';
+import { ConfigPanel } from './components/configPanel.js?v=365';
+import { ExportPanel } from './components/export.js?v=365';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=365';
+import { TerminalPanel } from './components/terminalPanel.js?v=365';
+import { MetricsPanel } from './components/metricsPanel.js?v=365';
+import { TracePanel } from './components/tracePanel.js?v=365';
+import { AgentRecord } from './components/agentRecord.js?v=365';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=365';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=365';
+import { initApprovals } from './approvals.js?v=365';
+import * as memory from './memory.js?v=365';
+import { audio } from './audio.js?v=365';
+import { AlwaysOn } from './alwaysOn.js?v=365';
+import { ApiLab } from './apiLab.js?v=365';
+import { BrainLab } from './brainlab.js?v=365';
+import { BrowserView } from './components/browserView.js?v=365';
+import { initKeyboardAvoid } from './keyboard.js?v=365';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -622,7 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // listening before the news arrives.
   //
   // The check is the cheap server-side one: it reads the published version out
-  // of a single small file, and the SERVER caches the answer for six hours, so
+  // of a single small file, and the SERVER caches the answer for one hour, so
   // a reload usually costs no network call at all. It only ever compares
   // VERSION NUMBERS -- what actually changed inside a release needs the full
   // archive, which is Config → Updates → DOWNLOAD UPDATE.
@@ -631,7 +631,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // a web root and used on a machine that may well be offline; "GitHub did not
   // answer" is not news the operator needs, and it must never interrupt boot.
   /**
-   * The update prompt, raised once per published release.
+   * The update prompt, raised on every load while a release is pending.
+   *
+   * Deliberately every load, not once per release: a CANCEL is "not now",
+   * not "never", and a prompt that goes quiet after one dismissal reads as
+   * a check that stopped working. The deferral below is what keeps it from
+   * nagging mid-thought -- it waits for a clear screen instead.
    *
    * Three answers, and the whole install runs from whichever is picked: an
    * optional backup of this copy to the Downloads folder, then the download,
@@ -649,7 +654,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * a streaming reply with `+398 −212` is how a good feature gets hated.
    */
   const offerUpdate = (info) => {
-    const { remote, local, headline, onShown } = info;
+    const { remote, local, headline } = info;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -760,12 +765,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(place, 5000);
         return;
       }
-      if (busy) return;          // gave up; onShown never fires, so the next
-                                 // load offers it again instead of going quiet
+      if (busy) return;          // gave up; the next load offers it again
+                                 // instead of going quiet
       document.body.appendChild(overlay);
-      // "Announced" means SHOWN. Marking it before the dialog exists is how a
-      // reload between the two leaves a release that is never mentioned again.
-      if (typeof onShown === 'function') onShown();
     })();
   };
 
@@ -776,29 +778,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       const remote = res.remoteVersion?.label;
       const local = res.localVersion?.label;
       if (!remote) return;
-      // One notification per published version, not one per reload: the bell
-      // keeps up to 100 entries, and the same news every page load would bury
-      // the things actually happening. A NEWER release re-notifies.
-      if (String(store.get('settings.updateNotifiedVersion') || '') === String(remote)) return;
       // Name what shipped, from the top of the published CHANGELOG. The
       // server asks for that file ONLY when an update exists, so it is normally
-      // here; when it could not be read the notification simply says less,
-      // which is better than not announcing the release at all.
-      // The toast became a prompt: this is the one place the app can offer to
-      // do the whole update, and a notification that only says "open Config"
-      // asks the operator to find the feature before they can use it.
-      //
-      // The version marker is written by onShown, once the dialog is really on
-      // screen. store.set is memory-only, hence the persistence call; a reload
-      // between deciding to show it and showing it must NOT consume the news.
+      // here; when it could not be read the prompt simply says less, which is
+      // better than not announcing the release at all.
+      // This used to be a bell notification saying "open Config"; it became
+      // a prompt because this is the one place the app can offer to do the
+      // whole update, and a notification that only names a panel asks the
+      // operator to find the feature before they can use it.
       offerUpdate({
         remote,
         local,
         headline: res.remoteChange?.title,
-        onShown: () => {
-          store.set('settings.updateNotifiedVersion', String(remote));
-          try { persistence.set('settings', store.get('settings')); } catch { /* private mode */ }
-        },
       });
     }).catch(() => { /* offline, or no curl on this PHP. Not the operator's problem at load. */ });
   });
