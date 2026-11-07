@@ -1589,7 +1589,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
             </select>
           </div>`).join('')}
           <div class="form-hint">Allow runs it, Ask prompts (skipped while Auto
-            Approve is on), Deny refuses. Auto Deny above refuses all four.</div>
+            Approve is on), Deny refuses. Auto Deny above refuses all of them.</div>
         </div>
 
         <div class="cfg-sublabel">Shell access <span class="form-hint-inline">agents running real commands</span></div>
@@ -2059,7 +2059,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbAutoDeny', (val) => store.set('settings.autoDeny', val));
     // Per-tool allow/ask/deny. Persisted like every other setting, so it
     // syncs; the running loop reads it live on each call.
-    for (const t of ['exec', 'write_file', 'write_note', 'remember']) {
+    for (const t of ['exec', 'window_open', 'window_close', 'write_file', 'write_note', 'remember']) {
       document.getElementById('sbToolPolicy-' + t)?.addEventListener('change', (e) => {
         const settings = store.get('settings') || {};
         const policy = { ...(settings.toolPolicy || {}) };

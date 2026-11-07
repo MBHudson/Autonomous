@@ -654,3 +654,19 @@
   .apps-menu { min-width: 200px; }
   .apps-item { padding: 12px 12px; font-size: 12px; }
 }
+
+/* ---- On-screen keyboard avoidance for dialogs (mobile + fullscreen) ---- */
+/* ui/js/keyboard.js shrinks .app to the visual viewport while the keyboard
+   is open and sets --kb-height (0px otherwise, so desktop is untouched).
+   These rules keep the centred dialogs (Config, Ask agent) clear of it: the
+   overlay gains bottom padding so the dialog shifts up instead of sliding
+   under the keyboard, and its max-height shrinks to match. */
+.modal-bg.open,
+.modal-overlay {
+  padding-bottom: var(--kb-height, 0px);
+}
+
+.modal-bg.open .modal,
+.modal-overlay .modal {
+  max-height: calc(85dvh - var(--kb-height, 0px));
+}

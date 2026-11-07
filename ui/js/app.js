@@ -56,6 +56,7 @@ import { AlwaysOn } from './alwaysOn.js?v=360';
 import { ApiLab } from './apiLab.js?v=360';
 import { BrainLab } from './brainlab.js?v=360';
 import { BrowserView } from './components/browserView.js?v=360';
+import { initKeyboardAvoid } from './keyboard.js?v=360';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -226,6 +227,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   safeInit('apiLab', () => apiLab.init());
   safeInit('brainLab', () => brainLab.init());
   safeInit('chat', () => chat.init());
+  // Mobile + fullscreen: keep the focused field above the on-screen keyboard.
+  safeInit('keyboard', () => initKeyboardAvoid());
   // Server-side command approvals, surfaced wherever the operator is looking.
   // Isolated like the rest: if the watcher fails, approvals still work from
   // the Config tab's own buttons.

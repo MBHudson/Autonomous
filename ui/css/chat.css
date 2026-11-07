@@ -391,3 +391,23 @@
   width: 14px;
   height: 14px;
 }
+
+/* ---- On-screen keyboard avoidance (mobile + fullscreen) ---- */
+/* --kb-height is set by ui/js/keyboard.js from window.visualViewport: the
+   height the keyboard is covering, 0px when it is closed. Added to the
+   composer's bottom padding so the input row rides above the keyboard in
+   fullscreen mobile view, where the keyboard overlays the page instead of
+   resizing it. Desktop keeps --kb-height at 0 and is untouched. */
+:root {
+  --kb-height: 0px;
+}
+
+.chat-input-area {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--kb-height, 0px));
+}
+
+@media (max-width: 1024px) {
+  .chat-input-area {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px) + var(--kb-height, 0px));
+  }
+}
