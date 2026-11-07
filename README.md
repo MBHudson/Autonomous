@@ -37,6 +37,19 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v369–v373 — calls that check the certificate, a limiter that gives its slot back, and a harness you can pin 🔒
+
+*Every model and speech call used to accept any certificate it was handed. Now it verifies, the exceptions are visible, and a pinned certificate that is about to run out says so before it does.*
+
+| | |
+|---|---|
+| 🔒 **Certificates are checked** | Model, catalog and speech calls verify the peer — and the hostname with it. **Auto** (the default) verifies real providers and skips loopback, private ranges and single-word host names, so LM Studio, Ollama and a NAS keep working untouched; **Always verify** checks those too; **Never verify** exists for a network you trust and says so in the panel. Plain `http://` endpoints have no certificate at all and behave exactly as before. |
+| 📌 **Pinning, read then confirmed** | CHECK CERTIFICATE reads the chain a host actually presents and shows the subject, issuer, validity, chain length and SHA-256 — curl's own cert-info, so no openssl and no hand-made PEM. PIN stores it in `storage/tls/trusted.pem`, which is what verification then checks against. |
+| 📋 **A list, not a blind file** | Every pinned certificate is listed with its fingerprint, expiry and pin date, with FORGET to drop it. Removing the last one deletes the bundle instead of leaving an empty file curl would choke on. |
+| ⚠️ **Warned before it lapses** | Inside 30 days the row reads *EXPIRES IN n DAYS* and the notification bell names the host, so a server renewing its certificate does not turn into a silent outage. |
+| ⏱️ **A cancelled call frees its slot** | The limiter no longer benches a key when Stop cuts a wait short, a call that goes out early is rebooked at the moment it really started, and a learned 429 reaches callers already queued. |
+| 🧭 **Per-agent API shape** | Brain Lab → **API harness** pins OpenAI-compatible, Anthropic Messages, Google generateContent or Ollama for one agent, with a hint naming what detection would have used instead. |
+
 ### 🆕 v368 — typing finds Store copies 🔧
 
 *`window_type` sees Windows 11's Notepad, waits for slow starters, and checks the focus before sending.*
@@ -188,6 +201,8 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
 | 🧠 **Memory** | Private + collective long-term memory the agents actually use |
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
+| 🔒 **Verified calls** | Model and speech calls check the certificate; Auto exempts LAN and loopback so local runners keep working; pins are listed with fingerprints and expiry |
+| 🧭 **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
 | 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
 | 🎨 **Themes** | Dark, Matrix, Cyberpunk |
@@ -907,6 +922,8 @@ The app checks its own published release, shows you **exactly what would change*
 - **🛰️ `fetch_url` and `http_request` refuse private and cloud-metadata hosts** by name — `169.254.x.x`, `metadata.google.internal`, `100.100.100.200` and friends — so a model can't use your box to probe the internal network or steal cloud credentials.
 - **🔒 `http/https` only.** Spoofed `Host`, `Content-Length` and `Accept-Encoding` headers are **stripped**; responses are **truncated** so a giant page can't exhaust memory.
 - **🧪 The API Lab keeps the same rules** and names the layer it failed at (dns / tls / connect / timeout / blocked) instead of leaking a stack trace.
+- **🔒 The certificate is checked, not assumed.** Every outbound model and speech call used to carry `CURLOPT_SSL_VERIFYPEER => false`, so any host that answered was trusted with the API key and the prompt — a café network, a shared VPS neighbour or a proxy from a free list could stand in for the provider. Verification is on now: **Auto** (default) verifies real providers and exempts loopback, private ranges, `.local`/`.lan`/`.internal` names and single-word host names so a self-signed local runner still works; **Always verify** covers those too; **Never verify** is an explicit choice saved in `storage/config.json` under `tls.verify`, and the panel spells out what it means. Plain `http://` endpoints are untouched — there is no certificate in that exchange to check.
+- **📌 A pin is a fingerprint, not a checkbox.** Trusting a LAN host means reading the chain it presents, seeing the SHA-256, and confirming it: `storage/tls/trusted.pem`, listed in Config → TLS / Certificates with its expiry, removable with FORGET (the last removal deletes the file, because an empty CAINFO fails every call while a missing one simply means nothing is pinned). `tls.ca_bundle` can still point at a PEM you manage yourself; an explicit bundle wins over pins and the panel says when it does. Nothing is ever written outside `storage/tls/`, and a certificate close to expiry is named in the TLS panel and in the bell before it becomes an outage.
 
 ### 🕵️ 9. Secrets never appear on screen
 - **🙈 Key-shaped headers (`Authorization`, `x-api-key`, `Cookie`, …) are masked in the UI** — display only. Copy and send still use the real value, and the server **never echoes request headers back**.

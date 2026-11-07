@@ -53,6 +53,9 @@ class Tls {
     const ON = 'on';
     const OFF = 'off';
 
+    /** Warn this many days before a pinned certificate expires. */
+    const EXPIRY_WARN_DAYS = 30;
+
     /** Anything unrecognised is AUTO: a typo must not silently disarm checks. */
     public static function normalise($value) {
         $v = strtolower(trim((string)$value));
@@ -554,6 +557,15 @@ class Tls {
                 }
             }
             $entry['expired'] = $entry['expires_ts'] > 0 ? ($entry['expires_ts'] < time()) : null;
+            // Whole days left, null when the expiry is unknown. "Expiring" is a
+            // separate flag from "expired": a certificate that already ran out
+            // is refused, not warned about.
+            $entry['days_left'] = $entry['expires_ts'] > 0
+                ? (int)floor(($entry['expires_ts'] - time()) / 86400)
+                : null;
+            $entry['expiring'] = $entry['days_left'] !== null
+                && $entry['days_left'] >= 0
+                && $entry['days_left'] <= self::EXPIRY_WARN_DAYS;
             $out[] = $entry;
         }
         usort($out, function ($a, $b) {

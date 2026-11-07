@@ -252,6 +252,8 @@ ok($list[0]['fingerprint'] !== '' && strlen($list[0]['fingerprint']) === 95,
     'each row carries its fingerprint');
 ok($list[0]['to'] === '' && $list[0]['expired'] === null,
     'a hand-copied certificate reports validity unknown, not a guess');
+ok($list[0]['days_left'] === null && $list[0]['expiring'] === false,
+    'an unknown expiry neither counts down nor warns');
 
 Tls::setPinMeta([$fp => [
     'host' => '192.168.1.50',
@@ -276,6 +278,36 @@ $row = null;
 foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
 ok($row !== null && $row['expired'] === true, 'a past expiry is flagged');
 ok($row['subject'] === 'CN = gpubox', 'a partial metadata update does not drop the other fields');
+
+// --- warning before expiry ------------------------------------------------
+$soon = time() + (10 * 86400);
+Tls::setPinMeta([$fp => ['to' => gmdate('Y-m-d', $soon), 'expires_ts' => $soon]]);
+$row = null;
+foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
+ok($row !== null && $row['expiring'] === true,
+    'a certificate expiring inside the warning window is flagged');
+ok($row !== null && ($row['days_left'] === 10 || $row['days_left'] === 9),
+    'and reports how many days are left');
+ok($row !== null && $row['expired'] === false, 'it is not expired yet');
+
+$later = time() + (120 * 86400);
+Tls::setPinMeta([$fp => ['to' => gmdate('Y-m-d', $later), 'expires_ts' => $later]]);
+$row = null;
+foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
+ok($row !== null && $row['expiring'] === false, 'a certificate four months out is not flagged');
+
+$just_out = time() + (Tls::EXPIRY_WARN_DAYS + 1) * 86400;
+Tls::setPinMeta([$fp => ['to' => gmdate('Y-m-d', $just_out), 'expires_ts' => $just_out]]);
+$row = null;
+foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
+ok($row !== null && $row['expiring'] === false, 'one day past the window is not flagged');
+
+$past = time() - 86400;
+Tls::setPinMeta([$fp => ['to' => gmdate('Y-m-d', $past), 'expires_ts' => $past]]);
+$row = null;
+foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
+ok($row !== null && $row['expired'] === true && $row['expiring'] === false,
+    'an expired certificate is expired, not "expiring"');
 
 $gone = Tls::forget($fp);
 ok($gone['ok'] === true && $gone['remaining'] === 1, 'forgetting one certificate leaves the other');

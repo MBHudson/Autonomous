@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## ⚠️ A pinned certificate warns before it lapses *(`VERSION` 373, cache-buster v372 → v373)*
+
+*2026-11-07. Pinning is only half the job: when the server renews its certificate the pin stops matching, and an expired one fails every verified call with an error nobody connects to last year's decision.*
+
+**The warning.** `Tls::pins()` reports `days_left` and `expiring` (inside `Tls::EXPIRY_WARN_DAYS`, 30 days). The TLS list shows `EXPIRES IN n DAYS (date)` in place of `valid to`, coloured like the expired row, and boot raises one notification per certificate that is expired or inside the window — naming the host, the date, and what fixes it (re-pin after the server renews). Expired and expiring are separate flags: a certificate that already ran out is `expired`, never both, and one whose expiry is unknown neither counts down nor warns.
+
+**Docs.** README: the **What's new** entry for v369–v373 (verification, pinning, the list, this warning, the limiter's returned slot and the per-agent harness), three new **What's inside** rows, and two bullets in the **Security** section's network-egress block covering what is verified, what Auto exempts, and what a pin actually is.
+
+`tests/php/tls.test.php` grew the countdown cases: ten days out is flagged with its day count, four months out is not, one day past the window is not, an expired certificate is expired rather than expiring, and an unknown expiry reports neither. Both suites green: `node tests/js/run.mjs` and `php tests/php/run.php`.
+
+---
+
 ## 📋 Pinned certificates are listed, with their dates and a way out *(`VERSION` 372, cache-buster v371 → v372)*
 
 *2026-11-07. Pinning wrote a file and said nothing more about it -- no way to see what was trusted, and no way to stop trusting it.*

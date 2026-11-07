@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=372';
-import { K } from '../storage.js?v=372';
-import { persistence } from '../persistence.js?v=372';
-import { api } from '../api.js?v=372';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=372';
-import { errText } from '../api.js?v=372';
-import { TOOL_REGISTRY } from '../tools.js?v=372';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=372';
-import { snapshot } from '../rateGovernor.js?v=372';
-import { resetBrowserEnabled } from '../toolManifest.js?v=372';
-import { perf } from '../perf.js?v=372';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=372';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=372';
+import { store } from '../store.js?v=373';
+import { K } from '../storage.js?v=373';
+import { persistence } from '../persistence.js?v=373';
+import { api } from '../api.js?v=373';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=373';
+import { errText } from '../api.js?v=373';
+import { TOOL_REGISTRY } from '../tools.js?v=373';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=373';
+import { snapshot } from '../rateGovernor.js?v=373';
+import { resetBrowserEnabled } from '../toolManifest.js?v=373';
+import { perf } from '../perf.js?v=373';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=373';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=373';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -2200,12 +2200,15 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           const name = p.subject || p.host || 'certificate';
           const validity = p.expired === true
             ? `EXPIRED ${p.to || ''}`.trim()
-            : (p.to ? `valid to ${p.to}` : 'validity unknown');
+            : (p.expiring === true
+              ? `EXPIRES IN ${p.days_left} DAY${p.days_left === 1 ? '' : 'S'}${p.to ? ` (${p.to})` : ''}`
+              : (p.to ? `valid to ${p.to}` : 'validity unknown'));
+          const alarm = p.expired === true || p.expiring === true;
           const pinned = p.pinned_at ? ` - pinned ${new Date(p.pinned_at * 1000).toLocaleDateString()}` : '';
           return `<div style="padding:8px 0;border-top:1px solid rgba(120,140,160,.25)">`
             + `<div style="font-size:12px">${esc(name)}</div>`
             + `<div class="form-hint" style="word-break:break-all">SHA-256 ${esc(p.fingerprint)}</div>`
-            + `<div class="form-hint">${esc(validity)}${esc(pinned)}</div>`
+            + `<div class="form-hint"${alarm ? ' style="color:#ffb74d"' : ''}>${esc(validity)}${esc(pinned)}</div>`
             + `<button class="btn btn-ghost btn-sm" data-forget="${esc(p.fingerprint)}">FORGET</button>`
             + '</div>';
         }).join('');

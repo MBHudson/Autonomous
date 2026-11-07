@@ -10,17 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=372';
-import { K } from './storage.js?v=372';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=372';
-import { esc, downloadFile } from './utils.js?v=372';
-import { startStateSync } from './stateSync.js?v=372';
-import { api } from './api.js?v=372';
-import { themeManager } from './themes.js?v=372';
-import { Sidebar } from './components/sidebar.js?v=372';
-import { Chat } from './components/chat.js?v=372';
-import { TopologyGraph } from './components/topology.js?v=372';
-import { initTopoPanel } from './components/topoPanel.js?v=372';
+import { store, APP_VERSION } from './store.js?v=373';
+import { K } from './storage.js?v=373';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=373';
+import { esc, downloadFile } from './utils.js?v=373';
+import { startStateSync } from './stateSync.js?v=373';
+import { api } from './api.js?v=373';
+import { themeManager } from './themes.js?v=373';
+import { Sidebar } from './components/sidebar.js?v=373';
+import { Chat } from './components/chat.js?v=373';
+import { TopologyGraph } from './components/topology.js?v=373';
+import { initTopoPanel } from './components/topoPanel.js?v=373';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -29,34 +29,34 @@ import { initTopoPanel } from './components/topoPanel.js?v=372';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=372')
+  return import('./components/topology3d/index.js?v=373')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=372';
-import { AgentEditor } from './components/agentEditor.js?v=372';
-import { ProviderEditor } from './components/providerEditor.js?v=372';
-import { Microphone } from './components/microphone.js?v=372';
-import { ConfigPanel } from './components/configPanel.js?v=372';
-import { ExportPanel } from './components/export.js?v=372';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=372';
-import { TerminalPanel } from './components/terminalPanel.js?v=372';
-import { MetricsPanel } from './components/metricsPanel.js?v=372';
-import { TracePanel } from './components/tracePanel.js?v=372';
-import { AgentRecord } from './components/agentRecord.js?v=372';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=372';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=372';
-import { initApprovals } from './approvals.js?v=372';
-import * as memory from './memory.js?v=372';
-import { audio } from './audio.js?v=372';
-import { AlwaysOn } from './alwaysOn.js?v=372';
-import { ApiLab } from './apiLab.js?v=372';
-import { BrainLab } from './brainlab.js?v=372';
-import { BrowserView } from './components/browserView.js?v=372';
-import { initKeyboardAvoid } from './keyboard.js?v=372';
+import { RoutingChart } from './components/routingChart.js?v=373';
+import { AgentEditor } from './components/agentEditor.js?v=373';
+import { ProviderEditor } from './components/providerEditor.js?v=373';
+import { Microphone } from './components/microphone.js?v=373';
+import { ConfigPanel } from './components/configPanel.js?v=373';
+import { ExportPanel } from './components/export.js?v=373';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=373';
+import { TerminalPanel } from './components/terminalPanel.js?v=373';
+import { MetricsPanel } from './components/metricsPanel.js?v=373';
+import { TracePanel } from './components/tracePanel.js?v=373';
+import { AgentRecord } from './components/agentRecord.js?v=373';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=373';
+import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=373';
+import { initApprovals } from './approvals.js?v=373';
+import * as memory from './memory.js?v=373';
+import { audio } from './audio.js?v=373';
+import { AlwaysOn } from './alwaysOn.js?v=373';
+import { ApiLab } from './apiLab.js?v=373';
+import { BrainLab } from './brainlab.js?v=373';
+import { BrowserView } from './components/browserView.js?v=373';
+import { initKeyboardAvoid } from './keyboard.js?v=373';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -792,6 +792,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         headline: res.remoteChange?.title,
       });
     }).catch(() => { /* offline, or no curl on this PHP. Not the operator's problem at load. */ });
+  });
+
+  // Pinned certificates, checked before they become an outage.
+  //
+  // A pinned fingerprint stops matching when the server renews its certificate,
+  // and an expired one fails every verified call with a TLS error nobody would
+  // connect to "the certificate I trusted last year". One bell entry per
+  // certificate that is expired or inside the warning window, raised once per
+  // load, naming the host and what fixes it.
+  safeInit('tlsExpiry', () => {
+    api.tlsPins().then((res) => {
+      const pins = (res && res.pins) || [];
+      pins.forEach((p) => {
+        if (p.expired !== true && p.expiring !== true) return;
+        const who = p.host || p.subject || 'a pinned certificate';
+        store.emit('topology:notify', {
+          agentId: null,
+          agentName: 'TLS',
+          agentColor: p.expired === true ? '#ff5252' : '#ffb74d',
+          type: p.expired === true ? 'error' : 'info',
+          message: p.expired === true
+            ? `Pinned certificate for ${who} has EXPIRED (${p.to || 'date unknown'}) - verified calls to it fail until the host's new certificate is pinned`
+            : `Pinned certificate for ${who} expires in ${p.days_left} day${p.days_left === 1 ? '' : 's'} (${p.to || 'date unknown'}) - re-pin it after the server renews`,
+        });
+      });
+    }).catch(() => { /* nothing pinned, no curl, or no route: nothing to say */ });
   });
 
   // Initial stats update
