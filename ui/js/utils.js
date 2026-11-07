@@ -264,6 +264,39 @@ export function debounce(fn, ms) {
   };
 }
 
+/**
+ * Whether a scroll container is at (or near) its bottom.
+ *
+ * Pure numbers in, boolean out, so the follow/pause decision is testable
+ * without a DOM. Anything within `tolerance` px of the bottom counts — a
+ * freshly filled line or a sub-pixel rounding should never read as
+ * "scrolled up". Unscrollable content (scrollHeight <= clientHeight) is
+ * trivially at the bottom.
+ */
+export function isNearBottom(scrollTop, scrollHeight, clientHeight, tolerance = 24) {
+  const top = Number(scrollTop) || 0;
+  const full = Number(scrollHeight) || 0;
+  const shown = Number(clientHeight) || 0;
+  const tol = Number(tolerance) || 0;
+  return full - (top + shown) <= tol;
+}
+
+/**
+ * Whether new chat output should pull the transcript to the bottom.
+ *
+ * `autoScroll` is the Config toggle (opt-out: only an explicit `false`
+ * disables it, a missing/garbage value keeps the old behaviour).
+ * `override` is the operator's gesture since: `true` after pressing the
+ * scroll-to-latest button (temporary follow), `false` after scrolling up
+ * while something was following (paused), `null` when neither happened.
+ * The gesture always wins over the toggle.
+ */
+export function scrollFollowWanted(autoScroll, override) {
+  if (override === true) return true;
+  if (override === false) return false;
+  return autoScroll !== false;
+}
+
 /** Generate unique ID */
 export function uuid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

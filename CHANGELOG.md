@@ -17,6 +17,27 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## ⬇️ Scroll-to-latest button and a rail of your prompts *(`VERSION` 364, cache-buster v363 → v364)*
+
+*2026-11-07. The transcript stops being a one-way ride, and the version bump that carries it.*
+
+**A scroll-to-latest button that respects the toggle.** With Auto Scroll off, scrolling up
+now reveals a circular `∨` button bottom-center of the chat box, parked above the composer.
+Clicking it jumps to the latest message and follows new output until you scroll up again --
+the temporary follow survives reaching the bottom and dies only on the next scroll up. As a
+side effect worth having, scrolling up with Auto Scroll *on* now pauses the follow instead of
+letting the next message yank the transcript out from under what is being read; returning to
+the bottom, pressing the button, or flipping the toggle resumes it.
+
+**A rail of your prompts.** One short tick per user message down the right edge of the chat
+box, newest at the bottom; hovering names the prompt, clicking jumps to it and flashes the
+landing. It rebuilds on send, on session open, and clears with the screen.
+
+Both suites green after the bump: PHP and JS runners all passing, including new
+`tests/js/scrollFollow.test.mjs` (bottom tolerance, gesture-beats-toggle priority).
+
+---
+
 ## 🛠️ Agent tool calls and shell execution that hold up *(`VERSION` 363, cache-buster v362 → v363)*
 
 *2026-11-07. Every item on the harness audit, and the version bump that carries it.*

@@ -37,6 +37,15 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v364 — a scroll button and a rail of your prompts ⬇️
+
+*The transcript stops being a one-way ride: scroll-to-latest follows until you scroll up, and every prompt gets a tick to jump back to.*
+
+| | |
+|---|---|
+| ⬇️ **Scroll to latest, on your terms** | With **Auto Scroll** off, scrolling up reveals a `∨` button bottom-center of the chat box — parked above the composer no matter how tall it grows. Clicking it jumps to the latest message and follows new output **until you scroll up again**. Scrolling up with Auto Scroll *on* now pauses the follow instead of letting the next message yank the transcript out from under you; returning to the bottom, pressing the button, or flipping the toggle resumes it. |
+| 💬 **A rail of your prompts** | One short tick per prompt down the right edge of the chat box, newest at the bottom. Hovering names the prompt, clicking jumps straight to it and flashes the landing. Rebuilds on send and session open, clears with the screen. |
+
 ### 🆕 v363 — agent tool calls and shell execution that hold up 🛠️
 
 *Timeouts that 500'd on Windows, the argv shapes models actually emit, approvals that resume the agent, and background commands for servers and watchers.*

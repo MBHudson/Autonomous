@@ -10,8 +10,8 @@
 // THINKINGPANEL.JS — Thinking overlay panel
 // ============================================
 
-import { store } from '../store.js?v=363';
-import { esc } from '../utils.js?v=363';
+import { store } from '../store.js?v=364';
+import { esc } from '../utils.js?v=364';
 
 export class ThinkingPanel {
   constructor() {

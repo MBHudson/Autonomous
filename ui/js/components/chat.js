@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=363';
-import { K as STORAGE_K } from '../storage.js?v=363';
+import { store } from '../store.js?v=364';
+import { K as STORAGE_K } from '../storage.js?v=364';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=363';
-import { persistence } from '../persistence.js?v=363';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=363';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=363';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=363';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=363';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=363';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=363';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=363';
-import { usageFor } from '../rateGovernor.js?v=363';
-import { trace } from '../trace.js?v=363';
-import { latency } from '../latency.js?v=363';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=363';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=363';
-import { SlashCommands } from '../slashCommands.js?v=363';
-import { parseRoute, routingHelp } from '../routing.js?v=363';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=363';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=363';
-import { MessageRenderer, renderToolCalls } from './message.js?v=363';
-import { createAvatar } from './avatar.js?v=363';
-import * as comms from '../commsLog.js?v=363';
+import { api, errText } from '../api.js?v=364';
+import { persistence } from '../persistence.js?v=364';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted } from '../utils.js?v=364';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=364';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=364';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=364';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=364';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=364';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=364';
+import { usageFor } from '../rateGovernor.js?v=364';
+import { trace } from '../trace.js?v=364';
+import { latency } from '../latency.js?v=364';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=364';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=364';
+import { SlashCommands } from '../slashCommands.js?v=364';
+import { parseRoute, routingHelp } from '../routing.js?v=364';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=364';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=364';
+import { MessageRenderer, renderToolCalls } from './message.js?v=364';
+import { createAvatar } from './avatar.js?v=364';
+import * as comms from '../commsLog.js?v=364';
 
 /**
  * How long an agent may keep working on a single task.
@@ -282,6 +282,14 @@ export class Chat {
      * immediately after the user turn ends (the "double response" bug).
      */
     this._turnResponded = new Set();
+    /**
+     * Scroll-follow gesture state. Null means "follow the Auto Scroll
+     * toggle"; true is a temporary follow after pressing the scroll-to-
+     * latest button (cancelled by scrolling up again); false is a pause
+     * after scrolling up while something was following (ended by returning
+     * to the bottom, pressing the button, or flipping the toggle).
+     */
+    this._followOverride = null;
 
     // An approved command was re-run for an agent (see rerunApproved in
     // tools.js). If that agent's session is open here, hand the result back:
@@ -409,6 +417,11 @@ export class Chat {
       });
       store.emit('flow:speak', { from: from || 'user', to: agentId, kind: 'tell', text: message });
     });
+
+    // Floating scroll chrome: the scroll-to-latest button and the prompt
+    // rail. Built once here so every later append, load and clear can just
+    // refresh it.
+    this._initScrollChrome();
 
     // Wake up an agent and prompt them to read their mailbox.
     store.on('agent:ping', ({ agentId } = {}) => {
@@ -901,6 +914,10 @@ export class Chat {
       container.appendChild(el);
     });
     container.scrollTop = container.scrollHeight;
+    // A newly opened session starts clean: whatever pause or temporary
+    // follow the previous one left behind does not carry over.
+    this._followOverride = null;
+    this._refreshPromptRail();
     store.set('currentConversation', conv);
   }
   clearScreen() {
@@ -911,6 +928,9 @@ export class Chat {
       <div>No messages yet. Start a conversation!</div>
     </div>`;
     this.messages = [];
+    // The transcript is empty: no prompts to jump to, nothing to follow.
+    this._followOverride = null;
+    this._refreshPromptRail();
   }
 
   _recordAgentUse(agentId) {
@@ -2892,6 +2912,8 @@ _makeLiveNode(agent) {
 
     const el = this.renderer.render(msg);
     document.getElementById('chatMessages').appendChild(el);
+    // Only a user message changes the prompt rail; agent bubbles never do.
+    if (msg && msg.role === 'user') this._refreshPromptRail();
     this._scrollToBottom();
 
     if (msg && (msg.role === 'user' || msg.role === 'agent')) {
@@ -2947,16 +2969,166 @@ _makeLiveNode(agent) {
   /**
    * Scroll the transcript to the newest message.
    *
-   * Honours the Auto Scroll toggle. It previously always scrolled, so the
-   * setting was written by the Config tab and read by nobody -- which is why
-   * turning it off looked broken. Opt-out, not opt-in: a missing/garbage value
-   * keeps the old behaviour rather than freezing the view.
+   * Honours the Auto Scroll toggle AND the operator's gesture since: the
+   * scroll-to-latest button grants a temporary follow even with the toggle
+   * off, and scrolling up pauses any follow until you return to the bottom.
+   * Opt-out, not opt-in: a missing/garbage toggle value keeps the old
+   * behaviour rather than freezing the view.
    */
   _scrollToBottom() {
-    if (store.get('settings.autoScroll') === false) return;
+    if (!this._wantsFollow()) {
+      // Not scrolling: a message still landed while scrolled up, so the
+      // button may need to appear.
+      this._updateScrollChrome();
+      return;
+    }
     const container = document.getElementById('chatMessages');
     if (!container) return;
     container.scrollTop = container.scrollHeight;
+  }
+
+  /** Whether new output should currently pull the transcript down. */
+  _wantsFollow() {
+    let auto;
+    try { auto = store.get('settings.autoScroll'); } catch { auto = undefined; }
+    return scrollFollowWanted(auto, this._followOverride);
+  }
+
+  /**
+   * Build the floating scroll chrome once: a scroll-to-latest button parked
+   * bottom-center of the transcript, and a rail of one tick per user prompt
+   * down the right edge that jumps to that prompt on click.
+   */
+  _initScrollChrome() {
+    const box = document.getElementById('chatMessages');
+    const panel = box?.closest('.main-panel') || box?.parentElement;
+    if (!box || !panel || document.getElementById('scrollBottomBtn')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'scrollBottomBtn';
+    btn.className = 'scroll-bottom-btn';
+    btn.type = 'button';
+    btn.hidden = true;
+    btn.title = 'Scroll to latest — follows new messages until you scroll up again';
+    btn.setAttribute('aria-label', 'Scroll to latest messages');
+    btn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor"'
+      + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M3 6.5 8 11.5 13 6.5"/></svg>';
+    btn.addEventListener('click', () => this._resumeFollow());
+    panel.appendChild(btn);
+
+    const rail = document.createElement('div');
+    rail.id = 'promptRail';
+    rail.className = 'prompt-rail';
+    rail.hidden = true;
+    rail.title = 'Your prompts — click a line to jump to it';
+    panel.appendChild(rail);
+
+    // Passive: tracking the gesture must never block the gesture.
+    box.addEventListener('scroll', () => this._onChatScroll(), { passive: true });
+    // Flipping the toggle resets any temporary state. Turning it on resumes
+    // the follow at once; turning it off just parks the transcript where it
+    // is and lets the button take over.
+    try {
+      store.subscribe('settings.autoScroll', val => {
+        this._followOverride = null;
+        if (val !== false) this._scrollToBottom();
+        this._updateScrollChrome();
+      });
+    } catch { /* no store */ }
+    // The composer grows as you type (and the mobile keyboard insets shift
+    // it), so re-park the chrome whenever its height changes or the window
+    // resizes rather than assuming a fixed offset.
+    try {
+      const input = panel.querySelector('.chat-input-area');
+      if (input && typeof ResizeObserver !== 'undefined')
+        new ResizeObserver(() => this._updateScrollChrome()).observe(input);
+    } catch { /* no observer */ }
+    window.addEventListener('resize', () => this._updateScrollChrome());
+    this._updateScrollChrome();
+  }
+
+  /** Track the scroll gesture: pausing and resuming the follow. */
+  _onChatScroll() {
+    const box = document.getElementById('chatMessages');
+    if (!box) return;
+    if (isNearBottom(box.scrollTop, box.scrollHeight, box.clientHeight)) {
+      // Back at the latest: a pause from scrolling up ends here. A temporary
+      // follow from the button survives — reaching the bottom is its goal,
+      // not its end; only scrolling up again switches it off.
+      if (this._followOverride === false) this._followOverride = null;
+    } else if (this._wantsFollow()) {
+      // Scrolled up while something was following: pause, so the next
+      // message does not yank the transcript out from under what is being
+      // read. The button appears and resumes on click.
+      this._followOverride = false;
+    }
+    this._updateScrollChrome();
+  }
+
+  /** The button: follow new messages until the operator scrolls up again. */
+  _resumeFollow() {
+    const box = document.getElementById('chatMessages');
+    if (!box) return;
+    this._followOverride = true;
+    // Instant, not smooth: a smooth scroll fires intermediate scroll events
+    // that read as "scrolled up" and would cancel the follow mid-flight.
+    box.scrollTop = box.scrollHeight;
+    this._updateScrollChrome();
+  }
+
+  /** Show/hide the button and re-park the chrome above the composer. */
+  _updateScrollChrome() {
+    const box = document.getElementById('chatMessages');
+    const btn = document.getElementById('scrollBottomBtn');
+    const rail = document.getElementById('promptRail');
+    if (!box || (!btn && !rail)) return;
+    const panel = box.closest('.main-panel');
+    const input = panel?.querySelector('.chat-input-area');
+    const base = ((input && input.offsetHeight) || 70) + 12;
+    const near = isNearBottom(box.scrollTop, box.scrollHeight, box.clientHeight);
+    const scrollable = box.scrollHeight > box.clientHeight + 4;
+    if (btn) {
+      btn.hidden = !scrollable || near;
+      btn.style.bottom = base + 'px';
+    }
+    if (rail) {
+      rail.hidden = !scrollable || !rail.children.length;
+      rail.style.bottom = base + 'px';
+    }
+  }
+
+  /** Rebuild the prompt rail: one tick per user message, newest last. */
+  _refreshPromptRail() {
+    const box = document.getElementById('chatMessages');
+    const rail = document.getElementById('promptRail');
+    if (!box || !rail) return;
+    rail.innerHTML = '';
+    box.querySelectorAll('.message-user').forEach(el => {
+      const tick = document.createElement('button');
+      tick.className = 'prompt-tick';
+      tick.type = 'button';
+      const text = (el.textContent || '').trim().replace(/\s+/g, ' ');
+      tick.title = text ? 'You: ' + text.slice(0, 80) + (text.length > 80 ? '…' : '') : 'Your prompt';
+      tick.setAttribute('aria-label', tick.title);
+      tick.addEventListener('click', () => this._jumpToPrompt(el));
+      rail.appendChild(tick);
+    });
+    this._updateScrollChrome();
+  }
+
+  /** Jump the transcript to a user prompt and flash it so the landing reads. */
+  _jumpToPrompt(el) {
+    const box = document.getElementById('chatMessages');
+    if (!box || !el || !el.isConnected) return;
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTop = Math.max(0, top - 12);
+    // Re-trigger the flash when jumping to the same prompt twice in a row.
+    el.classList.remove('message-flash');
+    void el.offsetWidth;
+    el.classList.add('message-flash');
+    setTimeout(() => el.classList.remove('message-flash'), 1300);
+    this._updateScrollChrome();
   }
 }
 

@@ -411,3 +411,93 @@
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px) + var(--kb-height, 0px));
   }
 }
+
+/* ---- Floating scroll chrome ---- */
+/* The scroll-to-latest button: bottom-center of the transcript, visible only
+   while scrolled up. Its `bottom` offset is set from JS so it always parks
+   above the composer, which grows as you type. The explicit [hidden] rules
+   win over the display set below (author display beats the UA one). */
+.scroll-bottom-btn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.scroll-bottom-btn:hover {
+  background: rgba(0, 229, 255, 0.15);
+  opacity: 1;
+}
+
+.scroll-bottom-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.scroll-bottom-btn[hidden] {
+  display: none;
+}
+
+/* The prompt rail: one short tick per user prompt down the right edge of the
+   transcript, newest at the bottom. Clicking a tick jumps to that prompt.
+   `bottom` is set from JS for the same reason as the button above. Ticks
+   carry pointer events; the rail itself lets clicks through to the messages. */
+.prompt-rail {
+  position: absolute;
+  right: 6px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 4px;
+  max-height: 45%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.prompt-rail[hidden] {
+  display: none;
+}
+
+.prompt-tick {
+  pointer-events: auto;
+  width: 16px;
+  height: 3px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: var(--text-secondary);
+  opacity: 0.45;
+  cursor: pointer;
+  flex: none;
+}
+
+.prompt-tick:hover {
+  opacity: 1;
+  background: var(--accent-cyan);
+}
+
+/* Brief landing highlight when a prompt-rail tick is jumped to. */
+.message-flash {
+  animation: msgFlash 1.2s ease-out;
+}
+
+@keyframes msgFlash {
+  0% { box-shadow: 0 0 0 2px var(--accent-cyan); }
+  100% { box-shadow: none; }
+}

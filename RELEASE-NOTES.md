@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v362
+# 🧠 Autonomous Loop Studio — v364
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,18 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v362** — backups in parts, restores that land anywhere 📦
+> ### 🆕 What's new in **v364** — a scroll button and a rail of your prompts ⬇️
+>
+> The transcript stops being a one-way ride: a scroll-to-latest button that
+> grants a temporary follow, a pause when you scroll up, and one tick per
+> prompt to jump back to.
+
+| | | |
+|---|---|---|
+| ⬇️ | **Scroll to latest, on your terms** | With **Auto Scroll** off, scrolling up reveals a `∨` button bottom-center of the chat box. Clicking it jumps to the latest message and follows new output until you scroll up again. Scrolling up with Auto Scroll *on* now pauses the follow instead of yanking the transcript away; returning to the bottom resumes it. |
+| 💬 | **A rail of your prompts** | One short tick per prompt down the right edge of the chat box, newest at the bottom. Hover to see which is which, click to jump straight to it. |
+
+> ### 🆕 …and in **v362** — backups in parts, restores that land anywhere 📦
 >
 > The backup stops being all-or-nothing: name the file, pick the sections, and
 > restore onto any copy without the token dance.
