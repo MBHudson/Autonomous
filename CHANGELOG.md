@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔏 The app reads a host's certificate and can trust exactly that *(`VERSION` 371, cache-buster v370 → v371)*
+
+*2026-11-07. Turning verification on left a self-signed LAN endpoint refusing to connect unless the operator assembled a CA bundle by hand. The app does that now.*
+
+**What it does.** Config -> TLS / Certificates gained a host field with CHECK CERTIFICATE and PIN. CHECK connects to the endpoint once, reads the chain it presents, and shows the subject, issuer, validity dates, chain length and SHA-256 fingerprint -- no openssl, no external tool: curl's own cert-info hands back each certificate as PEM. PIN writes that chain to `storage/tls/trusted.pem`, and `Tls::caBundle()` uses that file whenever no `tls.ca_bundle` is set, so Auto and Always verify can now succeed against a self-signed host instead of skipping it.
+
+**Why two buttons, not one.** The read has to be unverified -- it is how the app finds out what the host claims -- so the fingerprint is shown first and only a second, explicit action writes it. The whole presented chain is stored, which makes a self-signed leaf its own trust anchor and lets a private CA plus intermediate verify without assembling anything. Pins are matched by fingerprint, so pinning twice is a no-op and a rotated certificate adds an entry instead of overwriting the old one. Nothing outside `storage/tls/` is ever written, and an operator-set `ca_bundle` still wins, with the response saying so when it does.
+
+`tests/php/tls.test.php` grew the origin parsing, fingerprinting, bundle append/dedupe and fallback-trust-store cases. Both suites green: `node tests/js/run.mjs` and `php tests/php/run.php`.
+
+---
+
 ## 🔒 Model calls check the certificate again, and plain http still works *(`VERSION` 370, cache-buster v369 → v370)*
 
 *2026-11-07. Every outbound model and speech call accepted any certificate. That is one setting now, defaulting to something safe, with an explicit way to turn it off.*

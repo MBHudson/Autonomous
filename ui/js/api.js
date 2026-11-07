@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=370';
-import { acquire, note429 } from './rateGovernor.js?v=370';
-import { latency } from './latency.js?v=370';
-import { detectFamily } from './harness.js?v=370';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=370';
+import { store } from './store.js?v=371';
+import { acquire, note429 } from './rateGovernor.js?v=371';
+import { latency } from './latency.js?v=371';
+import { detectFamily } from './harness.js?v=371';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=371';
 
 latency.bindStore(store);
 
@@ -223,6 +223,17 @@ class ApiClient {
     // back — which showed up as "Not saved: API 404: <html>…". The API accepts
     // POST for the same route.
     return this.request('POST', '/config', config);
+  }
+
+  // --- TLS: what an https host presents, and pinning it ---
+  /** Read only: subject, issuer, validity and SHA-256 of the presented cert. */
+  tlsInspect(url) {
+    return this.request('POST', '/tls/pin', { url, confirm: false });
+  }
+
+  /** Write it to the pin bundle, so verification can succeed against it. */
+  tlsPin(url) {
+    return this.request('POST', '/tls/pin', { url, confirm: true });
   }
 
   // --- Shell execution ---

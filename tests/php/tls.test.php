@@ -46,6 +46,9 @@ $write = function (array $cfg) use ($cfgPath) {
 };
 $had = getenv('ROUTER_CONFIG');
 putenv('ROUTER_CONFIG=' . $cfgPath);
+$hadPins = getenv('ROUTER_TLS_PINS');
+$pinsPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tls-test-' . getmypid() . '-pins.pem';
+putenv('ROUTER_TLS_PINS=' . $pinsPath);
 $write([]);
 
 // --- normalise: only 'on' and 'off' are commands, everything else is auto ---
@@ -186,8 +189,56 @@ if (!function_exists('curl_setopt_array')) {
     curl_close($ch);
 }
 
+// --- origin(): where a certificate would be read from ---------------------
+ok(Tls::origin('https://192.168.1.50:1234/v1/chat') === 'https://192.168.1.50:1234/',
+    'origin keeps a non-default port and drops the path');
+ok(Tls::origin('https://api.example.com/v1') === 'https://api.example.com/',
+    'origin drops the default port');
+ok(Tls::origin('https://[::1]:8443/v1') === 'https://[::1]:8443/', 'origin brackets an IPv6 literal');
+ok(Tls::origin('http://localhost:1234/v1') === '', 'plain http presents no certificate to read');
+ok(Tls::origin('') === '', 'an empty url has no origin');
+
+// --- pins: where they live, and what gets written -------------------------
+ok(Tls::pinsPath() === $pinsPath, 'pinsPath() honours ROUTER_TLS_PINS');
+
+$fakePem = "-----BEGIN CERTIFICATE-----\r\n"
+    . chunk_split(base64_encode('not-a-real-der'), 64, "\r\n")
+    . '-----END CERTIFICATE-----';
+$secondPem = "-----BEGIN CERTIFICATE-----\r\n"
+    . chunk_split(base64_encode('another-der'), 64, "\r\n")
+    . '-----END CERTIFICATE-----';
+
+$fp = Tls::fingerprintFromPem($fakePem);
+ok(strlen($fp) === 95, 'SHA-256 fingerprint is 32 colon-separated pairs');
+ok($fp === Tls::fingerprintFromPem($fakePem), 'the same certificate always hashes the same');
+ok(Tls::fingerprintFromPem('nonsense') === '', 'a non-PEM string has no fingerprint');
+
+$res = Tls::appendPins([$fakePem, $secondPem, 'junk', '']);
+ok($res['added'] === 2, 'two certificates appended, junk and blanks dropped');
+ok($res['total'] === 2 && $res['error'] === '', 'the bundle reports two pins and no error');
+$body = (string)file_get_contents($pinsPath);
+ok(strpos($body, 'junk') === false, 'nothing that is not a certificate reaches the file');
+ok(substr_count($body, 'BEGIN CERTIFICATE') === 2, 'the file holds exactly the two PEM blocks');
+
+$again = Tls::appendPins([$fakePem]);
+ok($again['added'] === 0, 'pinning the same certificate twice adds nothing');
+ok($again['total'] === 2, 'and does not lose the other pin');
+$listed = Tls::pinnedFingerprints();
+ok(isset($listed[$fp]), 'pinnedFingerprints() lists what is pinned');
+
+// --- the pin bundle is the fallback trust store ---------------------------
+$write([]);
+ok(Tls::configuredBundle() === '', 'no ca_bundle configured');
+ok(Tls::caBundle() === $pinsPath, 'the pin bundle is used when ca_bundle is empty');
+ok(Tls::policy('https://192.168.1.50:1234/v1', 'on')['ca'] === $pinsPath,
+    'Always verify uses the pin bundle on a LAN host');
+$write(['tls' => ['ca_bundle' => $bundle]]);
+ok(Tls::caBundle() === $bundle, 'an explicit ca_bundle still wins over the pins');
+
 // --- cleanup ---------------------------------------------------------------
 @unlink($cfgPath);
+@unlink($pinsPath);
+if ($hadPins === false) { putenv('ROUTER_TLS_PINS'); } else { putenv('ROUTER_TLS_PINS=' . $hadPins); }
 @unlink($bundle);
 if ($had === false) { putenv('ROUTER_CONFIG'); } else { putenv('ROUTER_CONFIG=' . $had); }
 

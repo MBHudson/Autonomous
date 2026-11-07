@@ -237,6 +237,9 @@ try {
         case 'config':
             handleConfig($method, $segments, $body);
             break;
+        case 'tls':
+            handleTls($method, $segments, $body);
+            break;
         case 'state':
             handleState($method, $segments, $body);
             break;
@@ -1233,6 +1236,32 @@ function handleConfig($method, $segments, $body) {
             }
             break;
     }
+}
+
+/**
+ * Read, and on confirmation pin, the certificate an https host presents.
+ *
+ * POST /tls/pin { url }              -> what the host presents (nothing written)
+ * POST /tls/pin { url, confirm: 1 }  -> the same, plus write it to the bundle
+ *
+ * Split in two on purpose. The read is necessarily unverified -- it is how the
+ * app finds out what the host claims -- so the operator sees the fingerprint
+ * and the validity dates before anything is trusted. Only the confirmed call
+ * writes, and it never touches a file outside storage/tls.
+ */
+function handleTls($method, $segments, $body) {
+    if ($method !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'POST only']);
+        return;
+    }
+    $url = trim((string)($body['url'] ?? ''));
+    if ($url === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'url is required, e.g. https://192.168.1.50:1234']);
+        return;
+    }
+    echo json_encode(!empty($body['confirm']) ? Tls::pin($url) : Tls::inspect($url));
 }
 
 function handleExport($method, $segments, $body) {
