@@ -37,6 +37,18 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v363 — agent tool calls and shell execution that hold up 🛠️
+
+*Timeouts that 500'd on Windows, the argv shapes models actually emit, approvals that resume the agent, and background commands for servers and watchers.*
+
+| | |
+|---|---|
+| ⏱️ **Timeouts stop killing the turn** | The kill used a bare `SIGKILL`, which does not exist without pcntl — never on Windows — and turned every timed-out command into an HTTP 500. The signal now falls back, dead processes are terminated before the handle closes, and timeouts clamp below the PHP time limit so the child is never orphaned. `exec` and `run_code` take `"timeout"` (and `"max_bytes"`) instead of dying at 60/30 seconds with no say. |
+| ⌨️ **It runs what models type** | A one-element `["ls -la"]` splits server-side (words and quotes only — still no shell), numbers in argv coerce, near-miss field names (`parameters`, `input`) map to the arg, and prompt dialects run several sequential calls per reply instead of dropping all but the first. |
+| ✅ **Approvals resume the agent** | Approving a parked command in the dialog re-runs it at once and hands the result back — mid-turn it joins the live conversation, between turns it lands in the session for the next turn. |
+| 🚀 **Background commands** | `exec_start` runs a server, watcher or anything that never exits and returns a handle at once (same policy gate as `exec`); `exec_poll` reads its output and says if it is alive, `exec_kill` stops it. |
+| 🪟 **Windows + hardening** | `run_code` python falls back to `python.exe`, `.cmd`/`.bat` shims run through `cmd /c` with literal argv, inline-code flags are refused for known interpreters even when merely allowlisted, and the path guard covers unlisted commands too. |
+
 ### 🆕 v362 — backups in parts, restores that land anywhere 📦
 
 *Named files, per-section pickers, partial and older files that restore instead of refusing — and nothing in a backup can lock you out of the copy you restore onto.*
@@ -567,9 +579,10 @@ Tick tools per agent in the editor. They're grouped:
 | 📄 `fetch_url` | Read a page as plain text (refuses private/metadata hosts) |
 | 📖 `read_file` / `list_dir` / `glob_files` / `grep_code` / `stat` | Explore a jailed filesystem |
 | ✍️ `write_file` | Create or edit a file — **asks you first** |
-| 🧑💻 `exec` | Run one command as an **argv array** (no shell), allowlisted |
-| 🐍 `run_code` | Run a Python/Node/bash snippet (off by default) |
+| 🧑💻 `exec` | Run one command as an **argv array** (no shell), allowlisted — `"timeout"` for slow commands, several calls per reply |
+| 🐍 `run_code` | Run a Python/Node/bash snippet (off by default) — `"timeout"` for slow code |
 | 🐙 `git` / `git_commit` | Read-only git, plus stage + commit |
+| 🚀 `exec_start` / `exec_poll` / `exec_kill` | Background commands: start a server or watcher, poll its output, stop it |
 
 **🖊️ Familiar editor + workflow tools** (the names models were trained on)
 `str_replace_editor` (view/create/str_replace/insert), `edit_file` (search/replace), `apply_patch` (Codex **V4A** diffs), `multi_edit` (**all-or-nothing**), `todo_write` (a plan), `think` (a private scratchpad), `http_request` (any method + headers + body).
