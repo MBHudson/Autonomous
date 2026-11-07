@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=365';
-import { asText, compactText } from './utils.js?v=365';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=365';
-import { settingFor } from './agentConfig.js?v=365';
-import { trace } from './trace.js?v=365';
+import { store } from './store.js?v=366';
+import { asText, compactText } from './utils.js?v=366';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=366';
+import { settingFor } from './agentConfig.js?v=366';
+import { trace } from './trace.js?v=366';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -136,13 +136,13 @@ export const TOOL_REGISTRY = {
   ask_agent: {
     label: 'ask_agent',
     arg: '{"name":"Worker","question":"..."}',
-    describe: 'Ask another agent a question and get their reply now',
+    describe: 'Ask another agent a question and get their reply now (name "ALL" asks every other agent)',
     run: () => 'agent comms are not bound yet',
   },
   tell_agent: {
     label: 'tell_agent',
     arg: '{"name":"Worker","message":"..."}',
-    describe: 'Send another agent an instruction (no reply)',
+    describe: 'Send another agent an instruction (no reply; name "ALL" briefs every other agent)',
     run: () => 'agent comms are not bound yet',
   },
   read_mailbox: {
@@ -382,7 +382,7 @@ export const TOOL_REGISTRY = {
 
   // --- Desktop programs: real windows on this machine ---
   // NOT the built-in browser screen. The operator configures a list in
-  // Config → Shell access → Programs and names it there; the agent may only
+  // Config → Permissions → Shell access → Programs and names it there; the agent may only
   // NAME one of those programs. It never supplies a path or a command line,
   // which is what makes a launcher safe to hand to a model at all. Off unless
   // the operator turns it on, and the server refuses regardless of what this
@@ -610,6 +610,21 @@ export function bindAgentComms(bridge) {
       || null;
   };
 
+  // "ALL" (also "everyone"/"everybody") addresses every other agent at once,
+  // so one call can brief the whole roster instead of repeating the same
+  // tell_agent once per agent. An agent actually NAMED "all" keeps its name:
+  // an exact id or name match always wins over the keyword, and with nobody
+  // else around it reports that plainly instead of fanning out to nothing.
+  const ALL_WORDS = ['all', 'everyone', 'everybody'];
+  const resolveAll = (raw, roster, me) => {
+    const want = String(raw ?? '').trim().replace(/^the\s+/i, '').toLowerCase();
+    if (!ALL_WORDS.includes(want)) return null;
+    const others = roster.filter(a => a.id !== me);
+    if (others.some(a => a.id.toLowerCase() === want
+      || String(a.name || '').toLowerCase() === want)) return null;
+    return others;
+  };
+
   const rosterOf = () => (bridge.roster ? bridge.roster() : []) || [];
   const meOf = ctx => (ctx && ctx.agentId) || null;
 
@@ -630,19 +645,33 @@ export function bindAgentComms(bridge) {
 
   TOOL_REGISTRY.ask_agent.run = async (arg, _note, ctx) => {
     const spec = (arg && typeof arg === 'object') ? arg : { name: arg, question: _note };
-    const target = resolve(spec.name, rosterOf(), meOf(ctx));
-    if (!target) return notFound(spec.name);
     const question = String(spec.question ?? '').trim();
     if (!question) return 'error: ask_agent needs a "question" to send';
+    const all = resolveAll(spec.name, rosterOf(), meOf(ctx));
+    if (all) {
+      if (!all.length) return 'There are no other agents to ask.';
+      const replies = [];
+      for (const t of all) replies.push(`- ${t.name}: ${await bridge.ask(t.id, question, ctx)}`);
+      return `Replies from every other agent:\n${replies.join('\n')}`;
+    }
+    const target = resolve(spec.name, rosterOf(), meOf(ctx));
+    if (!target) return notFound(spec.name);
     return await bridge.ask(target.id, question, ctx);
   };
 
   TOOL_REGISTRY.tell_agent.run = (arg, _note, ctx) => {
     const spec = (arg && typeof arg === 'object') ? arg : { name: arg, message: _note };
-    const target = resolve(spec.name, rosterOf(), meOf(ctx));
-    if (!target) return notFound(spec.name);
     const message = String(spec.message ?? '').trim();
     if (!message) return 'error: tell_agent needs a "message" to send';
+    const all = resolveAll(spec.name, rosterOf(), meOf(ctx));
+    if (all) {
+      if (!all.length) return 'There are no other agents to brief.';
+      for (const t of all) bridge.post(t.id, meOf(ctx), message);
+      return `Instruction sent to every other agent (${all.map(t => t.name).join(', ')}). `
+        + 'They read it with read_mailbox. Use ask_agent instead if you need answers now.';
+    }
+    const target = resolve(spec.name, rosterOf(), meOf(ctx));
+    if (!target) return notFound(spec.name);
     bridge.post(target.id, meOf(ctx), message);
     return `Instruction sent to ${target.name}. They read it with read_mailbox. `
       + 'Use ask_agent instead if you need an answer now.';
@@ -1166,8 +1195,8 @@ export function bindSandboxTools(api) {
     const head = `Desktop programs on this ${res.platform} host${res.enabled ? '' : ' — OPENING IS OFF'}`;
     if (!apps.length) {
       return `${head}: none configured.`
-        + (res.enabled ? ' The operator adds them in Config → Shell access → Programs.'
-          : ' The operator turns them on, and adds them, in Config → Shell access → Programs.');
+        + (res.enabled ? ' The operator adds them in Config → Permissions → Shell access → Programs.'
+          : ' The operator turns them on, and adds them, in Config → Permissions → Shell access → Programs.');
     }
     const rows = apps.map((a) => {
       const bits = [a.name, '—', a.resolved || a.path];
@@ -1554,7 +1583,7 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       'ask_agent runs the other agent for real and hands you their reply, so use it '
       + 'when you genuinely need their answer before you can finish. It costs a real '
       + 'model call. list_agents first if you are unsure who to ask, and refer to '
-      + 'agents by their exact name.'
+      + 'agents by their exact name -- or "ALL" to ask every other agent at once.'
     );
   }
   if (names.includes('tell_agent') || names.includes('read_mailbox')) {

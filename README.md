@@ -37,6 +37,15 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v366 — one name reaches the whole roster 📣
+
+*One call briefs every agent, and every quoted Config path matches the screen.*
+
+| | |
+|---|---|
+| 📣 ** `"ALL"` fans out** | `ask_agent` / `tell_agent` take `"ALL"` (also `everyone`/`everybody`, any case) as the agent name: ask each one in turn with replies labeled by agent, or post one instruction to every mailbox. An agent actually named "All" keeps its name; an empty roster says so plainly. |
+| 🧭 **Directions that exist** | Every pointer said *Config → Shell access → …*, but Shell access is a subsection inside the Permissions card. Agent replies, refusal messages and docs now quote *Config → Permissions → Shell access → …*. |
+
 ### 🆕 v365 — the update prompt stops going quiet 🔔
 
 *Dismissing the offer no longer silences it for the whole release, and a fresh release is never more than an hour from being noticed.*
@@ -606,7 +615,7 @@ Tick tools per agent in the editor. They're grouped:
 `str_replace_editor` (view/create/str_replace/insert), `edit_file` (search/replace), `apply_patch` (Codex **V4A** diffs), `multi_edit` (**all-or-nothing**), `todo_write` (a plan), `think` (a private scratchpad), `http_request` (any method + headers + body).
 
 **🤝 Team + memory + MCP**
-`list_agents`, `ask_agent`, `tell_agent`, `read_mailbox`; `remember`, `share`, `recall`, `adopt`; `mcp_list`, `mcp_call`.
+`list_agents`, `ask_agent`, `tell_agent` (name one agent, or `"ALL"` for every other agent at once), `read_mailbox`; `remember`, `share`, `recall`, `adopt`; `mcp_list`, `mcp_call`.
 
 Every path is **jailed** server-side, so `../` and symlinks can't escape, and a **protected-paths** list keeps secrets (`storage/`, keys, dotfiles) off-limits even inside a root.
 
@@ -853,7 +862,7 @@ The app checks its own published release, shows you **exactly what would change*
 - **✅ An allowlist you own** decides which programs may run at all. Each command is matched **argument by argument** — no glob fuzz.
 - **⛔ A denylist that wins over approvals.** It is checked *before* the allowlist and before the approval prompt, so a name on it can never be waved through with "Always allow". `reboot`, `shutdown`, `rm`, `sudo`, `cmd`, `powershell` and the classic foot-guns live here.
 - **🔁 …but nothing is denied *forever*.** The list is a **default**, not a law: an explicit `sandbox.exec_deny` in `storage/config.json` **replaces it wholesale**, and the same list is editable inline under **Config → Shell access** (or an MCP card's *Permissions* tab). Remove a name and it becomes an ordinary command again — refused as *"not allowed"* and back in the approval queue, exactly like everything else. No program is refused by name anywhere in code.
-- **↩️ The undo path is on screen, not in the docs.** A refusal names the exact place to fix it — *"delete the `explorer` line under **Config → Shell access → Allow / Deny** (section 4), add it to section 2"* — and says why an approval can't do it (the denylist is checked first). In that panel, **Restore built-in defaults** reloads the shipped list even after a custom one replaced it, so you can always see what you replaced. An empty box falls back to the built-in defaults on purpose: clearing it must not silently un-deny `rm` and `sudo`. For a genuinely empty denylist, set `"exec_deny": []` in `storage/config.json` — which is what the panel's hint tells you.
+- **↩️ The undo path is on screen, not in the docs.** A refusal names the exact place to fix it — *"delete the `explorer` line under **Config → Permissions → Shell access → Allow / Deny** (section 4), add it to section 2"* — and says why an approval can't do it (the denylist is checked first). In that panel, **Restore built-in defaults** reloads the shipped list even after a custom one replaced it, so you can always see what you replaced. An empty box falls back to the built-in defaults on purpose: clearing it must not silently un-deny `rm` and `sudo`. For a genuinely empty denylist, set `"exec_deny": []` in `storage/config.json` — which is what the panel's hint tells you.
 - **🧨 Tripwires for metacharacters** — `|`, `&&`, `eval`, `xargs`, `env` and friends are refused, so a model can't smuggle a second command through a "harmless" one.
 - **🎚️ Per-interpreter levels** — Blocked / Scripts only / Full — so `run_code` can be dialled from "no" to "quiet scripts" to "go wild" independently of `exec`.
 
@@ -1051,8 +1060,8 @@ Run them with the rest of the suite (*Tests*, below). 🌱
 
 ### 🖥️ 19. Opening programs — a name, never a command line
 
-An agent can open a **real desktop program** on the machine this app runs on (**Config → Shell access →
-Programs**). It could not do this usefully before: through `exec` a window was force-closed at the command
+An agent can open a **real desktop program** on the machine this app runs on (**Config → Permissions →
+Shell access → Programs**). It could not do this usefully before: through `exec` a window was force-closed at the command
 timeout while the whole turn waited on it.
 
 - 🏷️ **The operator's list is the whole allowlist.** An agent may only **name** a program from

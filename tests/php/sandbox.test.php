@@ -388,7 +388,7 @@ file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));
 // why an approval cannot do it for them.
 $denyMsg = (string)(Sandbox::execCommand(['cmd', '/c', 'echo', 'hi'], ['cwd' => $writeDir])['stderr'] ?? '');
 ok(strpos($denyMsg, 'shell denylist') !== false
-    && strpos($denyMsg, 'Config → Shell access') !== false
+    && strpos($denyMsg, 'Config → Permissions → Shell access') !== false
     && stripos($denyMsg, 'Always allow') !== false,
     'deny refusal names the undo path and why approval cannot override it');
 

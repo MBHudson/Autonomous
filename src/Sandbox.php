@@ -664,7 +664,7 @@ class Sandbox {
                 'stderr' => "Refused: \"$program\" is on the shell denylist, which is checked "
                     . 'before approvals, so "Always allow" cannot override it. The list is yours, '
                     . "not a rule in code: delete the \"$program\" line under "
-                    . 'Config → Shell access → Allow / Deny (section 4), add it to section 2, '
+                    . 'Config → Permissions → Shell access → Allow / Deny (section 4), add it to section 2, '
                     . 'and it runs like any other command.',
                 'denied' => true, 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
@@ -682,7 +682,7 @@ class Sandbox {
                     return ['ok' => false, 'exit' => -1, 'stdout' => '',
                         'stderr' => "Refused: \"$a\" runs code supplied on the command line, which "
                             . 'the sandbox cannot inspect. Run a script file with "' . $program . '" '
-                            . '(opt it in under Config → Shell access → Interpreters), '
+                            . '(opt it in under Config → Permissions → Shell access → Interpreters), '
                             . 'give it the full-access opt-in, or use the run_code tool.',
                         'denied' => true, 'truncated' => false, 'timed_out' => false, 'ms' => 0];
                 }

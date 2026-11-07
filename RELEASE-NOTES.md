@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v365
+# 🧠 Autonomous Loop Studio — v366
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,20 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v365** — the update prompt stops going quiet 🔔
+> ### 🆕 What's new in **v366** — one name reaches the whole roster 📣
+>
+> `ask_agent` and `tell_agent` now take `"ALL"` as the agent name: one call
+> briefs every other agent instead of repeating it once per agent. Replies
+> come back labeled by agent, an exact name always beats the keyword, and
+> every quoted Config path now matches the Config on screen (*Permissions →
+> Shell access → …*).
+
+| | | |
+|---|---|---|
+| 📣 | **Brief everyone at once** | `"ALL"` (also `everyone`/`everybody`, any case) fans `ask_agent`/`tell_agent` out to the whole roster. Ask in turn with labeled replies, or post one instruction to every mailbox. An agent actually named "All" keeps its name. |
+| 🧭 | **Directions that exist** | Every pointer said *Config → Shell access → …*, but Shell access lives inside the Permissions card. The agent replies, refusal messages and docs now quote the real path. |
+
+> ### 🆕 …and in **v365** — the update prompt stops going quiet 🔔
 >
 > The release announcement used to show once and then never again, and a copy
 > that had checked just before a push stayed blind to it for six hours. Now

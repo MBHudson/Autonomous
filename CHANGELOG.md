@@ -17,6 +17,31 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 📣 One name reaches the whole roster: `ask_agent` / `tell_agent` take `"ALL"` *(`VERSION` 366, cache-buster v365 → v366)*
+
+*2026-11-07. Briefing every agent meant repeating the same call once per agent, and the Config path agents quoted never matched the Config on screen.*
+
+**`"ALL"` fans out to every other agent.** `ask_agent` asks each one in turn and
+returns every reply labeled by agent name; `tell_agent` posts the instruction to
+each mailbox and names who was briefed. Any capitalization, `"everyone"` and
+`"everybody"` work too, in both the JSON and bare-string forms. An agent actually
+*named* "All" keeps its name -- an exact match always beats the keyword -- and an
+empty roster says so plainly instead of erroring. `list_agents` still shows who
+is there; the schemas, the in-prompt instructions and the README's team-tools
+line all document the keyword. New `tests/js/commsAll.test.mjs` covers the
+fan-out, the exact-name precedence, the empty roster and single-agent
+regression.
+
+**The Config path agents quote is the real one.** Every pointer said *Config →
+Shell access → …*, but Shell access is a subsection *inside* the Permissions
+card -- which is why it was never found where quoted. `window_list`, both
+Sandbox refusal messages, and the README now say *Config → Permissions →
+Shell access → …* (`tests/php/sandbox.test.php` updated to match).
+
+Both suites green after the bump: JS and PHP runners all passing.
+
+---
+
 ## 🔔 The update prompt nags every load, and notices within the hour *(`VERSION` 365, cache-buster v364 → v365)*
 
 *2026-11-07. Two behaviors that kept releases invisible, and the version bump that carries the repair.*

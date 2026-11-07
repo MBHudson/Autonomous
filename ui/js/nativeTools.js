@@ -56,11 +56,11 @@ export const TOOL_SCHEMAS = {
   adopt: obj({ id: str('Collective note id') }, ['id']),
   list_agents: obj(),
   ask_agent: obj({
-    name: str('Exact agent name'),
+    name: str('Agent name, or "ALL" for every other agent'),
     question: str('Question to ask'),
   }, ['name', 'question']),
   tell_agent: obj({
-    name: str('Exact agent name'),
+    name: str('Agent name, or "ALL" for every other agent'),
     message: str('Instruction to deliver'),
   }, ['name', 'message']),
   read_mailbox: obj(),
