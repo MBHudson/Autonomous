@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=366';
-import { K } from '../storage.js?v=366';
-import { persistence } from '../persistence.js?v=366';
-import { api } from '../api.js?v=366';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=366';
-import { errText } from '../api.js?v=366';
-import { TOOL_REGISTRY } from '../tools.js?v=366';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=366';
-import { snapshot } from '../rateGovernor.js?v=366';
-import { resetBrowserEnabled } from '../toolManifest.js?v=366';
-import { perf } from '../perf.js?v=366';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=366';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=366';
+import { store } from '../store.js?v=367';
+import { K } from '../storage.js?v=367';
+import { persistence } from '../persistence.js?v=367';
+import { api } from '../api.js?v=367';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=367';
+import { errText } from '../api.js?v=367';
+import { TOOL_REGISTRY } from '../tools.js?v=367';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=367';
+import { snapshot } from '../rateGovernor.js?v=367';
+import { resetBrowserEnabled } from '../toolManifest.js?v=367';
+import { perf } from '../perf.js?v=367';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=367';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=367';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1577,6 +1577,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           ${[
             ['exec', 'Shell commands'],
             ['window_open', 'Opening programs'],
+            ['window_type', 'Typing into programs'],
             ['window_close', 'Closing programs'],
             ['write_file', 'File writes'],
             ['write_note', 'Notes'],
@@ -2063,7 +2064,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initToggle('sbAutoDeny', (val) => store.set('settings.autoDeny', val));
     // Per-tool allow/ask/deny. Persisted like every other setting, so it
     // syncs; the running loop reads it live on each call.
-    for (const t of ['exec', 'window_open', 'window_close', 'write_file', 'write_note', 'remember']) {
+    for (const t of ['exec', 'window_open', 'window_type', 'window_close', 'write_file', 'write_note', 'remember']) {
       document.getElementById('sbToolPolicy-' + t)?.addEventListener('change', (e) => {
         const settings = store.get('settings') || {};
         const policy = { ...(settings.toolPolicy || {}) };

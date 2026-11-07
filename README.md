@@ -37,6 +37,15 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v367 — watch it type ⌨️
+
+*`window_open` Notepad, `window_type` the words, watch them appear — with its own approval switch.*
+
+| | |
+|---|---|
+| ⌨️ **Live keystrokes** | `window_type` sends text into an open program's window: brought forward and typed in one motion, 2000 characters per call, special characters literal, newlines as ENTER. Typing into nothing throws instead of pretending. Windows only. |
+| 🙋 **Its own approval** | *Typing into programs* joins Opening and Closing in Config → Permissions (Ask by default), and the trace records that typing happened — never what was typed. |
+
 ### 🆕 v366 — one name reaches the whole roster 📣
 
 *One call briefs every agent, and every quoted Config path matches the screen.*
@@ -1091,6 +1100,16 @@ timeout while the whole turn waited on it.
   that refused with the reason (`access denied`, `already exited`) — `ok` means the program is gone, not that
   a signal was sent. A console program with no window has nothing to receive a close request, so it needs
   force.
+- ⌨️ **Typing is a tool too — `window_type`, and it is really typing.** An agent with an open window can send
+  keystrokes into it, live on screen: `window_open` Notepad, `window_type` the words, watch them appear. The
+  program must already be running (typing into nothing throws instead of pretending), the window is brought
+  forward and the keys sent in one motion, and each call carries at most 2000 characters — a long letter goes
+  in several bursts, which is also what it looks like. Special keys arrive literally (`+`, `%` and friends are
+  escaped, newlines become ENTER), the keystrokes are *never* written to the trace (it records that typing
+  happened, not what was typed), and approval is its own switch — **Typing into programs** beside Opening and
+  Closing. Windows only: it is the system's own keystroke injector, and POSIX has no single equivalent, so
+  anywhere else refuses plainly. And the old rule still holds — the operator names the program, the model only
+  supplies the keys.
 - 🧾 **The trace is written by this app alone** — every field is stripped of control characters before it
   reaches `storage/exec.log`, so an argument carrying a newline cannot append a record of a command that
   never ran. Full account in **[§22](#-22-the-trace-is-written-by-this-app-alone)**.

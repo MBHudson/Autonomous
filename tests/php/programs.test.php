@@ -223,6 +223,35 @@ ok(stripos((string)($closedIdle['note'] ?? ''), 'nothing') !== false, 'and says 
 ok(isset(Programs::handle(['action' => 'list'])['apps']), 'handle(list) returns the list');
 ok(isset(Programs::handle([])['apps']), 'handle() defaults to list');
 
+// --- 4b. typing: validation before anything touches a window -----------
+// Every one of these throws, because keystrokes that went nowhere must be
+// loud: an answer would read as "typed" when nothing received anything.
+write_cfg($configPath, false, $apps);
+throws(function () {
+    Programs::type('sleeper', ['text' => 'hi']);
+}, 'type refused while the switch is off', 'is off');
+write_cfg($configPath, true, $apps);
+throws(function () {
+    Programs::type('nope', ['text' => 'hi']);
+}, 'type at an unknown name is refused', 'is configured');
+throws(function () {
+    Programs::type('sleeper', ['text' => '']);
+}, 'type with no text is refused', 'Nothing to type');
+throws(function () {
+    Programs::type('sleeper', ['text' => str_repeat('x', Programs::MAX_TYPE + 1)]);
+}, 'type over the per-call limit is refused', 'at most');
+throws(function () {
+    Programs::type('ghost', ['text' => 'hi']);
+}, 'type at a bad path is refused', 'nothing on this machine matches');
+throws(function () {
+    Programs::type('sleeper', ['text' => 'hi']);
+}, 'type at a program that is not running is refused', 'is running');
+if ($platform !== 'windows') {
+    throws(function () {
+        Programs::handle(['action' => 'type', 'name' => 'bare-name', 'text' => 'hi']);
+    }, 'type() refuses off Windows instead of half-working', 'only built for Windows');
+}
+
 // --- 5. launch, look, close -------------------------------------------
 if ($runner === '') {
     echo "  SKIP: no long-running program to copy on this host\n";
@@ -264,6 +293,30 @@ if ($runner === '') {
             '"' . (int)$launched[0] . '"') !== false
         : is_file('/proc/' . (int)$launched[0]);
     ok($alive, 'the process is still running after open() returned');
+
+    // Typing goes to the program's own window -- here the throwaway console,
+    // so the keys land somewhere harmless. What is asserted is the whole
+    // chain (the window comes forward, the keys are sent, the verdict names
+    // the pid), not the characters, which no headless assertion could read.
+    if ($platform === 'windows') {
+        try {
+            $typed = Programs::type('sleeper', ['text' => 'hi', 'agent' => 'agent_progs_probe']);
+            ok(!empty($typed['ok']) && (int)($typed['typed'] ?? -1) === 2,
+                'type() reports the characters typed');
+            ok((int)($typed['pid'] ?? 0) === (int)$launched[0],
+                'type() reached the window this test opened');
+        } catch (\Throwable $e) {
+            // A host that runs processes without a visible desktop (a service
+            // install) has nothing to bring forward -- that is the feature
+            // refusing honestly, not the test failing.
+            if (stripos($e->getMessage(), 'no window yet') !== false
+                || stripos($e->getMessage(), 'come forward') !== false) {
+                echo "  SKIP: live typing needs a visible window ({$e->getMessage()})\n";
+            } else { throw $e; }
+        }
+    } else {
+        echo "  SKIP: live typing is only built for Windows\n";
+    }
 
     // Audited as a launch: a start with NO end, which is the record that shows
     // an agent opened something and it is still out there.

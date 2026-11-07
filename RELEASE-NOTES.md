@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v366
+# 🧠 Autonomous Loop Studio — v367
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,19 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v366** — one name reaches the whole roster 📣
+> ### 🆕 What's new in **v367** — watch it type ⌨️
+>
+> A new `window_type` tool sends keystrokes into an open program's window,
+> live on your screen: `window_open` Notepad, `window_type` the words, watch
+> them appear. Its own approval switch, 2000 characters per burst, and the
+> trace never records what was typed. Windows only.
+
+| | | |
+|---|---|---|
+| ⌨️ | **Live keystrokes** | The window comes forward and the keys land in one motion. The program must already be running — typing into nothing throws instead of pretending. Special characters type literally, newlines become ENTER. |
+| 🙋 | **Its own approval** | *Typing into programs* joins Opening and Closing in Config → Permissions, defaulting to Ask like the others. |
+
+> ### 🆕 …and in **v366** — one name reaches the whole roster 📣
 >
 > `ask_agent` and `tell_agent` now take `"ALL"` as the agent name: one call
 > briefs every other agent instead of repeating it once per agent. Replies

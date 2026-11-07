@@ -57,6 +57,8 @@ class Programs {
     const MAX_APPS = 40;
     const MAX_NAME = 40;
     const MAX_ARGV = 12;
+    /** One typing call is one visible burst: long text goes in several calls. */
+    const MAX_TYPE = 2000;
 
     /**
      * The cheap summary for /sandbox/status.
@@ -82,6 +84,7 @@ class Programs {
         $action = strtolower(trim((string)($body['action'] ?? 'list')));
         if ($action === 'open')  { return self::open($body['name'] ?? '', $body); }
         if ($action === 'close') { return self::close($body['name'] ?? '', $body); }
+        if ($action === 'type')  { return self::type($body['name'] ?? '', $body); }
         return self::list();
     }
 
@@ -437,6 +440,176 @@ class Programs {
                         . $reasonsText . '.'
                     : 'Closed ' . $closed . ' process(es)' . ($force ? ' forcefully.' : '.')),
         ];
+    }
+
+    // ---------------------------------------------------------------
+    // Type
+    // ---------------------------------------------------------------
+
+    /**
+     * Type text into one configured program's window, live on screen.
+     *
+     * The flip side of "a name, never a command line": the operator names
+     * WHAT may be typed into, and the model supplies only the keystrokes.
+     * Those keystrokes go to the program's own window and nowhere else -- the
+     * script brings that window forward and sends within the same invocation,
+     * so there is no gap for focus to wander in. The program must already be
+     * running (window_open first): typing into nothing is a no-op a model
+     * would otherwise report as done, so that throws instead of answering.
+     *
+     * Only Windows is built: it has a system keystroke injector (SendKeys)
+     * reachable without new dependencies. POSIX has no single equivalent
+     * (xdotool, ydotool, wtype all differ per session), so it refuses plainly
+     * rather than half-working.
+     *
+     * The typed text is never logged: the audit line carries the program and
+     * the character count, because keystrokes can be anything and the trail is
+     * meant to show THAT typing happened, not to replay it.
+     */
+    public static function type($name, array $opts = []) {
+        $c = self::config();
+        if (!$c['enabled']) {
+            throw new \RuntimeException('Opening programs is off. Turn on "Programs" in Config -> Shell access '
+                . '(storage/config.json -> sandbox.programs_enabled) to let an agent open one.');
+        }
+        if (!$c['apps']) {
+            throw new \RuntimeException('No programs are configured yet. Add one in Config -> Shell access -> '
+                . 'Programs (storage/config.json -> sandbox.programs).');
+        }
+        $app = self::find($c['apps'], $name);
+        if ($app === null) {
+            throw new \RuntimeException('No program called "' . trim((string)$name) . '" is configured. '
+                . 'Configured here: ' . implode(', ', array_column($c['apps'], 'name')) . '.');
+        }
+        $exe = self::resolve($app['path']);
+        if ($exe === null) {
+            throw new \RuntimeException('"' . $app['name'] . '" points at "' . $app['path'] . '", which '
+                . 'nothing on this machine matches. Fix the path in Config -> Shell access -> Programs.');
+        }
+        $problem = self::policyProblem($exe);
+        if ($problem !== '') { throw new \RuntimeException($problem); }
+        if (self::platform() !== 'windows') {
+            throw new \RuntimeException('Typing into a program window is only built for Windows in this '
+                . 'release, and this host is ' . self::platform() . '. Nothing was typed.');
+        }
+        // Newlines are the line separator whatever the caller sent; everything
+        // else goes through byte-identical, so what the operator reads back is
+        // what the model wrote.
+        $text = str_replace(["\r\n", "\r"], "\n", (string)($opts['text'] ?? ''));
+        if ($text === '') {
+            throw new \RuntimeException('Nothing to type: window_type needs "text".');
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
+        if ($len > self::MAX_TYPE) {
+            throw new \RuntimeException('That is ' . $len . ' characters; one call types at most '
+                . self::MAX_TYPE . '. Split it across several window_type calls.');
+        }
+        $table = self::processTable();
+        if (!is_array($table)) {
+            throw new \RuntimeException('Cannot tell which processes are "' . $app['name']
+                . '" on this host (no process list available). Nothing was typed.');
+        }
+        $pids = self::pidsFor($exe, $table);
+        if (!$pids) {
+            throw new \RuntimeException('Nothing of "' . $app['name'] . '" is running -- open it with '
+                . 'window_open first, then type.');
+        }
+
+        $runId = substr(bin2hex(random_bytes(6)), 0, 12);
+        Sandbox::audit(self::baseName($exe), [$exe], Sandbox::appDir(), null, null, [
+            'run' => $runId, 'phase' => 'start', 'kind' => 'program',
+            'agent' => (string)($opts['agent'] ?? ''),
+        ]);
+        $t0 = microtime(true);
+        $res = self::sendKeys($pids, $text, !empty($opts['enter']));
+        Sandbox::audit(self::baseName($exe), [$exe], Sandbox::appDir(), empty($res['ok']) ? 1 : 0,
+            (int)round((microtime(true) - $t0) * 1000), [
+                'run' => $runId, 'phase' => 'end', 'kind' => 'program',
+                'agent' => (string)($opts['agent'] ?? ''),
+            ]);
+        if (empty($res['ok'])) { throw new \RuntimeException($res['error']); }
+        return [
+            'ok' => true,
+            'name' => $app['name'],
+            'typed' => $len,
+            'pid' => $res['pid'],
+            'note' => 'Typed ' . $len . ' character(s) into the newest window of "' . $app['name']
+                . '" (pid ' . $res['pid'] . '). What you see on screen is what it received.',
+        ];
+    }
+
+    /**
+     * Send keystrokes to the newest window among these pids.
+     *
+     * The text travels in a temp FILE the script reads back, never on a
+     * command line: keystrokes can hold quotes, dollar signs and newlines, and
+     * every one of those is something cmd.exe or PowerShell would interpret.
+     * The script picks the newest pid with a real window (a starting program
+     * has a process before it has a window), brings exactly that window
+     * forward, and sends in the same invocation. SendKeys metacharacters
+     * (+ ^ % ~ ( ) { } [ ]) are escaped inside the script, so they type
+     * literally; newlines become ENTER and tabs become TAB.
+     *
+     * @return array{ok:bool,pid:int,error:string}
+     */
+    private static function sendKeys(array $pids, $text, $enter) {
+        $tmp = rtrim(sys_get_temp_dir(), '/\\');
+        $tag = 'router-type-' . getmypid() . '-' . substr(bin2hex(random_bytes(4)), 0, 8);
+        $txtFile = $tmp . DIRECTORY_SEPARATOR . $tag . '.txt';
+        $ps1 = $tmp . DIRECTORY_SEPARATOR . $tag . '.ps1';
+        if (@file_put_contents($txtFile, $text) === false) {
+            return ['ok' => false, 'pid' => 0, 'error' => 'Could not stage the text to type. Nothing was typed.'];
+        }
+        $script = 'param([string]$PidList, [string]$File, [int]$Enter)' . "\n"
+            . '$ErrorActionPreference = \'Stop\'' . "\n"
+            . 'Add-Type -AssemblyName System.Windows.Forms' . "\n"
+            . '$text = [System.IO.File]::ReadAllText($File, [System.Text.Encoding]::UTF8)' . "\n"
+            . '$ws = New-Object -ComObject WScript.Shell' . "\n"
+            . '$best = $null' . "\n"
+            . 'foreach ($raw in ($PidList -split \',\')) {' . "\n"
+            . '  $id = 0' . "\n"
+            . '  if (-not [int]::TryParse($raw.Trim(), [ref]$id)) { continue }' . "\n"
+            . '  try { $p = Get-Process -Id $id -ErrorAction Stop } catch { continue }' . "\n"
+            . '  if ($p.HasExited) { continue }' . "\n"
+            . '  if ($p.MainWindowHandle -eq 0) { continue }' . "\n"
+            . '  if (($null -eq $best) -or ($p.StartTime -gt $best.StartTime)) { $best = $p }' . "\n"
+            . '}' . "\n"
+            . 'if ($null -eq $best) { Write-Output \'NOTYPE it is running but has no window yet\'; exit 3 }' . "\n"
+            . 'if (-not $ws.AppActivate($best.Id)) { Write-Output \'NOTYPE its window would not come forward\'; exit 3 }' . "\n"
+            . 'Start-Sleep -Milliseconds 250' . "\n"
+            . '$esc = $text -replace \'([+^%~()\\[\\]{}])\', \'{$1}\'' . "\n"
+            . '$esc = $esc -replace "`r`n", "{ENTER}"' . "\n"
+            . '$esc = $esc -replace "`n", "{ENTER}"' . "\n"
+            . '$esc = $esc -replace "`t", "{TAB}"' . "\n"
+            . '[System.Windows.Forms.SendKeys]::SendWait($esc)' . "\n"
+            . 'if ($Enter -ne 0) { [System.Windows.Forms.SendKeys]::SendWait(\'{ENTER}\') }' . "\n"
+            . 'Write-Output (\'TYPED \' + $best.Id)' . "\n";
+        if (@file_put_contents($ps1, $script) === false) {
+            @unlink($txtFile);
+            return ['ok' => false, 'pid' => 0, 'error' => 'Could not stage the typing script. Nothing was typed.'];
+        }
+        $pidList = implode(',', array_map('intval', $pids));
+        $res = self::run(['powershell', '-NoProfile', '-NonInteractive',
+            '-ExecutionPolicy', 'Bypass', '-File', $ps1, $pidList, $txtFile, $enter ? '1' : '0'], 30);
+        @unlink($ps1);
+        @unlink($txtFile);
+        $out = trim((string)$res['out']);
+        if (preg_match('/^TYPED (\d+)/m', $out, $m)) {
+            return ['ok' => true, 'pid' => (int)$m[1], 'error' => ''];
+        }
+        if ($res['timed_out']) {
+            return ['ok' => false, 'pid' => 0,
+                'error' => 'Typing timed out -- the window may be showing a dialog that is holding the '
+                    . 'keystrokes. Check the window: anything typed before it appeared stayed.'];
+        }
+        if (preg_match('/^NOTYPE (.+)$/m', $out, $m)) {
+            return ['ok' => false, 'pid' => 0,
+                'error' => '"' . trim($m[1]) . '" -- still starting (retry in a moment), or the server cannot '
+                    . 'see this desktop (a service install draws windows in session 0). Nothing was typed.'];
+        }
+        return ['ok' => false, 'pid' => 0,
+            'error' => 'The keystrokes were refused'
+                . ($out !== '' ? ': ' . self::clip($out, 160) : ' (no reason given)') . '. Nothing was typed.'];
     }
 
     // ---------------------------------------------------------------

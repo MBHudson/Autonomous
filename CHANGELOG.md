@@ -17,6 +17,26 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## ⌨️ Watch it type: `window_type` sends keystrokes into a real window *(`VERSION` 367, cache-buster v366 → v367)*
+
+*2026-11-07. Opening a program was half the trick -- now an agent can type into it, live on screen, plus the Config path fix that got lost behind a bad tool call.*
+
+**`window_open` Notepad, `window_type` the words, watch them appear.** The window is
+brought forward and the keys sent in one motion, so focus cannot wander in
+between; the program must already be running, and typing into nothing throws
+instead of pretending. 2000 characters per call, so a long letter goes in
+several visible bursts. `+`, `%` and friends type literally, newlines become
+ENTER, and the trace records THAT typing happened -- never what was typed.
+Approval is its own switch, **Typing into programs**, beside Opening and
+Closing. Windows only: it rides the system's own keystroke injector, and
+POSIX has no single equivalent, so anywhere else refuses plainly.
+
+Both suites green after the bump: JS and PHP runners all passing, with new
+validation and live-window cases in `tests/php/programs.test.php` (the live
+send skips itself headless, where no window can come forward).
+
+---
+
 ## 📣 One name reaches the whole roster: `ask_agent` / `tell_agent` take `"ALL"` *(`VERSION` 366, cache-buster v365 → v366)*
 
 *2026-11-07. Briefing every agent meant repeating the same call once per agent, and the Config path agents quoted never matched the Config on screen.*

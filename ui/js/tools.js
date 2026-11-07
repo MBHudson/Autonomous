@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=366';
-import { asText, compactText } from './utils.js?v=366';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=366';
-import { settingFor } from './agentConfig.js?v=366';
-import { trace } from './trace.js?v=366';
+import { store } from './store.js?v=367';
+import { asText, compactText } from './utils.js?v=367';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=367';
+import { settingFor } from './agentConfig.js?v=367';
+import { trace } from './trace.js?v=367';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -402,6 +402,13 @@ export const TOOL_REGISTRY = {
     arg: '{"name":"notepad"}',
     describe: 'Open one configured desktop program as a real window on this machine (asks you first). '
       + 'It stays open after your reply.',
+    needsApproval: true,
+    run: () => 'program tools are not bound yet',
+  },
+  window_type: {
+    label: 'window_type',
+    arg: '{"name":"notepad","text":"hello"}',
+    describe: 'Type text into a running configured program\u2019s window, live on screen (asks you first). The program must already be open — window_open it first. Keep each call short; "enter":true presses Enter after.',
     needsApproval: true,
     run: () => 'program tools are not bound yet',
   },
@@ -1217,6 +1224,17 @@ export function bindSandboxTools(api) {
     return `opened "${res.name}"${pids} — ${res.path}\n${res.note}`;
   };
 
+  TOOL_REGISTRY.window_type.run = async (arg, _note, ctx) => {
+    const name = programArgName(arg, _note);
+    if (!name) return 'error: window_type needs a "name" — one of the program names window_list shows';
+    // Object form carries the text; with a bare name the text is the note slot.
+    const o = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
+    const text = String(o.text ?? o.message ?? (typeof arg === 'string' ? '' : _note) ?? '');
+    if (!text) return 'error: window_type needs "text" to type';
+    const res = await programCall('type', { name, text, enter: !!o.enter, agent: ctx && ctx.agentId });
+    return `typed ${res.typed} character(s) into "${res.name}" (pid ${res.pid}) — ${res.note}`;
+  };
+
   TOOL_REGISTRY.window_close.run = async (arg, _note, ctx) => {
     const name = programArgName(arg, _note);
     if (!name) return 'error: window_close needs a "name" — one of the program names window_list shows';
@@ -1486,11 +1504,19 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   }
   if (names.some(t => String(t).startsWith('window_'))) {
     notes.push(
-      'window_open / window_close act on REAL desktop programs on the machine this app runs on. '
+      'window_open / window_close'
+      + (names.includes('window_type') ? ' / window_type' : '')
+      + ' act on REAL desktop programs on the machine this app runs on. '
       + 'Call window_list FIRST: it names the programs the operator configured, so a name it does not '
       + 'list does not exist and you cannot supply a path or a command line. Prefer this over exec for '
       + 'starting an app — the window outlives your reply, nothing blocks waiting for it, and it is '
-      + 'recorded. It is not the built-in browser (browser_*), which drives a web page instead.'
+      + 'recorded.'
+      + (names.includes('window_type')
+        ? ' window_type types into an already-open program\u2019s window, live on screen — window_open it '
+          + 'first, keep each burst short, and never invent it: if it is not in your tool list it does '
+          + 'not exist for you.'
+        : '')
+      + ' It is not the built-in browser (browser_*), which drives a web page instead.'
     );
   }
   if (names.includes('web_search') || names.includes('fetch_url')) {
