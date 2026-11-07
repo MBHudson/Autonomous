@@ -37,49 +37,25 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
-### 🆕 v360 — the keys stopped leaving, and a close ends the right program 🔐
+### 🆕 v362 — backups in parts, restores that land anywhere 📦
 
-*A hardening release: five ways this app could be made to hand over something it was guarding, or to report a success it never had — plus the one command that gets you back in after you lock yourself out. Every measure has its full account in the [security section](#-security--guardrails--safe-by-construction-️).*
-
-| | |
-|---|---|
-| 🕵️ **Reads answer with masks** | `GET /api/config`, `GET /api/mcp/servers` and `GET /api/mcp-server/config` were returning the very values they exist to protect — the access token, a proxy password, every provider key, every MCP client's `Authorization` header, every friend token. Those are what the *other* gates compare against, so one read disclosed the keys to every other door. They answer `********` now, and the write paths **restore** the real value, matched by identity (id → URL → command line; friend id → label), because every panel here edits by reading the config, changing one key and posting the lot back. A mask reaching disk would have wiped a credential and shown up only as a server answering 401. 🛡️ **→ [§20](#-20-secrets--masked-going-out-restored-coming-back)** |
-| 🏠 **No token ⇒ this machine only** | `setup-token.sh --off` described itself as safe on "a machine nothing else can reach", and nothing enforced it — behind a web server bound to all interfaces, the agent-reachable launcher and the config route above were open to the network. A request from an address that is **not loopback** now gets **403**, with the one-liner that fixes it. The MCP route friends use is exempt on purpose and keeps its own per-friend Bearer token. 🚧 **→ [§21](#-21-no-token-set--this-machine-only)** |
-| 🎯 **A close ends the program you opened** | Processes were matched with `tasklist /FI "IMAGENAME eq …"`, so a configured `notepad.exe` was *"the same program"* as every other copy of that file on the machine — a close could end something you never opened. They are matched by **the file they are running from** now (`/proc/<pid>/exe` on Linux, one `Get-CimInstance Win32_Process` query on Windows, `ps` elsewhere), compared as resolved paths and case-folded on Windows. A host that will not give up a process list makes `close` **refuse**, because name matching is then the only thing left and that is the bug. |
-| ✅ **A kill reports what actually happened** | `terminate()` returned `ok: true` for everything: a kill that never happened, a pid already gone, a refusal whose output was never read — so *"closed"* could be said about a program still on screen. The command's **exit status** decides now (taskkill's own message is localised), `ok` means *nothing of it is running any more*, and the reply names each surviving pid with its reason (`access denied (it runs as another user, or elevated)`, `it had already exited`). |
-| 🧾 **The trace cannot be forged** | Every field of an `storage/exec.log` line has control characters stripped, so an agent name or an argument carrying a newline can no longer append a record of a command that never ran — or hide one that did. 🔏 **→ [§22](#-22-the-trace-is-written-by-this-app-alone)** |
-| ⏱️ **A command that answers can no longer hang the request** | `stream_select()` on a `proc_open` pipe **ignores its own timeout on Windows** and waited on the handle: a script that answered in half a second became a request that never answered at all, and `proc_close()` then waited on it for good measure. The reader is a bounded poll loop that cannot outlive its deadline, and the timeout path no longer calls `proc_close()` on a process it could not terminate. |
-| 🪟 **One argument, spelled the way Windows reads it** | An argument ending in a backslash is **doubled** (`"C:\dir\\"`), because `"…\"` is read by the program as an *escaped quote* — so a configured path used to arrive silently corrupted into a different argument. |
-| 🔎 **The way back in works on every machine** | `./setup-token.sh --show` needed `python3`: the one interpreter this app never needs, and on Windows usually the Microsoft Store's execution alias — a stub that prints English and exits 49. So the command you run *because* you are locked out printed its heading and no token. It now uses python **or** php, whichever actually answers, and says which it used; with neither, it points at `PHP_BIN=…` and at `start.bat -Token`, which needs no interpreter at all. |
-| 🧪 **The guards prove themselves** | The suite builds the fixtures it used to skip on, prints every `SKIP` with its reason and totals them, and never repeats a count it cannot trust. `php tests/freshClone.php` runs **both suites in a fresh copy** of the tree — `14 files, 14 passed, 0 failed, 840 assertions, 5 skipped`, *identical* on a clone and on the machine the tests were written on — and the pre-commit hook can run that same check with `--index`, so what is verified is exactly what the commit will contain. |
-| ⚡ **Fourteen test files at once** | The PHP suite ran its files one after another: **39.4s**, of which two files were 26s while twelve others sat runnable behind them. They run **four at a time** now and the half costs what its slowest file costs — **15.5–15.8s**, and the whole fresh-copy check **41.0s → 16.8–17.5s** — with the same `840 assertions, 5 skipped`. That is only safe because the two shared things were taken away first: each file's server binds a port walked from **its own process id** (asking the OS for "any free port" hands the same number to two files that ask together, leaving one of them talking to the other's server), and each file writes its logs to a directory of its own — so the suite no longer writes, or **truncates**, the install's `storage/exec.log` audit trail. 🔏 **→ [§23](#-23-the-test-suite-cannot-touch-the-trace--or-another-files-server)** |
-
-### 🖥️ v359 — agents can open real desktop programs
-
-*A capability that already existed and was unusable: `exec` waits for the process, kills it at the timeout and holds the whole turn open while it runs — so "open Notepad" produced a window that closed itself a minute later, inside a stalled chat.*
+*Named files, per-section pickers, partial and older files that restore instead of refusing — and nothing in a backup can lock you out of the copy you restore onto.*
 
 | | |
 |---|---|
-| 🖥️ **A name, never a command line** | **Config → Shell access → Programs**: you list programs — a name, a path, optional arguments — and an agent may only **name** one. It never supplies a path or a command line, so the only text a model controls is a name you already wrote. That is what makes this safe to hand a model where a raw `cmd /c` would not be. |
-| 🪟 **The window outlives the reply** | The launch is **detached** (`cmd /c start` with the empty title token on Windows — the mechanism the built-in browser already opens Chrome/Edge with — a backgrounded process on POSIX), so no timeout closes it behind you, and it is audited as `kind=program phase=start` with **no end line**: exactly the *"started and still running"* record the two-phase log was built for. |
-| 🙋 **Asked for like everything else** | *Ask / Allow / Deny* for **Opening programs** and **Closing programs**, with Auto Approve and Auto Deny above them. Closing is graceful first (`taskkill /PID` posts WM_CLOSE; POSIX sends TERM) so an editor can still ask about unsaved work; `force` ends it outright. |
-| 🚫 **Not a door to the command shell** | Anything that is not `.exe`/`.com` on Windows is refused as a launch target, because starting a `.bat`, `.cmd` or `.ps1` means handing back the script host this whole design keeps away from a model. That refusal is by extension and deliberately **not** overridable from the list; `exec_interpreters` is the door for script files, where the script is jailed and inline code is still refused. |
-| 🚪 **Off by default** | `sandbox.programs_enabled` with an empty list: an install that updates gains the tools and **no capability at all** until you add a program. |
+| 🏷️ **A name and a checklist** | **Config → FULL BACKUP** opens a dialog: a file name plus one checkbox per section — agents, providers & keys, models, settings, memory, pipelines, conversations, metrics, sessions, access & shell config, approval grants. The **models catalog** is backed up for the first time. |
+| 📥 **Restore only what you pick** | **RESTORE BACKUP** shows the file's name, date, release and the sections it carries. Anything the file does not carry is **left alone, never blanked** — so a partial file, or a backup from any older version, restores instead of refusing. |
+| 🔑 **No token dance** | A restore keeps **this copy's own** access token, gate and roots — even when the file came from a copy with a different token — and says so out loud. |
+| 🧾 **A report, not a reload** | After restoring, the dialog lists exactly what landed, what was skipped and why, and offers **Reload now** — nothing reloads underneath the report. |
 
-### 📦 Earlier in this line — still in the box
+### 📱 v361 — the keyboard stops eating what you type, and Allow finally sticks
+
+*Two small fixes reported from a phone.*
 
 | | |
 |---|---|
-| 🌐 **Proxy, in the nav** | Hundreds of live HTTP proxies — **ELITE** and **ANONYMOUS** only — with ping and uptime on every row, favourites, and one **USE** that routes *all* of an agent's outbound traffic (models, web tools, the shell) through it. |
-| 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
-| 🧾 **An audit trail that holds up** | Two lines per command — `phase=start` *before* the spawn, `phase=end` after — sharing a `run=` id and naming the **agent** that asked. A run that never finished now shows as a start with no end, and `run_code` is audited too. |
-| 🔄 **Updates that explain themselves** | A load-time check against the published `VERSION` **and** cache-buster, a bell that names the release from its changelog, a **What's new** row you can expand, and a download that verifies and **diffs** before anything is written. |
-| ⬇️ **Updates that install themselves** | The check offers **back up then update**, **update without a backup**, or **cancel** — and either of the first two runs the whole chain: download, verify, install, reload. A rollback copy of the code lands in `storage/backups/` first, settings are never in scope, and `install-update.php` undoes it from a terminal when a button cannot. |
-| 🖥️ **Classic & Desktop 2026** | Two shells, one switch, **Classic the default**; narrow the window and either becomes the same mobile layout. |
-| 🎛️ **Config → Desktop** | The machine-room card: map detail, fog, bloom, floating floor + floor pin, auto-rotate, glass blur, chat background and frame cap — each individually adjustable, with a preset that only ever turns visuals **down**. |
-| 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
-| 🔒 **Allow / Deny, with an undo** | The argv bouncer gained a **restore-defaults** button, a visible per-agent override path, and the `cmd` / `powershell` interpreter gap is closed — by list, never by hard-coding a refusal. |
-| 🧪 **One command per suite** | `node tests/run.mjs` and `php tests/php/run.php` run everything, including the guards that prove `/storage` and `/tests` are refused at any depth. |
+| ⌨️ **The composer rides above the keys** | On mobile the on-screen keyboard opens *over* the page — and in fullscreen it always overlays. The app now watches `window.visualViewport` and shrinks `.app` to the visible strip while the keyboard is open, so the composer rides above it and the chat stays pinned to the newest message. URL-bar wiggles are ignored and the desktop is untouched. |
+| ✅ **Opening/Closing choices stick** | The Permissions section rendered six per-tool Allow/Ask/Deny dropdowns but the change handler only listened to four — `window_open` and `window_close` wrote nothing, so the next re-render flipped them back to Ask. Both keys are in the loop now, so **Allow** for Opening/Closing Programs finally stays. |
 
 ---
 
@@ -152,14 +128,16 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🛠️ **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP |
 | ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling |
 | 📊 **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
+| 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
 | 🧠 **Memory** | Private + collective long-term memory the agents actually use |
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
+| 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
 | 🎨 **Themes** | Dark, Matrix, Cyberpunk |
 | 🖼️ **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
 | 🎙️ **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
 | ⌨️ **Slash commands** | `/CODE`, `/ROLE`, `/NAME`, `/ALL`, `/?` — address agents from the composer |
-| 💾 **Export / import** | Take a session out, or back up and restore the whole state |
+| 💾 **Export / import** | Take a session out, or back up the whole state — or just the sections you pick, under a name you choose — and restore either onto any copy |
 | 🧠 **Dynamic tools** | Teaches each model the environment it's really in — and learns the tool dialect that works |
 | 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
 | 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
@@ -183,6 +161,9 @@ Jump straight to a section — every heading on this page is also clickable.
 ## 🖥️ Two interfaces, one switch
 
 Both shells are the same application: one store, one set of components, one feature list. `settings.interfaceMode` decides which decoration is worn, and it applies the moment you pick it in **Config → Interface** — no reload, no second install, and **no feature that exists in only one of them**.
+
+<details>
+<summary>▼ Comparison table, layout map and the two rules</summary>
 
 | | 🗂️ **Classic** *(the default)* | 💎 **Desktop 2026** |
 | --- | --- | --- |
@@ -218,13 +199,17 @@ Two rules kept that honest:
 - 🧩 **The choice is the only switch.** Nothing else forks. `ui/js/desktop2026.js` *decorates* the DOM the existing components already render — it owns no state and no feature — so a bug in the shell can never take one with it.
 - 📱 **Narrow windows are untouched.** Under 1025px both shells resolve to the same slide-over drawer layout, which is why the phone view looks and behaves exactly as it always did.
 
----
+</details>
 
+---
 ## 🎛️ Config → Desktop — the machine-room card
 
 ![Config → Desktop: performance mode, glass and topography controls](screenshots/desktop-settings.png)
 
 The card is in **both** shells on purpose. Most of it is the map — fog, bloom, floor, frame rate, detail — so Classic gets it too. The rows that address the glass (chat background, blur, glow, ambient motion, the floating floor) stay **visible** in Classic with their saved values but are disabled there, because there is no glass to tune. Nothing is hidden and nothing is lost. 🧷
+
+<details>
+<summary>▼ Knob-by-knob table, the preset, topography and defaults</summary>
 
 ### 🧮 What each knob buys
 
@@ -276,8 +261,9 @@ One switch writes **the same nine settings the controls above already own** — 
 
 Saved settings always win: a fresh copy starts here, and an existing install keeps whatever you already chose until you move that control. 💾
 
----
+</details>
 
+---
 ## 🚀 Quick start
 
 ### 🪟 Windows — one click
@@ -371,6 +357,9 @@ On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/m
 
 One rail for everything about the selected agent:
 
+<details>
+<summary>▼ The full rail, locks, and the Config tidy-up</summary>
+
 - **Identity** — name, label, role, provider, model, colour, active.
 - **Prompts & Profiles** — the agent's system prompt, an always-append box, and reusable **direction profiles** you can attach and lock. (A fleet-wide override lives in the Agents-tab header — see *Global pre-prompt override*.)
 - **Direction profiles** — reusable, lockable instructions you can **attach** and **append** to any agent, so a house style is defined once and shared.
@@ -395,20 +384,25 @@ Every setting has a 🔒 **lock**: unlocked agents follow the global value live;
 > the same app, the same features and the same store; the full comparison and the
 > screenshots live in *Two interfaces, one switch* above. 🔁
 
----
+</details>
 
+---
 ## 🧪 API Lab
 
 ![API Lab](screenshots/API-Lab.png)
 
 Opened from the 🧪 icon in the Agents-tab header.
 
+<details>
+<summary>▼ Both directions, server-side sending and guardrails</summary>
+
 - **Both directions**: `curl → request → 10 languages`, and `language → request → curl/bash/Python/TypeScript/OpenAI-SDK`.
 - **Sending is server-side**, because the browser can't reach most providers (no CORS headers). The server runs the request and returns the status + body.
 - **Guardrails**: http/https only; cloud-metadata addresses refused; key-shaped headers masked on screen (copy/send still use the real value); response bodies truncated.
 
----
+</details>
 
+---
 ## 🔀 Routing chart
 
 Draw the flow instead of describing it.
@@ -435,38 +429,53 @@ Draw the flow instead of describing it.
 
 Drop an image into the composer and a vision-capable agent can see it. 👁️🖼️
 
+<details>
+<summary>▼ Paste, drop or pick, safety and per-agent vision</summary>
+
 - 📎 **Paste, drop or pick** — the bytes **never touch the server**. They become an in-memory `data:` URL and ride in the request's `image_url` field: 🚫 no upload endpoint, 🚫 no file on disk.
 - 🛡️ **Safe by construction** — only 🖼️ PNG / 📷 JPEG / 🎞️ WebP / 🎬 GIF are accepted, all inert when sniffed, which keeps the polyglot *"image that is also a script"* family out.
 - 🤖 **Per-agent** — only models that actually support vision get the attachment; everyone else is unaffected.
 
----
+</details>
 
+---
 ## 🎙️ Voice & audio
 
 Talk to the team, and let them talk back. 🗣️🔊
+
+<details>
+<summary>▼ Speech-to-text, spoken replies, engines and pitch</summary>
 
 - 🎤 **Speech to text** — the mic button turns your voice into a message in the composer.
 - 🔊 **Speak replies** — a speaker button reads any reply aloud; flip **Speak every reply automatically** to hear them all.
 - 🧰 **Two engines** — use your provider's TTS, or the browser's 🏠 built-in voices (works offline, no API, no key). Pick the engine, provider and voice.
 - ⏩ **Speed** and 🎚️ **pitch** — tune playback; pitch reads higher as female, lower as male. 🤖 **Each agent can override the pitch**, so a whole roster can sound distinct.
 
----
+</details>
 
+---
 ## ⌨️ Slash commands
 
 Type `/` in the composer for a palette of everything you can address. ⌨️✨
+
+<details>
+<summary>▼ Targets, app commands and quick reference</summary>
 
 - 🎯 **Target an agent** — `/CODE`, `/ROLE`, `/NAME` or `/ALL` sends your next message to one agent, a role, or the whole team.
 - 🧭 **App commands** — the palette also lists the app's own commands, and never suggests one that wouldn't work here.
 - ❓ **`/?`** — a quick reference, right in the input box.
 
----
+</details>
 
+---
 ## ♾️ Always-On — the loop that runs itself
 
 Give an agent a **standing goal** and this app re-invokes it on a timer, one turn
 at a time, until it finishes or you stop it. It is the difference between *"ask
 the model a thing"* and *"hand the model a job and walk away."* 🚶♂️💨
+
+<details>
+<summary>▼ Goals, cadence, badges, caps, kill switch and tips</summary>
 
 - 🎯 **A standing goal per agent** — set it in the agent editor (or Brain Lab). Every tick, the agent is re-prompted with its goal, the iteration number, and a plain instruction to **make concrete progress now using its tools.**
 - ⏱️ **A cadence you own** — the interval lives in **Config → Limits & Budgets** (default generous, because every iteration is **billed**). 💸
@@ -484,13 +493,17 @@ the model a thing"* and *"hand the model a job and walk away."* 🚶♂️💨
 > test suite and fix failures until green."* The status line in Config tells you
 > roughly how many turns/hour that will cost.
 
----
+</details>
 
+---
 ## ❝ Global pre-prompt override — one instruction for the whole fleet
 
 A single box in the **Agents-tab header** (§ button) that reaches **every agent's
 system prompt**, on every call path — main chat, ask-directly and routing-chart
 runs alike. ✨
+
+<details>
+<summary>▼ Prepend or replace, live toggle and the tool-fight fix</summary>
 
 - 🧩 **Prepend (default) or Replace — your call.** A toggle **inside the popup**
   (bottom-left) picks the behaviour, and the hint above the box updates to match:
@@ -500,8 +513,9 @@ runs alike. ✨
 - 🔒 **Stored prompts are never harmed** — the moment you switch it off (or flip back to Prepend), every agent's own prompt returns exactly as it was.
 - ⚠️ **It can fight tools — and the app knows it.** A pre-prompt like *"reply with ONLY text / 9 words"* used to make agents narrate tool calls instead of sending them. The tool instructions now state plainly that a **tool call is the one exception** to any brevity rule, and the loop **re-prompts once** if a model only *says* it will use a tool.
 
----
+</details>
 
+---
 ## 🧭 The apps notch — one thumb to everything
 
 A pull-tab centred just under the header **dips into the chat area** — a `\___/`
@@ -516,6 +530,9 @@ something. 📱
 ## 🧠 The context assembler & native tool calling
 
 So a long job doesn't quietly fall out of the model's memory mid-task. 🧵
+
+<details>
+<summary>▼ Budgeting, compaction, surviving plans and native schemas</summary>
 
 - 📏 **Budgeted against the model's *real* window** — replayed history is sized to
   the model's actual context limit (not a fixed `24k` characters), and each
@@ -533,11 +550,15 @@ So a long job doesn't quietly fall out of the model's memory mid-task. 🧵
 - 🧠 **Learned dialect** — see *Dynamic tools* below: the dialect that last worked
   for a `provider::model` is remembered and tried first.
 
----
+</details>
 
+---
 ## 🛠️ Tools agents can use
 
 Tick tools per agent in the editor. They're grouped:
+
+<details>
+<summary>▼ Sandbox, editor, team, memory and MCP tools</summary>
 
 **🧰 Server-side sandbox (files, web, shell)**
 | Tool | What it does |
@@ -558,11 +579,15 @@ Tick tools per agent in the editor. They're grouped:
 
 Every path is **jailed** server-side, so `../` and symlinks can't escape, and a **protected-paths** list keeps secrets (`storage/`, keys, dotfiles) off-limits even inside a root.
 
----
+</details>
 
+---
 ## 🧭 The provider harness
 
 Different providers aren't one API with different URLs. A single registry (`src/Harness.php` + `ui/js/harness.js`) decides, per request:
+
+<details>
+<summary>▼ Shapes, dialects, quirks and adding a provider</summary>
 
 - **Which API shape** — OpenAI-compatible, Anthropic Messages, Google `generateContent`, or Ollama — from the **endpoint host**, then provider id, then a model hint.
 - **Which tool dialect** to teach — JSON, Claude XML, native tags, or plain — from the provider + model id.
@@ -570,13 +595,17 @@ Different providers aren't one API with different URLs. A single registry (`src/
 
 Adding a provider is one line in the alias table, or just a new provider in the UI. The browser copy is **generated** from the PHP (`php tools/gen-harness.php`) so the two can't drift.
 
----
+</details>
 
+---
 ## 🧠 Dynamic tools & the learned dialect
 
 ![Config → Labs: dynamic tools, the learned dialect, the API pool and the browser](screenshots/Learn-Dialect.png)
 
 No two models are alike — and the **free** ones are the fussiest of all. 🔧 **Dynamic tools** hands each model the environment it is *actually* running in — the server's 🪟/🐧 OS, the working directory, and which shell commands **really exist** — then shows **one correct example per tool in that model's own dialect** (JSON, Claude XML, native `<|tool_call|>` tags, or plain). No more `findstr` on Linux, no more guessing the syntax: the model is *told*, up front. 🎯
+
+<details>
+<summary>▼ Dialects, the rescue retry and the learned winner</summary>
 
 - 🌍 **Speaks the model's language** — OpenAI-style JSON, Claude XML, native tags or plain JSON, detected from the provider + model id (or forced per agent).
 - 🛟 **One rescue retry** — if a reply *looks* like a tool call but parses to nothing, the loop re-teaches **once** with a different dialect instead of letting the near-miss become the answer.
@@ -585,25 +614,33 @@ No two models are alike — and the **free** ones are the fussiest of all. 🔧 
 
 Free, quantised models that used to burn **6–8 calls** guessing now get it right the first time. 🚀
 
----
+</details>
 
+---
 ## ⏱️ Throttle / limiter / pacer
 
 ![Throttle and metrics](screenshots/throttle-token-metrics-clock.png)
 
 A 40-requests-per-minute key dies when 16 chart nodes fire at once. The pacer counts outbound calls **per host + key** and waits instead of spending a 429.
 
+<details>
+<summary>▼ Buckets, free-tier ceilings and 429 learning</summary>
+
 - **Per-key buckets** — four agents on four keys are four buckets; two agents on one key correctly share.
 - **Knows the free tiers** — NVIDIA NIM 40/min, Groq 30, OpenRouter 20, … with a host default for anything unknown. Set the global field to **`0 = AUTO`** to use each provider's real ceiling, or type a number to override everyone. Precedence: **agent lock → provider → global → host default**.
 - **Learns from a 429** — a real refusal holds the bucket closed for the server's `Retry-After`.
 
----
+</details>
 
+---
 ## 🔑 API pool — rotate your keys
 
 ![Provider editor → API pool: extra keys, model scoping and rotate-after-N](screenshots/API-Pool.png)
 
 Got several keys for one provider — a handful of free accounts, a team key, a spare? 🗝️ Drop them into the provider's **API pool** and let the console do the shuffling.
+
+<details>
+<summary>▼ Rotation, model pinning and 429 cooldowns</summary>
 
 - 🔁 **Rotate after N requests** — set the number and the pool hands out the next key when one reaches it (`0` = every call).
 - 🎯 **Pin a key to a model** — tick *Only this model* and enter a model # (like `#63BET7`) or a model id, and that key circles **just that model** while everything else keeps the single key.
@@ -612,13 +649,17 @@ Got several keys for one provider — a handful of free accounts, a team key, a 
 
 It stacks with the pacer: every key is counted in its **own** bucket 📈, so a busy fleet spreads its load instead of slamming one ceiling.
 
----
+</details>
 
+---
 ## 🌐 Proxy — route every agent's outbound traffic
 
 ![The Proxy tab: ELITE and ANONYMOUS rows, ping, uptime, favourite, USE and clear](screenshots/proxy.png)
 
 Agents leak. 🕵️ By default every model call, every `web_search`, every `fetch_url` and every `curl` an agent runs in the shell leaves from **your** IP. The **Proxy** tab — in the top nav, beside Providers — puts a checkpoint in front of all of it.
+
+<details>
+<summary>▼ List grades, ping, favourites and global routing</summary>
 
 - 🔄 **REFRESH LIST pulls hundreds at once.** The server reads a live public proxy feed — the kind of list that rotates daily — and keeps only what is usable: alive, HTTP, **IPv4** (this host dials IPv4 for `CURLOPT_PROXY`, so an IPv6 entry would look selected while traffic quietly went direct) and **identity-hiding only**. The header tells you what you got — *340 IPv4 proxies (elite + anonymous)* — and the drop counters explain a short list instead of leaving you to guess.
 - 🥇 **Two grades of hiding, and nothing below them.** **ELITE** *(best)* never announces itself and never forwards your address, so the far end sees a stranger. **ANONYMOUS** *(better)* strips your address, but the request may still be identifiable as proxied. Transparent proxies are refused at the source: they are your real IP with extra steps.
@@ -627,8 +668,9 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
 - ✅ **USE routes everything, server-side.** The choice is saved in `config.json`, because the **server** is what makes the call — a browser-only setting is invisible to it, which is exactly why picking a proxy once changed nothing. From then on: model relays, `web_search`, `fetch_url` and every shell command that honours proxy variables (`curl`, `wget`, `nmap`) go through it, while `localhost` and `127.0.0.1` stay direct via `NO_PROXY`. A per-request proxy in an agent's own spec still wins over the global choice.
 - ⚠️ **It does not fail closed — deliberately.** Free lists rot; when the selected proxy dies, calls fail with a curl error and its row says so. That is a consequence you can *see*, not a silent fall back to your real address. **CLEAR SELECTION** returns everything to the direct route.
 
----
+</details>
 
+---
 ## 📊 Metrics & 🔎 Run trace
 
 - **Agent cards** show a live line: `⚡ tokens/budget · N req · up 2h · 40/min` — with a tooltip of in/out tokens, billed calls, output cap, context window and last call. Set a **token budget** (Config → Limits) and it shows `used/limit (%)`.
@@ -647,6 +689,9 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
 
 The whole loop as a living map. Every activated agent and provider becomes a glowing node, and each exchange paints a dotted line whose dots travel the way the traffic actually moved.
 
+<details>
+<summary>▼ Nodes, traffic, MCP on the graph, ASK and verbose replies</summary>
+
 > 🎛️ **It is also the most expensive thing in the app**, so every visual it owns has a switch in **Config → Desktop** — fog, bloom, the floating floor, auto-rotate, map detail and the frame cap. That card — every knob, what it costs and what it defaults to — is detailed in *Config → Desktop* above. 🧮
 
 - 🧑 **You** — the red node at the heart of the graph, with a live card: 📨 prompts sent, 💬 replies, 🤖 agents online, ⚙️ working now, 🪙 session tokens and 📡 fleet average ping.
@@ -660,13 +705,17 @@ The whole loop as a living map. Every activated agent and provider becomes a glo
 - ❓ **Ask a model from its node** — the 3D card carries an **ASK** button that docks a small prompt box with a send button and a **Voice** toggle. The answer lands in a floating box pinned to the graph, isolated from the transcript, while the traffic still animates.
 - 🛠️ **Verbose inline replies** — the graph's reply box prints the **real tool work** verbatim (call name, pretty-printed arguments, status, duration, full output) before the closing answer, and only the closing answer is ever read aloud. 🔊
 
----
+</details>
 
+---
 ## 🧮 Resource Manager — let the 3D graph rest 😴
 
 The living map is lovely and also, by default, *always on*. **Config → Resource
 Manager** adds optional brakes — every switch **off by default**, so nothing
 changes until you ask:
+
+<details>
+<summary>▼ Pause switches, idle slowdown and gauges</summary>
 
 - 🪟 **Pause when a panel is open** (routing chart, API Lab, Brain Lab, browser, modals) — no point rendering a graph behind a full-screen drawer.
 - 🎯 **Pause when the window isn't focused** — switch to another app and it stands down.
@@ -674,8 +723,9 @@ changes until you ask:
 - 🐢 **Slow down when idle** (default **10 fps**) — idle means no traffic beams, no working agents, settled layout, no recent interaction.
 - 🧭 **Two speedometer gauges** + an FPS / frame-ms readout — **CPU** is this app's JS share of each frame; **GPU** is real GPU ms via `EXT_disjoint_timer_query_webgl2` when the browser exposes it, otherwise a clearly-labelled estimate.
 
----
+</details>
 
+---
 ## 💭 Thinking & reasoning
 
 Some models show their work. 💭🧩 When a provider streams a reasoning trace, the **thinking panel** opens and shows it live, so you can watch the model deliberate before the answer lands — handy for debugging a stubborn prompt without cluttering the reply.
@@ -686,6 +736,9 @@ Some models show their work. 💭🧩 When a provider streams a reasoning trace,
 
 Agents keep **private notes** and share a small **collective** every agent reads. Tools: `remember` (private), `share` (collective), `recall`, `adopt`. Notes are injected as **recollection, not instructions**, and are fully editable/deletable in Brain Lab.
 
+<details>
+<summary>▼ Hardenings, budgeting and sync rules</summary>
+
 Two recent hardenings so memory can't look "off":
 
 - If a model **narrates** a tool call ("I'll use the remember tool") instead of emitting it, the loop **re-prompts once** to actually send it.
@@ -693,8 +746,9 @@ Two recent hardenings so memory can't look "off":
 
 Replayed history is budgeted against the model's real context window instead of a fixed 24k characters, and oversized tool output keeps its head and tail rather than being cut mid-result.
 
----
+</details>
 
+---
 ## 💾 Export & import
 
 Take your work with you. 📦
@@ -1154,6 +1208,9 @@ security rests on**. 🧪
 
 **Config → MCP Client.** Add any MCP server (stdio command + args, or an HTTP URL with headers). Its tools become available to your agents through `mcp_list` / `mcp_call`. Servers are operator-configured — a model can *call* them, never add one.
 
+<details>
+<summary>▼ Config example and Windows PATH notes</summary>
+
 ```jsonc
 // storage/config.json
 "mcp": { "servers": [
@@ -1167,13 +1224,17 @@ security rests on**. 🧪
 
 On Windows, stdio servers inherit the process environment (including `PATH`, `ComSpec`, `APPDATA`, `TEMP` and the usual Node install directories), so `npx`/`node` work without a manual PATH. `env` overrides individual keys. HTTP servers that require a session get `initialize` + `Mcp-Session-Id` automatically when the first call says it needs one; stateless servers still use a single POST.
 
----
+</details>
 
+---
 ## 🖥️ MCP — let others connect **in** (server)
 
 ![MCP](screenshots/MCP.png)
 
 The mirror of the client: an operator can expose this install as a **remote MCP server**, so another person's MCP client — their own local model, Claude Desktop, Cursor — can call tools that run on the operator's machine.
+
+<details>
+<summary>▼ Enable steps, token scopes and friend setup</summary>
 
 ### 🔧 Enable it (operator)
 **Config → MCP Server**
@@ -1202,13 +1263,17 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 
 The operator hands over the **URL + that friend's token**; `FRIENDS.md` is the one-page version to send along.
 
----
+</details>
 
+---
 ## 🌐 Built-in browser — you watch, the agents drive
 
 ![The built-in browser: live page, address bar, click-through and the drive-it rail](screenshots/Browser.png)
 
 A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 no extensions, just the DevTools Protocol. 🖥️ Open it from the **Browser** item in the apps notch and you get the live page, an address bar, **Go / Reload**, a **Live** auto-refresh, a headless ⇄ window toggle, and a **click-through** view: tap the page and it clicks. ✨
+
+<details>
+<summary>▼ Click, type and read, logins, gates and the block list</summary>
 
 - 🖱️ **Click, type, read** — click anywhere on the screenshot, type into the field you need, press **Enter**, and pull the page's visible text.
 - 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
@@ -1218,11 +1283,15 @@ A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 n
 - 🐕 **One browser, reaped** — launching (or stopping) reaps any stray headless Chrome/Edge still holding the profile dir, so orphan instances never pile up and chew CPU/GPU.
 - ⚡ **No multi-second stalls** — DevTools HTTP is read by exact `Content-Length` over a raw socket, navigation returns the moment the page is interactive, and every action is single-flight so a slow page can't stampede the connection pool.
 
----
+</details>
 
+---
 ## 📱 Android & mobile
 
 The UI is **mobile-first** — touch controls, a responsive layout, an icon rail on phones, and it works in the phone's browser right next to wireless-debugging tooling.
+
+<details>
+<summary>▼ The Android correction: WebView, on-device PHP and PWA</summary>
 
 > ⚠️ **Correction:** an earlier note claimed there would be no Android app because *"you can't put a PHP server into an Android app."* **That is false.** An Android build is a packaging exercise, not an impossibility:
 >
@@ -1232,8 +1301,9 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 >
 > So: 📱 an Android version is on the table. The old "impossible" line is struck.
 
----
+</details>
 
+---
 ## 🧩 Architecture
 
 ```
@@ -1327,6 +1397,9 @@ Either half runs on its own, which is what you want while working on one of them
 
 All under `/router/api/…` (or `/api/…`). Every route is token-gated.
 
+<details>
+<summary>▼ Full route table and error format</summary>
+
 | Area | Routes |
 | --- | --- |
 | 🗂️ State / config | `GET·PUT /state`, `GET·PUT /config` (secrets masked on read, restored on write), `GET /models` |
@@ -1343,8 +1416,9 @@ All under `/router/api/…` (or `/api/…`). Every route is token-gated.
 
 Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for the model, so a refused path reads as *"outside the allowed directories"* rather than a blank 500.
 
----
+</details>
 
+---
 ## 🧯 Troubleshooting
 
 - **"PHP's curl extension is not enabled"** → the server was started without the launcher (e.g. a bare `php -S`). Use `start.bat` / `start.sh`, or run `php serve.php --setup`.
