@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v361
+# 🧠 Autonomous Loop Studio — v362
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,19 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v361** — the keyboard stops eating what you type, and Allow finally sticks 📱
+> ### 🆕 What's new in **v362** — backups in parts, restores that land anywhere 📦
+>
+> The backup stops being all-or-nothing: name the file, pick the sections, and
+> restore onto any copy without the token dance.
+
+| | | |
+|---|---|---|
+| 🏷️ | **A name and a checklist** | **Config → FULL BACKUP** opens a dialog: a file name plus one checkbox per section — agents, providers & keys, models, settings, memory, pipelines, conversations, metrics, sessions, access & shell config, approval grants. The **models catalog** is backed up for the first time. |
+| 📥 | **Restore only what you pick** | **RESTORE BACKUP** shows the file's name, date, release and the sections it carries. Anything the file does not carry is **left alone, never blanked** — so a partial file, or a backup from any older version, restores instead of refusing. |
+| 🔑 | **No token dance** | A restore keeps **this copy's own** access token, gate and roots — even when the file came from a copy with a different token — and says so out loud. Nothing in a backup can lock you out of the copy you restore onto. |
+| 🧾 | **A report, not a reload** | After restoring, the dialog lists exactly what landed, what was skipped and why, and offers **Reload now** — nothing reloads underneath the report. |
+
+> ### 🆕 …and in **v361** — the keyboard stops eating what you type, and Allow finally sticks 📱
 >
 > Two paper cuts, both reported from a phone: the composer hid behind the keyboard in fullscreen,
 > and the Opening/Closing Programs switches snapped back to Ask.

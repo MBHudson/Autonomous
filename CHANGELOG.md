@@ -17,6 +17,34 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 📦 Backups in parts: named files, chosen sections, restores that land anywhere *(`VERSION` 362, cache-buster v361 → v362)*
+
+*2026-11-07. The backup stops being all-or-nothing, and the version bump that carries it.*
+
+**Take only what you mean, call it what you like.** FULL BACKUP opens a dialog now: a file name
+plus one checkbox per section -- agents, providers & keys, models, settings, memory, pipelines,
+conversations, metrics, sessions, access & shell config, approval grants. The models catalog
+(`storage/models.json`) is backed up for the first time; the old file never carried it at all.
+`GET /api/backup` takes `?sections=` and `?name=` and labels the bundle (`backupVersion: 2`,
+with the file's name, the release it came from, and the section list).
+
+**Restore only what you pick, from any file, onto any copy.** The restore dialog shows the
+backup's name, date, release and the sections it carries, and `POST /api/import` takes
+`{backup, only}`: state merges per-slot (the rest of the copy is kept), sessions are replaced
+only when the sessions section is restored, and anything the file does not carry is skipped,
+never blanked -- so a partial file, or a backup from any older version, restores instead of
+refusing. The config still keeps this copy's gate, token and roots, and the answer reports what
+landed, what was skipped and why, and whether the file carried a different access token (this
+copy's own still applies, so there is nothing to paste). The trap this removes is the one where
+a restore only worked back onto the same copy with the same token: nothing in the file can lock
+you out of the copy you restore onto, and the dialog says so out loud.
+
+Both suites green after the bump: PHP `16 files, 16 passed, 0 failed, 934 assertions, 5 skipped`,
+JS `11 files, 11 passed, 0 failed, 320 assertions`. No cache-buster-only release here -- `ui/`
+changed (two new dialogs, a new picker module), so both numbers moved together.
+
+---
+
 ## 📱 The keyboard stops eating what you type, and Allow finally sticks *(`VERSION` 361, cache-buster v360 → v361)*
 
 *2026-11-07. Two small fixes reported from a phone, carried by the version bump below them.*
