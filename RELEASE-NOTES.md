@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v360
+# 🧠 Autonomous Loop Studio — v361
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,17 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v360** — the keys stopped leaving, and a close ends the right program 🔐
+> ### 🆕 What's new in **v361** — the keyboard stops eating what you type, and Allow finally sticks 📱
+>
+> Two paper cuts, both reported from a phone: the composer hid behind the keyboard in fullscreen,
+> and the Opening/Closing Programs switches snapped back to Ask.
+
+| | | |
+|---|---|---|
+| ⌨️ | **The input stays above the keyboard** | On mobile the on-screen keyboard opens *over* the page — in fullscreen it always does — so the chat composer sat behind it and you typed blind. The app now follows `window.visualViewport`: while the keyboard is open the layout shrinks to the visible strip, the input row and dialogs gain the covered height as padding, and the focused field scrolls into view. Desktop has no touch keyboard, so nothing changes there. |
+| 🙋 | **Allow finally sticks for programs** | **Config → Permissions**: *Opening programs* and *Closing programs* had no save handler, so Allow changed the dropdown and nothing else — the next render flipped them back to Ask. Both choices now persist like the other four tools. |
+
+> ### 🔐 …and in **v360** — the keys stopped leaving, and a close ends the right program 🔐
 >
 > Five ways this app could be made to hand over something it was guarding, or to report a success
 > it never had — plus the one command that gets you back in after you lock yourself out. 🛠️

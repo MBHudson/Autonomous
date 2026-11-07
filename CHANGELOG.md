@@ -17,6 +17,34 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 📱 The keyboard stops eating what you type, and Allow finally sticks *(`VERSION` 361, cache-buster v360 → v361)*
+
+*2026-11-07. Two small fixes reported from a phone, carried by the version bump below them.*
+
+**Fullscreen + keyboard: the composer hid behind the keys.** On mobile the on-screen keyboard opens
+*over* the page instead of resizing it — and in fullscreen (`documentElement.requestFullscreen`) it
+always overlays, because there is no browser chrome left to shrink. The fixed chat input then sat
+behind the keyboard and you typed blind. New `ui/js/keyboard.js` watches `window.visualViewport`
+(the part of the page the keyboard is not covering) and, while the keyboard is open, shrinks `.app`
+to the visible strip so the composer rides above it, exposes the covered height as `--kb-height`
+(which the composer and dialog padding absorb), and scrolls the focused field into view — pinning
+the chat to the newest message while you type. Changes under ~120px are ignored so the URL bar
+showing or hiding never resizes the app, and without a touch keyboard `--kb-height` stays 0, so
+the desktop is untouched. The viewport meta also gains `interactive-widget=resizes-content`, and
+the wiring is an isolated `safeInit`, so it cannot break boot.
+
+**Opening/Closing Programs snapped back to Ask.** The Permissions section renders six per-tool
+Allow/Ask/Deny dropdowns, but the change handler only listened to four of them — `window_open`
+and `window_close` had no listener at all. Picking Allow changed the dropdown on screen and wrote
+nothing, so the next re-render read the still-unchanged setting (`ask`) and flipped it back —
+exactly the reported symptom. Both keys are now in the handler loop; the enforcement side already
+read them generically, so nothing else had to change.
+
+Both suites green after the bump: PHP `15 files, 15 passed, 0 failed, 872 assertions, 5 skipped`,
+JS `10 files, 10 passed, 0 failed, 296 assertions`.
+
+---
+
 ## ⚡ Fourteen test files, four at a time: the fresh-copy check drops from 41 seconds to 17 *(tests only — `VERSION` 360 and the cache-buster are unchanged)*
 
 *2026-10-27. The suite that checks the app, not the app: no runtime file changed except two inert seams, and no
