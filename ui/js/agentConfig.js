@@ -23,8 +23,8 @@
 // Keeping one source per setting is what stops the UI, the resolver and the
 // call paths from disagreeing about what an agent is actually using.
 
-import { store } from './store.js?v=367';
-import { DEFAULT_HISTORY_TURNS } from './utils.js?v=367';
+import { store } from './store.js?v=368';
+import { DEFAULT_HISTORY_TURNS } from './utils.js?v=368';
 
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o || {}, k);
 

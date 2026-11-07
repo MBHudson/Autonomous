@@ -1,4 +1,4 @@
-# 🧠 Autonomous Loop Studio — v367
+# 🧠 Autonomous Loop Studio — v368
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run. 🔁
 
@@ -14,7 +14,13 @@ One folder of PHP. 🚫 No database. 🚫 No build step. 🚫 No external servic
 agents with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both
 directions.** 🕸️
 
-> ### 🆕 What's new in **v367** — watch it type ⌨️
+> ### 🆕 What's new in **v368** — typing finds Store copies 🔧
+>
+> `window_type` now sees Windows 11's Notepad (which runs from a WindowsApps
+> path nobody configured), waits a few seconds for a just-opened program
+> before giving up, and checks the window really came forward before sending.
+>
+> ### 🆕 …and in **v367** — watch it type ⌨️
 >
 > A new `window_type` tool sends keystrokes into an open program's window,
 > live on your screen: `window_open` Notepad, `window_type` the words, watch

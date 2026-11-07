@@ -504,15 +504,33 @@ class Programs {
             throw new \RuntimeException('That is ' . $len . ' characters; one call types at most '
                 . self::MAX_TYPE . '. Split it across several window_type calls.');
         }
-        $table = self::processTable();
-        if (!is_array($table)) {
+        // A program opened moments ago -- in the same breath, by a model that
+        // batches open and type -- may not have appeared in the process list
+        // yet (a Store package can take seconds to spin up). So this waits a
+        // few seconds for SOMETHING to appear rather than failing the race.
+        // What it will not do is type into nothing: still absent after that,
+        // and it throws instead of pretending.
+        $pids = [];
+        $sawTable = false;
+        $until = microtime(true) + 8;
+        do {
+            $table = self::processTable();
+            if (is_array($table)) {
+                $sawTable = true;
+                $pids = self::pidsFor($exe, $table);
+                if ($pids) { break; }
+            }
+            usleep(500000);
+        } while (microtime(true) < $until);
+        if (!$pids && !$sawTable) {
             throw new \RuntimeException('Cannot tell which processes are "' . $app['name']
                 . '" on this host (no process list available). Nothing was typed.');
         }
-        $pids = self::pidsFor($exe, $table);
         if (!$pids) {
             throw new \RuntimeException('Nothing of "' . $app['name'] . '" is running -- open it with '
-                . 'window_open first, then type.');
+                . 'window_open first, then type. If it IS open on screen, it may be a Store-packaged '
+                . 'copy running from somewhere else: window_list shows what this machine can actually '
+                . 'see under "running".');
         }
 
         $runId = substr(bin2hex(random_bytes(6)), 0, 12);
@@ -565,6 +583,7 @@ class Programs {
             . 'Add-Type -AssemblyName System.Windows.Forms' . "\n"
             . '$text = [System.IO.File]::ReadAllText($File, [System.Text.Encoding]::UTF8)' . "\n"
             . '$ws = New-Object -ComObject WScript.Shell' . "\n"
+            . 'Add-Type -Namespace RouterWin -Name Foreground -MemberDefinition \'[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();\'' . "\n"
             . '$best = $null' . "\n"
             . 'foreach ($raw in ($PidList -split \',\')) {' . "\n"
             . '  $id = 0' . "\n"
@@ -577,6 +596,7 @@ class Programs {
             . 'if ($null -eq $best) { Write-Output \'NOTYPE it is running but has no window yet\'; exit 3 }' . "\n"
             . 'if (-not $ws.AppActivate($best.Id)) { Write-Output \'NOTYPE its window would not come forward\'; exit 3 }' . "\n"
             . 'Start-Sleep -Milliseconds 250' . "\n"
+            . 'if ([RouterWin.Foreground]::GetForegroundWindow() -ne $best.MainWindowHandle) { Write-Output \'NOTYPE another window kept the focus\'; exit 3 }' . "\n"
             . '$esc = $text -replace \'([+^%~()\\[\\]{}])\', \'{$1}\'' . "\n"
             . '$esc = $esc -replace "`r`n", "{ENTER}"' . "\n"
             . '$esc = $esc -replace "`n", "{ENTER}"' . "\n"
@@ -604,8 +624,9 @@ class Programs {
         }
         if (preg_match('/^NOTYPE (.+)$/m', $out, $m)) {
             return ['ok' => false, 'pid' => 0,
-                'error' => '"' . trim($m[1]) . '" -- still starting (retry in a moment), or the server cannot '
-                    . 'see this desktop (a service install draws windows in session 0). Nothing was typed.'];
+                'error' => '"' . trim($m[1]) . '" -- still starting (retry in a moment), another window '
+                    . 'stole the focus (click the program and retry), or the server cannot see this desktop '
+                    . '(a service install draws windows in session 0). Nothing was typed.'];
         }
         return ['ok' => false, 'pid' => 0,
             'error' => 'The keystrokes were refused'
@@ -844,8 +865,10 @@ class Programs {
      *
      * Compared as resolved paths, case-folded on Windows (where the same file
      * is spelled C:\X and c:\x and the short name is a third spelling). There is
-     * deliberately NO basename fallback: that is what made two different
-     * programs that share a file name into "the same program".
+     * deliberately NO general basename fallback: that is what made two
+     * different programs that share a file name into "the same program". The
+     * one exception is a Store alias boundary (see aliasMatch), where neither
+     * side is a place a second copy could be hiding.
      *
      * @return int[]
      */
@@ -855,10 +878,31 @@ class Programs {
         if ($want === '') { return []; }
         $pids = [];
         foreach ($table as $pid => $path) {
-            if (self::key($path) === $want) { $pids[] = (int)$pid; }
+            if (self::key($path) === $want) { $pids[] = (int)$pid; continue; }
+            if (self::platform() === 'windows' && self::aliasMatch($exe, (string)$path)) {
+                $pids[] = (int)$pid;
+            }
         }
         sort($pids);
         return $pids;
+    }
+
+    /**
+     * Whether a running path is the same program as the configured one, even
+     * though the paths differ: a Store/packaged program (Notepad on Windows
+     * 11) RUNS from a WindowsApps path no config could name, while the list
+     * holds the app-execution-alias stub that launched it. Basename matching
+     * is allowed ONLY across that boundary -- one side is a protected system
+     * folder no twin copy can be dropped into, or a zero-byte stub no real
+     * program is -- so the twin finding still holds: two real files sharing
+     * a name never match by name alone.
+     */
+    private static function aliasMatch($exe, $path) {
+        $base = strtolower(self::baseName($exe));
+        if ($base === '' || strtolower(self::baseName($path)) !== $base) { return false; }
+        if (stripos($path, 'WindowsApps') !== false) { return true; }
+        if (stripos($exe, 'WindowsApps') !== false) { return true; }
+        return @filesize($exe) === 0;
     }
 
     /** One spelling of a path, for comparing two of them. */

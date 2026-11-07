@@ -37,6 +37,15 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v368 — typing finds Store copies 🔧
+
+*`window_type` sees Windows 11's Notepad, waits for slow starters, and checks the focus before sending.*
+
+| | |
+|---|---|
+| 📦 **Store copies count** | A packaged program runs from a WindowsApps path nobody configured — the match now crosses that one alias boundary by file name, and only there. |
+| ⏳ **Waits, then tells the truth** | A just-opened program gets a few seconds to appear before `window_type` concludes nothing is running; the send verifies the window really came forward, so a stolen focus fails loudly. |
+
 ### 🆕 v367 — watch it type ⌨️
 
 *`window_open` Notepad, `window_type` the words, watch them appear — with its own approval switch.*
@@ -1110,6 +1119,12 @@ timeout while the whole turn waited on it.
   Closing. Windows only: it is the system's own keystroke injector, and POSIX has no single equivalent, so
   anywhere else refuses plainly. And the old rule still holds — the operator names the program, the model only
   supplies the keys.
+- 📦 **A Store copy is still the same program.** On Windows 11 a program like Notepad *runs* from a
+  WindowsApps path nobody configured, while the list holds the alias stub that launched it — so the match
+  crosses that one boundary by file name, and only there, because neither side is a place a second copy
+  could be hiding. `window_type` also waits a few seconds for a just-opened program to show up before
+  concluding nothing is running, and checks the window really came forward before sending — a stolen focus
+  fails loudly instead of typing into the wrong place.
 - 🧾 **The trace is written by this app alone** — every field is stripped of control characters before it
   reaches `storage/exec.log`, so an argument carrying a newline cannot append a record of a command that
   never ran. Full account in **[§22](#-22-the-trace-is-written-by-this-app-alone)**.

@@ -17,6 +17,19 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔧 Typing finds Store copies, waits for slow starters, checks the focus *(`VERSION` 368, cache-buster v367 → v368)*
+
+*2026-11-07. The first `window_type` could not see Windows 11's Notepad: it runs from
+a WindowsApps path nobody configured. Now the match crosses that one alias boundary by
+file name -- and only there -- `window_type` waits a few seconds for a just-opened program
+before concluding nothing is running, and the send verifies the window really came forward
+so a stolen focus fails loudly instead of typing into the wrong place.*
+
+Both suites green after the bump: JS and PHP runners all passing, with synthetic-table cases
+proving the Store match and the surviving twin rule in `tests/php/programs.test.php`.
+
+---
+
 ## ⌨️ Watch it type: `window_type` sends keystrokes into a real window *(`VERSION` 367, cache-buster v366 → v367)*
 
 *2026-11-07. Opening a program was half the trick -- now an agent can type into it, live on screen, plus the Config path fix that got lost behind a bad tool call.*

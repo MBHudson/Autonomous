@@ -252,6 +252,38 @@ if ($platform !== 'windows') {
     }, 'type() refuses off Windows instead of half-working', 'only built for Windows');
 }
 
+// --- 4c. a Store-packaged copy matches across the alias boundary --------
+// On Windows 11 Notepad RUNS from a WindowsApps path no config could name,
+// while the list holds the alias stub that launched it. pidsFor is private,
+// so this drives it directly with a synthetic table -- no window needed.
+if ($platform === 'windows') {
+    $pidsFor = new ReflectionMethod(Programs::class, 'pidsFor');
+    $pidsFor->setAccessible(true);
+    // The configured side is the classic path; the running side is the
+    // packaged copy. Same file name, different world -- and a match.
+    $storeTable = [4242 => 'C:/Program Files/WindowsApps/FakeNotepad_1.0/Notepad.exe'];
+    ok($pidsFor->invoke(null, 'C:\\Windows\\System32\\notepad.exe', $storeTable) === [4242],
+        'a Store-packaged copy matches the configured classic path');
+    // ...and the reverse: the list holds the user alias stub, the running
+    // side the package. A zero-byte file is what those stubs are.
+    $stubExe = $tmpDir . '/notepad.exe';
+    file_put_contents($stubExe, '');
+    ok($pidsFor->invoke(null, $stubExe, $storeTable) === [4242],
+        'a Store-packaged copy matches a zero-byte alias stub');
+    // The twin rule survives: two REAL files sharing a name never match by
+    // name alone, whichever folder they sit in.
+    if ($runner !== '') {
+        $twinTable = [4243 => $tmpDir . '/' . basename($runner)];
+        @copy($runner, $tmpDir . '/' . basename($runner));
+        ok($pidsFor->invoke(null, $runner, $twinTable) === [],
+            'two real files with the same name still do not match');
+        @unlink($tmpDir . '/' . basename($runner));
+    } else {
+        echo "  SKIP: no long-running program to copy on this host\n";
+    }
+    @unlink($stubExe);
+}
+
 // --- 5. launch, look, close -------------------------------------------
 if ($runner === '') {
     echo "  SKIP: no long-running program to copy on this host\n";
@@ -310,7 +342,8 @@ if ($runner === '') {
             // install) has nothing to bring forward -- that is the feature
             // refusing honestly, not the test failing.
             if (stripos($e->getMessage(), 'no window yet') !== false
-                || stripos($e->getMessage(), 'come forward') !== false) {
+                || stripos($e->getMessage(), 'come forward') !== false
+                || stripos($e->getMessage(), 'kept the focus') !== false) {
                 echo "  SKIP: live typing needs a visible window ({$e->getMessage()})\n";
             } else { throw $e; }
         }
