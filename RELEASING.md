@@ -47,7 +47,7 @@ no cached asset changed, so it cannot report one.
    `tests/php/update.test.php` fails when `VERSION` is behind `APP_VERSION`,
    which is the mistake this checklist exists to prevent.
 6. **Push.** Running copies get a notification in the bell on their next page
-   load; the check is cached server-side for six hours, and nothing installs
+   load; the check is cached server-side for one hour, and nothing installs
    itself — **Config → Updates → DOWNLOAD UPDATE…** is still a manual,
    compare-first step.
 
