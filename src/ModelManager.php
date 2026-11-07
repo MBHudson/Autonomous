@@ -240,8 +240,6 @@ class ModelManager {
         if (!empty($spec['proxy'])) {
             curl_setopt($ch, CURLOPT_PROXY, $spec['proxy']);
             curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         } else {
             // No proxy configured, so nothing to set.
         }
@@ -265,7 +263,9 @@ class ModelManager {
         // curl-template agents got 12 — the streaming path is what the
         // tool-loop agents use, so ordinary agents failed and templates did not.
         curl_setopt($ch, CURLOPT_TIMEOUT, 720);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        // Certificate policy (config: tls.verify). This used to be an
+        // unconditional "trust anything" on every call.
+        Tls::apply($ch, $endpoint);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_BUFFERSIZE, 1);
 
@@ -383,13 +383,13 @@ class ModelManager {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        // Certificate policy (config: tls.verify). This used to be an
+        // unconditional "trust anything" on every call.
+        Tls::apply($ch, $endpoint);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         if ($proxy) {
             curl_setopt($ch, CURLOPT_PROXY, $proxy);
             curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         }
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -508,14 +508,21 @@ class ModelManager {
         $provider = (string)($model['provider'] ?? 'openrouter');
         $apiKey = (string)($model['api_key'] ?? '');
 
+        // ONE registry decision for this call, exactly as the relay paths make
+        // it. Using the raw provider id here meant an alias (gemini, vertex,
+        // nim, a custom row, an explicit harness pin) got the OpenAI body and
+        // Bearer auth on this path while the relay detected the family
+        // correctly -- the "works in the relay, breaks in /query" split.
+        $family = Harness::detect($model);
+
         // Build context-aware prompt
         $fullPrompt = $this->buildPromptWithContext($prompt, $sessionData, $model['role']);
 
-        $payload = $this->buildPayload($model, $fullPrompt);
+        $payload = $this->buildPayload($model, $fullPrompt, $family);
 
         // Auth + endpoint rewrite come from the registry (Anthropic x-api-key +
         // version, Google ?key= + x-goog-api-key, Azure api-key, else Bearer).
-        $auth = Harness::auth($provider, (string)$model['endpoint'], $apiKey, $provider);
+        $auth = Harness::auth($family, (string)$model['endpoint'], $apiKey, $provider);
         $endpoint = $auth['endpoint'];
         $headers = $auth['headers'];
         
@@ -525,7 +532,9 @@ class ModelManager {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        // Certificate policy (config: tls.verify). This used to be an
+        // unconditional "trust anything" on every call.
+        Tls::apply($ch, $endpoint);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
         // This is the path the NON-streaming relay actually takes -- relay()
@@ -556,24 +565,26 @@ class ModelManager {
             return json_decode($response, true);
         }
         
-        return $this->parseResponse($response, $model['provider']);
+        return $this->parseResponse($response, $family);
     }
     
-    private function buildPayload($model, $fullPrompt) {
-        $provider = (string)($model['provider'] ?? 'openrouter');
+    private function buildPayload($model, $fullPrompt, $family = null) {
+        // The detected (or pinned) family, not the provider id: the two only
+        // agree when a provider is literally named after its API.
+        $family = $family ?: Harness::detect($model);
 
         // Family-specific default output ceiling, then the harness's own cap
         // (e.g. Gemini 8k) so an over-large global max_tokens cannot 400.
-        $base = $provider === 'anthropic' ? 4000 : ($provider === 'google' ? 2048 : 4096);
+        $base = $family === 'anthropic' ? 4000 : ($family === 'google' ? 2048 : 4096);
         $asked = array_key_exists('max_tokens', $model) ? (int)$model['max_tokens'] : 0;
         $maxTokens = $asked > 0 ? $asked : $base;
-        $cap = Harness::capMaxTokens($provider, (string)($model['model'] ?? ''), $maxTokens);
+        $cap = Harness::capMaxTokens($family, (string)($model['model'] ?? ''), $maxTokens);
         if ($cap !== null) { $maxTokens = $cap; }
 
         // The registry owns the request shape per API. Passing the flattened
         // prompt (no messages array) reproduces the long-standing single-turn
         // body each family expects.
-        return Harness::payload($provider, [
+        return Harness::payload($family, [
             'model' => $model['model'] ?? '',
             'prompt' => $fullPrompt,
             'temperature' => $model['temperature'] ?? 0.7,

@@ -12,7 +12,7 @@
 //
 // Pure functions only; no browser globals. Exits 0 on success, 1 on failure.
 
-import { detectFamily, harnessFor, autoProtocol, toolProtocolFor, defaultRpmFor, contextLimitFor } from '../../ui/js/harness.js';
+import { detectFamily, harnessFor, autoProtocol, toolProtocolFor, harnessOverride, defaultRpmFor, contextLimitFor } from '../../ui/js/harness.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -62,6 +62,20 @@ eq(g.toolProtocol, 'json', 'harnessFor: gemini -> json tools');
 // explicit override always wins
 eq(toolProtocolFor({ provider: 'openai', model: 'gpt-4o', toolProtocol: 'native' }), 'native', 'explicit toolProtocol override wins');
 eq(toolProtocolFor({ provider: 'openai', model: 'gpt-4o', toolProtocol: 'auto' }), 'json', 'auto falls back to detection');
+
+// explicit per-agent API shape (Brain Lab -> API harness) -------------------
+eq(detectFamily({ provider: 'openrouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', model: 'anthropic/claude-3.5-sonnet', harness: 'anthropic' }), 'anthropic',
+  'explicit harness wins over the endpoint host');
+eq(detectFamily({ provider: 'google', endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini:generateContent', model: 'gemini', harness: 'anthropic' }), 'anthropic',
+  'explicit harness wins over the google host');
+eq(detectFamily({ provider: 'openrouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', model: 'x', harness: 'nonsense' }), 'openai',
+  'an unknown harness is ignored');
+eq(harnessFor({ provider: 'openrouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', model: 'anthropic/claude-3.5-sonnet', harness: 'anthropic' }).id, 'anthropic',
+  'harnessFor honours the pin');
+eq(harnessOverride({ harness: 'google' }), 'google', 'harnessOverride: a real choice is kept');
+eq(harnessOverride({ harness: 'OpenAI' }), 'openai', 'harnessOverride: case is tolerated');
+eq(harnessOverride({ harness: 'auto' }), '', 'harnessOverride: auto means detect');
+eq(harnessOverride({}), '', 'harnessOverride: absent means detect');
 
 // default RPM per host (used by the rate governor when nothing is configured)
 eq(defaultRpmFor('https://integrate.api.nvidia.com/v1/chat/completions'), 40, 'default rpm: NVIDIA NIM 40');

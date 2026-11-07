@@ -16,6 +16,10 @@
 
 export {
   TOOL_PROTOCOLS,
+  HARNESS_CHOICES,
+  harnessLabel,
+  harnessHintFor,
+  harnessOverride,
   protocolLabel,
   protocolHint,
   autoProtocol,
@@ -26,4 +30,4 @@ export {
   contextLimitFor,
   learnedDialect,
   rememberDialect,
-} from './harness.js?v=368';
+} from './harness.js?v=370';

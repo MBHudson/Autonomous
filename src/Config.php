@@ -440,7 +440,9 @@ class Config {
             'sounds_enabled' => true,
             'auto_scroll' => true,
             'code_isolation' => true,
-            'session_timeout' => 86400
+            'session_timeout' => 86400,
+            // Certificate policy for outbound calls: auto | on | off. See Tls.php.
+            'tls' => ['verify' => 'auto']
         ];
         file_put_contents(self::configPath(), json_encode($default, JSON_PRETTY_PRINT));
     }

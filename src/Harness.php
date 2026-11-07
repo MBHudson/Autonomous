@@ -112,10 +112,28 @@ class Harness {
      * matched, and even then it can only choose the two families whose APIs are
      * unmistakably model-tied (Claude, Gemini).
      *
-     * @param array $spec {provider, endpoint, model}
+     * An explicit `harness` in the spec (a per-agent pin) skips all of the
+     * above: the operator's own choice is the only signal that beats the
+     * endpoint.
+     *
+     * @param array $spec {provider, endpoint, model, harness}
      * @return string harness id
      */
     public static function detect(array $spec) {
+        // 0. An explicit per-agent harness comes first. It is the operator
+        //    saying which shape this endpoint speaks, so no host, provider or
+        //    model heuristic may overrule it. Unknown values fall through to
+        //    detection, so a stale saved choice can never break a call.
+        //    'openai' is the browser's name for the shape this class calls
+        //    'openrouter' -- the same OpenAI-compatible wire format.
+        $explicit = strtolower(trim((string)($spec['harness'] ?? '')));
+        if ($explicit === 'openai') {
+            $explicit = 'openrouter';
+        }
+        if (in_array($explicit, ['openrouter', 'anthropic', 'google', 'ollama'], true)) {
+            return $explicit;
+        }
+
         $provider = strtolower(trim((string)($spec['provider'] ?? '')));
         $endpoint = (string)($spec['endpoint'] ?? '');
         $model    = strtolower(trim((string)($spec['model'] ?? '')));

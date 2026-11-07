@@ -266,7 +266,8 @@ class Audio {
             $payload['speed'] = $speed;
         }
 
-        $ch = curl_init(self::urlFor($base, 'speech'));
+        $ttsUrl = self::urlFor($base, 'speech');
+        $ch = curl_init($ttsUrl);
         // Cloud speech goes through the operator's proxy too, like every other
         // outbound agent call.
         $ap = Sandbox::activeProxy();
@@ -279,7 +280,7 @@ class Audio {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        Tls::apply($ch, $ttsUrl);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false); // never chase a redirect off-host
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -353,7 +354,8 @@ class Audio {
             $headers[] = 'Authorization: Bearer ' . $spec['api_key'];
         }
 
-        $ch = curl_init(self::urlFor($base, 'transcriptions'));
+        $sttUrl = self::urlFor($base, 'transcriptions');
+        $ch = curl_init($sttUrl);
         // Cloud speech goes through the operator's proxy too, like every other
         // outbound agent call.
         $ap = Sandbox::activeProxy();
@@ -366,7 +368,7 @@ class Audio {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $fields); // array form = multipart
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 120);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        Tls::apply($ch, $sttUrl);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);

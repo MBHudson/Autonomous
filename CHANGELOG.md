@@ -17,6 +17,34 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔒 Model calls check the certificate again, and plain http still works *(`VERSION` 370, cache-buster v369 → v370)*
+
+*2026-11-07. Every outbound model and speech call accepted any certificate. That is one setting now, defaulting to something safe, with an explicit way to turn it off.*
+
+**What was wrong.** `relayStream`, `relay`, `callModel`, the model-catalog fetch and both speech calls set `CURLOPT_SSL_VERIFYPEER => false`, and every proxy branch also set `CURLOPT_SSL_VERIFYHOST => 0`. The encryption still happened; what stopped happening was the identity check. Any host that answered was trusted, which meant anyone in the path -- hotel wifi, a shared VPS neighbour, a proxy picked from a free list -- could stand in for the provider, read the code and prompts going up, and write the "model's reply" coming down.
+
+**One policy, one place.** `src/Tls.php` owns the decision, and `storage/config.json` owns the value, under `tls.verify`: **auto** (default) verifies real providers and skips loopback, private ranges, `.local`/`.lan`/`.internal` names and single-word host names, which is where a self-signed certificate actually lives; **on** verifies everything; **off** verifies nothing, hostname included. `tls.ca_bundle` names a PEM file to trust, the proper way to verify a self-signed LAN host. Plain `http://` endpoints are untouched: no certificate, no check, so LM Studio and Ollama over http behave exactly as before. An unrecognised value falls back to auto rather than disarming.
+
+**Where it is set.** Config -> **TLS / Certificates** (saved immediately through `/config`, like the proxy and sandbox paths), with a status line that spells out what the current choice means. The same helper now covers the catalog fetch and the endpoint probe, so a LAN endpoint that works in an agent no longer reports "TLS error" in the test button.
+
+New `tests/php/tls.test.php` pins the policy: mode parsing, what counts as local, what each mode decides for a public and a local host, the CA bundle, and that an http URL asks for no TLS options at all. Both suites green after the bump: `node tests/js/run.mjs` and `php tests/php/run.php`.
+
+---
+
+## ⏱️ A stopped call gives its slot back, and every agent can pin its API harness *(`VERSION` 369, cache-buster v368 → v369)*
+
+*2026-11-07. The limiter's own claims were what could jam it, and the universal harness now takes an order from the operator instead of only a guess.*
+
+**A cancelled call no longer benches the key.** `acquire()` claimed a slot and then slept; if Stop (or a closing tab) cut that wait short, the claim stayed in the bucket and the next single call waited out a window for a request that was never sent. The claim is handed back now, and a call that goes out early -- a queue longer than `rateLimitMaxWaitMs` fails open -- is rebooked at the moment it really started, so the window stops reporting a queue nobody is in. The window itself is counted at the start time being claimed and re-counted after every push forward, so parallel callers cannot each see room for one more. A learned 429 now reaches callers already queued: after waking, a wait re-reads the hold and waits it out instead of waking into the same refusal. Usage and the status line count only starts that actually happened, and each bucket reports its own ceiling rather than the global fallback.
+
+**Brain Lab -> API harness.** Every agent carries an optional API SHAPE: Auto (the detection that was always there), OpenAI-compatible, Anthropic Messages, Google generateContent or Ollama native. A pin wins over endpoint -> provider -> model on both sides -- `ui/js/harness.js` for the client's native tool schemas and stream parsing, `src/Harness.php` for the server's payload, auth and parser -- and the one-shot relay whitelist carries it too. The hint names what detection would have used, so a wrong pin (Anthropic on an OpenRouter endpoint) is visible before it 400s.
+
+**One shape on every path.** `ModelManager::callModel()` detected the family and then ignored it, handing the raw provider id to the payload builder, the auth headers and the parser. An alias (`gemini`, `vertex`, `nim`, a custom row, an explicit pin) therefore got an OpenAI body and Bearer auth on the `/query` path while the relay did the right thing. It now makes one registry decision per call, with the provider still passed so Azure keeps its `api-key` header.
+
+Both suites green after the bump: `node tests/js/run.mjs` and `php tests/php/run.php`, including the new `tests/js/rateGovernor.test.mjs` and five new harness cases on each side.
+
+---
+
 ## 🔧 Typing finds Store copies, waits for slow starters, checks the focus *(`VERSION` 368, cache-buster v367 → v368)*
 
 *2026-11-07. The first `window_type` could not see Windows 11's Notepad: it runs from

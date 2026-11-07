@@ -30,9 +30,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=368';
-import { store } from './store.js?v=368';
-import { persistence } from './persistence.js?v=368';
+} from './harness.data.js?v=370';
+import { store } from './store.js?v=370';
+import { persistence } from './persistence.js?v=370';
 
 export { API_FAMILIES };
 
@@ -64,6 +64,68 @@ export const TOOL_PROTOCOLS = [
   },
 ];
 
+/**
+ * The API SHAPES an agent can be pinned to. 'auto' is not a shape: it means
+ * "keep detecting", which is what every agent did before this existed.
+ *
+ * Shape and dialect are different questions. Shape is how the bytes are
+ * framed (and which auth header carries the key); dialect is how the model is
+ * taught to ask for a tool. Pinning one never changes the other.
+ */
+export const HARNESS_CHOICES = [
+  {
+    id: 'auto',
+    label: 'Auto — detect it',
+    hint: 'Picks the shape from the endpoint host, then the provider, then the model. Right for almost every agent.',
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI-compatible',
+    hint: 'chat/completions + Bearer: OpenRouter, OpenAI, Groq, NVIDIA NIM, DeepSeek, Together, Mistral, and every /v1 shim.',
+  },
+  {
+    id: 'anthropic',
+    label: 'Anthropic Messages',
+    hint: 'x-api-key + anthropic-version, top-level system, max_tokens required. api.anthropic.com, or a proxy that mirrors it.',
+  },
+  {
+    id: 'google',
+    label: 'Google generateContent',
+    hint: '?key= with contents/parts and a generationConfig. generativelanguage.googleapis.com or Vertex AI.',
+  },
+  {
+    id: 'ollama',
+    label: 'Ollama (native)',
+    hint: "Ollama's own /api/chat on :11434. Its /v1 shim is OpenAI-compatible, not this.",
+  },
+];
+
+const HARNESS_BY_ID = new Map(HARNESS_CHOICES.map(h => [h.id, h]));
+/** Every id that names a real shape ('auto' excluded). */
+const HARNESS_IDS = new Set(HARNESS_CHOICES.map(h => h.id).filter(id => id !== 'auto'));
+
+/** Display label for a shape id; anything unknown reads as auto. */
+export function harnessLabel(id) {
+  return HARNESS_BY_ID.get(String(id || '').trim().toLowerCase())?.label
+    || HARNESS_CHOICES[0].label;
+}
+
+/** The one-line description of a shape, for hints and tooltips. */
+export function harnessHintFor(id) {
+  return HARNESS_BY_ID.get(String(id || '').trim().toLowerCase())?.hint || '';
+}
+
+/**
+ * The agent's pinned API shape, or '' when it should be detected.
+ *
+ * Stored as agent.harness. Unknown or stale values are treated as auto, so a
+ * saved choice can never break a call.
+ */
+export function harnessOverride(agent) {
+  const chosen = String(agent?.harness || '').trim().toLowerCase();
+  return HARNESS_IDS.has(chosen) ? chosen : '';
+}
+
 const BY_ID = new Map(TOOL_PROTOCOLS.map(p => [p.id, p]));
 const PROTOCOL_RE = TOOL_PATTERNS.map(([re, protocol]) => [new RegExp(re, 'i'), protocol]);
 
@@ -87,6 +149,12 @@ function isOllamaPath(path) {
  * @returns {'openai'|'anthropic'|'google'|'ollama'}
  */
 export function detectFamily(spec = {}) {
+  // 0. An explicit per-agent harness wins. The operator said which shape this
+  //    endpoint speaks, and no host, provider or model heuristic may overrule
+  //    that -- pinning one is the whole point.
+  const forced = harnessOverride(spec);
+  if (forced) return forced;
+
   const endpoint = String(spec.endpoint || '');
   const provider = String(spec.provider || '').trim().toLowerCase();
   const model = String(spec.model || '').trim().toLowerCase();

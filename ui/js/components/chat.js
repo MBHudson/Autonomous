@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=368';
-import { K as STORAGE_K } from '../storage.js?v=368';
+import { store } from '../store.js?v=370';
+import { K as STORAGE_K } from '../storage.js?v=370';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=368';
-import { persistence } from '../persistence.js?v=368';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted } from '../utils.js?v=368';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=368';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=368';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=368';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=368';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=368';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=368';
-import { usageFor } from '../rateGovernor.js?v=368';
-import { trace } from '../trace.js?v=368';
-import { latency } from '../latency.js?v=368';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=368';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=368';
-import { SlashCommands } from '../slashCommands.js?v=368';
-import { parseRoute, routingHelp } from '../routing.js?v=368';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=368';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=368';
-import { MessageRenderer, renderToolCalls } from './message.js?v=368';
-import { createAvatar } from './avatar.js?v=368';
-import * as comms from '../commsLog.js?v=368';
+import { api, errText } from '../api.js?v=370';
+import { persistence } from '../persistence.js?v=370';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted } from '../utils.js?v=370';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=370';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=370';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=370';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=370';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=370';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=370';
+import { usageFor } from '../rateGovernor.js?v=370';
+import { trace } from '../trace.js?v=370';
+import { latency } from '../latency.js?v=370';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=370';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=370';
+import { SlashCommands } from '../slashCommands.js?v=370';
+import { parseRoute, routingHelp } from '../routing.js?v=370';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=370';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=370';
+import { MessageRenderer, renderToolCalls } from './message.js?v=370';
+import { createAvatar } from './avatar.js?v=370';
+import * as comms from '../commsLog.js?v=370';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1424,6 +1424,7 @@ _makeLiveNode(agent) {
       endpoint: this._endpointFor(agent, provider),
       api_key: effectiveKey,
       agent_id: agent.id,
+      harness: harnessOverride(agent),
       model: agent.model,
       temperature: settingFor(agent, 'temperature') ?? 1.0,
       max_tokens: settingFor(agent, 'maxTokens') ?? 16384,
@@ -1629,6 +1630,7 @@ _makeLiveNode(agent) {
     const baseSpec = specFor(working);
     const family = detectFamily({
       provider: agent.provider, endpoint: baseSpec.endpoint, model: agent.model,
+      harness: harnessOverride(agent),
     });
     let nativeMode = NATIVE_FAMILIES.has(family) && agent.nativeTools !== false;
     const describeTool = name => TOOL_REGISTRY[name]?.describe || name;
@@ -2284,6 +2286,7 @@ _makeLiveNode(agent) {
             endpoint: provider.endpoint,
             api_key: provider.apiKey,
             agent_id: agent.id,
+            harness: harnessOverride(agent),
             model: agent.model,
             temperature: options.temperature,
             max_tokens: options.maxTokens,
@@ -2666,6 +2669,7 @@ _makeLiveNode(agent) {
         endpoint: parsed.url,
         api_key: bearerFromHeaders(parsed.headers) || effectiveKey,
         agent_id: agent.id,
+        harness: harnessOverride(agent),
         model: body.model || agent.model,
         temperature: body.temperature ?? temperature,
         max_tokens: body.max_tokens ?? maxTokens,
@@ -2714,6 +2718,7 @@ _makeLiveNode(agent) {
         endpoint: parsed.url,
         api_key: bearerFromHeaders(parsed.headers) || effectiveKey,
         agent_id: agent.id,
+        harness: harnessOverride(agent),
         model: body.model || agent.model,
         raw_payload: body,
         proxy: store.get('settings.proxyActive') || null,
@@ -2730,6 +2735,7 @@ _makeLiveNode(agent) {
       endpoint: parsed.url,
       api_key: bearerFromHeaders(parsed.headers) || effectiveKey,
       agent_id: agent.id,
+      harness: harnessOverride(agent),
       model: body.model || agent.model,
       temperature: body.temperature ?? temperature,
       max_tokens: body.max_tokens ?? maxTokens,

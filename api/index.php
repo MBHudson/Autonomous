@@ -55,6 +55,7 @@ require_once __DIR__ . '/lab.inc.php';
 use Src\Backup;
 use Src\Config;
 use Src\ModelManager;
+use Src\Tls;
 use Src\Audio;
 use Src\Sandbox;
 use Src\Mcp;
@@ -335,7 +336,7 @@ function handleCatalog($method, $segments, $body) {
     $ch = curl_init($catalog);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    Tls::apply($ch, $catalog);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     if (!empty($authHeader)) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $authHeader);
@@ -632,6 +633,10 @@ function handleRelay($method, $segments, $body) {
         }
         $result = $manager->relay([
             'provider' => $body['provider'] ?? 'custom',
+            // A pinned per-agent API shape has to survive the whitelist
+            // below, or the one-shot relay talks the detected shape while
+            // the streaming path talks the pinned one.
+            'harness' => $body['harness'] ?? '',
             'endpoint' => $body['endpoint'] ?? '',
             'api_key' => $body['api_key'] ?? '',
             'model' => $body['model'] ?? '',
@@ -1476,8 +1481,9 @@ function handleDiag($method, $segments, $body) {
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        // Same policy the real calls use, so a LAN endpoint that works in an
+        // agent does not report "TLS error" here.
+        Tls::apply($ch, $url);
         if ($payload !== null) {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));

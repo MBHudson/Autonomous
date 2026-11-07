@@ -69,6 +69,24 @@ ok($detect('openai', 'https://api.openai.com/v1/chat/completions', 'gpt-4o') ===
 ok($detect('ollama', 'https://openrouter.ai/api/v1/chat/completions', 'llama3') === 'openrouter',
     'endpoint overrides a wrong ollama provider id');
 
+// --- an explicit per-agent harness beats every heuristic -----------------
+$forced = function ($provider, $endpoint, $model, $harness) {
+    return Harness::detect([
+        'provider' => $provider, 'endpoint' => $endpoint,
+        'model' => $model, 'harness' => $harness,
+    ]);
+};
+ok($forced('openrouter', 'https://openrouter.ai/api/v1/chat/completions', 'anthropic/claude-3.5-sonnet', 'anthropic') === 'anthropic',
+    'explicit harness wins over the endpoint host');
+ok($forced('google', 'https://generativelanguage.googleapis.com/v1beta/models/gemini:generateContent', 'gemini', 'anthropic') === 'anthropic',
+    'explicit harness wins over the google host');
+ok($forced('openrouter', 'https://openrouter.ai/api/v1/chat/completions', 'x', 'openai') === 'openrouter',
+    "the browser's 'openai' name is the openai-compatible shape");
+ok($forced('openrouter', 'https://openrouter.ai/api/v1/chat/completions', 'x', 'nonsense') === 'openrouter',
+    'an unknown harness is ignored, not obeyed');
+ok($forced('openrouter', 'https://openrouter.ai/api/v1/chat/completions', 'x', 'ANTHROPIC') === 'anthropic',
+    'a harness name is case-insensitive');
+
 // --- payload shapes -----------------------------------------------------
 $or = Harness::payload('openrouter', ['model' => 'm', 'prompt' => 'P', 'temperature' => 0.3, 'max_tokens' => 10]);
 ok($or['model'] === 'm' && $or['messages'][0]['content'] === 'P' && $or['temperature'] === 0.3 && $or['max_tokens'] === 10,

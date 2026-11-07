@@ -6,20 +6,20 @@
  * BryceFromIndiana@gmail.com
  */
 
-import { store } from './store.js?v=368';
-import { persistence } from './persistence.js?v=368';
-import { esc, escAttr, agentCode } from './utils.js?v=368';
-import { api } from './api.js?v=368';
-import * as memory from './memory.js?v=368';
+import { store } from './store.js?v=370';
+import { persistence } from './persistence.js?v=370';
+import { esc, escAttr, agentCode } from './utils.js?v=370';
+import { api } from './api.js?v=370';
+import * as memory from './memory.js?v=370';
 import {
   profiles, newProfileId, alwaysAppendFor,
   settingFor, isLocked, lockSetting, unlockSetting, setSetting, sandboxRootFor,
-} from './agentConfig.js?v=368';
+} from './agentConfig.js?v=370';
 import {
   customToolDefs, defaultTools, loadCustomTools, validateCustomTool,
-} from './tools.js?v=368';
-import { SandboxFiles } from './sandboxFiles.js?v=368';
-import { TOOL_PROTOCOLS, toolProtocolFor, protocolLabel, protocolHint, harnessFor } from './toolProtocol.js?v=368';
+} from './tools.js?v=370';
+import { SandboxFiles } from './sandboxFiles.js?v=370';
+import { TOOL_PROTOCOLS, HARNESS_CHOICES, toolProtocolFor, protocolLabel, protocolHint, harnessFor, harnessOverride } from './toolProtocol.js?v=370';
 
 const ZOOM_KEY = 'als.brainLab.zoom.v1';
 const ZOOM_STEPS = [130, 160, 190, 225, 270, 320];
@@ -537,13 +537,24 @@ export class BrainLab {
     const protoHint = protoSelected === 'auto'
       ? `Auto -> ${protocolLabel(protoEffective)} for ${agent.provider || 'this provider'}${agent.model ? ' / ' + agent.model : ''}.`
       : protocolHint(protoEffective);
-    // What the harness registry detected for this agent, so the operator can
-    // see which API shape and tool dialect it will be fitted with.
-    const providerEndpoint = (store.get('providers') || []).find(p => p.id === agent.provider)?.endpoint || '';
-    const detected = harnessFor({ provider: agent.provider, endpoint: providerEndpoint, model: agent.model });
-    const harnessHint = `Detected: ${detected.label} - ${protocolLabel(detected.toolProtocol).replace(/ \(.*\)$/, '')} tools`;
     const protoOpts = TOOL_PROTOCOLS.map(p =>
       `<option value="${p.id}"${p.id === protoSelected ? ' selected' : ''} title="${escAttr(p.hint)}">${esc(p.label)}</option>`
+    ).join('');
+
+    // Which API SHAPE this agent's bytes will be framed in. Detection is the
+    // default; a pin (agent.harness) overrules it, and the hint names what
+    // detection WOULD have used, so a wrong pin is visible before it 400s.
+    const providerEndpoint = (store.get('providers') || []).find(p => p.id === agent.provider)?.endpoint || '';
+    const harnessAuto = harnessFor({ provider: agent.provider, endpoint: providerEndpoint, model: agent.model });
+    const harnessSelected = harnessOverride(agent) || 'auto';
+    const harnessResolved = harnessSelected === 'auto'
+      ? harnessAuto
+      : harnessFor({ provider: agent.provider, endpoint: providerEndpoint, model: agent.model, harness: harnessSelected });
+    const harnessHint = harnessSelected === 'auto'
+      ? `Auto -> ${harnessResolved.label} - ${protocolLabel(harnessResolved.toolProtocol).replace(/ \(.*\)$/, '')} tools`
+      : `Pinned to ${harnessResolved.label}${harnessResolved.id === harnessAuto.id ? '' : ` (detection would have used ${harnessAuto.label})`}`;
+    const harnessOpts = HARNESS_CHOICES.map(h =>
+      `<option value="${h.id}"${h.id === harnessSelected ? ' selected' : ''} title="${escAttr(h.hint)}">${esc(h.label)}</option>`
     ).join('');
 
     this.rail.innerHTML = `
@@ -627,7 +638,12 @@ export class BrainLab {
           <label class="form-label">Tool protocol</label>
           <select class="form-select" data-bl-field="toolProtocol">${protoOpts}</select>
           <div class="form-hint">${esc(protoHint)}</div>
-          <div class="form-hint" style="opacity:.75">${esc(harnessHint)}</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">API harness</label>
+          <select class="form-select" data-bl-field="harness">${harnessOpts}</select>
+          <div class="form-hint">${esc(harnessHint)}</div>
+          <div class="form-hint" style="opacity:.75">An explicit shape wins over detection &mdash; only pin one this endpoint really speaks. OpenRouter serves Claude models over the OpenAI-compatible API, so pinning Anthropic there fails.</div>
         </div>
         ${this._customToolsHtml(agent)}
       `)}
@@ -983,6 +999,12 @@ export class BrainLab {
         this._updateAgent(agent => {
           if (value && value !== 'auto') agent.toolProtocol = value;
           else delete agent.toolProtocol;
+        });
+        break;
+      case 'harness':
+        this._updateAgent(agent => {
+          if (value && value !== 'auto') agent.harness = value;
+          else delete agent.harness;
         });
         break;
       default:

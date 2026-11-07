@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=368';
-import { K } from '../storage.js?v=368';
-import { persistence } from '../persistence.js?v=368';
-import { api } from '../api.js?v=368';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=368';
-import { errText } from '../api.js?v=368';
-import { TOOL_REGISTRY } from '../tools.js?v=368';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=368';
-import { snapshot } from '../rateGovernor.js?v=368';
-import { resetBrowserEnabled } from '../toolManifest.js?v=368';
-import { perf } from '../perf.js?v=368';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=368';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=368';
+import { store } from '../store.js?v=370';
+import { K } from '../storage.js?v=370';
+import { persistence } from '../persistence.js?v=370';
+import { api } from '../api.js?v=370';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=370';
+import { errText } from '../api.js?v=370';
+import { TOOL_REGISTRY } from '../tools.js?v=370';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=370';
+import { snapshot } from '../rateGovernor.js?v=370';
+import { resetBrowserEnabled } from '../toolManifest.js?v=370';
+import { perf } from '../perf.js?v=370';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=370';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=370';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1526,6 +1526,24 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         </div>
       `)}
 
+      ${this._cfgSection('tls', 'TLS / Certificates', { text: settings.tlsOff ? 'OFF' : '' }, `
+        <div class="form-group">
+          <label class="form-label">Certificate checks on model and speech calls</label>
+          <select class="form-input" id="sbTlsVerify">
+            <option value="auto">Auto &mdash; verify public hosts, skip LAN and loopback</option>
+            <option value="on">Always verify, LAN included</option>
+            <option value="off">Never verify (any certificate, no hostname check)</option>
+          </select>
+          <div class="form-hint">The server makes these calls, so this is stored in <code>storage/config.json</code> under <code>tls.verify</code>, not in the browser. <b>Auto</b> verifies real providers (OpenAI, Anthropic, OpenRouter, Google) and skips the check for loopback, LAN addresses and single-word host names &mdash; where a self-signed certificate normally lives. Plain <code>http://</code> endpoints (LM Studio, Ollama) have no certificate at all, so they work whatever this says. <b>Never verify</b> accepts any certificate and stops checking the hostname, which means the API key and the prompt go to whoever answers.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CA bundle <span class="form-hint-inline">optional</span></label>
+          <input type="text" class="form-input" id="sbTlsCa" placeholder="/etc/ssl/certs/my-lan-ca.pem" autocomplete="off" spellcheck="false">
+          <div class="form-hint">A PEM file trusted in addition to the system store &mdash; the way to make a self-signed LAN host verify properly instead of turning the checks off. Saved as <code>tls.ca_bundle</code>; a path the server cannot read is ignored.</div>
+        </div>
+        <div class="form-hint" id="sbTlsStatus"></div>
+      `)}
+
       ${this._cfgSection('perm', 'Permissions', settings.autoDeny
         ? { text: 'AUTO DENY', cls: 'danger' }
         : (mem === 0 ? { text: 'MEMORY OFF', cls: 'warn' } : { text: '' }), `
@@ -2130,6 +2148,73 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       }
     });
     this._renderGovStatus();
+
+    // Config -> TLS / Certificates. This is a server-side policy, so it is
+    // saved through /config the moment it changes (like the proxy and the
+    // sandbox paths) rather than with the browser settings on SAVE.
+    const tlsSel = document.getElementById('sbTlsVerify');
+    const tlsStatus = (mode, ca) => {
+      const el = document.getElementById('sbTlsStatus');
+      if (!el) return;
+      if (mode === 'off') {
+        el.textContent = 'Off: any certificate is accepted and the hostname is not checked, so the API key and your prompts go to whoever answers.';
+      } else if (mode === 'on') {
+        el.textContent = ca
+          ? `Verifying every host, with the CA bundle at ${ca}.`
+          : 'Verifying every host. A self-signed LAN endpoint refuses to connect until a CA bundle is set or this goes back to Auto.';
+      } else {
+        el.textContent = 'Auto: public hosts verified; localhost, LAN addresses and single-word host names skipped, so a self-signed local runner keeps working.';
+      }
+    };
+    const tlsLoad = () => {
+      api.getConfig()
+        .then((cfg) => {
+          const tls = (cfg && cfg.tls) || {};
+          const mode = tls.verify || 'auto';
+          if (tlsSel) tlsSel.value = mode;
+          const ca = document.getElementById('sbTlsCa');
+          if (ca && typeof tls.ca_bundle === 'string') ca.value = tls.ca_bundle;
+          tlsStatus(mode, tls.ca_bundle || '');
+        })
+        .catch(() => { if (tlsSel) tlsStatus(tlsSel.value, ''); });
+    };
+    if (tlsSel) {
+      tlsLoad();
+      tlsSel.addEventListener('change', async () => {
+        const mode = tlsSel.value;
+        try {
+          await this._patchServerConfig((cfg) => {
+            cfg.tls = { ...(cfg.tls || {}), verify: mode };
+          });
+          tlsStatus(mode, (document.getElementById('sbTlsCa')?.value || '').trim());
+          store.emit('toast', {
+            message: mode === 'off'
+              ? 'Certificate checks OFF - any host is trusted'
+              : (mode === 'on' ? 'Certificates verified on every call' : 'Certificates verified except on LAN and loopback'),
+            type: mode === 'off' ? 'error' : 'success',
+          });
+        } catch (e) {
+          store.emit('toast', { message: `TLS setting not saved: ${e.message}`, type: 'error' });
+        }
+      });
+      const caInput = document.getElementById('sbTlsCa');
+      caInput?.addEventListener('change', async () => {
+        const bundle = caInput.value.trim();
+        try {
+          await this._patchServerConfig((cfg) => {
+            cfg.tls = { ...(cfg.tls || {}), ca_bundle: bundle };
+            if (!bundle) delete cfg.tls.ca_bundle;
+          });
+          tlsStatus(tlsSel.value, bundle);
+          store.emit('toast', {
+            message: bundle ? 'CA bundle saved' : 'CA bundle cleared',
+            type: 'success',
+          });
+        } catch (e) {
+          store.emit('toast', { message: `CA bundle not saved: ${e.message}`, type: 'error' });
+        }
+      });
+    }
 
     // Save (writes current field values through, confirms to user)
     document.getElementById('sbSaveBtn').addEventListener('click', async () => {
