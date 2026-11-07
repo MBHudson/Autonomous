@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=362';
-import { asText, compactText } from './utils.js?v=362';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=362';
-import { settingFor } from './agentConfig.js?v=362';
-import { trace } from './trace.js?v=362';
+import { store } from './store.js?v=363';
+import { asText, compactText } from './utils.js?v=363';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=363';
+import { settingFor } from './agentConfig.js?v=363';
+import { trace } from './trace.js?v=363';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -155,8 +155,27 @@ export const TOOL_REGISTRY = {
   exec: {
     label: 'exec',
     arg: 'argv',
-    describe: 'Run one shell command as an argv array, e.g. ["grep","-rn","x","."]',
+    describe: 'Run one program with an argv array, e.g. ["grep","-rn","x","."]. Pass "timeout" seconds for slow commands (default 60, max 600). There is no shell: no pipes, redirects, && or $().',
     needsApproval: true,
+    run: () => 'sandbox tools are not bound yet',
+  },
+  exec_start: {
+    label: 'exec_start',
+    arg: '{"argv":["python","server.py"],"timeout":300}',
+    describe: 'Start a command in the BACKGROUND for servers, watchers and anything that never exits. Returns a handle at once; read it with exec_poll, stop it with exec_kill. Same policy gate as exec.',
+    needsApproval: true,
+    run: () => 'sandbox tools are not bound yet',
+  },
+  exec_poll: {
+    label: 'exec_poll',
+    arg: '{"handle":"..."}',
+    describe: 'Read new output from a background command started with exec_start. Reports whether it is still running.',
+    run: () => 'sandbox tools are not bound yet',
+  },
+  exec_kill: {
+    label: 'exec_kill',
+    arg: '{"handle":"..."}',
+    describe: 'Stop a background command started with exec_start.',
     run: () => 'sandbox tools are not bound yet',
   },
 
@@ -276,7 +295,7 @@ export const TOOL_REGISTRY = {
   run_code: {
     label: 'run_code',
     arg: '{"language":"python|node|bash","code":"..."}',
-    describe: 'Run a snippet with an interpreter in the sandbox (no state between calls; files persist)',
+    describe: 'Run a snippet with an interpreter in the sandbox (no state between calls; files persist). Pass "timeout" seconds for slow code (default 30, max 600).',
     needsApproval: true,
     run: () => 'sandbox tools are not bound yet',
   },
@@ -1005,6 +1024,7 @@ export function bindSandboxTools(api) {
       code,
       cwd: scopeOf(ctx),
       root: scopeOf(ctx),
+      timeout: numOrNull(a.timeout),
       agent: ctx && ctx.agentId,
     });
     const parts = [];
@@ -1032,20 +1052,22 @@ export function bindSandboxTools(api) {
     // Accept every shape the parser can produce instead of assuming one (see
     // normaliseExecArgv). The model retries identical calls when the error
     // does not say what it wants, so leniency here directly saves tokens.
-    const argv = normaliseExecArgv(arg);
+    const { argv, timeout, maxBytes } = execCallOpts(arg);
     if (!argv) {
       return 'error: exec needs argv as a non-empty array of strings, e.g. '
-        + '{"tool":"exec","argv":["grep","-rn","TODO","."]}. A bare command works too '
+        + '{"tool":"exec","arg":{"argv":["grep","-rn","TODO","."]}}. A bare command works too '
         + '("pwd"), but shell syntax (|, ;, &&, $()) never runs -- there is no shell.';
     }
     const cwd = scopeOf(ctx);
-    const res = await api.execCommand(argv, { cwd, agent: ctx && ctx.agentId });
+    const res = await api.execCommand(argv, { cwd, agent: ctx && ctx.agentId, timeout, maxBytes });
     // Fast path for the approval watcher: the server parked this exact argv
     // and handed back a pending id. Emit it now so the prompt can appear
     // immediately instead of waiting for the next poll.
     if (res && res.pending) {
       try { store.emit('exec:pending', { id: res.pending, argv }); } catch { /* no store */ }
-      return `pending approval (${res.pending}): ${res.stderr || 'waiting for the operator to approve this command'}`;
+      recordPendingApproval(res.pending, { kind: 'exec', arg, note: _name, ctx: { ...(ctx || {}), cwd }, argv });
+      return `pending approval (${res.pending}): ${res.stderr || 'waiting for the operator to approve this command'}\n`
+        + 'If the operator approves it in the approval dialog, it is re-run automatically -- do not send it again meanwhile.';
     }
     // The server answers errors as { error } on some routes. Printing
     // "[exit undefined, undefinedms]" told the model nothing, so it retried
@@ -1066,6 +1088,69 @@ export function bindSandboxTools(api) {
       parts.push(`[exit ${res.exit}, ${res.ms}ms]`);
     }
     return parts.join('\n');
+  };
+
+  /**
+   * Start a command in the BACKGROUND and hand back a handle at once.
+   *
+   * Same policy gate as exec (the server runs the identical gauntlet, only
+   * the ending differs), so this is where servers, watchers and anything
+   * that never exits go. Poll with exec_poll, stop with exec_kill.
+   */
+  TOOL_REGISTRY.exec_start.run = async (arg, _name, ctx) => {
+    const { argv, timeout, maxBytes } = execCallOpts(arg);
+    if (!argv) {
+      return 'error: exec_start needs argv as a non-empty array of strings, e.g. '
+        + '{"tool":"exec_start","arg":{"argv":["python","server.py"],"timeout":300}}. '
+        + 'Shell syntax never runs -- there is no shell.';
+    }
+    const cwd = scopeOf(ctx);
+    const res = await api.execStart(argv, { cwd, agent: ctx && ctx.agentId, timeout, maxBytes });
+    if (res && res.pending) {
+      try { store.emit('exec:pending', { id: res.pending, argv }); } catch { /* no store */ }
+      recordPendingApproval(res.pending, { kind: 'exec_start', arg, note: _name, ctx: { ...(ctx || {}), cwd }, argv });
+      return `pending approval (${res.pending}): ${res.stderr || 'waiting for the operator to approve this command'}\n`
+        + 'If the operator approves it in the approval dialog, it is started automatically -- do not send it again meanwhile.';
+    }
+    if (res && res.error) return `error: ${res.error}`;
+    if (!res || typeof res !== 'object' || !res.handle) {
+      return `error: exec_start returned no handle${res === undefined ? '' : ` (${JSON.stringify(res)})`}`;
+    }
+    return `started in the background: ${res.note || 'running'}\n`
+      + `handle "${res.handle}". Poll it with exec_poll, stop it with exec_kill.`;
+  };
+
+  TOOL_REGISTRY.exec_poll.run = async (arg, _name, ctx) => {
+    const h = typeof arg === 'string' ? arg.trim()
+      : String((arg && (arg.handle || arg.arg)) || '').trim();
+    if (!h) {
+      return 'error: exec_poll needs the handle from exec_start, '
+        + 'e.g. {"tool":"exec_poll","arg":{"handle":"..."}}';
+    }
+    const res = await api.execPoll(h);
+    if (res && res.error) return `error: ${res.error}`;
+    if (!res || typeof res !== 'object') return 'error: exec_poll returned no result';
+    const parts = [];
+    parts.push(res.running ? `still running (${res.elapsed || 0}s so far)` : 'finished');
+    if (res.timed_out) parts.push('[timed out -- killed on sight]');
+    if (res.killed) parts.push('[killed]');
+    if (res.stdout) parts.push(String(res.stdout).trimEnd());
+    if (res.stderr) parts.push('[stderr] ' + String(res.stderr).trim());
+    if (!res.stdout && !res.stderr) parts.push('(no output yet)');
+    return parts.join('\n');
+  };
+
+  TOOL_REGISTRY.exec_kill.run = async (arg, _name, ctx) => {
+    const h = typeof arg === 'string' ? arg.trim()
+      : String((arg && (arg.handle || arg.arg)) || '').trim();
+    if (!h) {
+      return 'error: exec_kill needs the handle from exec_start, '
+        + 'e.g. {"tool":"exec_kill","arg":{"handle":"..."}}';
+    }
+    const res = await api.execKill(h);
+    if (res && res.error) return `error: ${res.error}`;
+    if (!res || typeof res !== 'object') return 'error: exec_kill returned no result';
+    return res.running ? `handle "${h}" is still running` : `handle "${h}" is stopped`;
   };
 
   // --- Desktop programs: real windows on this machine ----------------------
@@ -1169,6 +1254,12 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     // ("<argv>") actively misled models into sending a bare string.
     if (t === 'exec') {
       return '{"tool":"exec","arg":{"argv":["grep","-rn","TODO","src"]}}';
+    }
+    if (t === 'exec_start') {
+      return '{"tool":"exec_start","arg":{"argv":["python","server.py"],"timeout":300}}';
+    }
+    if (t === 'exec_poll' || t === 'exec_kill') {
+      return `{"tool":"${t}","arg":{"handle":"..."}}`;
     }
     if (t === 'str_replace_editor') {
       return '{"tool":"str_replace_editor","arg":{"command":"str_replace","path":"src/app.js","old_str":"...","new_str":"..."}}';
@@ -1315,12 +1406,20 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     notes.push(
       'There is NO shell. The pipes, redirects and chaining you would type in a terminal '
       + '(| ; && > >> $( ) backticks) are NOT special here and will be passed through as literal '
-      + 'text. Use one command per call and read its output before deciding the next.'
+      + 'text. One command per call; independent calls may share a reply and run in order, '
+      + 'but a call that needs another call\'s result must wait for the next turn.'
+    );
+    notes.push(
+      'Slow commands need "timeout" (seconds, default 60, max 600) in the same object as argv: '
+      + '{"argv":["npm","test"],"timeout":300}. Without it, builds and test suites die at 60 seconds. '
+      + 'For servers, watchers and anything that never exits, use exec_start instead of exec: it returns '
+      + 'a handle at once, and exec_poll / exec_kill read and stop it.'
     );
     notes.push(
       'Anything the sandbox refuses comes back as an error string telling you why. Read it and '
-      + 'adjust �?" do not retry the identical call, and do not try to work around a refusal with '
-      + 'a different tool. A command may also wait for the operator to approve it.'
+      + 'adjust -- do not retry the identical call, and do not try to work around a refusal with '
+      + 'a different tool. A command may also wait for the operator to approve it; approving it in '
+      + 'the approval dialog re-runs it automatically.'
     );
     const win = typeof navigator !== 'undefined'
       && /Windows/i.test(String(navigator.userAgent || ''));
@@ -1329,7 +1428,8 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
         'This sandbox is on Windows. echo, pwd, type, where, dir, mkdir and sleep are handled '
         + 'internally; ls, cat, head, tail, wc, grep, sed and awk work when Git for Windows is '
         + 'installed. Use real .exe programs (ipconfig, findstr, tasklist) and pass the exact '
-        + 'argv, never PowerShell/cmd syntax. npm.cmd and other .cmd/.bat shims are not run.'
+        + 'argv, never PowerShell/cmd syntax. npm.cmd and other .cmd/.bat shims run through cmd /c '
+        + 'automatically; run_code python maps to python.exe automatically.'
       );
     }
   }
@@ -1445,7 +1545,8 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   if (names.includes('run_code')) {
     notes.push(
       'run_code runs a snippet and returns stdout/stderr. Each call is a fresh process, so variables do NOT '
-      + 'survive between calls — but files you write in the working directory do. Default language is python.'
+      + 'survive between calls — but files you write in the working directory do. Default language is python. '
+      + 'Slow code needs "timeout" seconds (default 30, max 600).'
     );
   }
   if (names.includes('ask_agent')) {
@@ -1488,17 +1589,19 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   }
 
   const rules = {
-    json: 'exactly ONE tool request, as a single JSON object and nothing else.\n'
+    json: 'one or more tool requests, each as a single JSON object, one per line and nothing else.\n'
       + 'For (b) output only the JSON: no explanation, no markdown fence, no status\n'
-      + 'line, no "I am calling...", no "awaiting results".',
-    plain: 'exactly ONE tool request, as a single JSON object and nothing else.\n'
-      + 'Output the raw JSON only. No prose, no markdown fence, no wrapper tags.',
-    anthropic: 'exactly ONE Claude-style XML tool call and nothing else:\n'
+      + 'line, no "I am calling...", no "awaiting results". Calls run in order; independent\n'
+      + 'calls may share a reply, but a call that needs another call\u2019s result must wait for the next turn.',
+    plain: 'one or more tool requests, each as a single JSON object and nothing else.\n'
+      + 'Output the raw JSON only, one object per line. No prose, no markdown fence, no wrapper tags.\n'
+      + 'Calls run in order; a call that needs another call\u2019s result must wait for the next turn.',
+    anthropic: 'one or more Claude-style XML tool calls and nothing else, one invoke per line:\n'
       + '<function_calls><invoke name="TOOL"><parameter name="KEY">VALUE</parameter></invoke></function_calls>\n'
-      + 'No prose around it, no markdown fence.',
-    native: 'exactly ONE native tool call and nothing else:\n'
-      + '<|tool_call|>{"tool":"TOOL","arg":...}<|/tool_call|>\n'
-      + 'No prose around it, no markdown fence.',
+      + 'No prose around them, no markdown fence. Calls run in order.',
+    native: 'one or more native tool calls and nothing else, one per line:\n'
+      + '<|tool_call|>{"tool":"TOOL","arg":...}<|/tool_call>\n'
+      + 'No prose around them, no markdown fence. Calls run in order.',
   }[mode];
 
   const exampleTurn = mode === 'anthropic'
@@ -1512,7 +1615,8 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     + 'You may use the tools listed below. Your ENTIRE reply must be EITHER\n'
     + '  (a) normal prose answering the user, OR\n'
     + '  (b) ' + rules + '\n\n'
-    +     'A tool request wrapped in prose is ignored and treated as the final answer.\n'
+    +     'A tool call on its own line is read even with prose around it, but the clean form above\n'
+    +     'is far more reliable -- prefer it.\n'
     + 'A tool call is the ONE exception to any instruction to keep replies short, to reply\n'
     + 'with only text, or to limit the number of words. When you want to act, the tool call\n'
     + 'IS your reply — never announce that you will use a tool, emit the call itself.\n\n'
@@ -1522,7 +1626,7 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     + '\n\n'
     + 'Example turn 1 (you want a tool):\n  ' + exampleTurn.replace(/\n/g, '\n  ') + '\n'
     + 'Example turn 2 (the harness replies TOOL_RESULT: ...):\n'
-    + '  Now you write the answer in plain prose. No more tool calls.\n\n'
+    + '  Then you EITHER send the next tool call(s) OR write the answer in plain prose when done.\n\n'
     + 'Never invent a tool that is not listed. If none fits, just answer normally. '
     + 'You get ' + MAX_TOOL_STEPS + ' tool calls per turn, so spend them carefully.'
     + (notes.length ? '\n' + notes.join('\n') : '')
@@ -1543,7 +1647,7 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
  * it stops the model retry-looping a call that was one pair of brackets away
  * from correct (e.g. {"argv":"pwd"}).
  */
-function normaliseExecArgv(arg) {
+export function normaliseExecArgv(arg) {
   let argv = arg;
   if (argv && typeof argv === 'object' && !Array.isArray(argv)) {
     if (Array.isArray(argv.argv)) {
@@ -1570,8 +1674,32 @@ function normaliseExecArgv(arg) {
     }
   }
   if (!Array.isArray(argv) || !argv.length) return null;
-  if (argv.some(a => typeof a !== 'string')) return null;
-  return argv;
+  // Models emit numbers for counts and ports (["sleep", 5], ["head","-n",20]).
+  // Coerce scalars; objects and arrays are never valid argv entries.
+  const flat = [];
+  for (const a of argv) {
+    if (typeof a === 'string') flat.push(a);
+    else if (typeof a === 'number' || typeof a === 'boolean') flat.push(String(a));
+    else return null;
+  }
+  return flat.length ? flat : null;
+}
+
+/** Finite number or null (timeout / max_bytes arrive as strings or numbers). */
+function numOrNull(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Split an exec-shaped arg into argv plus the optional timeout/max_bytes. */
+function execCallOpts(arg) {
+  const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
+  return {
+    argv: normaliseExecArgv(arg),
+    timeout: numOrNull(a.timeout),
+    maxBytes: numOrNull(a.max_bytes ?? a.maxBytes),
+  };
 }
 
 /**
@@ -1668,6 +1796,42 @@ export async function runTool(name, arg, noteName, ctx) {
 }
 
 /**
+ * Calls parked for approval, keyed by pending id. When the operator approves
+ * one in the dialog, it is re-run automatically (see rerunApproved) instead
+ * of leaving the agent to notice and retry -- by then the turn has usually
+ * moved on and the approved command never executes.
+ */
+const pendingApprovals = new Map();
+function recordPendingApproval(id, rec) { if (id) pendingApprovals.set(id, rec); }
+export function takePendingApproval(id) {
+  const rec = pendingApprovals.get(id);
+  pendingApprovals.delete(id);
+  return rec || null;
+}
+/** Re-run a parked call after the operator approved it; emits exec:approved. */
+export async function rerunApproved(id) {
+  const rec = takePendingApproval(id);
+  if (!rec) return false;
+  const def = TOOL_REGISTRY[rec.kind];
+  if (!def || typeof def.run !== 'function') return false;
+  let result;
+  try {
+    result = await runTool(rec.kind, rec.arg, rec.note, rec.ctx);
+  } catch (err) {
+    result = `error: ${err && err.message ? err.message : String(err)}`;
+  }
+  const cmd = Array.isArray(rec.argv) ? rec.argv.map(String).join(' ') : rec.kind;
+  try {
+    store.emit('exec:approved', {
+      agentId: rec.ctx && rec.ctx.agentId,
+      sessionId: rec.ctx && rec.ctx.sessionId,
+      text: `Operator approved "${cmd}" -- it has been re-run automatically:\n${result}\nUse it and continue.`,
+    });
+  } catch { /* no store */ }
+  return true;
+}
+
+/**
  * Decide whether a model reply is a tool request.
  * Tolerates fenced JSON and stray prose around it.
  *
@@ -1731,12 +1895,76 @@ function fromToolObject(source) {
   if (arg === undefined && fn) arg = fn.arguments;
   if (arg === undefined) arg = obj.args;
   if (arg === undefined) arg = obj.arguments;
+  if (arg === undefined) arg = obj.parameters;
+  if (arg === undefined) arg = obj.input;
   if (arg === undefined) arg = obj.text;
   // Several dialects send arguments as a JSON *string*.
   if (typeof arg === 'string' && /^\s*\{/.test(arg)) {
     try { arg = JSON.parse(arg); } catch { /* keep the raw string */ }
   }
   return { tool: name, arg };
+}
+
+/**
+ * Parse every tool call in a reply, not just the first.
+ *
+ * The prompt dialects used to execute one call per model round-trip: a reply
+ * carrying two calls ran the first and silently dropped the second (its
+ * markup was stripped from the transcript but never executed). Up to four
+ * calls per step run in order; a call that needs another call's result must
+ * still wait for the next turn.
+ *
+ * Each candidate span is validated with the same parser, and only a span
+ * that parses to an EQUAL call is consumed -- so the blanked text is always
+ * exactly the call just recorded, never a neighbour.
+ */
+export function parseToolCalls(text, fallback) {
+  const out = [];
+  let rest = String(text || '');
+  for (let guard = 0; guard < 4; guard++) {
+    if (!rest || rest.length > MAX_TOOL_CALL_CHARS) break;
+    const call = _parseToolCall(rest);
+    if (!call) break;
+    out.push(call);
+    const span = callSpan(rest, call);
+    if (!span) break;
+    rest = rest.slice(0, span[0]) + ' ' + rest.slice(span[1]);
+  }
+  if (!out.length && fallback && fallback !== text) {
+    const call = _parseToolCall(fallback);
+    if (call) out.push(call);
+  }
+  return out;
+}
+
+/** Character span of the first block that parses to an equal call. */
+function callSpan(text, call) {
+  const want = JSON.stringify([call.tool, call.arg]);
+  const spans = [];
+  const push = (start, end) => { if (end > start) spans.push([start, end]); };
+  let m;
+  const fenceRe = /```[ \t]*[a-zA-Z0-9_-]*[ \t]*\r?\n([\s\S]*?)```/g;
+  while ((m = fenceRe.exec(text))) push(m.index, m.index + m[0].length);
+  for (const re of [...TOOL_BLOCK_PATTERNS, TOOL_BEGIN_END_BLOCK]) {
+    const r = new RegExp(re.source, 'gi');
+    let mm;
+    while ((mm = r.exec(text))) push(mm.index, mm.index + mm[0].length);
+  }
+  let from = 0;
+  for (let guard = 0; guard < 8; guard++) {
+    const start = text.indexOf('{', from);
+    if (start === -1) break;
+    const end = balancedObjectEnd(text, start);
+    if (end === -1) break;
+    push(start, end);
+    from = end;
+  }
+  spans.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  for (const [start, end] of spans) {
+    const c = _parseToolCall(text.slice(start, end));
+    if (c && JSON.stringify([c.tool, c.arg]) === want) return [start, end];
+  }
+  return null;
 }
 
 /**
@@ -2050,7 +2278,7 @@ function extractJsonObject(text) {
 }
 
 /** Most models need a few attempts before they emit clean tool JSON. */
-export const MAX_TOOL_STEPS = 8;
+export const MAX_TOOL_STEPS = 12;
 
 /**
  * Ceiling on a tool request we will even try to parse. Generous, because

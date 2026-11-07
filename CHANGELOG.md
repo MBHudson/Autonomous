@@ -17,6 +17,45 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🛠️ Agent tool calls and shell execution that hold up *(`VERSION` 363, cache-buster v362 → v363)*
+
+*2026-11-07. Every item on the harness audit, and the version bump that carries it.*
+
+**Timeouts stop killing the turn on Windows.** The kill used a bare `SIGKILL`, which does not
+exist without the pcntl extension -- never on Windows -- and an undefined constant is an `Error`,
+not a warning `@` can suppress, so every timed-out command became an HTTP 500. The signal now
+falls back to 9, the group kill is guarded by `posix_kill`, and a process that is somehow still
+running is terminated before the handle closes (a `proc_close` on a live handle blocked the whole
+request). Timeouts are also clamped below the PHP time limit so the request cannot die first and
+orphan the child, and the model can now pass `"timeout"` (and `"max_bytes"`) to `exec` and
+`run_code` instead of dying at 60/30 seconds with no say.
+
+**Calls the model actually sends now parse.** A one-element argv array containing spaces is split
+server-side (whitespace and quotes only -- still no shell), numbers in argv coerce to strings, and
+the prompt dialects accept several sequential calls per reply instead of running the first and
+silently dropping the rest. Near-miss field names (`parameters`, `input`) map to the arg, and the
+`exec` help no longer calls it a "shell command".
+
+**Approvals resume the agent.** Approving a parked command in the dialog re-runs it at once and
+hands the result back -- mid-turn it joins the live conversation, between turns it is saved to the
+session so the next turn continues from it. Previously the approval authorized work that never ran.
+
+**Background execution exists.** `exec_start` runs a server, watcher or anything that never exits
+and returns a handle at once (same policy gate as `exec`); `exec_poll` reads its output and reports
+whether it is alive, `exec_kill` stops it, and an overrun is killed the first time anyone polls it.
+
+**Hardening alongside.** `run_code` python resolves `python.exe` on Windows; `.cmd`/`.bat` shims
+(`npm`, `npx`) resolve and run through `cmd /c` with literal argv; inline-code flags (`-c`, `-e`)
+are refused for known interpreters even when merely allowlisted; and the path guard now covers
+unlisted commands too, closing `git -C /etc`, `curl -o /etc/...` and `node script-outside-the-jail`.
+The prompt protocol teaches multi-call, and budgets move to 12 steps a round / 20 a turn.
+
+Both suites green after the bump: PHP and JS runners all passing, including new
+`tests/php/execArgv.test.php` (splitter, kill signal, timeout clamp) and
+`tests/js/toolCalls.test.mjs` (multi-call parsing, argv leniency, near-miss fields).
+
+---
+
 ## 📦 Backups in parts: named files, chosen sections, restores that land anywhere *(`VERSION` 362, cache-buster v361 → v362)*
 
 *2026-11-07. The backup stops being all-or-nothing, and the version bump that carries it.*

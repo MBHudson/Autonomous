@@ -995,9 +995,27 @@ function handleSandbox($method, $segments, $body) {
                         'cwd' => $body['cwd'] ?? null,
                         'root' => $body['root'] ?? null,
                         'timeout' => $body['timeout'] ?? null,
+                        'max_bytes' => $body['max_bytes'] ?? null,
                         'agent' => $body['agent'] ?? '',
                     ]
                 ));
+                break;
+            case 'exec-start':
+                echo json_encode(Sandbox::execStart(
+                    $body['argv'] ?? [],
+                    [
+                        'cwd' => $body['cwd'] ?? null,
+                        'timeout' => $body['timeout'] ?? null,
+                        'max_bytes' => $body['max_bytes'] ?? null,
+                        'agent' => $body['agent'] ?? '',
+                    ]
+                ));
+                break;
+            case 'exec-poll':
+                echo json_encode(Sandbox::execPoll((string)($body['handle'] ?? '')));
+                break;
+            case 'exec-kill':
+                echo json_encode(Sandbox::execKill((string)($body['handle'] ?? '')));
                 break;
             case 'upload':
                 echo json_encode(Sandbox::writeBinary(

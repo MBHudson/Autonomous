@@ -24,9 +24,10 @@
 // Errors back off instead of spamming: a copy with no token (or no server)
 // would otherwise toast every few seconds forever.
 
-import { api } from './api.js?v=362';
-import { store } from './store.js?v=362';
-import { askServerApproval } from './approveDialog.js?v=362';
+import { api } from './api.js?v=363';
+import { rerunApproved } from './tools.js?v=363';
+import { store } from './store.js?v=363';
+import { askServerApproval } from './approveDialog.js?v=363';
 
 const POLL_MS = 6000;
 const MAX_BACKOFF_MS = 60000;
@@ -55,6 +56,20 @@ async function decide(id, decision, argv) {
         store.emit('toast', { message: `Allowed and added "${res.allowlisted}" to the allowlist (reversible in Config).`, type: 'info' });
       } else {
         store.emit('toast', { message: `Allowed once: ${cmd}`, type: 'info' });
+      }
+      if (decision === 'once' || decision === 'always') {
+        // The agent that asked is usually mid-turn: re-run the command now
+        // and hand the result back, instead of approving work that then never
+        // runs because the turn moved on. Done in the dialog path only; an
+        // approval from the Config tab still needs the agent to retry.
+        try {
+          await rerunApproved(id);
+        } catch (err) {
+          store.emit('toast', {
+            message: `Approved, but the re-run failed (${err && err.message ? err.message : err}) — ask the agent to run it again.`,
+            type: 'error',
+          });
+        }
       }
     } else {
       // Already handled elsewhere (Config tab, another device) or expired.

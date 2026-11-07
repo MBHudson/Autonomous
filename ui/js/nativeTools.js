@@ -66,7 +66,16 @@ export const TOOL_SCHEMAS = {
   read_mailbox: obj(),
   exec: obj({
     argv: arr('Command and arguments, one array entry per argument'),
+    timeout: num('Seconds before the command is killed (default 60, max 600)'),
+    max_bytes: num('Cap on output kept per stream'),
   }, ['argv']),
+  exec_start: obj({
+    argv: arr('Command and arguments, one array entry per argument'),
+    timeout: num('Seconds before an overrun is killed on poll (default 60, max 600)'),
+    max_bytes: num('Cap on output kept per stream'),
+  }, ['argv']),
+  exec_poll: obj({ handle: str('Handle returned by exec_start') }, ['handle']),
+  exec_kill: obj({ handle: str('Handle returned by exec_start') }, ['handle']),
   web_search: obj({ query: str('Search query') }, ['query']),
   fetch_url: obj({ url: str('Page URL') }, ['url']),
   read_file: obj({ path: str('Path, optionally "path 20-80" for a line range') }, ['path']),
@@ -187,6 +196,8 @@ const SCALAR_ARGS = {
   glob_files: 'pattern',
   grep_code: 'pattern',
   think: 'thought',
+  exec_poll: 'handle',
+  exec_kill: 'handle',
 };
 
 /**

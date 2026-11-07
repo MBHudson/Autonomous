@@ -560,6 +560,17 @@ class Sandbox {
                 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
 
+        // Models often send one string ("ls -la") instead of an array. A safe
+        // splitter -- whitespace and quotes only, no expansion, no operators --
+        // keeps the shell-free guarantee: pieces can only become literal argv
+        // entries, never syntax. Only when the whole string does not resolve
+        // as a program itself, so "C:\Program Files\app\run.exe" keeps working.
+        if (count($argv) === 1 && preg_match('/\s/', $argv[0])
+            && self::resolveProgram($argv[0]) === null) {
+            $split = self::splitArgvString($argv[0]);
+            if (count($split) > 1) { $argv = $split; }
+        }
+
         $program = basename($argv[0]);
 
         // An interpreter the operator opted in runs SCRIPT FILES only, and is
@@ -658,6 +669,26 @@ class Sandbox {
                 'denied' => true, 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
 
+        // A known interpreter that was merely allowlisted (not opted in as an
+        // interpreter) still runs code: `node -e` is an eval, not a command.
+        // Inline-code flags are refused for these regardless of list
+        // membership; the scripted path above (or the full-access opt-in) is
+        // how interpreter code runs. Bare `python3` with no script still exits
+        // on closed stdin, so only the flags are refused.
+        if (!$fullInterpreter && !$scriptedInterpreter && self::isKnownInterpreter($program)) {
+            $inlineHere = self::interpreterInlineFlags($program);
+            foreach (array_slice($argv, 1) as $a) {
+                if (in_array($a, $inlineHere, true)) {
+                    return ['ok' => false, 'exit' => -1, 'stdout' => '',
+                        'stderr' => "Refused: \"$a\" runs code supplied on the command line, which "
+                            . 'the sandbox cannot inspect. Run a script file with "' . $program . '" '
+                            . '(opt it in under Config → Shell access → Interpreters), '
+                            . 'give it the full-access opt-in, or use the run_code tool.',
+                        'denied' => true, 'truncated' => false, 'timed_out' => false, 'ms' => 0];
+                }
+            }
+        }
+
         // A scripted interpreter was already fully validated above (jailed
         // script, no inline code), so it does not ALSO have to appear in the
         // command allowlist -- opting in via exec_interpreters is the grant.
@@ -729,6 +760,13 @@ class Sandbox {
 
         $timeout = isset($opts['timeout'])
             ? max(1, min(600, (int)$opts['timeout'])) : $cfg['exec_timeout'];
+        // Never outlive the PHP request itself: when the web SAPI kills this
+        // script first, the kill-on-timeout below never runs, the child is
+        // orphaned, and the agent retries the identical command. 0 (CLI or
+        // unlimited) means no ceiling. The request is then allowed to live as
+        // long as the command plus a margin.
+        $timeout = self::clampTimeout($timeout);
+        if (PHP_SAPI !== 'cli') { @set_time_limit($timeout + 30); }
         $maxBytes = isset($opts['max_bytes'])
             ? max(1024, min(2000000, (int)$opts['max_bytes'])) : $cfg['exec_max_bytes'];
 
@@ -762,6 +800,20 @@ class Sandbox {
                 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
         $argv[0] = $resolved;
+
+        // Batch shims (.cmd/.bat) are not real executables: CreateProcess
+        // cannot run them directly. Route through the console host with /c --
+        // the file and every argument stay literal argv entries, so this adds
+        // no shell parsing of the arguments themselves.
+        if (self::isWindows() && preg_match('/\.(cmd|bat)$/i', (string)$resolved)) {
+            $comspec = (string)(getenv('ComSpec') ?: 'C:\Windows\System32\cmd.exe');
+            if (!is_file($comspec)) {
+                return ['ok' => false, 'exit' => -1, 'stdout' => '',
+                    'stderr' => 'Command "' . $program . '" resolved to a batch shim but cmd.exe was not found.',
+                    'truncated' => false, 'timed_out' => false, 'ms' => 0];
+            }
+            $argv = array_merge([$comspec, '/c', $resolved], array_slice($argv, 1));
+        }
 
         // A deliberately small environment. Inheriting the web server's
         // environment would hand the agent anything the master process has.
@@ -800,6 +852,14 @@ class Sandbox {
             'run' => $runId, 'phase' => 'start', 'kind' => 'exec',
             'agent' => (string)($opts['agent'] ?? ''),
         ]);
+        // Background mode shares the whole gauntlet above and only changes
+        // the ending: no waiting, output to files, a handle back. Agents use
+        // it for servers, watchers and anything else that outlives a reply.
+        if (!empty($opts['background'])) {
+            return self::startBackground($argv, $cwd, $env, $program, $timeout, $maxBytes,
+                (string)($opts['agent'] ?? ''), $runId);
+        }
+
         $proc = @proc_open($argv, $descriptors, $pipes, $cwd, $env);
         if (!is_resource($proc)) {
             return ['ok' => false, 'exit' => -1, 'stdout' => '',
@@ -847,14 +907,26 @@ class Sandbox {
                 fclose($pipes[$i]);
             }
         }
-        if ($timedOut) {
-            $status = proc_get_status($proc);
+        // The loop above can also leave on a select error with the child still
+        // running; closing the handle then blocks until it exits on its own.
+        // Make sure nothing survives before draining, on every path out.
+        $status = proc_get_status($proc);
+        if (!empty($status['running'])) {
+            // SIGKILL only exists with the pcntl extension (never on Windows,
+            // often absent on shared hosting). An undefined constant is an
+            // Error in PHP 8, not a warning @ can suppress -- and the API's
+            // catch (Exception) does not catch Error -- so a bare SIGKILL
+            // turned every timed-out command into an HTTP 500. Fall back to
+            // the signal number, which both kills accept as well.
+            $sigkill = defined('SIGKILL') ? SIGKILL : 9;
             // Kill the whole group: nmap and curl both fork children, and
             // killing only the parent leaves those running.
-            @proc_terminate($proc, SIGKILL);
-            if (function_exists('posix_kill') && $status['pid'] > 0) {
-                @posix_kill(-$status['pid'], SIGKILL);
+            @proc_terminate($proc, $sigkill);
+            if (function_exists('posix_kill') && ($status['pid'] ?? 0) > 0) {
+                @posix_kill(-$status['pid'], $sigkill);
             }
+        }
+        if ($timedOut) {
             proc_close($proc);
         } else {
             proc_close($proc);
@@ -895,7 +967,65 @@ class Sandbox {
      */
     private static function policyName($name) {
         $n = strtolower(basename((string)$name));
-        return (string)preg_replace('/\.(exe|com)$/', '', $n);
+        return (string)preg_replace('/\.(exe|com|cmd|bat)$/', '', $n);
+    }
+
+    /**
+     * Split a command line the way a shell would for WORD SEPARATION ONLY:
+     * whitespace splits, single/double quotes group, backslash escapes the
+     * next character. No expansion and no operators: `|`, `;`, `$()`,
+     * backticks survive as literal characters inside an argument, so the
+     * result is no more powerful than what the caller could pass as an
+     * array. Public so the suite can pin the quoting rules.
+     */
+    public static function splitArgvString($s) {
+        $out = [];
+        $cur = '';
+        $quote = null;   // "'" or '"' while inside quotes
+        $has = false;    // current word has content (empty quotes count)
+        $len = strlen((string)$s);
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $s[$i];
+            if ($quote !== null) {
+                if ($ch === $quote) { $quote = null; }
+                elseif ($ch === '\\' && $quote === '"' && $i + 1 < $len && strpos('"\\$`' . "\n", $s[$i + 1]) !== false) { $cur .= ($s[$i + 1] === "\n" ? '' : $s[++$i]); $has = true; }
+                else { $cur .= $ch; $has = true; }
+                continue;
+            }
+            if ($ch === '"' || $ch === "'") { $quote = $ch; $has = true; continue; }
+            if ($ch === '\\' && $i + 1 < $len) { $cur .= $s[++$i]; $has = true; continue; }
+            if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
+                if ($has) { $out[] = $cur; $cur = ''; $has = false; }
+                continue;
+            }
+            $cur .= $ch; $has = true;
+        }
+        // An unterminated quote simply runs to the end of the string.
+        if ($has) { $out[] = $cur; }
+        return $out;
+    }
+
+    /** Signal that kills a runaway child on this host (SIGKILL with pcntl, else 9). */
+    public static function killSignal() {
+        return defined('SIGKILL') ? SIGKILL : 9;
+    }
+
+    /**
+     * Cap a command timeout so it can never outlive the PHP request itself:
+     * when the web SAPI kills the script first, the kill-on-timeout never
+     * runs, the child is orphaned, and the agent retries the identical
+     * command. 0 (CLI or unlimited) means no ceiling. $sapi/$phpLimit are
+     * injectable so the suite can pin the arithmetic without touching the
+     * real SAPI or ini. Public for the same reason.
+     */
+    public static function clampTimeout($timeout, $sapi = null, $phpLimit = null) {
+        $timeout = (int)$timeout;
+        $limit = $phpLimit === null ? (int)@ini_get('max_execution_time') : (int)$phpLimit;
+        if ($sapi === null) { $sapi = PHP_SAPI; }
+        if ($limit > 0 && $sapi !== 'cli') {
+            $timeout = min($timeout, max(5, $limit - 10));
+        }
+        return $timeout;
     }
 
     /** Is $program in this list, under either Windows spelling? */
@@ -905,6 +1035,12 @@ class Sandbox {
             if (self::policyName($entry) === $want) { return true; }
         }
         return false;
+    }
+
+    /** Names the inline-code table knows: refusing -c/-e for these never depends on opting in. */
+    private static function isKnownInterpreter($program) {
+        static $names = ['python', 'python2', 'python3', 'perl', 'php', 'node', 'ruby', 'lua', 'sh', 'bash', 'zsh', 'ksh'];
+        return in_array(self::policyName($program), $names, true);
     }
 
     /**
@@ -929,7 +1065,13 @@ class Sandbox {
             // which are cmd builtins with no .exe of their own.
             'dir' => 1, 'type' => 1, 'more' => 1, 'mkdir' => 1, 'base64' => 1,
         ];
-        return $pathsFrom[$program] ?? null;
+        // Unknown commands are checked from argv[1] like everything else. The
+        // checker skips flags, key=value pairs, URLs, globs and anything that
+        // does not resolve to an existing file -- so only a real, existing,
+        // outside-the-jail path trips it. That closes `git -C /etc`,
+        // `curl -o /etc/...` and `node script-outside-the-jail.js` without
+        // needing a per-command table entry for every program ever allowlisted.
+        return $pathsFrom[$program] ?? 1;
     }
 
     /** @return string|null a human-readable reason, or null when everything is inside */
@@ -1252,7 +1394,7 @@ class Sandbox {
             $hasExt = (bool)preg_match('/\.[^\\\\\/]+$/', $program);
             foreach (self::programDirs() as $dir) {
                 $base = $dir . '\\' . $program;
-                $candidates = $hasExt ? [$base] : [$base . '.exe', $base . '.com'];
+                $candidates = $hasExt ? [$base] : [$base . '.exe', $base . '.com', $base . '.cmd', $base . '.bat'];
                 foreach ($candidates as $candidate) {
                     if (!is_file($candidate)) { continue; }
                     $target = realpath($candidate);
@@ -2808,7 +2950,7 @@ class Sandbox {
             throw new \RuntimeException("code: unsupported language \"$lang\" (python, node, bash, ruby, php, perl)");
         }
         $interp = $map[$lang];
-        $ext = ['python3' => 'py', 'node' => 'js', 'bash' => 'sh', 'ruby' => 'rb', 'php' => 'php', 'perl' => 'pl'][$interp] ?? 'txt';
+        $ext = ['python3' => 'py', 'python' => 'py', 'py' => 'py', 'node' => 'js', 'bash' => 'sh', 'ruby' => 'rb', 'php' => 'php', 'perl' => 'pl'][$interp] ?? 'txt';
 
         $scope = $opts['scope'] ?? $opts['root'] ?? null;
         $roots = self::scopeRoots($scope, self::writeRoots(), 'code');
@@ -2816,6 +2958,13 @@ class Sandbox {
         if (!is_dir($cwd)) { $cwd = $roots[0] ?? self::appDir(); }
 
         $program = self::resolveProgram($interp);
+        // Windows ships python.exe (and the py launcher), never python3.exe.
+        if ($program === null && self::isWindows() && $interp === 'python3') {
+            foreach (['python', 'py'] as $alt) {
+                $program = self::resolveProgram($alt);
+                if ($program !== null) { $interp = $alt; break; }
+            }
+        }
         if ($program === null) {
             throw new \RuntimeException("code: $interp is not installed on this host.");
         }
@@ -2897,6 +3046,258 @@ class Sandbox {
         if (strlen($err) > $maxBytes) { $err = substr($err, 0, $maxBytes); $truncated = true; }
         return ['stdout' => trim($out), 'stderr' => trim($err), 'exit' => $exit,
             'timed_out' => $timedOut, 'truncated' => $truncated];
+    }
+
+    // ---------------------------------------------------------------
+    // Background execution: start a command and poll/kill it across requests
+    // ---------------------------------------------------------------
+    //
+    // A foreground exec always waits for the process, so a server, a watcher
+    // or anything that never exits dies at the timeout instead. Background
+    // runs keep the same policy gauntlet (execCommand with background:true)
+    // and only change the ending: stdio goes to files in
+    // storage/exec-runs/<handle>/, the request returns at once with a handle,
+    // and later requests poll or kill by pid. No handle is kept in memory --
+    // PHP shares nothing across requests -- so the meta file plus the pid
+    // and the log offsets ARE the handle.
+    //
+    // Caveats, stated plainly: an exit CODE cannot be reaped portably across
+    // requests, so "finished" means "the pid is gone", with the usual
+    // pid-reuse asterisk. A child that outlives its parent is reparented and
+    // reaped by init/systemd, except under storied PHP SAPIs where a worker
+    // recycle does the same job -- nothing here leaks beyond a zombie window.
+
+    /** Background run records live this long before a start prunes them. */
+    const EXEC_RUN_TTL = 86400;
+
+    /**
+     * Foreground entry point for background runs: same gauntlet, no waiting.
+     * Most callers want execCommand($argv, $opts + ['background' => true]).
+     */
+    public static function execStart($argv, $opts = []) {
+        $opts['background'] = true;
+        return self::execCommand($argv, $opts);
+    }
+
+    private static function execRunDir() {
+        $base = self::appDir();
+        if ($base === null || $base === '') { return null; }
+        $dir = rtrim($base, '/\\') . '/storage/exec-runs';
+        if (!is_dir($dir) && @mkdir($dir, 0770, true) === false && !is_dir($dir)) {
+            return null;
+        }
+        return $dir;
+    }
+
+    private static function execRunPath($id, $dir = null) {
+        if (!is_string($id) || preg_match('/^[0-9a-f]{12}$/', $id) !== 1) { return null; }
+        $dir = $dir !== null ? $dir : self::execRunDir();
+        if ($dir === null) { return null; }
+        return rtrim($dir, '/\\') . '/' . $id;
+    }
+
+    private static function nullDevice() {
+        return self::isWindows() ? 'NUL' : '/dev/null';
+    }
+
+    private static function startBackground($argv, $cwd, $env, $program, $timeout, $maxBytes, $agent, $runId) {
+        $dir = self::execRunDir();
+        if ($dir === null) {
+            return ['ok' => false, 'stderr' => 'error: background runs need storage/exec-runs to be writable.',
+                'truncated' => false, 'timed_out' => false];
+        }
+        $id = substr(bin2hex(random_bytes(8)), 0, 12);
+        $run = $dir . '/' . $id;
+        if (@mkdir($run, 0770, true) === false) {
+            return ['ok' => false, 'stderr' => 'error: could not create the background run directory.',
+                'truncated' => false, 'timed_out' => false];
+        }
+        $outFile = $run . '/stdout.log';
+        $errFile = $run . '/stderr.log';
+        // Files, not pipes: pipes would fill and block the child once this
+        // request (the only reader) is gone.
+        $descriptors = [
+            0 => ['file', self::nullDevice(), 'r'],
+            1 => ['file', $outFile, 'w'],
+            2 => ['file', $errFile, 'w'],
+        ];
+        $proc = @proc_open($argv, $descriptors, $pipes, $cwd, $env);
+        if (!is_resource($proc)) {
+            @rmdir($run);
+            return ['ok' => false, 'stderr' => 'error: could not start the process.',
+                'truncated' => false, 'timed_out' => false];
+        }
+        $status = proc_get_status($proc);
+        $pid = (int)($status['pid'] ?? 0);
+        // Do NOT proc_close: that waits for exit, which is the thing
+        // background mode exists to avoid. Closing our ends lets the child
+        // keep the log files; it is reparented when this request ends.
+        foreach ((array)$pipes as $p) { if (is_resource($p)) { @fclose($p); } }
+        unset($proc);
+        if ($pid <= 0) {
+            return ['ok' => false, 'stderr' => 'error: the process started but reported no pid.',
+                'truncated' => false, 'timed_out' => false];
+        }
+        $meta = [
+            'id' => $id, 'pid' => $pid, 'run' => $runId, 'argv' => array_values($argv),
+            'cwd' => $cwd, 'agent' => (string)$agent, 'started' => time(),
+            'timeout' => (int)$timeout, 'max_bytes' => (int)$maxBytes,
+            'killed' => false, 'timed_out' => false,
+        ];
+        if (@file_put_contents($run . '/meta.json', json_encode($meta), LOCK_EX) === false) {
+            self::killPid($pid);
+            return ['ok' => false, 'stderr' => 'error: the process started but its handle could not be saved; it was killed.',
+                'truncated' => false, 'timed_out' => false];
+        }
+        self::pruneExecRuns($dir);
+        self::audit($program, $argv, $cwd, null, null, [
+            'run' => $runId, 'phase' => 'start', 'kind' => 'exec-bg', 'agent' => (string)$agent,
+        ]);
+        return [
+            'ok' => true, 'handle' => $id, 'pid' => $pid,
+            'stdout' => '', 'stderr' => '',
+            'truncated' => false, 'timed_out' => false, 'ms' => 0,
+            'note' => '"' . $program . '" keeps running in the background (handle ' . $id
+                . ', pid ' . $pid . '). Read its output with exec_poll, stop it with exec_kill.',
+        ];
+    }
+
+    private static function pruneExecRuns($dir) {
+        $now = time();
+        $runs = @glob(rtrim($dir, '/\\') . '/*', GLOB_ONLYDIR) ?: [];
+        // Oldest first so a cap keeps the newest runs.
+        usort($runs, fn($a, $b) => @filemtime($a) <=> @filemtime($b));
+        while (count($runs) > 50) {
+            self::removeExecRun(array_shift($runs));
+        }
+        foreach ($runs as $run) {
+            if ($now - (int)@filemtime($run) > self::EXEC_RUN_TTL) {
+                self::removeExecRun($run);
+            }
+        }
+    }
+
+    private static function removeExecRun($run) {
+        if (!is_string($run) || $run === '') { return; }
+        foreach (['stdout.log', 'stderr.log', 'meta.json'] as $f) {
+            @unlink(rtrim($run, '/\\') . '/' . $f);
+        }
+        @rmdir($run);
+    }
+
+    /**
+     * Minimal environment for the Windows helper tools (tasklist, taskkill).
+     * They fail with "The specified module could not be found" under a fully
+     * empty environment because they locate system DLLs via SystemRoot.
+     */
+    private static function toolEnv() {
+        if (!self::isWindows()) { return []; }
+        return ['SystemRoot' => (string)(getenv('SystemRoot') ?: 'C:/Windows')];
+    }
+
+    /** True while a pid names a live process (tasklist on Windows, signal 0 on POSIX). */
+    private static function procAlive($pid) {
+        $pid = (int)$pid;
+        if ($pid <= 0) { return false; }
+        if (function_exists('posix_kill')) {
+            return @posix_kill($pid, 0);
+        }
+        $tasklist = (string)(getenv('SystemRoot') ?: 'C:\\Windows') . '\\System32\\tasklist.exe';
+        if (!is_file($tasklist)) { return true; }   // cannot tell: assume alive
+        try {
+            $res = self::procRun([$tasklist, '/FI', 'PID eq ' . $pid, '/FO', 'CSV', '/NH'],
+                sys_get_temp_dir(), self::toolEnv(), 10, 65536);
+        } catch (\Throwable $e) { return true; }
+        return strpos((string)($res['stdout'] ?? ''), '"' . $pid . '"') !== false
+            || strpos((string)($res['stdout'] ?? ''), (string)$pid) !== false;
+    }
+
+    /** Kill one pid: signal on POSIX, taskkill /T /F on Windows. */
+    private static function killPid($pid) {
+        $pid = (int)$pid;
+        if ($pid <= 0) { return; }
+        if (function_exists('posix_kill')) {
+            @posix_kill($pid, self::killSignal());
+            return;
+        }
+        $taskkill = (string)(getenv('SystemRoot') ?: 'C:\\Windows') . '\\System32\\taskkill.exe';
+        if (!is_file($taskkill)) { return; }
+        try {
+            self::procRun([$taskkill, '/PID', (string)$pid, '/T', '/F'],
+                sys_get_temp_dir(), self::toolEnv(), 10, 65536);
+        } catch (\Throwable $e) { /* best effort */ }
+    }
+
+    /** Read the tail of a background run, enforcing its timeout on sight. */
+    public static function execPoll($id) {
+        $run = self::execRunPath($id);
+        if ($run === null || !is_dir($run)) {
+            return ['ok' => false, 'error' => 'unknown background handle'];
+        }
+        $meta = json_decode((string)@file_get_contents($run . '/meta.json'), true);
+        if (!is_array($meta)) {
+            return ['ok' => false, 'error' => 'the background handle is corrupt'];
+        }
+        $alive = self::procAlive($meta['pid'] ?? 0);
+        $timedOut = !empty($meta['timed_out']);
+        // Nothing reaps a background child, so an overrun is killed the first
+        // time anyone looks at it.
+        if ($alive && ($meta['timeout'] ?? 0) > 0 && time() - (int)($meta['started'] ?? 0) > (int)$meta['timeout']) {
+            self::killPid($meta['pid'] ?? 0);
+            $alive = self::procAlive($meta['pid'] ?? 0);
+            $timedOut = true;
+            $meta['timed_out'] = true;
+            @file_put_contents($run . '/meta.json', json_encode($meta), LOCK_EX);
+        }
+        $cap = max(65536, (int)($meta['max_bytes'] ?? 65536));
+        $stdout = self::tailFile($run . '/stdout.log', $cap);
+        $stderr = self::tailFile($run . '/stderr.log', $cap);
+        if (!$alive && empty($meta['ended'])) {
+            $meta['ended'] = time();
+            @file_put_contents($run . '/meta.json', json_encode($meta), LOCK_EX);
+        }
+        return [
+            'ok' => true, 'handle' => $id, 'running' => $alive,
+            'pid' => (int)($meta['pid'] ?? 0),
+            'stdout' => $stdout, 'stderr' => $stderr,
+            'timed_out' => $timedOut, 'killed' => !empty($meta['killed']),
+            'elapsed' => time() - (int)($meta['started'] ?? time()),
+        ];
+    }
+
+    /** Stop a background run. Idempotent: a finished handle reports done. */
+    public static function execKill($id) {
+        $run = self::execRunPath($id);
+        if ($run === null || !is_dir($run)) {
+            return ['ok' => false, 'error' => 'unknown background handle'];
+        }
+        $meta = json_decode((string)@file_get_contents($run . '/meta.json'), true);
+        if (!is_array($meta)) {
+            return ['ok' => false, 'error' => 'the background handle is corrupt'];
+        }
+        $alive = self::procAlive($meta['pid'] ?? 0);
+        if ($alive) {
+            self::killPid($meta['pid'] ?? 0);
+            $meta['killed'] = true;
+            @file_put_contents($run . '/meta.json', json_encode($meta), LOCK_EX);
+        }
+        return ['ok' => true, 'handle' => $id, 'running' => self::procAlive($meta['pid'] ?? 0)];
+    }
+
+    /** Last $cap bytes of a file (log tails), without loading it whole. */
+    private static function tailFile($path, $cap) {
+        $cap = max(1024, (int)$cap);
+        $size = @filesize($path);
+        if ($size === false || $size <= 0) { return ''; }
+        $fh = @fopen($path, 'rb');
+        if (!$fh) { return ''; }
+        try {
+            if ($size > $cap) { fseek($fh, $size - $cap); }
+            $out = stream_get_contents($fh);
+        } finally {
+            fclose($fh);
+        }
+        return (string)$out;
     }
 
     /**

@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=362';
-import { K as STORAGE_K } from '../storage.js?v=362';
+import { store } from '../store.js?v=363';
+import { K as STORAGE_K } from '../storage.js?v=363';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=362';
-import { persistence } from '../persistence.js?v=362';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=362';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=362';
-import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=362';
-import { toolInstructions, parseToolCall, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=362';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=362';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=362';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=362';
-import { usageFor } from '../rateGovernor.js?v=362';
-import { trace } from '../trace.js?v=362';
-import { latency } from '../latency.js?v=362';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=362';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=362';
-import { SlashCommands } from '../slashCommands.js?v=362';
-import { parseRoute, routingHelp } from '../routing.js?v=362';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=362';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=362';
-import { MessageRenderer, renderToolCalls } from './message.js?v=362';
-import { createAvatar } from './avatar.js?v=362';
-import * as comms from '../commsLog.js?v=362';
+import { api, errText } from '../api.js?v=363';
+import { persistence } from '../persistence.js?v=363';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText } from '../utils.js?v=363';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=363';
+import { toolProtocolFor, contextLimitFor, detectFamily, rememberDialect } from '../toolProtocol.js?v=363';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=363';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=363';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=363';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=363';
+import { usageFor } from '../rateGovernor.js?v=363';
+import { trace } from '../trace.js?v=363';
+import { latency } from '../latency.js?v=363';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=363';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=363';
+import { SlashCommands } from '../slashCommands.js?v=363';
+import { parseRoute, routingHelp } from '../routing.js?v=363';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=363';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=363';
+import { MessageRenderer, renderToolCalls } from './message.js?v=363';
+import { createAvatar } from './avatar.js?v=363';
+import * as comms from '../commsLog.js?v=363';
 
 /**
  * How long an agent may keep working on a single task.
@@ -49,8 +49,7 @@ import * as comms from '../commsLog.js?v=362';
  * off mid-task is what produced "stops without completing". So the loop keeps
  * going -- but only to a ceiling. Without one, a model that keeps calling a
  * failing tool would spend tokens until the tab died.
- */
-const PERSISTENCE_MAX_STEPS = 12;          // tool calls per turn, all rounds
+ */  const PERSISTENCE_MAX_STEPS = 20;          // tool calls per turn, all rounds
 const PERSISTENCE_WALL_CLOCK_MS = 20 * 60 * 1000;
 const FINAL_SUMMARY_MS = 90 * 1000;         // grace period for the closing summary
 const AGENT_FILES_BUDGET = 260000;          // absolute character ceiling for attached files
@@ -283,6 +282,16 @@ export class Chat {
      * immediately after the user turn ends (the "double response" bug).
      */
     this._turnResponded = new Set();
+
+    // An approved command was re-run for an agent (see rerunApproved in
+    // tools.js). If that agent's session is open here, hand the result back:
+    // mid-turn it joins the live conversation, otherwise it is saved into the
+    // session so the next turn continues from it. Anywhere else it would be
+    // delivered to the wrong conversation, so anything else is ignored.
+    try {
+      store.on('exec:approved', ({ agentId, sessionId, text }) =>
+        this._deliverApproved({ agentId, sessionId, text }));
+    } catch { /* no store */ }
 
     // One call per tool run() is all the wiring the comms tools need; the
     // bridge below owns the roster and can start another agent.
@@ -1420,6 +1429,29 @@ _makeLiveNode(agent) {
    * @param {Function} o.messages  () => starting message array
    * @param {Function} o.specFor   messages => relay spec for one round trip
    */
+  /**
+   * Deliver an approved command's re-run result to its agent.
+   *
+   * Mid-turn the result is steered into the live conversation, which shows it
+   * in the transcript like any other interruption. Between turns it is saved
+   * as a session note in the same shape, so the next turn picks up where the
+   * approval left off instead of the approved work silently never happening.
+   */
+  _deliverApproved({ agentId, sessionId, text }) {
+    const msg = String(text || '').trim();
+    if (!msg || !sessionId || this.currentSessionId !== sessionId) return;
+    const envelope = { role: 'user', content: msg, agentId: agentId || null, timestamp: Date.now() };
+    try {
+      if (this.aborter) {
+        this.steer(msg);
+        return;
+      }
+      this._addMessage(envelope);
+      this._saveMessageToBackend(envelope);
+      store.emit('toast', { message: 'Approved command finished — result saved to the session', type: 'info' });
+    } catch { /* best effort */ }
+  }
+
   async _runToCompletion({ agent, signal, liveNode, commsCtx, messages, specFor }) {
     const deadline = Date.now() + PERSISTENCE_WALL_CLOCK_MS;
     // Everything the agent has already been told this turn, so a new round
@@ -1757,7 +1789,7 @@ _makeLiveNode(agent) {
       // counted even when the provider streams no usage block.
       if (res) this._recordUsage(agent, res.usage || null, chunk || res.content || '');
 
-      // Content first, then THIS response's reasoning channel: see parseToolCall's
+      // Content first, then THIS response's reasoning channel: see parseToolCalls'
       // second argument. Without it a reasoning model narrates the tool call
       // instead of sending it, and the loop ends with that narration as the
       // answer.
@@ -1774,8 +1806,12 @@ _makeLiveNode(agent) {
         return { tool: c.name, arg, note, native: true };
       });
       if (!calls.length) {
-        const call = parseToolCall(chunk, res && res.reasoning);
-        if (call) calls.push(call);
+        // Several tool calls may share one reply; they run in order (see
+        // parseToolCalls). A call that needs another call's result must still
+        // wait for the next turn, because nothing has run yet at this point.
+        for (const call of parseToolCalls(chunk, res && res.reasoning)) {
+          calls.push({ tool: call.tool, arg: call.arg });
+        }
       }
       if (calls.length) {
         // It parsed. Remember this dialect for this provider::model so the next
@@ -1986,7 +2022,7 @@ _makeLiveNode(agent) {
         exchanges.push({ role: 'assistant', content: assistantText });
         exchanges.push({
           role: 'user',
-          content: `TOOL_RESULT: ${asText(result)}\nNow answer the user plainly.`,
+          content: `TOOL_RESULT: ${asText(result)}\nContinue with the next tool call if the task needs it, or answer the user in plain prose when done.`,
         });
       }
 

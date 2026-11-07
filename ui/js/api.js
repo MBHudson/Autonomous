@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=362';
-import { acquire, note429 } from './rateGovernor.js?v=362';
-import { latency } from './latency.js?v=362';
-import { detectFamily } from './harness.js?v=362';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=362';
+import { store } from './store.js?v=363';
+import { acquire, note429 } from './rateGovernor.js?v=363';
+import { latency } from './latency.js?v=363';
+import { detectFamily } from './harness.js?v=363';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=363';
 
 latency.bindStore(store);
 
@@ -241,6 +241,28 @@ class ApiClient {
       // without this the log can say WHAT ran but never WHOSE turn it was.
       agent: opts.agent || null,
     });
+  }
+
+  /**
+   * Start a command in the background: same policy gate as exec, no waiting.
+   * Returns a handle; poll it with execPoll, stop it with execKill.
+   */
+  execStart(argv, opts = {}) {
+    return this.sandbox('exec-start', {
+      argv: (argv || []).map(String),
+      cwd: opts.cwd || null,
+      timeout: opts.timeout || null,
+      maxBytes: opts.maxBytes || null,
+      agent: opts.agent || null,
+    });
+  }
+
+  execPoll(handle) {
+    return this.sandbox('exec-poll', { handle });
+  }
+
+  execKill(handle) {
+    return this.sandbox('exec-kill', { handle });
   }
 
   /**
