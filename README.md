@@ -193,7 +193,7 @@ Jump straight to a section — every heading on this page is also clickable.
 Both shells are the same application: one store, one set of components, one feature list. `settings.interfaceMode` decides which decoration is worn, and it applies the moment you pick it in **Config → Interface** — no reload, no second install, and **no feature that exists in only one of them**.
 
 <details>
-<summary>▼ Comparison table, layout map and the two rules</summary>
+<summary>Comparison table, layout map and the two rules</summary>
 
 | | 🗂️ **Classic** *(the default)* | 💎 **Desktop 2026** |
 | --- | --- | --- |
@@ -239,7 +239,7 @@ Two rules kept that honest:
 The card is in **both** shells on purpose. Most of it is the map — fog, bloom, floor, frame rate, detail — so Classic gets it too. The rows that address the glass (chat background, blur, glow, ambient motion, the floating floor) stay **visible** in Classic with their saved values but are disabled there, because there is no glass to tune. Nothing is hidden and nothing is lost. 🧷
 
 <details>
-<summary>▼ Knob-by-knob table, the preset, topography and defaults</summary>
+<summary>Knob-by-knob table, the preset, topography and defaults</summary>
 
 ### 🧮 What each knob buys
 
@@ -388,7 +388,7 @@ On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/m
 One rail for everything about the selected agent:
 
 <details>
-<summary>▼ The full rail, locks, and the Config tidy-up</summary>
+<summary>The full rail, locks, and the Config tidy-up</summary>
 
 - **Identity** — name, label, role, provider, model, colour, active.
 - **Prompts & Profiles** — the agent's system prompt, an always-append box, and reusable **direction profiles** you can attach and lock. (A fleet-wide override lives in the Agents-tab header — see *Global pre-prompt override*.)
@@ -424,7 +424,7 @@ Every setting has a 🔒 **lock**: unlocked agents follow the global value live;
 Opened from the 🧪 icon in the Agents-tab header.
 
 <details>
-<summary>▼ Both directions, server-side sending and guardrails</summary>
+<summary>Both directions, server-side sending and guardrails</summary>
 
 - **Both directions**: `curl → request → 10 languages`, and `language → request → curl/bash/Python/TypeScript/OpenAI-SDK`.
 - **Sending is server-side**, because the browser can't reach most providers (no CORS headers). The server runs the request and returns the status + body.
@@ -460,7 +460,7 @@ Draw the flow instead of describing it.
 Drop an image into the composer and a vision-capable agent can see it. 👁️🖼️
 
 <details>
-<summary>▼ Paste, drop or pick, safety and per-agent vision</summary>
+<summary>Paste, drop or pick, safety and per-agent vision</summary>
 
 - 📎 **Paste, drop or pick** — the bytes **never touch the server**. They become an in-memory `data:` URL and ride in the request's `image_url` field: 🚫 no upload endpoint, 🚫 no file on disk.
 - 🛡️ **Safe by construction** — only 🖼️ PNG / 📷 JPEG / 🎞️ WebP / 🎬 GIF are accepted, all inert when sniffed, which keeps the polyglot *"image that is also a script"* family out.
@@ -474,7 +474,7 @@ Drop an image into the composer and a vision-capable agent can see it. 👁️�
 Talk to the team, and let them talk back. 🗣️🔊
 
 <details>
-<summary>▼ Speech-to-text, spoken replies, engines and pitch</summary>
+<summary>Speech-to-text, spoken replies, engines and pitch</summary>
 
 - 🎤 **Speech to text** — the mic button turns your voice into a message in the composer.
 - 🔊 **Speak replies** — a speaker button reads any reply aloud; flip **Speak every reply automatically** to hear them all.
@@ -489,7 +489,7 @@ Talk to the team, and let them talk back. 🗣️🔊
 Type `/` in the composer for a palette of everything you can address. ⌨️✨
 
 <details>
-<summary>▼ Targets, app commands and quick reference</summary>
+<summary>Targets, app commands and quick reference</summary>
 
 - 🎯 **Target an agent** — `/CODE`, `/ROLE`, `/NAME` or `/ALL` sends your next message to one agent, a role, or the whole team.
 - 🧭 **App commands** — the palette also lists the app's own commands, and never suggests one that wouldn't work here.
@@ -505,7 +505,7 @@ at a time, until it finishes or you stop it. It is the difference between *"ask
 the model a thing"* and *"hand the model a job and walk away."* 🚶♂️💨
 
 <details>
-<summary>▼ Goals, cadence, badges, caps, kill switch and tips</summary>
+<summary>Goals, cadence, badges, caps, kill switch and tips</summary>
 
 - 🎯 **A standing goal per agent** — set it in the agent editor (or Brain Lab). Every tick, the agent is re-prompted with its goal, the iteration number, and a plain instruction to **make concrete progress now using its tools.**
 - ⏱️ **A cadence you own** — the interval lives in **Config → Limits & Budgets** (default generous, because every iteration is **billed**). 💸
@@ -533,7 +533,7 @@ system prompt**, on every call path — main chat, ask-directly and routing-char
 runs alike. ✨
 
 <details>
-<summary>▼ Prepend or replace, live toggle and the tool-fight fix</summary>
+<summary>Prepend or replace, live toggle and the tool-fight fix</summary>
 
 - 🧩 **Prepend (default) or Replace — your call.** A toggle **inside the popup**
   (bottom-left) picks the behaviour, and the hint above the box updates to match:
@@ -562,7 +562,7 @@ something. 📱
 So a long job doesn't quietly fall out of the model's memory mid-task. 🧵
 
 <details>
-<summary>▼ Budgeting, compaction, surviving plans and native schemas</summary>
+<summary>Budgeting, compaction, surviving plans and native schemas</summary>
 
 - 📏 **Budgeted against the model's *real* window** — replayed history is sized to
   the model's actual context limit (not a fixed `24k` characters), and each
@@ -588,7 +588,7 @@ So a long job doesn't quietly fall out of the model's memory mid-task. 🧵
 Tick tools per agent in the editor. They're grouped:
 
 <details>
-<summary>▼ Sandbox, editor, team, memory and MCP tools</summary>
+<summary>Sandbox, editor, team, memory and MCP tools</summary>
 
 **🧰 Server-side sandbox (files, web, shell)**
 | Tool | What it does |
@@ -618,7 +618,7 @@ Every path is **jailed** server-side, so `../` and symlinks can't escape, and a 
 Different providers aren't one API with different URLs. A single registry (`src/Harness.php` + `ui/js/harness.js`) decides, per request:
 
 <details>
-<summary>▼ Shapes, dialects, quirks and adding a provider</summary>
+<summary>Shapes, dialects, quirks and adding a provider</summary>
 
 - **Which API shape** — OpenAI-compatible, Anthropic Messages, Google `generateContent`, or Ollama — from the **endpoint host**, then provider id, then a model hint.
 - **Which tool dialect** to teach — JSON, Claude XML, native tags, or plain — from the provider + model id.
@@ -636,7 +636,7 @@ Adding a provider is one line in the alias table, or just a new provider in the 
 No two models are alike — and the **free** ones are the fussiest of all. 🔧 **Dynamic tools** hands each model the environment it is *actually* running in — the server's 🪟/🐧 OS, the working directory, and which shell commands **really exist** — then shows **one correct example per tool in that model's own dialect** (JSON, Claude XML, native `<|tool_call|>` tags, or plain). No more `findstr` on Linux, no more guessing the syntax: the model is *told*, up front. 🎯
 
 <details>
-<summary>▼ Dialects, the rescue retry and the learned winner</summary>
+<summary>Dialects, the rescue retry and the learned winner</summary>
 
 - 🌍 **Speaks the model's language** — OpenAI-style JSON, Claude XML, native tags or plain JSON, detected from the provider + model id (or forced per agent).
 - 🛟 **One rescue retry** — if a reply *looks* like a tool call but parses to nothing, the loop re-teaches **once** with a different dialect instead of letting the near-miss become the answer.
@@ -655,7 +655,7 @@ Free, quantised models that used to burn **6–8 calls** guessing now get it rig
 A 40-requests-per-minute key dies when 16 chart nodes fire at once. The pacer counts outbound calls **per host + key** and waits instead of spending a 429.
 
 <details>
-<summary>▼ Buckets, free-tier ceilings and 429 learning</summary>
+<summary>Buckets, free-tier ceilings and 429 learning</summary>
 
 - **Per-key buckets** — four agents on four keys are four buckets; two agents on one key correctly share.
 - **Knows the free tiers** — NVIDIA NIM 40/min, Groq 30, OpenRouter 20, … with a host default for anything unknown. Set the global field to **`0 = AUTO`** to use each provider's real ceiling, or type a number to override everyone. Precedence: **agent lock → provider → global → host default**.
@@ -671,7 +671,7 @@ A 40-requests-per-minute key dies when 16 chart nodes fire at once. The pacer co
 Got several keys for one provider — a handful of free accounts, a team key, a spare? 🗝️ Drop them into the provider's **API pool** and let the console do the shuffling.
 
 <details>
-<summary>▼ Rotation, model pinning and 429 cooldowns</summary>
+<summary>Rotation, model pinning and 429 cooldowns</summary>
 
 - 🔁 **Rotate after N requests** — set the number and the pool hands out the next key when one reaches it (`0` = every call).
 - 🎯 **Pin a key to a model** — tick *Only this model* and enter a model # (like `#63BET7`) or a model id, and that key circles **just that model** while everything else keeps the single key.
@@ -690,7 +690,7 @@ It stacks with the pacer: every key is counted in its **own** bucket 📈, so a 
 Agents leak. 🕵️ By default every model call, every `web_search`, every `fetch_url` and every `curl` an agent runs in the shell leaves from **your** IP. The **Proxy** tab — in the top nav, beside Providers — puts a checkpoint in front of all of it.
 
 <details>
-<summary>▼ List grades, ping, favourites and global routing</summary>
+<summary>List grades, ping, favourites and global routing</summary>
 
 - 🔄 **REFRESH LIST pulls hundreds at once.** The server reads a live public proxy feed — the kind of list that rotates daily — and keeps only what is usable: alive, HTTP, **IPv4** (this host dials IPv4 for `CURLOPT_PROXY`, so an IPv6 entry would look selected while traffic quietly went direct) and **identity-hiding only**. The header tells you what you got — *340 IPv4 proxies (elite + anonymous)* — and the drop counters explain a short list instead of leaving you to guess.
 - 🥇 **Two grades of hiding, and nothing below them.** **ELITE** *(best)* never announces itself and never forwards your address, so the far end sees a stranger. **ANONYMOUS** *(better)* strips your address, but the request may still be identifiable as proxied. Transparent proxies are refused at the source: they are your real IP with extra steps.
@@ -721,7 +721,7 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
 The whole loop as a living map. Every activated agent and provider becomes a glowing node, and each exchange paints a dotted line whose dots travel the way the traffic actually moved.
 
 <details>
-<summary>▼ Nodes, traffic, MCP on the graph, ASK and verbose replies</summary>
+<summary>Nodes, traffic, MCP on the graph, ASK and verbose replies</summary>
 
 > 🎛️ **It is also the most expensive thing in the app**, so every visual it owns has a switch in **Config → Desktop** — fog, bloom, the floating floor, auto-rotate, map detail and the frame cap. That card — every knob, what it costs and what it defaults to — is detailed in *Config → Desktop* above. 🧮
 
@@ -746,7 +746,7 @@ Manager** adds optional brakes — every switch **off by default**, so nothing
 changes until you ask:
 
 <details>
-<summary>▼ Pause switches, idle slowdown and gauges</summary>
+<summary>Pause switches, idle slowdown and gauges</summary>
 
 - 🪟 **Pause when a panel is open** (routing chart, API Lab, Brain Lab, browser, modals) — no point rendering a graph behind a full-screen drawer.
 - 🎯 **Pause when the window isn't focused** — switch to another app and it stands down.
@@ -768,7 +768,7 @@ Some models show their work. 💭🧩 When a provider streams a reasoning trace,
 Agents keep **private notes** and share a small **collective** every agent reads. Tools: `remember` (private), `share` (collective), `recall`, `adopt`. Notes are injected as **recollection, not instructions**, and are fully editable/deletable in Brain Lab.
 
 <details>
-<summary>▼ Hardenings, budgeting and sync rules</summary>
+<summary>Hardenings, budgeting and sync rules</summary>
 
 Two recent hardenings so memory can't look "off":
 
@@ -1240,7 +1240,7 @@ security rests on**. 🧪
 **Config → MCP Client.** Add any MCP server (stdio command + args, or an HTTP URL with headers). Its tools become available to your agents through `mcp_list` / `mcp_call`. Servers are operator-configured — a model can *call* them, never add one.
 
 <details>
-<summary>▼ Config example and Windows PATH notes</summary>
+<summary>Config example and Windows PATH notes</summary>
 
 ```jsonc
 // storage/config.json
@@ -1265,7 +1265,7 @@ On Windows, stdio servers inherit the process environment (including `PATH`, `Co
 The mirror of the client: an operator can expose this install as a **remote MCP server**, so another person's MCP client — their own local model, Claude Desktop, Cursor — can call tools that run on the operator's machine.
 
 <details>
-<summary>▼ Enable steps, token scopes and friend setup</summary>
+<summary>Enable steps, token scopes and friend setup</summary>
 
 ### 🔧 Enable it (operator)
 **Config → MCP Server**
@@ -1304,7 +1304,7 @@ The operator hands over the **URL + that friend's token**; `FRIENDS.md` is the o
 A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 no extensions, just the DevTools Protocol. 🖥️ Open it from the **Browser** item in the apps notch and you get the live page, an address bar, **Go / Reload**, a **Live** auto-refresh, a headless ⇄ window toggle, and a **click-through** view: tap the page and it clicks. ✨
 
 <details>
-<summary>▼ Click, type and read, logins, gates and the block list</summary>
+<summary>Click, type and read, logins, gates and the block list</summary>
 
 - 🖱️ **Click, type, read** — click anywhere on the screenshot, type into the field you need, press **Enter**, and pull the page's visible text.
 - 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
@@ -1322,7 +1322,7 @@ A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 n
 The UI is **mobile-first** — touch controls, a responsive layout, an icon rail on phones, and it works in the phone's browser right next to wireless-debugging tooling.
 
 <details>
-<summary>▼ The Android correction: WebView, on-device PHP and PWA</summary>
+<summary>The Android correction: WebView, on-device PHP and PWA</summary>
 
 > ⚠️ **Correction:** an earlier note claimed there would be no Android app because *"you can't put a PHP server into an Android app."* **That is false.** An Android build is a packaging exercise, not an impossibility:
 >
@@ -1429,7 +1429,7 @@ Either half runs on its own, which is what you want while working on one of them
 All under `/router/api/…` (or `/api/…`). Every route is token-gated.
 
 <details>
-<summary>▼ Full route table and error format</summary>
+<summary>Full route table and error format</summary>
 
 | Area | Routes |
 | --- | --- |
