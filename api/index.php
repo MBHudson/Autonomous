@@ -52,6 +52,7 @@ require_once __DIR__ . '/../autoload.php';
 // is a lot easier to keep those rules in one readable place.
 require_once __DIR__ . '/lab.inc.php';
 
+use Src\Backup;
 use Src\Config;
 use Src\ModelManager;
 use Src\Audio;
@@ -1227,18 +1228,24 @@ function handleExport($method, $segments, $body) {
 }
 
 /**
- * Full backup: everything needed to restore this copy elsewhere.
+ * Full backup, in parts: only the requested sections.
  *
- *   GET -> { app, backupVersion, exportedAt, state, sessions, config, approvals }
+ *   GET ?sections=agents,providers&name=my-copy
+ *     -> { app, backupVersion: 2, name, exportedAt, exportedFrom, sections,
+ *          state, sessions, models, config, approvals }
  *
- * - state: the whole state.json bundle (agents with their settings, prompts
- *   and memory; providers; workflows; conversations; metrics).
+ * - state: the requested state.json slots only (agents with their settings,
+ *   prompts and memory; providers; workflows; conversations; metrics).
  * - sessions: every session file, active or closed (getSessions filters to
  *   active only, so this reads the directory directly).
+ * - models: the storage/models.json catalog, which the old all-or-nothing
+ *   backup never carried at all.
  * - config: storage/config.json verbatim, INCLUDING the access token and the
  *   sandbox allow/deny lists. It is a backup, not a handover: keep the file
  *   somewhere safe, never post it.
  * - approvals: pending exec-approval grants, if the file exists.
+ * - sections: the ids actually in the file, so a restore can offer exactly
+ *   those. Unknown ids in ?sections= are a 400 naming them.
  */
 function handleBackup($method, $segments, $body) {
     if ($method !== 'GET') {
@@ -1246,38 +1253,52 @@ function handleBackup($method, $segments, $body) {
         echo json_encode(['error' => 'GET only']);
         return;
     }
-    $statePath = __DIR__ . '/../storage/state.json';
-    $state = is_file($statePath) ? json_decode((string)@file_get_contents($statePath), true) : null;
-
-    $sessions = [];
-    foreach ((array)glob(__DIR__ . '/../storage/sessions/*.json') as $file) {
-        $s = json_decode((string)@file_get_contents($file), true);
-        if (is_array($s)) $sessions[] = $s;
+    $parsed = Backup::parseList(isset($_GET['sections']) ? $_GET['sections'] : null);
+    if ($parsed['unknown']) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Unknown backup section(s): ' . implode(', ', $parsed['unknown'])]);
+        return;
     }
-
-    $approvalsPath = __DIR__ . '/../storage/exec-approvals.json';
-    $approvals = is_file($approvalsPath)
-        ? json_decode((string)@file_get_contents($approvalsPath), true) : null;
-
-    echo json_encode([
-        'app' => 'router-studio',
-        'backupVersion' => 1,
-        'exportedAt' => time(),
-        'state' => $state,
-        'sessions' => $sessions,
-        'config' => Config::loadConfig(),
-        'approvals' => $approvals,
-    ]);
+    // The file's own label: the first non-comment line of VERSION, so the
+    // restore dialog can say which release a backup came from.
+    $exportedFrom = null;
+    $versionFile = __DIR__ . '/../VERSION';
+    if (is_file($versionFile)) {
+        foreach (explode("\n", (string)@file_get_contents($versionFile)) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#' || substr($line, 0, 2) === '//') continue;
+            $exportedFrom = $line;
+            break;
+        }
+    }
+    echo json_encode(Backup::exportBundle(
+        __DIR__ . '/../storage',
+        $parsed['sections'],
+        [
+            'name' => Backup::sanitizeName(isset($_GET['name']) ? $_GET['name'] : ''),
+            'exportedFrom' => $exportedFrom,
+        ]
+    ));
 }
 
 /**
- * Restore a backup made by handleBackup.
+ * Restore a backup made by handleBackup -- all of it, or only parts of it.
  *
- *   POST { backup: {...} } -> { success, sessions, rev }
+ *   POST { backup: {...}, only: ['agents', 'providers'] }
+ *     -> { success, restored, skipped, sessions, rev, config_saved,
+ *          kept_local, token_differs }
  *
- * True restore semantics: the app ends up looking like the backup. Session
- * files not in the backup are removed; state, config and approvals are
- * replaced wholesale (with the revision bumped, so other devices adopt it).
+ * An omitted `only` restores every section the file carries (which is what
+ * the old all-or-nothing backup did). A section the file does not carry is
+ * SKIPPED, never blanked: that is what makes a partial file -- or a backup
+ * from any older version -- safe to restore. State merges per-slot (the rest
+ * of the copy is kept) with the revision bumped so other devices adopt it;
+ * sessions are replaced only when the sessions section is restored; the
+ * config goes through sanitizeImportedConfig, so this copy keeps its own
+ * gate, token and roots. `token_differs` says the backup came from a copy
+ * with a different access token -- this copy's own still applies, so there
+ * is nothing to paste.
+ *
  * Refuses anything that is not recognisably our backup, caps the body well
  * below PHP's post limits, and sanitises session filenames so a crafted
  * backup cannot write outside the sessions directory.
@@ -1296,88 +1317,18 @@ function handleImport($method, $segments, $body) {
     }
     $backup = (is_array($body) && isset($body['backup']) && is_array($body['backup']))
         ? $body['backup'] : null;
-    if ($backup === null
-        || ($backup['app'] ?? null) !== 'router-studio'
-        || !isset($backup['state']) || !isset($backup['sessions']) || !isset($backup['config'])
-    ) {
+    $only = (is_array($body) && array_key_exists('only', $body)) ? $body['only'] : null;
+    if ($only !== null && !is_array($only)) {
         http_response_code(400);
-        echo json_encode(['error' => 'Not a router-studio backup (need app, state, sessions, config)']);
+        echo json_encode(['error' => '`only` must be an array of backup section ids']);
         return;
     }
-
-    // Sessions: drop the current files, then write the backup's. IDs are
-    // basename-sanitised and restricted to safe characters.
-    $sessionsDir = __DIR__ . '/../storage/sessions/';
-    if (!is_dir($sessionsDir)) @mkdir($sessionsDir, 0755, true);
-    foreach ((array)glob($sessionsDir . '*.json') as $file) @unlink($file);
-    $sessionCount = 0;
-    foreach ((array)$backup['sessions'] as $session) {
-        if (!is_array($session)) continue;
-        $id = isset($session['id']) ? basename((string)$session['id']) : '';
-        if (!preg_match('/^[A-Za-z0-9_.-]+$/', $id)) continue;
-        $session['id'] = $id;
-        if (@file_put_contents($sessionsDir . $id . '.json',
-            json_encode($session, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false) {
-            $sessionCount++;
-        }
-    }
-
-    // State bundle: replace wholesale (this is a restore, not a merge), with
-    // the revision bumped so other devices adopt it on their next poll.
-    $statePath = __DIR__ . '/../storage/state.json';
-    $current = is_file($statePath) ? json_decode((string)@file_get_contents($statePath), true) : null;
-    $incoming = $backup['state'];
-    if (!is_array($incoming)) $incoming = ['slots' => []];
-    // Tokens never roam, not even in a backup restore pushed over sync: strip
-    // device credentials the same way live PUTs do.
-    if (isset($incoming['slots']['settings']) && is_array($incoming['slots']['settings'])) {
-        unset($incoming['slots']['settings']['routerToken'], $incoming['slots']['settings']['sandboxToken']);
-    }
-    $incoming['rev'] = (int)(is_array($current) ? ($current['rev'] ?? 0) : 0) + 1;
-    $incoming['updated'] = time();
-    $json = json_encode($incoming, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if ($json === false) {
+    $res = Backup::importBundle(__DIR__ . '/../storage', $backup, $only);
+    if (isset($res['error'])) {
         http_response_code(400);
-        echo json_encode(['error' => 'Restored state could not be encoded as JSON']);
-        return;
     }
-    $tmp = $statePath . '.' . getmypid() . '.tmp';
-    if (@file_put_contents($tmp, $json, LOCK_EX) === false || !@rename($tmp, $statePath)) {
-        @unlink($tmp);
-        http_response_code(500);
-        echo json_encode(['error' => 'Could not write storage/state.json']);
-        return;
-    }
-
-    // Config (allow/deny lists, sandbox roots, exec policy) and exec approval
-    // grants: restored, which is what makes this a restore -- EXCEPT the four
-    // keys that describe the machine this is being restored ONTO rather than
-    // the contents of the backup: the gate flag, the token guarding it, and the
-    // two absolute root paths. A backup taken with the gate off (or on another
-    // OS) used to disarm this install and point its file tools at /var/www.
-    // sanitizeImportedConfig() keeps this machine's own values and reports what
-    // it refused, so the operator can see the import was not blind.
-    [$importConfig, $keptLocal] = Config::sanitizeImportedConfig(
-        $backup['config'], Config::loadConfig());
-    $configSaved = Config::saveConfig($importConfig);
-    if (isset($backup['approvals'])) {
-        @file_put_contents(__DIR__ . '/../storage/exec-approvals.json',
-            json_encode($backup['approvals'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    }
-
-    echo json_encode([
-        'success' => true,
-        'sessions' => $sessionCount,
-        'rev' => $incoming['rev'],
-        // `success` is about the state restore; say separately whether the
-        // config actually reached disk, and what the import was not allowed to
-        // change. A restore that silently kept the old gate is the point -- a
-        // restore that silently failed to write the config is not.
-        'config_saved' => $configSaved,
-        'kept_local' => $keptLocal,
-    ]);
+    echo json_encode($res);
 }
-
 /**
  * Can this copy answer two calls at once — and if not, what should be done?
  *

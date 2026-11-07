@@ -279,6 +279,22 @@ class Config {
         $env = getenv('ROUTER_CONFIG');
         return is_string($env) && trim($env) !== '' ? trim($env) : self::$configPath;
     }
+    /**
+     * Same override for the models catalog: point ROUTER_MODELS at another
+     * JSON file and the catalog reads and writes land there instead of
+     * storage/. A restore writes the catalog the backup carries, and the
+     * tests need that write to land somewhere safe.
+     */
+    public static function modelsPath() {
+        $env = getenv('ROUTER_MODELS');
+        return is_string($env) && trim($env) !== '' ? trim($env) : self::$modelsPath;
+    }
+
+    /** Replace the whole models catalog; returns success like saveConfig. */
+    public static function saveModels($models) {
+        if (!is_array($models)) return false;
+        return file_put_contents(self::modelsPath(), json_encode(array_values($models), JSON_PRETTY_PRINT)) !== false;
+    }
 
     public static function loadConfig() {
         $path = self::configPath();
@@ -430,16 +446,16 @@ class Config {
     }
     
     public static function getModels() {
-        if (!file_exists(self::$modelsPath)) {
+        if (!file_exists(self::modelsPath())) {
             self::saveDefaultModels();
         }
-        return json_decode(file_get_contents(self::$modelsPath), true);
+        return json_decode(file_get_contents(self::modelsPath()), true);
     }
     
     public static function addModel($model) {
         $models = self::getModels();
         $models[] = $model;
-        file_put_contents(self::$modelsPath, json_encode($models, JSON_PRETTY_PRINT));
+        file_put_contents(self::modelsPath(), json_encode($models, JSON_PRETTY_PRINT));
     }
     
     public static function removeModel($id) {
@@ -447,7 +463,7 @@ class Config {
         $models = array_filter($models, function($m) use ($id) {
             return $m['id'] !== $id;
         });
-        file_put_contents(self::$modelsPath, json_encode($models, JSON_PRETTY_PRINT));
+        file_put_contents(self::modelsPath(), json_encode($models, JSON_PRETTY_PRINT));
     }
     
     private static function saveDefaultModels() {
@@ -486,6 +502,6 @@ class Config {
                 'active' => false
             ]
         ];
-        file_put_contents(self::$modelsPath, json_encode($default, JSON_PRETTY_PRINT));
+        file_put_contents(self::modelsPath(), json_encode($default, JSON_PRETTY_PRINT));
     }
 }

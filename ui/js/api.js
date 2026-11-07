@@ -433,17 +433,27 @@ class ApiClient {
     return this.request('POST', '/state', { state });
   }
 
-  // --- Full backup & restore ---
-  // downloadBackup returns the whole copy (state bundle, every session file,
-  // config incl. allow/deny lists and token, approval grants) as one JSON
-  // object for the caller to save to disk. importBackup posts such an object
-  // back; the server replaces everything (true restore semantics).
-  downloadBackup() {
-    return this.request('GET', '/backup');
+  // --- Full backup & restore, in parts ---
+  // downloadBackup returns the requested sections (state slots, sessions,
+  // models catalog, config, approval grants) as one JSON object for the
+  // caller to save to disk. Sections default to everything, so callers that
+  // never heard of sections keep getting the whole copy. `name` labels the
+  // file; the server sanitises it again. importBackup posts such an object
+  // back with an optional `only` list; the server restores just those
+  // sections and leaves everything else alone.
+  downloadBackup(sections, name) {
+    let path = '/backup';
+    const q = [];
+    if (Array.isArray(sections) && sections.length) q.push('sections=' + encodeURIComponent(sections.join(',')));
+    if (typeof name === 'string' && name.trim()) q.push('name=' + encodeURIComponent(name.trim()));
+    if (q.length) path += '?' + q.join('&');
+    return this.request('GET', path);
   }
 
-  importBackup(backup) {
-    return this.request('POST', '/import', { backup });
+  importBackup(backup, only) {
+    const body = { backup };
+    if (Array.isArray(only) && only.length) body.only = only;
+    return this.request('POST', '/import', body);
   }
 
   // --- Sandbox: server-side search / fetch / filesystem ---

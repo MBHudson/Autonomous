@@ -314,3 +314,23 @@
   color: var(--accent-cyan);
   margin-top: 4px;
 }
+
+/* Backup / restore section picker: one checkbox row per section, hint under
+   its label. Missing sections render dimmed and cannot be ticked. */
+.bk-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 2px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.bk-check input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--accent-cyan);
+  flex: none;
+}
+.bk-check.bk-missing {
+  opacity: 0.45;
+  cursor: default;
+}

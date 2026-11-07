@@ -22,6 +22,7 @@ import { snapshot } from '../rateGovernor.js?v=361';
 import { resetBrowserEnabled } from '../toolManifest.js?v=361';
 import { perf } from '../perf.js?v=361';
 import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=361';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=361';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1799,10 +1800,13 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <button class="btn btn-ghost btn-block" id="sbExportBtn" style="margin-top:8px">EXPORT SESSION</button>
         <button class="btn btn-ghost btn-block" id="sbBackupBtn" style="margin-top:8px">FULL BACKUP</button>
         <button class="btn btn-ghost btn-block" id="sbRestoreBtn" style="margin-top:8px">RESTORE BACKUP…</button>
-        <div class="form-hint">A full backup holds everything — sessions, agents
-          (settings, prompts, memories), providers, config, allow/deny lists,
-          workflows — <b>including API keys and the access token</b>. Keep the
-          file somewhere safe, never post it.</div>
+        <div class="form-hint">A backup downloads straight to your device, so it can
+          move between copies freely — the restore keeps this copy's own access
+          token, gate and roots. Choose the file name and which parts to include
+          (agents, providers &amp; keys, models, settings, notes, sessions…);
+          restoring offers the same choice, and parts the file does not carry
+          are left alone. <b>Backups hold API keys and the access token</b> —
+          keep the file somewhere safe, never post it.</div>
         <input type="file" id="sbRestoreFile" accept=".json,application/json" hidden>
         <button class="btn btn-ghost btn-block cfg-danger" id="sbResetBtn" style="margin-top:8px">RESET ALL</button>
       </div>
@@ -2357,25 +2361,16 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       return true;
     };
 
-    // Full backup: the whole copy as one JSON file (state bundle, every
-    // session, config incl. allow/deny lists and token, approval grants).
-    document.getElementById('sbBackupBtn')?.addEventListener('click', async () => {
+    // Full backup: a dialog names the file and picks the sections, so "just
+    // my providers" no longer means carrying everyone's sessions with it.
+    document.getElementById('sbBackupBtn')?.addEventListener('click', () => {
       if (needToken('a backup')) return;
-      try {
-        const data = await api.downloadBackup();
-        const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-        downloadFile(JSON.stringify(data, null, 2), `router-backup-${stamp}.json`, 'application/json');
-        store.emit('toast', {
-          message: 'Full backup downloaded — it holds keys and the token, keep it somewhere safe',
-          type: 'success',
-        });
-      } catch (err) {
-        store.emit('toast', { message: 'Backup failed: ' + (err?.message || err), type: 'error' });
-      }
+      this._openBackupDialog();
     });
 
-    // Restore: replaces everything with the backup's contents, then reloads
-    // so every panel re-reads the restored state from scratch.
+    // Restore: pick a file, then a dialog offers the sections THAT file
+    // carries. Sections it does not carry are left alone on this copy --
+    // never blanked -- which is what makes a partial or older backup safe.
     document.getElementById('sbRestoreBtn')?.addEventListener('click', () => {
       document.getElementById('sbRestoreFile')?.click();
     });
@@ -2398,24 +2393,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         store.emit('toast', { message: 'Not an Autonomous Loop Studio backup file', type: 'error' });
         return;
       }
-      const n = Array.isArray(backup.sessions) ? backup.sessions.length : 0;
-      const when = backup.exportedAt
-        ? new Date(backup.exportedAt * 1000).toLocaleString() : 'unknown date';
-      if (!confirm(`Restore this backup (exported ${when}, ${n} session(s))? It REPLACES all current sessions, agents, providers, settings and workflows. Export first if unsure.`)) return;
-      try {
-        const res = await api.importBackup(backup);
-        if (res && res.success) {
-          store.emit('toast', {
-            message: `Restored ${res.sessions} session(s) — reloading`,
-            type: 'success',
-          });
-          setTimeout(() => location.reload(), 900);
-        } else {
-          store.emit('toast', { message: 'Restore failed: ' + (res?.error || 'unknown error'), type: 'error' });
-        }
-      } catch (err) {
-        store.emit('toast', { message: 'Restore failed: ' + (err?.message || err), type: 'error' });
-      }
+      this._openRestoreDialog(backup);
     });
 
     // Reset
@@ -2425,6 +2403,214 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         store.emit('toast', { message: 'All data reset', type: 'info' });
         store.emit('app:reload');
       }
+    });
+  }
+
+  /**
+   * Backup dialog: a name for the file and a checkbox per section. Sections
+   * download straight to the device, so the file moves between copies and
+   * versions freely. Closes on Cancel, the backdrop, or Escape.
+   */
+  _openBackupDialog() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const stamp = defaultBackupName();
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-label="Download backup">
+        <div class="modal-header">
+          <span class="modal-title">Download backup</span>
+          <button class="modal-close" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">File name</label>
+            <input type="text" class="form-input" data-name value="${escAttr(stamp)}" maxlength="80" autocomplete="off">
+            <div class="form-hint">Saved as <span data-filename>${esc(stamp)}.json</span> on your device.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Include
+              <span class="form-hint-inline"><a href="#" data-all>all</a> &middot; <a href="#" data-none>none</a></span>
+            </label>
+            <div data-sections>
+              ${BACKUP_SECTIONS.map(sec => `
+                <label class="bk-check"><input type="checkbox" data-section="${sec.id}" checked>
+                  <span><b>${esc(sec.label)}</b><br>
+                  <span class="form-hint" style="margin:0">${esc(sec.hint)}</span></span>
+                </label>`).join('')}
+            </div>
+            <div class="form-hint">Holds API keys and the access token — keep the file somewhere safe, never post it.</div>
+          </div>
+          <div class="form-hint" data-status style="min-height:1.2em"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" data-close>Cancel</button>
+          <button class="btn btn-primary" data-download>Download</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const say = (text) => { const el = overlay.querySelector('[data-status]'); if (el) el.textContent = text; };
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('[data-close]')) close();
+    });
+    document.addEventListener('keydown', onKey);
+    const nameInput = overlay.querySelector('[data-name]');
+    const fileLabel = overlay.querySelector('[data-filename]');
+    nameInput.addEventListener('input', () => {
+      fileLabel.textContent = sanitizeBackupName(nameInput.value, stamp) + '.json';
+    });
+    overlay.querySelector('[data-all]').addEventListener('click', (e) => {
+      e.preventDefault();
+      overlay.querySelectorAll('[data-section]').forEach(c => { c.checked = true; });
+    });
+    overlay.querySelector('[data-none]').addEventListener('click', (e) => {
+      e.preventDefault();
+      overlay.querySelectorAll('[data-section]').forEach(c => { c.checked = false; });
+    });
+    const dlBtn = overlay.querySelector('[data-download]');
+    dlBtn.addEventListener('click', async () => {
+      const sections = [...overlay.querySelectorAll('[data-section]:checked')].map(c => c.dataset.section);
+      if (!sections.length) { say('Pick at least one section — or Cancel.'); return; }
+      const name = sanitizeBackupName(nameInput.value, stamp);
+      dlBtn.disabled = true;
+      say('Preparing the backup…');
+      try {
+        const data = await api.downloadBackup(sections, name);
+        downloadFile(JSON.stringify(data, null, 2), name + '.json', 'application/json');
+        close();
+        store.emit('toast', {
+          message: `Backup downloaded as ${name}.json — it holds keys and the token, keep it somewhere safe`,
+          type: 'success',
+        });
+      } catch (err) {
+        say('Backup failed: ' + (err?.message || err));
+        dlBtn.disabled = false;
+      }
+    });
+    nameInput.focus();
+    nameInput.select();
+  }
+
+  /**
+   * Restore dialog: says what the file holds (name, date, release, parts),
+   * offers the sections it carries, and warns when the file came from a copy
+   * with a different access token -- this copy keeps its own, so there is
+   * nothing to paste. After a restore the dialog reports exactly what landed
+   * and what was skipped, with a Reload button; nothing reloads underneath
+   * the report.
+   */
+  _openRestoreDialog(backup) {
+    const sum = summarizeBackup(backup);
+    const present = new Set(sum.sections);
+    const labelOf = (id) => (BACKUP_SECTIONS.find(sec => sec.id === id) || {}).label || id;
+    const when = sum.exportedAt ? new Date(sum.exportedAt * 1000).toLocaleString() : 'unknown date';
+    const differs = backupTokenDiffers(backup, store.get('settings.routerToken'));
+    const nSessions = Array.isArray(backup.sessions) ? backup.sessions.length : 0;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-label="Restore backup">
+        <div class="modal-header">
+          <span class="modal-title">Restore backup</span>
+          <button class="modal-close" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" data-body>
+          <div class="form-group">
+            <label class="form-label">This file</label>
+            <div><b>${esc(sum.name || 'Unnamed backup')}</b></div>
+            <div class="form-hint" style="margin:4px 0 0">
+              Exported ${esc(when)}${sum.exportedFrom ? ` · from release v${esc(sum.exportedFrom)}` : ''}
+              ${nSessions ? ` · ${nSessions} session(s)` : ''}</div>
+            ${differs ? `<div class="form-hint" style="margin:4px 0 0">
+              From a copy with a <b>different access token</b> — this copy keeps its own,
+              so you stay logged in as now and there is nothing to paste.</div>` : ''}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Restore
+              <span class="form-hint-inline"><a href="#" data-all>all</a> &middot; <a href="#" data-none>none</a></span>
+            </label>
+            <div data-sections>
+              ${BACKUP_SECTIONS.map(sec => present.has(sec.id) ? `
+                <label class="bk-check"><input type="checkbox" data-section="${sec.id}" checked>
+                  <span><b>${esc(sec.label)}</b><br>
+                  <span class="form-hint" style="margin:0">${esc(sec.hint)}</span></span>
+                </label>` : `
+                <label class="bk-check bk-missing"><input type="checkbox" disabled>
+                  <span><b>${esc(sec.label)}</b><br>
+                  <span class="form-hint" style="margin:0">Not in this backup — left alone.</span></span>
+                </label>`).join('')}
+            </div>
+            <div class="form-hint">Restoring REPLACES the parts you pick — sessions, agents,
+              providers, settings — with what the file holds. Parts the file does not
+              carry are never touched. Export first if unsure.</div>
+          </div>
+          <div class="form-hint" data-status style="min-height:1.2em"></div>
+        </div>
+        <div class="modal-footer" data-footer>
+          <button class="btn btn-ghost" data-close>Cancel</button>
+          <button class="btn btn-primary" data-restore>Restore</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const say = (text) => { const el = overlay.querySelector('[data-status]'); if (el) el.textContent = text; };
+    const close = () => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('[data-close]')) close();
+    });
+    document.addEventListener('keydown', onKey);
+    overlay.querySelector('[data-all]').addEventListener('click', (e) => {
+      e.preventDefault();
+      overlay.querySelectorAll('[data-section]:not([disabled])').forEach(c => { c.checked = true; });
+    });
+    overlay.querySelector('[data-none]').addEventListener('click', (e) => {
+      e.preventDefault();
+      overlay.querySelectorAll('[data-section]').forEach(c => { c.checked = false; });
+    });
+    overlay.querySelector('[data-restore]').addEventListener('click', async () => {
+      const only = [...overlay.querySelectorAll('[data-section]:checked')].map(c => c.dataset.section);
+      if (!only.length) { say('Pick at least one section — or Cancel.'); return; }
+      const btn = overlay.querySelector('[data-restore]');
+      btn.disabled = true;
+      say('Restoring…');
+      let res = null;
+      try {
+        res = await api.importBackup(backup, only);
+      } catch (err) {
+        say('Restore failed: ' + (err?.message || err));
+        btn.disabled = false;
+        return;
+      }
+      if (!res || !res.success) {
+        say('Restore failed: ' + ((res && res.error) || 'unknown error'));
+        btn.disabled = false;
+        return;
+      }
+      const restored = (res.restored || []).map(labelOf);
+      const skipped = res.skipped || [];
+      const kept = res.kept_local || [];
+      overlay.querySelector('[data-body]').innerHTML = `
+        <div class="form-group">
+          <label class="form-label">Restored</label>
+          <div>${restored.length ? restored.map(esc).join('<br>') : 'Nothing — every section was skipped.'}</div>
+          ${res.sessions != null ? `<div class="form-hint" style="margin:4px 0 0">${res.sessions} session(s) written.</div>` : ''}
+          ${skipped.length ? `<div class="form-hint" style="margin:4px 0 0">Skipped: ${skipped.map(sk => esc(labelOf(sk.section)) + ' (' + esc(sk.reason) + ')').join('; ')}.</div>` : ''}
+          ${kept.length ? `<div class="form-hint" style="margin:4px 0 0">Kept this copy's own: ${kept.map(esc).join('; ')}.</div>` : ''}
+          ${res.token_differs ? `<div class="form-hint" style="margin:4px 0 0">The file came from a copy with a different access token — this copy's own still applies.</div>` : ''}
+        </div>`;
+      overlay.querySelector('[data-footer]').innerHTML = `
+        <button class="btn btn-ghost" data-close2>Later</button>
+        <button class="btn btn-primary" data-reload>Reload now</button>`;
+      overlay.querySelector('[data-close2]').addEventListener('click', close);
+      overlay.querySelector('[data-reload]').addEventListener('click', () => location.reload());
+      store.emit('toast', { message: `Restored ${restored.length} section(s) — reload to see everything`, type: 'success' });
     });
   }
 
