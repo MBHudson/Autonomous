@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=371';
-import { acquire, note429 } from './rateGovernor.js?v=371';
-import { latency } from './latency.js?v=371';
-import { detectFamily } from './harness.js?v=371';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=371';
+import { store } from './store.js?v=372';
+import { acquire, note429 } from './rateGovernor.js?v=372';
+import { latency } from './latency.js?v=372';
+import { detectFamily } from './harness.js?v=372';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=372';
 
 latency.bindStore(store);
 
@@ -234,6 +234,16 @@ class ApiClient {
   /** Write it to the pin bundle, so verification can succeed against it. */
   tlsPin(url) {
     return this.request('POST', '/tls/pin', { url, confirm: true });
+  }
+
+  /** Everything currently trusted, with fingerprints and expiry where known. */
+  tlsPins() {
+    return this.request('GET', '/tls/pins');
+  }
+
+  /** Remove one certificate from the bundle, by SHA-256 fingerprint. */
+  tlsForget(fingerprint) {
+    return this.request('POST', '/tls/pins', { fingerprint });
   }
 
   // --- Shell execution ---

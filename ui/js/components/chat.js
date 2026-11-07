@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=371';
-import { K as STORAGE_K } from '../storage.js?v=371';
+import { store } from '../store.js?v=372';
+import { K as STORAGE_K } from '../storage.js?v=372';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=371';
-import { persistence } from '../persistence.js?v=371';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted } from '../utils.js?v=371';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=371';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=371';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=371';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=371';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=371';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=371';
-import { usageFor } from '../rateGovernor.js?v=371';
-import { trace } from '../trace.js?v=371';
-import { latency } from '../latency.js?v=371';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=371';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=371';
-import { SlashCommands } from '../slashCommands.js?v=371';
-import { parseRoute, routingHelp } from '../routing.js?v=371';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=371';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=371';
-import { MessageRenderer, renderToolCalls } from './message.js?v=371';
-import { createAvatar } from './avatar.js?v=371';
-import * as comms from '../commsLog.js?v=371';
+import { api, errText } from '../api.js?v=372';
+import { persistence } from '../persistence.js?v=372';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted } from '../utils.js?v=372';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=372';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=372';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=372';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=372';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=372';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=372';
+import { usageFor } from '../rateGovernor.js?v=372';
+import { trace } from '../trace.js?v=372';
+import { latency } from '../latency.js?v=372';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=372';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=372';
+import { SlashCommands } from '../slashCommands.js?v=372';
+import { parseRoute, routingHelp } from '../routing.js?v=372';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=372';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=372';
+import { MessageRenderer, renderToolCalls } from './message.js?v=372';
+import { createAvatar } from './avatar.js?v=372';
+import * as comms from '../commsLog.js?v=372';
 
 /**
  * How long an agent may keep working on a single task.

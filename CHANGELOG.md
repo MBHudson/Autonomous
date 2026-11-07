@@ -17,6 +17,20 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 📋 Pinned certificates are listed, with their dates and a way out *(`VERSION` 372, cache-buster v371 → v372)*
+
+*2026-11-07. Pinning wrote a file and said nothing more about it -- no way to see what was trusted, and no way to stop trusting it.*
+
+**The list.** Config -> TLS / Certificates now reads `storage/tls/trusted.pem` back every time the section opens and after every pin or removal. Each row shows the subject (or host), the SHA-256 fingerprint, the expiry -- `EXPIRED <date>`, `valid to <date>`, or `validity unknown` -- the date it was pinned, and a FORGET button. The badge on the section header counts what is trusted.
+
+**Where the dates come from.** A PEM file carries no name and no expiry a browser can read, so pinning also writes a row to `storage/tls/pins.json`, keyed by fingerprint, filled from the cert-info curl already returned during the read. A bundle that arrived by hand has no row; those are read with `openssl_x509_parse` when that extension is present, and reported as `validity unknown` rather than guessed when it is not. A partial metadata update merges, so re-pinning never blanks a name it already had.
+
+**Forget.** `POST /tls/pins {fingerprint}` rewrites the bundle without that certificate and drops its row; `GET /tls/pins` is the list. Removing the last one deletes the file instead of leaving it empty -- an empty CAINFO makes every call fail to verify, while a missing file simply means nothing is pinned, so Auto goes back to skipping a LAN host and Always verify goes back to refusing it. `storage/tls/` is now gitignored: it is this machine's trust state, not source.
+
+`tests/php/tls.test.php` covers the list, the metadata merge, an expired row, the unknown-validity case, forgetting one, forgetting something absent, and forgetting the last. Both suites green: `node tests/js/run.mjs` and `php tests/php/run.php`.
+
+---
+
 ## 🔏 The app reads a host's certificate and can trust exactly that *(`VERSION` 371, cache-buster v370 → v371)*
 
 *2026-11-07. Turning verification on left a self-signed LAN endpoint refusing to connect unless the operator assembled a CA bundle by hand. The app does that now.*

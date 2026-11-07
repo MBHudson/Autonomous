@@ -49,6 +49,9 @@ putenv('ROUTER_CONFIG=' . $cfgPath);
 $hadPins = getenv('ROUTER_TLS_PINS');
 $pinsPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tls-test-' . getmypid() . '-pins.pem';
 putenv('ROUTER_TLS_PINS=' . $pinsPath);
+$metaPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tls-test-' . getmypid() . '-meta.json';
+$hadMeta = getenv('ROUTER_TLS_PINS_META');
+putenv('ROUTER_TLS_PINS_META=' . $metaPath);
 $write([]);
 
 // --- normalise: only 'on' and 'off' are commands, everything else is auto ---
@@ -235,10 +238,70 @@ ok(Tls::policy('https://192.168.1.50:1234/v1', 'on')['ca'] === $pinsPath,
 $write(['tls' => ['ca_bundle' => $bundle]]);
 ok(Tls::caBundle() === $bundle, 'an explicit ca_bundle still wins over the pins');
 
+// --- the pin list: metadata, expiry, forgetting ---------------------------
+$write([]);
+@unlink($pinsPath);
+@unlink($metaPath);
+
+ok(Tls::pins() === [], 'no bundle -> an empty pin list');
+
+Tls::appendPins([$fakePem, $secondPem]);
+$list = Tls::pins();
+ok(count($list) === 2, 'both bundle entries are listed');
+ok($list[0]['fingerprint'] !== '' && strlen($list[0]['fingerprint']) === 95,
+    'each row carries its fingerprint');
+ok($list[0]['to'] === '' && $list[0]['expired'] === null,
+    'a hand-copied certificate reports validity unknown, not a guess');
+
+Tls::setPinMeta([$fp => [
+    'host' => '192.168.1.50',
+    'subject' => 'CN = gpubox',
+    'issuer' => 'CN = gpubox',
+    'from' => '2026-01-01',
+    'to' => '2036-01-01',
+    'expires_ts' => 2082758400,
+    'pinned_at' => 1700000000,
+]]);
+$row = null;
+foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
+ok($row !== null, 'the pinned row is listed by fingerprint');
+ok($row['subject'] === 'CN = gpubox' && $row['host'] === '192.168.1.50',
+    'the name and host from the pin are shown');
+ok($row['to'] === '2036-01-01', 'the expiry date is shown');
+ok($row['expired'] === false, 'a future expiry is not expired');
+ok($row['pinned_at'] === 1700000000, 'the pin time is kept');
+
+Tls::setPinMeta([$fp => ['to' => '2001-01-01', 'expires_ts' => 978307200]]);
+$row = null;
+foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
+ok($row !== null && $row['expired'] === true, 'a past expiry is flagged');
+ok($row['subject'] === 'CN = gpubox', 'a partial metadata update does not drop the other fields');
+
+$gone = Tls::forget($fp);
+ok($gone['ok'] === true && $gone['remaining'] === 1, 'forgetting one certificate leaves the other');
+$after = Tls::pinnedFingerprints();
+ok(!isset($after[$fp]), 'the forgotten certificate is gone from the bundle');
+ok(strpos((string)@file_get_contents($pinsPath), 'BEGIN CERTIFICATE') !== false,
+    'the remaining certificate is still in the file');
+ok(!isset(Tls::pinMeta()[$fp]), 'its metadata row went with it');
+
+$missing = Tls::forget('AA:BB');
+ok($missing['ok'] === false, 'forgetting something not pinned reports failure');
+ok(Tls::forget('')['ok'] === false, 'a blank fingerprint is refused');
+
+$last = Tls::forget(Tls::fingerprintFromPem($secondPem));
+ok($last['ok'] === true && $last['remaining'] === 0, 'forgetting the last one empties the list');
+ok(!is_file($pinsPath), 'an empty bundle is deleted, not left as a file curl would choke on');
+ok(!is_file($metaPath), 'the metadata sidecar goes too');
+ok(Tls::caBundle() === '', 'and nothing is trusted by the pin fallback any more');
+ok(Tls::pins() === [], 'the list is empty again');
+
 // --- cleanup ---------------------------------------------------------------
 @unlink($cfgPath);
 @unlink($pinsPath);
+@unlink($metaPath);
 if ($hadPins === false) { putenv('ROUTER_TLS_PINS'); } else { putenv('ROUTER_TLS_PINS=' . $hadPins); }
+if ($hadMeta === false) { putenv('ROUTER_TLS_PINS_META'); } else { putenv('ROUTER_TLS_PINS_META=' . $hadMeta); }
 @unlink($bundle);
 if ($had === false) { putenv('ROUTER_CONFIG'); } else { putenv('ROUTER_CONFIG=' . $had); }
 

@@ -325,7 +325,7 @@ class Tls {
      */
     private static function readChain($url) {
         $origin = self::origin($url);
-        $out = ['ok' => false, 'error' => '', 'origin' => $origin, 'chain' => [], 'meta' => []];
+        $out = ['ok' => false, 'error' => '', 'origin' => $origin, 'chain' => [], 'meta' => [], 'metas' => []];
         if ($origin === '') {
             $out['error'] = 'Only https:// endpoints present a certificate. A plain http:// endpoint has none to read.';
             return $out;
@@ -352,11 +352,13 @@ class Tls {
 
         $chain = [];
         $meta = [];
+        $metas = [];
         foreach ((array)$info as $i => $entry) {
             if (!is_array($entry)) { continue; }
             $pem = (string)($entry['Cert'] ?? '');
             if ($pem === '') { continue; }
             $chain[] = $pem;
+            $metas[] = $entry;
             if ($i === 0) { $meta = $entry; }
         }
         if (!$chain) {
@@ -368,6 +370,7 @@ class Tls {
         $out['ok'] = true;
         $out['chain'] = $chain;
         $out['meta'] = $meta;
+        $out['metas'] = $metas;
         return $out;
     }
 
@@ -410,6 +413,9 @@ class Tls {
         }
         $meta = $seen['meta'];
         $fp = self::fingerprintFromPem($seen['chain'][0]);
+        // Remember what each certificate is, so the pin list can show a name and
+        // an expiry instead of a bare fingerprint.
+        self::recordChainMeta($seen);
         $custom = self::configuredBundle();
         return [
             'ok' => true,
@@ -429,5 +435,165 @@ class Tls {
                 ? 'A custom ca_bundle is set, so pinned certificates are stored but not used until that field is cleared.'
                 : '',
         ];
+    }
+
+    /**
+     * Sidecar holding the display metadata for each pin.
+     *
+     * The bundle itself is only certificates -- it has to stay a PEM file curl
+     * will read -- so the names, dates and pin time live beside it, keyed by
+     * fingerprint. A bundle copied in by hand simply has no rows, and the list
+     * falls back to what the certificate itself says.
+     */
+    public static function metaPath() {
+        $env = getenv('ROUTER_TLS_PINS_META');
+        if (is_string($env) && trim($env) !== '') { return trim($env); }
+        return dirname(self::pinsPath()) . DIRECTORY_SEPARATOR . 'pins.json';
+    }
+
+    /** Every metadata row, keyed by fingerprint. Never throws. */
+    public static function pinMeta() {
+        $path = self::metaPath();
+        if (!is_file($path) || !is_readable($path)) { return []; }
+        $raw = json_decode((string)@file_get_contents($path), true);
+        return is_array($raw) ? $raw : [];
+    }
+
+    /** Merge rows into the metadata map (fingerprint => row). */
+    public static function setPinMeta(array $map) {
+        if (!$map) { return false; }
+        $all = self::pinMeta();
+        $changed = false;
+        foreach ($map as $fp => $row) {
+            if (!is_string($fp) || $fp === '' || !is_array($row)) { continue; }
+            $all[$fp] = array_merge($all[$fp] ?? [], $row);
+            $changed = true;
+        }
+        if (!$changed) { return false; }
+        $dir = dirname(self::metaPath());
+        if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) { return false; }
+        return @file_put_contents(self::metaPath(), json_encode($all, JSON_PRETTY_PRINT), LOCK_EX) !== false;
+    }
+
+    /** `Nov  7 10:00:00 2027 GMT` -> `2027-11-07`; unchanged when unparsable. */
+    private static function dateLabel($raw) {
+        $raw = trim((string)$raw);
+        if ($raw === '') { return ''; }
+        $ts = strtotime($raw);
+        return $ts ? gmdate('Y-m-d', $ts) : $raw;
+    }
+
+    /** A distinguished name from openssl_x509_parse (array) as one line. */
+    private static function dnLabel($dn) {
+        if (is_string($dn)) { return $dn; }
+        if (!is_array($dn)) { return ''; }
+        $parts = [];
+        foreach ($dn as $k => $v) {
+            $parts[] = $k . '=' . (is_array($v) ? implode('+', array_map('strval', $v)) : (string)$v);
+        }
+        return implode(', ', $parts);
+    }
+
+    /** Record the display metadata for every certificate in a read chain. */
+    private static function recordChainMeta(array $seen) {
+        $host = self::host((string)($seen['origin'] ?? ''));
+        $map = [];
+        foreach ((array)($seen['chain'] ?? []) as $i => $pem) {
+            $fp = self::fingerprintFromPem($pem);
+            if ($fp === '') { continue; }
+            $m = (array)($seen['metas'][$i] ?? []);
+            $expires = strtotime((string)($m['Expire date'] ?? ''));
+            $map[$fp] = [
+                'host' => $host,
+                'subject' => (string)($m['Subject'] ?? ''),
+                'issuer' => (string)($m['Issuer'] ?? ''),
+                'from' => self::dateLabel($m['Start date'] ?? ''),
+                'to' => self::dateLabel($m['Expire date'] ?? ''),
+                'expires_ts' => $expires ? (int)$expires : 0,
+                'pinned_at' => time(),
+            ];
+        }
+        if ($map) { self::setPinMeta($map); }
+    }
+
+    /**
+     * Everything in the pin bundle, soonest expiry first.
+     *
+     * `expired` is true/false where the expiry is known and null where it is
+     * not, so the UI can say "validity unknown" instead of guessing.
+     */
+    public static function pins() {
+        $meta = self::pinMeta();
+        $out = [];
+        foreach (self::pinnedFingerprints() as $fp => $pem) {
+            $row = is_array($meta[$fp] ?? null) ? $meta[$fp] : [];
+            $entry = [
+                'fingerprint' => $fp,
+                'host' => (string)($row['host'] ?? ''),
+                'subject' => (string)($row['subject'] ?? ''),
+                'issuer' => (string)($row['issuer'] ?? ''),
+                'from' => (string)($row['from'] ?? ''),
+                'to' => (string)($row['to'] ?? ''),
+                'pinned_at' => (int)($row['pinned_at'] ?? 0),
+                'expires_ts' => (int)($row['expires_ts'] ?? 0),
+            ];
+            // A bundle that arrived by hand has no sidecar row: read the
+            // certificate itself when openssl is there to do it.
+            if (($entry['subject'] === '' || $entry['to'] === '') && function_exists('openssl_x509_parse')) {
+                $parsed = @openssl_x509_parse($pem);
+                if (is_array($parsed)) {
+                    if ($entry['subject'] === '') { $entry['subject'] = self::dnLabel($parsed['subject'] ?? ''); }
+                    if ($entry['issuer'] === '') { $entry['issuer'] = self::dnLabel($parsed['issuer'] ?? ''); }
+                    if (!empty($parsed['validTo_time_t'])) {
+                        $entry['expires_ts'] = (int)$parsed['validTo_time_t'];
+                        if ($entry['to'] === '') { $entry['to'] = gmdate('Y-m-d', $entry['expires_ts']); }
+                    }
+                    if ($entry['from'] === '' && !empty($parsed['validFrom_time_t'])) {
+                        $entry['from'] = gmdate('Y-m-d', (int)$parsed['validFrom_time_t']);
+                    }
+                }
+            }
+            $entry['expired'] = $entry['expires_ts'] > 0 ? ($entry['expires_ts'] < time()) : null;
+            $out[] = $entry;
+        }
+        usort($out, function ($a, $b) {
+            $at = $a['expires_ts'] > 0 ? $a['expires_ts'] : PHP_INT_MAX;
+            $bt = $b['expires_ts'] > 0 ? $b['expires_ts'] : PHP_INT_MAX;
+            if ($at === $bt) { return strcmp($a['fingerprint'], $b['fingerprint']); }
+            return $at < $bt ? -1 : 1;
+        });
+        return $out;
+    }
+
+    /**
+     * Remove one certificate from the bundle by fingerprint.
+     *
+     * The file is rewritten without that block, and the sidecar row goes with
+     * it. Removing the last certificate deletes the bundle instead of leaving an
+     * empty file: an empty CAINFO makes curl fail every call, and a missing file
+     * simply means "nothing pinned".
+     */
+    public static function forget($fingerprint) {
+        $fp = strtoupper(trim((string)$fingerprint));
+        if ($fp === '') { return ['ok' => false, 'error' => 'fingerprint is required']; }
+        $file = self::pinsPath();
+        $blocks = self::pinnedFingerprints($file);
+        if (!isset($blocks[$fp])) {
+            return ['ok' => false, 'error' => 'That certificate is not pinned.'];
+        }
+        unset($blocks[$fp]);
+        if (!$blocks) {
+            @unlink($file);
+            @unlink(self::metaPath());
+            return ['ok' => true, 'removed' => 1, 'remaining' => 0, 'bundle' => $file];
+        }
+        if (@file_put_contents($file, rtrim(implode('', array_values($blocks))) . "\n", LOCK_EX) === false) {
+            return ['ok' => false, 'error' => 'Could not write ' . $file];
+        }
+        $meta = self::pinMeta();
+        unset($meta[$fp]);
+        if ($meta) { @file_put_contents(self::metaPath(), json_encode($meta, JSON_PRETTY_PRINT), LOCK_EX); }
+        else { @unlink(self::metaPath()); }
+        return ['ok' => true, 'removed' => 1, 'remaining' => count($blocks), 'bundle' => $file];
     }
 }

@@ -1250,6 +1250,30 @@ function handleConfig($method, $segments, $body) {
  * writes, and it never touches a file outside storage/tls.
  */
 function handleTls($method, $segments, $body) {
+    $action = $segments[1] ?? '';
+
+    // GET  /tls/pins              -> everything trusted, by fingerprint
+    // POST /tls/pins {fingerprint} -> forget one
+    if ($action === 'pins') {
+        if ($method === 'GET') {
+            echo json_encode(['ok' => true, 'pins' => Tls::pins(), 'bundle' => Tls::pinsPath()]);
+            return;
+        }
+        if ($method === 'POST') {
+            $fp = trim((string)($body['fingerprint'] ?? ''));
+            if ($fp === '') {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'fingerprint is required']);
+                return;
+            }
+            echo json_encode(Tls::forget($fp));
+            return;
+        }
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'GET or POST only']);
+        return;
+    }
+
     if ($method !== 'POST') {
         http_response_code(405);
         echo json_encode(['ok' => false, 'error' => 'POST only']);

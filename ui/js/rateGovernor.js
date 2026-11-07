@@ -35,9 +35,9 @@
 // a stale bucket throttles calls that would succeed, a fresh one merely risks
 // a 429 the retry path already handles.
 
-import { store } from './store.js?v=371';
-import { settingFor, hasRateLock, overridesOf } from './agentConfig.js?v=371';
-import { defaultRpmFor } from './harness.js?v=371';
+import { store } from './store.js?v=372';
+import { settingFor, hasRateLock, overridesOf } from './agentConfig.js?v=372';
+import { defaultRpmFor } from './harness.js?v=372';
 
 /** Sliding window length. Per-minute limits are the common shape. */
 const WINDOW_MS = 60000;

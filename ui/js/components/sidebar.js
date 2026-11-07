@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=371';
-import { K } from '../storage.js?v=371';
-import { persistence } from '../persistence.js?v=371';
-import { api } from '../api.js?v=371';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=371';
-import { errText } from '../api.js?v=371';
-import { TOOL_REGISTRY } from '../tools.js?v=371';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=371';
-import { snapshot } from '../rateGovernor.js?v=371';
-import { resetBrowserEnabled } from '../toolManifest.js?v=371';
-import { perf } from '../perf.js?v=371';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=371';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=371';
+import { store } from '../store.js?v=372';
+import { K } from '../storage.js?v=372';
+import { persistence } from '../persistence.js?v=372';
+import { api } from '../api.js?v=372';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=372';
+import { errText } from '../api.js?v=372';
+import { TOOL_REGISTRY } from '../tools.js?v=372';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=372';
+import { snapshot } from '../rateGovernor.js?v=372';
+import { resetBrowserEnabled } from '../toolManifest.js?v=372';
+import { perf } from '../perf.js?v=372';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=372';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=372';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1551,6 +1551,11 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           </div>
           <div class="form-hint" id="sbTlsCertStatus"></div>
         </div>
+        <div class="form-group">
+          <label class="form-label">Pinned certificates <span class="form-hint-inline" id="sbTlsPinCount"></span></label>
+          <div id="sbTlsPins"><div class="form-hint">Reading pinned certificates...</div></div>
+          <div class="form-hint">Everything in <code>storage/tls/trusted.pem</code> is trusted by Auto and Always verify. FORGET rewrites the bundle without that certificate, so the trust stops at once; pinning the host again restores it.</div>
+        </div>
         <div class="form-hint" id="sbTlsStatus"></div>
       `)}
 
@@ -2176,6 +2181,56 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         el.textContent = 'Auto: public hosts verified; localhost, LAN addresses and single-word host names skipped, so a self-signed local runner keeps working.';
       }
     };
+    // The pin list. Read back from the server rather than remembered here: the
+    // bundle is a file the operator may also edit, and a stale row would offer
+    // a FORGET that quietly does nothing.
+    const renderPins = async () => {
+      const box = document.getElementById('sbTlsPins');
+      const count = document.getElementById('sbTlsPinCount');
+      if (!box) return;
+      try {
+        const r = await api.tlsPins();
+        const pins = (r && r.pins) || [];
+        if (count) count.textContent = pins.length ? `${pins.length} TRUSTED` : '';
+        if (!pins.length) {
+          box.innerHTML = '<div class="form-hint">Nothing pinned. A self-signed LAN host stays unverified under Auto, and is refused under Always verify, until its certificate is pinned above.</div>';
+          return;
+        }
+        box.innerHTML = pins.map((p) => {
+          const name = p.subject || p.host || 'certificate';
+          const validity = p.expired === true
+            ? `EXPIRED ${p.to || ''}`.trim()
+            : (p.to ? `valid to ${p.to}` : 'validity unknown');
+          const pinned = p.pinned_at ? ` - pinned ${new Date(p.pinned_at * 1000).toLocaleDateString()}` : '';
+          return `<div style="padding:8px 0;border-top:1px solid rgba(120,140,160,.25)">`
+            + `<div style="font-size:12px">${esc(name)}</div>`
+            + `<div class="form-hint" style="word-break:break-all">SHA-256 ${esc(p.fingerprint)}</div>`
+            + `<div class="form-hint">${esc(validity)}${esc(pinned)}</div>`
+            + `<button class="btn btn-ghost btn-sm" data-forget="${esc(p.fingerprint)}">FORGET</button>`
+            + '</div>';
+        }).join('');
+        box.querySelectorAll('[data-forget]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const fp = btn.getAttribute('data-forget') || '';
+            try {
+              const res = await api.tlsForget(fp);
+              if (res && res.ok) {
+                store.emit('toast', { message: 'Certificate forgotten - pin it again to restore trust', type: 'info' });
+                renderPins();
+                tlsStatus(tlsSel.value, (document.getElementById('sbTlsCa')?.value || '').trim());
+              } else {
+                store.emit('toast', { message: (res && res.error) || 'Not forgotten', type: 'error' });
+              }
+            } catch (e) {
+              store.emit('toast', { message: `Not forgotten: ${e.message}`, type: 'error' });
+            }
+          });
+        });
+      } catch (e) {
+        if (count) count.textContent = '';
+        box.textContent = `Could not list pinned certificates: ${e.message}`;
+      }
+    };
     const tlsLoad = () => {
       api.getConfig()
         .then((cfg) => {
@@ -2185,6 +2240,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           const ca = document.getElementById('sbTlsCa');
           if (ca && typeof tls.ca_bundle === 'string') ca.value = tls.ca_bundle;
           tlsStatus(mode, tls.ca_bundle || '');
+          renderPins();
         })
         .catch(() => { if (tlsSel) tlsStatus(tlsSel.value, ''); });
     };
@@ -2245,6 +2301,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
               type: 'success',
             });
             tlsStatus(tlsSel.value, (document.getElementById('sbTlsCa')?.value || '').trim());
+            renderPins();
           }
         } catch (e) { certLine({ ok: false, error: e.message }); }
       });
