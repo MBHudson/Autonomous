@@ -40,13 +40,22 @@ no cached asset changed, so it cannot report one.
 3. **Add a [CHANGELOG](CHANGELOG.md) entry.** Say which numbers moved, and say
    *"no cache-buster bump"* plainly when you left it alone — that is information,
    not an omission.
-4. **Update [RELEASE-NOTES.md](RELEASE-NOTES.md)** if what shipped changed:
+4. **Put the feature where it will still be found.** [README](README.md)'s
+   **What's new** holds only the current release, so a capability a release adds
+   also needs a row in the ✨ **What's inside** table — one capability per row,
+   with its emoji, in the words an operator would use — and, whenever it changes
+   what a model or a stranger is allowed to do, a line under the 🔐 **Security**
+   section's matching numbered rule. A fix with nothing new to name needs
+   neither. When the next release lands, fold the previous entry into those two
+   lists: once it leaves the top of the page, the table is the only place the
+   feature is described.
+5. **Update [RELEASE-NOTES.md](RELEASE-NOTES.md)** if what shipped changed:
    tag, title and body are what the release page will say. A release whose notes
    still describe the previous build reads as an accident.
-5. **Run both suites:** `php tests/php/run.php` and `node tests/run.mjs`.
+6. **Run both suites:** `php tests/php/run.php` and `node tests/js/run.mjs`.
    `tests/php/update.test.php` fails when `VERSION` is behind `APP_VERSION`,
    which is the mistake this checklist exists to prevent.
-6. **Push.** Running copies get a notification in the bell on their next page
+7. **Push.** Running copies get a notification in the bell on their next page
    load; the check is cached server-side for one hour, and nothing installs
    itself — **Config → Updates → DOWNLOAD UPDATE…** is still a manual,
    compare-first step.
