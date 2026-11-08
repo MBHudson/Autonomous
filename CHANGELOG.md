@@ -1,5 +1,5 @@
 <!--
- ## 💡 The Proxy tab says what it skips *(`VERSION` 410, cache-buster v409 → v410)**
+ ## 💡 The Proxy tab says what it skips *(`VERSION` 410, cache-buster v409 → v410)*
 
 *The Proxy tab could only say "active: 1.2.3.4:8080". Since v408 the relay calls local endpoints directly, so that line was true for the internet and false for the runner the operator was actually watching -- the one case where "is it proxied?" decides whether a model answers.
 
