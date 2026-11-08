@@ -18,6 +18,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔁 The button comes back with the warning *(`VERSION` 404, cache-buster v403 → v404)*
+
+*2026-11-08. Clearing a stale warning only helps after the tools work. Before that, a reload replayed the sentence as an ordinary agent bubble -- and the `BIND FILE TOOLS` control that the live warning carries does not exist in stored text, so the transcript told the operator to press a button that was not on the screen.*
+
+**Replay re-offers it.** `loadConversation()` checks every stored message with `isFileToolWarning()` and calls `_offerRebind()` on the ones that match. `_offerRebind()` now refuses to append anything when this tab's tools are already bound, so the offer appears only where a click can change something -- an empty server jail still gets the plain sentence, as it does live.
+
+**The stored message, not the rendered copy.** `loadConversation()` renders `{ role, content, agentId, reasoning, toolCalls, timestamp }` into a fresh object, so passing that to the button would have rewritten a detached copy: the bubble would say the tools were bound while the saved conversation kept the warning. The button is handed the message from `conv.messages` instead, which is the object `_clearFileToolWarnings()` later filters.
+
+**Tests.** `tests/js/staleFileToolWarning.test.mjs` gains the reload path: a warning serialised and parsed again still reads as one and is still removable.
+
 ## 🧹 A fixed warning leaves the transcript *(`VERSION` 403, cache-buster v402 → v403)*
 
 *2026-11-08. The file-tool warning is added to the conversation before a turn, so a model that could not write cannot report the file as written. Nothing removed it. Once the tools were fixed, every stored session still said the writes were not landing -- false, and in the direction that makes an operator distrust work that did happen.*

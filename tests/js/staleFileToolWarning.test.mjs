@@ -73,6 +73,14 @@ ok(withoutFileToolWarnings('nonsense').messages.length === 0, 'a non-array is tr
 // --- the original list is untouched -----------------------------------------
 ok(messages.length === 5, 'the caller keeps its own array');
 
+// --- the reload path ---------------------------------------------------------
+// loadConversation() hands the button the message it read back from storage, so
+// the note has to still be recognisable after that round trip.
+const stored = JSON.parse(JSON.stringify(note(`${FILE_TOOL_WARNING_PREFIX} — this page never bound write_file.`)));
+ok(isFileToolWarning(stored), 'a warning still reads as one after a storage round-trip');
+ok(withoutFileToolWarnings([stored, { role: 'user', content: 'hi' }]).removed === 1,
+  'and is still removable after the reload');
+
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 for (const e of errors) console.log('  ' + e);

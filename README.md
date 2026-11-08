@@ -37,18 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v403 — a fixed warning leaves the transcript 🧹
+### 🆕 v404 — the button comes back with the warning 🔁
 
-*The warning is written before a turn so a model cannot claim a write that never happened. Nothing ever took it back out: after the repair, every saved session still said the writes were not landing — no longer true, and wrong in the opposite direction.*
+*Clearing stale warnings fixed the transcript after a repair, not before it. On reload a stored warning returned as plain text, so the one control that could fix the page was missing exactly when it was needed.*
 
 | | |
 |---|---|
-| 🧹 **Removed when it stops being true** | Once both halves check out, the notes are stripped from the open transcript and from every saved conversation |
-| 🔎 **Old notes included** | Recognised by the sentence they begin with, because the warnings already stored carry no flag |
-| 🛡️ **A quote is not a warning** | Only an agent note with no author counts, so a model repeating the sentence keeps its reply |
-| 🧯 **Still true stays** | Bound with an empty jail keeps the warning, and an unverifiable status deletes nothing |
-| ⚡ **Wherever the fix happens** | Config, the agent editor and the chat bubble all announce the bind, and the chat re-checks both halves before removing anything |
-| ✅ **Guarded** | `staleFileToolWarning.test.mjs` covers old notes with no flag, a quoted sentence, the corrected bubble, and the clean-conversation no-op |
+| 🔁 **Re-offered on load** | Every message replayed from a stored session is checked, and a warning gets its `BIND FILE TOOLS` button back |
+| 🎯 **Only where it is true** | Offered only while this tab's tools are still unbound — a bound page with an empty jail gets no button it cannot make work |
+| 📝 **The record, not a copy** | The stored message is handed to the button, so a confirmed rebind rewrites the saved bubble instead of a throwaway copy |
+| ✅ **Guarded** | `staleFileToolWarning.test.mjs` now checks that a warning survives the storage round-trip it takes on reload |
 
 ---
 

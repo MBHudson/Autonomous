@@ -6,20 +6,20 @@
  * BryceFromIndiana@gmail.com
  */
 
-import { store } from './store.js?v=403';
-import { persistence } from './persistence.js?v=403';
-import { esc, escAttr, agentCode } from './utils.js?v=403';
-import { api } from './api.js?v=403';
-import * as memory from './memory.js?v=403';
+import { store } from './store.js?v=404';
+import { persistence } from './persistence.js?v=404';
+import { esc, escAttr, agentCode } from './utils.js?v=404';
+import { api } from './api.js?v=404';
+import * as memory from './memory.js?v=404';
 import {
   profiles, newProfileId, alwaysAppendFor,
   settingFor, isLocked, lockSetting, unlockSetting, setSetting, sandboxRootFor,
-} from './agentConfig.js?v=403';
+} from './agentConfig.js?v=404';
 import {
   customToolDefs, defaultTools, loadCustomTools, validateCustomTool,
-} from './tools.js?v=403';
-import { SandboxFiles } from './sandboxFiles.js?v=403';
-import { TOOL_PROTOCOLS, HARNESS_CHOICES, toolProtocolFor, protocolLabel, protocolHint, harnessFor, harnessOverride } from './toolProtocol.js?v=403';
+} from './tools.js?v=404';
+import { SandboxFiles } from './sandboxFiles.js?v=404';
+import { TOOL_PROTOCOLS, HARNESS_CHOICES, toolProtocolFor, protocolLabel, protocolHint, harnessFor, harnessOverride } from './toolProtocol.js?v=404';
 
 const ZOOM_KEY = 'als.brainLab.zoom.v1';
 const ZOOM_STEPS = [130, 160, 190, 225, 270, 320];
