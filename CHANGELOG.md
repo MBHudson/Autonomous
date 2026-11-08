@@ -27,6 +27,8 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 `tests/php/harness.test.php` and `tests/js/harness.test.mjs` cover the envelope: the message block, a joined block array, a reasoning block kept out of the content, the `stats` counts, and an empty or absent `output` list returning nothing. Both suites green: `node tests/js/run.mjs` and `php tests/php/run.php`.
 
+**Docs.** README: the **What's new** entry for v374; the *Auto-fitting harness* row now credits reading the reply back; a new bullet under **The provider harness** puts reply parsing in the harness beside the per-family quirks; and **Troubleshooting** gains *A reply arrives as raw JSON* — what the body means, that the envelope is read from v374, and that the browser bundle has to reload because the parsers ship in `ui/js/harness.js`. The v369–v373 work got its **What's inside** rows in the same pass: *Verified calls* rewritten to name Auto / Always / Never and `tls.ca_bundle`, new *Pinned certificates* and *Expiry warnings* rows, and the limiter row recording that a cancelled or early call returns its slot. The **Security** section already carried the certificate and pin bullets, which were checked against that text rather than assumed.
+
 ---
 
 ## ⚠️ A pinned certificate warns before it lapses *(`VERSION` 373, cache-buster v372 → v373)*
