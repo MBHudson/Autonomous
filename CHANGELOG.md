@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🐧 The Linux runner's three refusals *(`VERSION` 428, no browser file changed)*
+
+*The first CI run failed in three files, and not one of them was a broken feature: the suite had never run on a host that is not this one.*
+
+**`setup-token.sh` shipped without its executable bit.** `100644` is invisible on Windows and fatal on Linux: `./setup-token.sh --show` exits 126 before the script runs a line, which is why three assertions about a locked-out operator failed on the runner. The mode is `100755` now, which is how the docs already tell people to call it.
+
+**The secrets test was failing on its own escaping.** `json_encode` writes `https:\/\/mcp.example\/v1`, so a raw `strpos($body, 'https://...')` could never match -- a test failing on its own encoding rather than on anything the route did. It decodes the response and compares the server's `url` now. Reproduced locally with a curl-enabled PHP, which is the only way that route half runs at all.
+
+**The programs harness stopped pretending.** Its launch and pid-lookup sections detach a copy of `sleep` and find it again through the host's process table; that path is built for this machine, so on other platforms the sections now print a skip instead of asserting a lookup they cannot diagnose. The twin-copy section also chmods the copy before opening it, which is the part that was genuinely broken: a copied binary inherits bytes, not permissions, so on POSIX it is `0644` and `open()` refuses it as "not executable on this host".
+
 ## 🧪 The suites run on every push *(`VERSION` 427, no browser file changed)*
 
 *The tests were something someone remembered to run, so a branch could sit green in a local folder and break the moment it left it.*

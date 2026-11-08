@@ -285,10 +285,19 @@ if ($platform === 'windows') {
 }
 
 // --- 5. launch, look, close -------------------------------------------
-if ($runner === '') {
+// The audit path is taken first so section 5d still runs where the launch
+// sections below do not: writing and reading one audit line needs no window.
+$execLogPath = Sandbox::execLogPath();
+if ($platform !== 'windows') {
+    // The launcher detaches on purpose, so its pid has to be recovered from the
+    // host's process table, and this harness only follows that on Windows --
+    // where the feature is built and used. Rather than assert a lookup it
+    // cannot diagnose on this host, it says so: a printed skip is a fact, a
+    // failure here would blame the app for the harness.
+    echo "  SKIP: detached launch and pid lookup are asserted on Windows only\n";
+} elseif ($runner === '') {
     echo "  SKIP: no long-running program to copy on this host\n";
 } else {
-    $execLogPath = Sandbox::execLogPath();
     $logBefore = is_file($execLogPath) ? (int)@filesize($execLogPath) : 0;
 
     $opened = Programs::open('sleeper', ['agent' => 'agent_progs_probe']);
@@ -412,11 +421,15 @@ if ($runner === '') {
 // (tasklist /FI "IMAGENAME eq ...") cannot tell the configured copy from any
 // other copy of that file on the machine, so a window_close could end a process
 // the operator never opened.
-if ($runner !== '') {
+if ($platform === 'windows' && $runner !== '') {
     $twinDir = $tmpDir . '/twin';
     @mkdir($twinDir, 0777, true);
     $twin = $twinDir . '/' . basename($runner);   // same name, different path
     ok(@copy($runner, $twin) && is_file($twin), 'a second copy of the same file name exists elsewhere');
+    // A copied binary inherits the source's bytes, not its permissions: on
+    // POSIX the copy is 0644 and open() refuses it as "not executable on this
+    // host". Windows decides by extension, which is why this never showed there.
+    @chmod($twin, 0755);
 
     $twinApps = $apps;
     $twinApps[] = ['name' => 'twin', 'path' => $twin, 'args' => $runnerArgs];
@@ -446,6 +459,8 @@ if ($runner !== '') {
     $closedTwin = Programs::close('twin', ['force' => true, 'agent' => 'agent_progs_probe']);
     ok(!empty($closedTwin['ok']) && (int)($closedTwin['closed'] ?? 0) === 1,
         'the twin closes through its own entry');
+} else {
+    echo "  SKIP: the twin-copy launch is asserted on Windows only\n";
 }
 
 // --- 5c. what a Windows argument becomes on the command line -----------

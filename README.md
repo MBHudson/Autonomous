@@ -38,15 +38,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v427 — the suites run on every push 🧪
+### 🆕 v428 — the Linux runner's three refusals 🐧
 
-*The tests were something someone remembered to run, so a broken branch could sit green in a local folder.*
+*The first CI run failed in three files, and none of them was a broken feature.*
 
 | | |
 |---|---|
-| 🧪 **Three steps, any one of which fails the job** | `node tests/run.mjs`, then the same suites in a fresh copy (`php tests/freshClone.php`), then the serving refusals with `./tools/check-guards.sh --serve` |
-| 🔌 **Extensions are asserted, not skipped** | the job fails when curl, mbstring, fileinfo, zip, json or openssl is missing, so a green build means the network paths really ran |
-| 🐧 **Skips stay visible** | Apache and IIS are not on the runner, so those files print why they skip — a skip is reported, never counted as a pass, and `permissions: contents: read` is the job's whole authority |
+| 🐧 **`setup-token.sh` was never executable** | it shipped `100644` — invisible on Windows, fatal on Linux, where `./setup-token.sh --show` exits 126 before reading a line |
+| 🔗 **A masked URL is still a URL** | `json_encode` escapes slashes, so the secrets test now parses the response instead of grepping for a spelling JSON never contains |
+| 🪟 **The launcher's pid lookup is Windows-only here** | the programs harness prints a skip instead of failing, and chmods the twin copy it opens |
 ---
 
 ## 🧭 Contents

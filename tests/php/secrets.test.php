@@ -334,7 +334,17 @@ if (!function_exists('proc_open')) {
             ok(strpos($body2, $bearer) === false && strpos($body2, $envValue) === false,
                 'GET /api/mcp/servers does not disclose a credential');
             ok(strpos($body2, Config::SECRET_MASK) !== false, 'GET /api/mcp/servers shows the mask instead');
-            ok(strpos($body2, 'https://mcp.example/v1') !== false, 'and still returns what the editor needs');
+            // Parsed, not grepped: json_encode escapes forward slashes, so the
+            // raw body spells this URL https:\/\/mcp.example\/v1 and a strpos
+            // for the plain form could never match -- a test failing on its own
+            // escaping rather than on anything the route did.
+            $parsed2 = json_decode($body2, true);
+            $remoteRow = null;
+            foreach ((array)($parsed2['servers'] ?? []) as $row) {
+                if (($row['id'] ?? '') === 'remote') { $remoteRow = $row; }
+            }
+            same($remoteRow['url'] ?? null, 'https://mcp.example/v1',
+                'and still returns what the editor needs');
         }
 
         [$code3, $body3] = http_json($base . '/api/mcp-server/config');
