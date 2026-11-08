@@ -19,6 +19,22 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 📎 The sandbox binds, or says so *(`VERSION` 393, cache-buster v392 → v393)*
+
+*2026-11-08. The file tools were never bound to the sandbox in that session, and nothing retried them. Binding ran once inside `safeInit`, whose whole job is to swallow the error, so a single failure left every file tool on its placeholder for the life of the page -- quietly.*
+
+**Why nothing noticed.** `bindSandboxTools(api)` was called exactly once, behind `try/catch` that logs to the console and shows a boot badge nobody was reading. Nothing asked afterwards whether the assignment had happened, and the placeholders were indistinguishable from real runners until a model called one.
+
+**Unbound is now a query.** `unboundTools()` in `ui/js/tools.js` reads the placeholder's message off each `run` function (`SANDBOX_UNBOUND_MARKER`) and returns the names still unbound. No hardcoded list, so a tool added later is covered, and a missing or non-function runner is not mistaken for a failure.
+
+**Bind, verify, retry.** `app.js` retries up to five times with backoff (400 / 800 / 1600 / 3200 ms), which covers a cold server or a script that landed late. If tools are still unbound it now says so where it cannot be missed: console, `bootErrors` (which the boot badge renders), and a toast -- with the names and the last thrown error, so "write_file does not work" becomes "write_file, edit_file, apply_patch are unbound after 5 attempts: <reason>".
+
+**Tests and docs.** New `tests/js/sandboxBinding.test.mjs` covers the marker, the real registry before binding, exact reporting against a fake registry, partial binding (the dangerous case: assign some, fail at one, leave the rest), a missing registry, a non-function runner, and that an unbound call now throws rather than returning a status. README: the **What's new** entry for v393 (replacing v392, which stays in this file).
+
+**Still open.** The retry cannot fix a cause that repeats -- if the server's sandbox route is unreachable, five attempts fail and the message says so. That message is the diagnostic, and it did not exist before this release.
+
+---
+
 ## 🚫 "Done" is not evidence *(`VERSION` 392, cache-buster v391 → v392)*
 
 *2026-11-08. A reply said `write_file` had created the file and the disk was untouched. The tool that was meant to do it had never been bound to the sandbox, and when it was called it answered "sandbox tools are not bound yet" as ordinary output -- so `runTool` marked the call ok and the model read that sentence as confirmation.*

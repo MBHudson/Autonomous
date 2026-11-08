@@ -10,17 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=392';
-import { K } from './storage.js?v=392';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=392';
-import { esc, downloadFile } from './utils.js?v=392';
-import { startStateSync } from './stateSync.js?v=392';
-import { api } from './api.js?v=392';
-import { themeManager } from './themes.js?v=392';
-import { Sidebar } from './components/sidebar.js?v=392';
-import { Chat } from './components/chat.js?v=392';
-import { TopologyGraph } from './components/topology.js?v=392';
-import { initTopoPanel } from './components/topoPanel.js?v=392';
+import { store, APP_VERSION } from './store.js?v=393';
+import { K } from './storage.js?v=393';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=393';
+import { esc, downloadFile } from './utils.js?v=393';
+import { startStateSync } from './stateSync.js?v=393';
+import { api } from './api.js?v=393';
+import { themeManager } from './themes.js?v=393';
+import { Sidebar } from './components/sidebar.js?v=393';
+import { Chat } from './components/chat.js?v=393';
+import { TopologyGraph } from './components/topology.js?v=393';
+import { initTopoPanel } from './components/topoPanel.js?v=393';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -29,34 +29,34 @@ import { initTopoPanel } from './components/topoPanel.js?v=392';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=392')
+  return import('./components/topology3d/index.js?v=393')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=392';
-import { AgentEditor } from './components/agentEditor.js?v=392';
-import { ProviderEditor } from './components/providerEditor.js?v=392';
-import { Microphone } from './components/microphone.js?v=392';
-import { ConfigPanel } from './components/configPanel.js?v=392';
-import { ExportPanel } from './components/export.js?v=392';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=392';
-import { TerminalPanel } from './components/terminalPanel.js?v=392';
-import { MetricsPanel } from './components/metricsPanel.js?v=392';
-import { TracePanel } from './components/tracePanel.js?v=392';
-import { AgentRecord } from './components/agentRecord.js?v=392';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=392';
-import { bindMemoryTools, bindSandboxTools, initCustomTools } from './tools.js?v=392';
-import { initApprovals } from './approvals.js?v=392';
-import * as memory from './memory.js?v=392';
-import { audio } from './audio.js?v=392';
-import { AlwaysOn } from './alwaysOn.js?v=392';
-import { ApiLab } from './apiLab.js?v=392';
-import { BrainLab } from './brainlab.js?v=392';
-import { BrowserView } from './components/browserView.js?v=392';
-import { initKeyboardAvoid } from './keyboard.js?v=392';
+import { RoutingChart } from './components/routingChart.js?v=393';
+import { AgentEditor } from './components/agentEditor.js?v=393';
+import { ProviderEditor } from './components/providerEditor.js?v=393';
+import { Microphone } from './components/microphone.js?v=393';
+import { ConfigPanel } from './components/configPanel.js?v=393';
+import { ExportPanel } from './components/export.js?v=393';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=393';
+import { TerminalPanel } from './components/terminalPanel.js?v=393';
+import { MetricsPanel } from './components/metricsPanel.js?v=393';
+import { TracePanel } from './components/tracePanel.js?v=393';
+import { AgentRecord } from './components/agentRecord.js?v=393';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=393';
+import { bindMemoryTools, bindSandboxTools, initCustomTools, unboundTools } from './tools.js?v=393';
+import { initApprovals } from './approvals.js?v=393';
+import * as memory from './memory.js?v=393';
+import { audio } from './audio.js?v=393';
+import { AlwaysOn } from './alwaysOn.js?v=393';
+import { ApiLab } from './apiLab.js?v=393';
+import { BrainLab } from './brainlab.js?v=393';
+import { BrowserView } from './components/browserView.js?v=393';
+import { initKeyboardAvoid } from './keyboard.js?v=393';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -166,7 +166,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Same for the server-backed tools (search, fetch, filesystem). Bound up
   // front so an agent never sees "not bound yet" for a tool you enabled.
-  safeInit('sandboxTools', () => bindSandboxTools(api));
+  //
+  // Bind, VERIFY, retry. A single attempt behind safeInit was silent by design:
+  // the tools kept their placeholder runners, runTool answered with one, and a
+  // model read it as success -- which is how a reply could claim a file it never
+  // wrote. A cold server or a slow first script is worth waiting for, so retry
+  // with backoff; if it still never binds, say which tools and where to look.
+  const bindSandbox = (attempt = 1) => {
+    let threw = null;
+    try { bindSandboxTools(api); } catch (err) { threw = err; }
+    const left = unboundTools();
+    if (!left.length) {
+      if (attempt > 1) console.info(`Sandbox tools bound on attempt ${attempt}.`);
+      return;
+    }
+    if (attempt < 5) {
+      setTimeout(() => bindSandbox(attempt + 1), 400 * Math.pow(2, attempt - 1));
+      return;
+    }
+    const why = `Sandbox tools still unbound after ${attempt} attempts: ${left.join(', ')}`
+      + (threw ? ` (last error: ${threw.message})` : '');
+    console.error(why);
+    bootErrors.push(`[sandboxTools] ${why}`);
+    showBootError();
+    try {
+      store.emit('toast', {
+        message: 'Sandbox file tools are unavailable — reload the page', type: 'error',
+      });
+    } catch { /* no toast listener yet */ }
+  };
+  bindSandbox();
 
   // Adopt this copy's saved agents/providers/settings from the server BEFORE
   // anything renders, so the sidebar, header and agent editor all read the

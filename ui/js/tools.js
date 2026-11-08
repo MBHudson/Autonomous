@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=392';
-import { asText, compactText } from './utils.js?v=392';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=392';
-import { settingFor } from './agentConfig.js?v=392';
-import { trace } from './trace.js?v=392';
+import { store } from './store.js?v=393';
+import { asText, compactText } from './utils.js?v=393';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=393';
+import { settingFor } from './agentConfig.js?v=393';
+import { trace } from './trace.js?v=393';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -525,6 +525,20 @@ export const BROWSER_TOOLS = ['browser_open', 'browser_click', 'browser_type', '
 
 const BUILTIN_TOOL_NAMES = new Set(Object.keys(TOOL_REGISTRY));
 
+/** The message every unbound placeholder runner throws, used to find them. */
+export const SANDBOX_UNBOUND_MARKER = 'sandbox file API is not bound';
+
+// ONLY the runners that are placeholders, captured before anything can bind
+// them. Identity against these decides "still unbound" for this app's registry,
+// so a reworded message cannot break detection -- and a tool that has a real
+// runner of its own (list_agents, todo_write, think) is never mistaken for one.
+const PLACEHOLDER_RUNS = new Map(
+  Object.entries(TOOL_REGISTRY)
+    .filter(([, def]) => def && typeof def.run === 'function'
+      && String(def.run).includes(SANDBOX_UNBOUND_MARKER))
+    .map(([name, def]) => [name, def.run]),
+);
+
 function normaliseCustomTool(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const name = String(raw.name || '').trim();
@@ -817,6 +831,36 @@ export function bindMemoryTools(api) {
  *
  * @param {object} api the ApiClient from api.js
  */
+/**
+ * Which tools are still on their placeholder runner.
+ *
+ * Binding is one big function that assigns a real `run` to each registry entry.
+ * If it never ran -- or threw partway -- the untouched entries keep the
+ * placeholder that throws SANDBOX_UNBOUND_MARKER, and there was no way to ask
+ * "did it work?". Reading the marker off the function source answers that
+ * without a hardcoded list, so a tool added tomorrow is covered too.
+ */
+export function unboundTools(registry = TOOL_REGISTRY, placeholders = PLACEHOLDER_RUNS) {
+  const out = [];
+  const isThisApp = registry === TOOL_REGISTRY;
+  for (const [name, def] of Object.entries(registry || {})) {
+    const run = def && typeof def.run === 'function' ? def.run : null;
+    if (!run) continue;
+    if (isThisApp) {
+      // Only the placeholders are candidates: an unchanged runner among THOSE
+      // means the binding never reached it. Everything else is already real.
+      const original = placeholders && typeof placeholders.get === 'function'
+        ? placeholders.get(name) : null;
+      if (original && run === original) out.push(name);
+      continue;
+    }
+    // A foreign registry (a test, or tools added at runtime) can only be judged
+    // by what its runners say.
+    if (String(run).includes(SANDBOX_UNBOUND_MARKER)) out.push(name);
+  }
+  return out;
+}
+
 export function bindSandboxTools(api) {
   const lines = rows => rows.map(r => (typeof r === 'string' ? r : r.join(' '))).join('\n');
   const scopeOf = ctx => (ctx && ctx.sandboxRoot) || undefined;

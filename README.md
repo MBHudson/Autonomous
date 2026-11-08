@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v392 — “done” is not evidence 🚫
+### 🆕 v393 — the sandbox binds, or says so 📎
 
-*A reply said `write_file` had created the file. The disk was untouched. The tool that was supposed to do it had never been bound to the sandbox, and when called it answered “sandbox tools are not bound yet” as ordinary output — so the app marked the call **ok** and the model read that sentence as confirmation.*
+*The file tools were never bound to the sandbox in that session, and nothing retried them. Binding ran once inside `safeInit`, whose whole job is to swallow the error, so one failure left every file tool on its placeholder for the life of the page — quietly.*
 
 | | |
 |---|---|
-| 🚫 **Unbound is now an error** | The placeholder runners throw instead of returning a sentence, so `runTool` records `ok: false` and the model is handed `error: …` it has to deal with |
-| 🔍 **A false claim is labelled** | A reply that names a tool in the past tense with no tool call in the turn is committed behind a plain warning: `⚠ No tool call ran this turn, so nothing was changed` |
-| 🧾 **The tool box tells the truth** | A refused or unbound call shows as a failure in the message's tool box, which the copy button and the transcript both read |
-| ✅ **Guarded** | `tests/js/finalMessage.test.mjs` pins the claim rule — including the sentence that started this — and the cases that must stay quiet |
+| 🔁 **Bind, verify, retry** | After binding, the app asks which tools are still on their placeholder and retries with backoff (400 ms, 800 ms, 1.6 s, 3.2 s) instead of assuming one call was enough |
+| 📋 **It names what is left** | Still unbound after five attempts? The tool names go to the console, the boot-error badge and a toast, with the last error attached |
+| 🔎 **Unbound is measurable** | `unboundTools()` finds a placeholder by its message, so the check needs no hardcoded list and covers tools added later |
+| ✅ **Guarded** | `tests/js/sandboxBinding.test.mjs` pins the detection, partial binding, and the failure an unbound call now raises |
 
 ---
 
