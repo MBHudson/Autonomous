@@ -1,5 +1,15 @@
 <!--
- ## 🧭 One proxy setting, on the server *(`VERSION` 409, cache-buster v408 → v409)*
+ ## 💡 The Proxy tab says what it skips *(`VERSION` 410, cache-buster v409 → v410)**
+
+*The Proxy tab could only say "active: 1.2.3.4:8080". Since v408 the relay calls local endpoints directly, so that line was true for the internet and false for the runner the operator was actually watching -- the one case where "is it proxied?" decides whether a model answers.
+
+**A note under the proxy list.** When a proxy is selected and any configured provider lives on this network, the tab names those hosts and says they are called directly. It reads the provider list the app already has, so it needs no new request.
+
+**The rules live in one place.** `ui/js/localEndpoints.js` mirrors `Tls::isLocalUrl` -- loopback, RFC1918, CGNAT, link-local, `.local`/`.lan`/`.internal` names, docker host aliases and bare hostnames. It is display only: the decision stays in the server, per call, and the file says so at the top so it is never mistaken for a gate.
+
+**What it prevents.** A proxied-looking tab invites exactly the wrong fix -- changing an endpoint that was never being proxied, or clearing a proxy that was never in the path. The note makes the real route visible, and stays silent when every provider is remote.
+
+## 🧭 One proxy setting, on the server *(`VERSION` 409, cache-buster v408 → v409)*
 
 *2026-11-08. The same install worked on the PC and failed on the phone. The endpoint and the server were identical; what differed was a proxy choice saved per device. Chat sent it with every call, and the relay let a supplied proxy win outright, so one browser could route around the server setting -- and, after v408, around the LAN bypass too, since the endpoint check ran after the spec was preferred.*
 

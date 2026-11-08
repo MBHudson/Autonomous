@@ -37,15 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v409 — one proxy setting, on the server 🧭
+### 🆕 v410 — the Proxy tab says what it skips 💡
 
-*The server makes the model call, so it is the only place a proxy can matter. The browser was sending one anyway, which let a stale choice on one device override the server on every call.*
+*A proxy is for leaving the network, so a runner on the LAN never goes through one. The tab listed the selection and nothing else, which read as "everything is proxied" while the local call went direct.*
 
 | | |
 |---|---|
-| 🧭 **The server decides** | Chat no longer sends the browser value; the Proxy tab already writes the server setting |
-| 📵 **No per-device vote** | A phone holding a dead proxy kept routing through it while the PC, whose value was cleared, went direct |
-| 🧹 **Clear still clears both** | As in v408, and nothing can re-introduce the value one device at a time |
+| 💡 **The bypass is visible** | With a proxy selected, the tab names the host it is not used for |
+| 🖥️ **What counts as local** | Loopback, 10.x, 172.16–31.x, 192.168.x, CGNAT, link-local, `.local`/`.lan` names and bare hostnames |
+| ☁️ **Cloud is still proxied** | A public endpoint is never labelled local, so a working proxy is not hidden |
+| ✅ **Guarded** | `localEndpoints.test.mjs` pins the rule the server applies |
 
 ---
 

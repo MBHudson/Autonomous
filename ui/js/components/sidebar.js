@@ -10,19 +10,20 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=409';
-import { K } from '../storage.js?v=409';
-import { persistence } from '../persistence.js?v=409';
-import { api } from '../api.js?v=409';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=409';
-import { errText } from '../api.js?v=409';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=409';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=409';
-import { snapshot } from '../rateGovernor.js?v=409';
-import { resetBrowserEnabled } from '../toolManifest.js?v=409';
-import { perf } from '../perf.js?v=409';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=409';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=409';
+import { store } from '../store.js?v=410';
+import { K } from '../storage.js?v=410';
+import { persistence } from '../persistence.js?v=410';
+import { api } from '../api.js?v=410';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=410';
+import { errText } from '../api.js?v=410';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=410';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=410';
+import { snapshot } from '../rateGovernor.js?v=410';
+import { resetBrowserEnabled } from '../toolManifest.js?v=410';
+import { perf } from '../perf.js?v=410';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=410';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=410';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=410';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -759,6 +760,7 @@ export class Sidebar {
         </label>
       </div>
       <div class="proxy-stats" id="proxyStats"></div>
+      <div class="proxy-stats" id="proxyBypass" hidden></div>
       <div class="proxy-list" id="proxyList">Loading…</div>
     `;
 
@@ -799,6 +801,7 @@ export class Sidebar {
 
   _renderProxyList() {
     const listEl = document.getElementById('proxyList');
+    this._renderProxyBypass();
     if (!this._proxies?.length) {
       listEl.innerHTML = '<div class="proxy-empty">No proxies found.</div>';
       return;
@@ -859,6 +862,30 @@ export class Sidebar {
     listEl.querySelectorAll('.proxy-remove').forEach(btn => {
       btn.addEventListener('click', (e) => this._removeProxy(e.currentTarget.dataset.proxy));
     });
+  }
+
+  /**
+   * Say what the selected proxy is NOT carrying.
+   *
+   * A proxy leaves this network; a runner inside it is not reachable through
+   * one, so the relay calls loopback, private and .local endpoints directly.
+   * Without this line the tab reads as "all traffic is proxied", which is the
+   * wrong thing to believe while a local model appears not to answer.
+   */
+  _renderProxyBypass() {
+    const el = document.getElementById('proxyBypass');
+    if (!el) return;
+    const active = store.get('settings.proxyActive') || '';
+    const local = active ? localEndpoints(store.get('providers') || []) : [];
+    if (!local.length) {
+      el.textContent = '';
+      el.hidden = true;
+      return;
+    }
+    const hosts = local.slice(0, 2).map(hostOf).join(', ');
+    const more = local.length > 2 ? ` and ${local.length - 2} more` : '';
+    el.textContent = `💡 Not used for ${hosts}${more} — endpoints on your own network are called directly.`;
+    el.hidden = false;
   }
 
   _renderProxyRow(p, activeId, favorites) {
