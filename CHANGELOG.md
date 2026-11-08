@@ -19,6 +19,20 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧾 Every extra model call has a reason beside it *(`VERSION` 390, cache-buster v389 → v390)*
+
+*2026-11-08. A turn that made four model calls for one question looked identical in the run trace to one that made two: the narration nudge, the dialect retry after a near-miss and the empty-reply retry each spend a full request and left nothing behind to say why.*
+
+**Three notes, one shape.** `trace('note', ...)` now records each in-turn re-ask as it happens: `nudge — narration` (a reply said it would use a tool), `nudge — dialect` (a tool-looking reply parsed to nothing, retried in the alternate format) and `nudge — empty reply` (the upstream returned nothing and was asked again). Each carries the agent, the model, the step and a `detail`.
+
+**The narration row carries the sentence.** The text the model wrote instead of a call goes into `detail`, cut at 120 characters -- the difference between "it described a tool" and "it ignored the tools entirely", which are the two cases the retry exists to separate. The dialect row names the format it switched to; the empty row keeps the upstream `finishReason` when there is one.
+
+**Readable in the Runs tab.** The table used `e.tool || e.kind` for everything that was not a model call; it now prefers `e.note`, and prints `detail` in the same sub-line it already used for errors. A turn therefore reads model, `nudge — narration  "I will use list_agents to see..."`, model -- the extra request with its cause attached.
+
+**Docs.** README: the **What's new** entry for v390 (replacing v389, which stays in this file) and the *Metrics & Run trace* section now says a note is an in-turn re-ask.
+
+---
+
 ## 🔧 "I'll call the tool" is not a call *(`VERSION` 389, cache-buster v388 → v389)*
 
 *2026-11-08. The commonest way a local model fails at tools is not syntax: it writes "I will use list_agents to see who is available" and stops. Nothing runs, that sentence becomes the answer, and the loop spends an extra model call nudging it to send the call it already described.*

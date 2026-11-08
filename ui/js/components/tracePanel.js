@@ -26,11 +26,11 @@
 // The two renderers are exported so the per-agent drawer on the map can show
 // the same rows filtered to one agent instead of re-implementing them.
 
-import { store } from '../store.js?v=389';
-import { esc } from '../utils.js?v=389';
-import { recent, clear, stats } from '../trace.js?v=389';
-import { api } from '../api.js?v=389';
-import * as comms from '../commsLog.js?v=389';
+import { store } from '../store.js?v=390';
+import { esc } from '../utils.js?v=390';
+import { recent, clear, stats } from '../trace.js?v=390';
+import { api } from '../api.js?v=390';
+import * as comms from '../commsLog.js?v=390';
 
 function fmtTime(t) {
   try { return new Date(t).toLocaleTimeString([], { hour12: false }); } catch { return ''; }
@@ -298,16 +298,21 @@ export class TracePanel {
 
   runsTable() {
     const rows = recent(300).map(e => {
+      // A note is a re-ask inside a turn (see the nudge rows in chat.js): its
+      // label names which one, so an extra model call has a reason printed
+      // directly above the call it caused.
       const what = e.kind === 'model'
         ? `${esc(e.model || 'model')}${e.approx ? ' (est)' : ''}`
-        : esc(e.tool || e.kind);
+        : esc(e.note || e.tool || e.kind);
       const cost = e.kind === 'model'
         ? `${fmtTokens((e.prompt || 0) + (e.completion || 0))} tok`
         : (e.ms != null ? `${e.ms}ms` : '');
       const ok = e.ok === false
         ? '<span class="trace-fail">fail</span>'
         : (e.ok === true ? 'ok' : '');
-      const err = e.error ? ` <span class="metrics-sub">${esc(String(e.error).slice(0, 80))}</span>` : '';
+      const err = e.error
+        ? ` <span class="metrics-sub">${esc(String(e.error).slice(0, 80))}</span>`
+        : (e.detail ? ` <span class="metrics-sub">${esc(String(e.detail).slice(0, 80))}</span>` : '');
       return `<tr>
         <td>${esc(fmtTime(e.t))}</td>
         <td>${esc(e.kind)}</td>

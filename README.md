@@ -37,17 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v389 — “I'll call the tool” is not a call 🔧
+### 🆕 v390 — every extra model call has a reason beside it 🧾
 
-*The commonest way a local model fails at tools is not syntax: it writes “I will use `list_agents` to see who is available” and stops. Nothing runs, that sentence becomes the answer, and the loop spends another model call nudging it to actually send the call.*
+*When a turn made four model calls for one question, the Runs tab showed four identical `model` rows. The narration nudge, the dialect retry after a near-miss and the empty-reply retry each spend a whole request, and each left nothing behind to say why.*
 
 | | |
 |---|---|
-| 🚫 **Named as a failure** | The tool block now says it outright: saying you will use a tool is not using it, there is no later step where the harness acts on an intention, and the turn ends with that sentence as the answer |
-| ✅ **Wrong and right, side by side** | `Wrong: “I will use list_agents…”` sits directly above the correct call in the model's own dialect, so the contrast is the example |
-| ⚠️ **Examples can execute** | It warns that prose is scanned for calls, so a shape a model is only describing can run for real — the instruction-side statement of the parsing rule in v388 |
-| 🧠 **`think` is called, not discussed** | A reasoning model tends to narrate its intention to think; the note says to send the call instead, and native-schema mode gets the same no-announcement rule |
-| ✅ **Guarded** | `tests/js/toolInstructions.test.mjs` pins all of it, per dialect |
+| 🧾 **Nudges are rows now** | `note` events named `nudge — narration`, `nudge — dialect` and `nudge — empty reply`, each stamped with the agent, the model and the step |
+| 💬 **With what caused it** | The narration row carries the sentence the model wrote instead of a call; the dialect row names the format it was retried in; the empty row keeps the upstream finish reason |
+| 🔗 **In sequence** | The note lands between the two `model` rows it explains, so a turn's cost reads end to end instead of being summed |
+| ✅ **No new machinery** | Same in-memory ring buffer, same Runs tab — the note is a label and a detail line on a row that already existed |
 
 ---
 
@@ -682,7 +681,7 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
 
 - **Agent cards** show a live line: `⚡ tokens/budget · N req · up 2h · 40/min` — with a tooltip of in/out tokens, billed calls, output cap, context window and last call. Set a **token budget** (Config → Limits) and it shows `used/limit (%)`.
 - **🔎 Run trace** (Config → TRACE) is one viewer with three tabs:
-  - **RUNS** — a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals.
+  - **RUNS** — a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals. A `note` row between two turns is an in-turn re-ask — **nudge — narration** (with the sentence the model wrote instead of a call), **nudge — dialect**, or **nudge — empty reply** — so an extra model call always has its cause printed beside it.
   - **COMMS** — the whole conversation, with the text: your **prompt**, the task a coordinator **delegated**, each agent-to-agent **ask** with the answer that came back, one-way orders and pings, and the **reply** you were sent — each with its duration and a failure marker. Kept in memory (600 hops, 8 000 characters each) for the page-load; none of it is written to `storage/`.
   - **EXEC** — `storage/exec.log` parsed into runs, newest first: time, agent, command, working directory, duration, exit code, and a **no end** marker for a run that started and never reported back. Read-only — the UI has no button that can clear evidence.
   - **SENT** — the exact body each agent posted, kept by the server in `storage/sent.json` (last 20): harness family, model, endpoint, message roles, and a **tools** badge naming the schemas that went out — or **no tools** when the request carried none. That distinction is the one a reply cannot make, and the full JSON is one click away under each row.

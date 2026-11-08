@@ -19,7 +19,7 @@
 // traces are for watching a run, not for keeping forever, and unbounded logs
 // are how a tab grows to hundreds of megabytes.
 
-import { store } from './store.js?v=389';
+import { store } from './store.js?v=390';
 
 const MAX_EVENTS = 500;
 
@@ -28,7 +28,13 @@ let seq = 0;
 
 /**
  * Record one event. `kind` is 'model' | 'tool' | 'error' | 'note'.
- * data: {agentId, agentName, model, tool, ms, ok, prompt, completion, approx, error}
+ * data: {agentId, agentName, model, tool, ms, ok, prompt, completion, approx, error,
+ *        note, detail, step}
+ *
+ * A 'note' is an in-turn re-ask -- the narration nudge, a dialect retry, an
+ * empty-reply retry -- and exists so an extra model call in the Runs tab has a
+ * reason printed next to it. `note` is the label, `detail` the sentence, dialect
+ * or finish reason that caused it.
  */
 export function trace(kind, data = {}) {
   const e = { id: ++seq, t: Date.now(), kind, ...data };
