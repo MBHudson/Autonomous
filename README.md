@@ -37,16 +37,17 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v388 — a model's musings aren't a to-do list 🧠
+### 🆕 v389 — “I'll call the tool” is not a call 🔧
 
-*Asking a local agent to list the agents ran `list_agents` three times, then an `echo` nobody asked for. Nothing was wrong with the roster: the model was explaining tool-call syntax inside its own thinking, and every example it wrote — `{"tool":"list_agents","arg":{}}` — was parsed as a real call and executed.*
+*The commonest way a local model fails at tools is not syntax: it writes “I will use `list_agents` to see who is available” and stops. Nothing runs, that sentence becomes the answer, and the loop spends another model call nudging it to actually send the call.*
 
 | | |
 |---|---|
-| 🔇 **Prose means no mining** | The reasoning channel is read for a call only when the reply itself says nothing. A model that thinks the call instead of sending it is still rescued; a model that explains the syntax no longer has its own examples run |
-| 🧾 **Examples stay examples** | The decision lives in `parseToolCalls`, so native calls, every prompt dialect, the near-miss repair and the rescue retry all obey it |
-| 💸 **The budget stops leaking** | Each phantom call spent a step and posted a result the operator never asked for; a turn that repeated itself now answers instead |
-| ✅ **Guarded** | `tests/js/toolCalls.test.mjs` covers prose stopping the fallback, the stray `\boxed{think}` answer, the empty reply that still gets the rescue, and a real call that ignores the channel |
+| 🚫 **Named as a failure** | The tool block now says it outright: saying you will use a tool is not using it, there is no later step where the harness acts on an intention, and the turn ends with that sentence as the answer |
+| ✅ **Wrong and right, side by side** | `Wrong: “I will use list_agents…”` sits directly above the correct call in the model's own dialect, so the contrast is the example |
+| ⚠️ **Examples can execute** | It warns that prose is scanned for calls, so a shape a model is only describing can run for real — the instruction-side statement of the parsing rule in v388 |
+| 🧠 **`think` is called, not discussed** | A reasoning model tends to narrate its intention to think; the note says to send the call instead, and native-schema mode gets the same no-announcement rule |
+| ✅ **Guarded** | `tests/js/toolInstructions.test.mjs` pins all of it, per dialect |
 
 ---
 
@@ -614,6 +615,7 @@ No two models are alike — and the **free** ones are the fussiest of all. 🔧 
 - 🛟 **One rescue retry** — if a reply *looks* like a tool call but parses to nothing, the loop re-teaches **once** with a different dialect instead of letting the near-miss become the answer.
 - 🩹 **Near misses are read, not dropped** — a guessed name (`list_agent` for `list_agents`, `Read-File`, `read_fil`, `functions.read_file`) is repaired to the tool it meant, and a guessed wrapper (`<|begin|> … <|end|>`, `<begin> … </begin>`, `<|tool|> … <|/tool|>`) parses exactly like `<|tool_call|>`. An invented name and a fence full of prose are still refused.
 - 🔇 **Thinking is not a to-do list** — a call is only read out of the model's reasoning channel when the reply itself says nothing. A model that thinks the call instead of sending it is still rescued; a model that explains the syntax (`{"tool":"list_agents"}`) no longer has its own examples executed, which used to run the same tool repeatedly.
+- 🗣️ **“I'll call the tool” isn't a call** — the instructions name that failure, show the wrong and right forms side by side in the model's own dialect, warn that an example written in prose can execute, and says to call `think` rather than write about using it.
 - 🧠 **Learns the winner** — once a call parses, the dialect that worked is remembered per `provider + model` and tried first next time.
 - 🛑 **Off in one click** — Config → Labs → *Dynamic tools* restores the classic behaviour exactly, if you ever want it.
 

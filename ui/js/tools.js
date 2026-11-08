@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=388';
-import { asText, compactText } from './utils.js?v=388';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=388';
-import { settingFor } from './agentConfig.js?v=388';
-import { trace } from './trace.js?v=388';
+import { store } from './store.js?v=389';
+import { asText, compactText } from './utils.js?v=389';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=389';
+import { settingFor } from './agentConfig.js?v=389';
+import { trace } from './trace.js?v=389';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1575,7 +1575,8 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   if (names.includes('think')) {
     notes.push(
       'think is a private scratchpad — it is echoed back to you and never shown to the user. Use it to '
-      + 'reason about the next step before a risky or irreversible action.'
+      + 'reason about the next step before a risky or irreversible action. Call it like any other tool, '
+      + 'with the thought as its argument; do not write about using it.'
     );
   }
   if (names.includes('mcp_call')) {
@@ -1636,6 +1637,8 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       '\n\nTOOL USE\n'
       + 'Tools are provided directly by the API. Call them through the native tool interface; '
       + 'do not print JSON, XML, <|tool_call|> tags, or a "tool" object in your reply.\n'
+      + 'Never announce a call or describe the arguments you are about to send — saying you will use '
+      + 'a tool runs nothing, so call it through the interface instead.\n'
       + 'You may call several independent tools in one turn. Read each result before deciding '
       + 'what to do next, and do not call a tool that is not in the provided list.\n'
       + 'When no tool is needed, answer the user in plain prose.\n'
@@ -1672,9 +1675,17 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     + '  (b) ' + rules + '\n\n'
     +     'A tool call on its own line is read even with prose around it, but the clean form above\n'
     +     'is far more reliable -- prefer it.\n'
+    + 'SAYING you will use a tool is not using it. "I will call list_agents", "let me check the\n'
+    + 'files first", "to use think I send {"tool":"think"}" -- none of these run anything, and\n'
+    + 'the turn ends with that sentence as your answer. There is no later step where the\n'
+    + 'harness acts on an intention: the call in (b) IS the action.\n'
     + 'A tool call is the ONE exception to any instruction to keep replies short, to reply\n'
-    + 'with only text, or to limit the number of words. When you want to act, the tool call\n'
-    + 'IS your reply — never announce that you will use a tool, emit the call itself.\n\n'
+    + 'with only text, or to limit the number of words: when you want to act, the tool call\n'
+    + 'IS your reply — never announce that you will use a tool, emit the call itself.\n'
+    + 'Wrong:  "I will use list_agents to see who is available."\n'
+    + 'Right:  ' + exampleTurn + '\n'
+    + 'Never print an example call you do not mean to run: prose in a reply is scanned for\n'
+    + 'calls, so a shape you are only describing can execute for real.\n\n'
     + 'Available tools:\n'
     + examples
     + (customHelp ? '\n\nCustom tools:\n' + customHelp : '')

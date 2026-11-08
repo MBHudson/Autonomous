@@ -19,6 +19,24 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🔧 "I'll call the tool" is not a call *(`VERSION` 389, cache-buster v388 → v389)*
+
+*2026-11-08. The commonest way a local model fails at tools is not syntax: it writes "I will use list_agents to see who is available" and stops. Nothing runs, that sentence becomes the answer, and the loop spends an extra model call nudging it to send the call it already described.*
+
+**The instruction now names it.** The TOOL USE block says outright that SAYING you will use a tool is not using it -- "I will call X", "let me check the files first", "to use think I send {"tool":"think"}" run nothing -- that there is no later step where the harness acts on an intention, and that the turn ends with that sentence as the answer.
+
+**A wrong/right pair, in the model's own dialect.** `Wrong: "I will use list_agents..."` sits directly above `Right:` the dialect-correct call, built from the same `exampleTurn` the block already uses, so json, plain, anthropic and native each show their own shape rather than a generic one. The native-schema path gained the same no-announcement sentence and still forbids printing JSON at all.
+
+**Examples can execute.** The block now warns that prose in a reply is scanned for calls, so a shape a model is only describing can run for real -- the instruction-side statement of the parser rule v388 introduced.
+
+**`think` is called, not discussed.** A reasoning model narrates its intention to think; the note now says to call it like any other tool, with the thought as its argument, rather than write about using it.
+
+**Tests and docs.** New `tests/js/toolInstructions.test.mjs` pins the rule for json, plain, anthropic, native and native-api, checks that each dialect's right-hand example is that dialect's own shape, that the example-executes warning is present, that no tools means no instructions, and that native-api is not taught a competing syntax. README: the **What's new** entry for v389 (replacing v388, which stays in this file) and a bullet in *Dynamic tools & the learned dialect*.
+
+**Unchanged.** The narration nudge in `chat.js` stays. Instructions make the failure rarer; they cannot make a model incapable of failing.
+
+---
+
 ## 🧠 A model's musings are not a to-do list *(`VERSION` 388, cache-buster v387 → v388)*
 
 *2026-11-08. A local agent asked to list the agents ran `list_agents` three times and then an `echo` nobody asked for. The roster was fine: the model was explaining tool-call syntax in its own thinking, and every example it wrote -- `{"tool":"list_agents","arg":{}}`, `{"tool":"echo",...}` -- was parsed as a real call and executed.*
