@@ -14,11 +14,11 @@
 // through the server-side relay (POST /api/llm).
 // ============================================
 
-import { store } from '../store.js?v=395';
-import { api } from '../api.js?v=395';
-import { esc } from '../utils.js?v=395';
-import { tokenizeCurl, parseCurl, bearerFromHeaders, resolveShellCurl } from '../curlParser.js?v=395';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=395';
+import { store } from '../store.js?v=396';
+import { api } from '../api.js?v=396';
+import { esc } from '../utils.js?v=396';
+import { tokenizeCurl, parseCurl, bearerFromHeaders, resolveShellCurl } from '../curlParser.js?v=396';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=396';
 
 export class TerminalPanel {
   constructor() {

@@ -107,6 +107,31 @@ export function claimsCompletedToolWork(text) {
   return /\b(completed|created|written|wrote|saved|succeeded|applied|done|finished)\b/i.test(s);
 }
 
+/**
+ * Why the file tools cannot work right now, in one sentence, or ''.
+ *
+ * Checked at the top of a turn so the warning lands BEFORE the reply: a model
+ * that could not write still reports the file as written, and the transcript
+ * then contradicts the disk. There are two independent halves -- the browser
+ * may never have bound the tools, and the server may have no allowed directory
+ * -- so both are named when both are true.
+ */
+export function fileToolWarning(unbound, status) {
+  const names = Array.isArray(unbound) ? unbound.filter(n => typeof n === 'string' && n) : [];
+  const jail = status && typeof status === 'object' ? status : null;
+  const parts = [];
+  if (names.length) {
+    const head = names.slice(0, 4).join(', ');
+    parts.push(`this page never bound ${head}${names.length > 4 ? ` and ${names.length - 4} more` : ''}`);
+  }
+  if (jail && jail.enabled === false) parts.push('the server has no allowed directory');
+  if (!parts.length) return '';
+  const fix = names.length
+    ? 'Reload the page; if it still says so, the sandbox route is not answering.'
+    : 'Set Working Project Directory in Config.';
+  return `⚠ File tools are unavailable — ${parts.join('; ')}. Anything an agent reports writing is not on disk. ${fix}`;
+}
+
 export function finishedWithoutAnswer(calls) {
   const list = Array.isArray(calls) ? calls.filter(Boolean) : [];
   if (!list.length) return 'The agent finished without writing a reply.';

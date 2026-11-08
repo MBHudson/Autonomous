@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🚩 A warning before the reply, not after *(`VERSION` 396, cache-buster v395 → v396)*
+
+*2026-11-08. A model with no working file tools still reports the file as written, and the warning that said otherwise arrived attached to that reply -- the one place it is already too late. The transcript had just claimed work the disk never saw.*
+
+**Checked at the top of the turn.** `sendMessage()` now adds the warning before any agent is called, so the claim and its contradiction are never separated by the reading order. The check is deliberately not awaited: it must never delay the turn.
+
+**Two halves, named separately.** `fileToolWarning()` in `ui/js/utils.js` takes the browser's unbound list and the server's `sandbox/status`: `this page never bound write_file, read_file` and `the server has no allowed directory` are different faults with different fixes, and both appear when both are true. A long list is summarised (`a, b, c, d and 2 more`) rather than printed whole.
+
+**Cheap enough to run every turn.** The binding is a local read; the jail is one status request, cached for 15 seconds, so a burst of messages does not poll and a Config change is picked up moments later. One line per distinct problem, so a session that is already warned does not repeat it, and the same sentence goes to the run trace.
+
+**Tests.** New `tests/js/fileToolWarning.test.mjs`: clean state says nothing, an unbound page is named with its consequence and fix, an empty jail points at Working Project Directory, both are combined into one warning, and malformed input is ignored rather than trusted.
+
 ## 🧩 The Config panel knows when the tools are bound *(`VERSION` 395, cache-buster v394 → v395)*
 
 *2026-11-08. A bind failure was visible in the console, the boot badge and a toast -- and nowhere the operator was already looking. The Config card said where the jail pointed and nothing about whether the file tools could reach it, so an unbound tool read as the model being wrong about the filesystem rather than the page being half-bound.*

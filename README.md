@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v395 — Config knows when the tools are bound 🧩
+### 🆕 v396 — the chat warns before the reply, not after 🚩
 
-*A bind failure lived in the console, the boot badge and a toast — and nowhere you were already looking. Config said where the jail pointed and nothing about whether the file tools could reach it, so an unbound tool read as the model being wrong about the disk.*
+*A model with no working file tools still reports the file as written. The warning used to arrive with the answer — the one place it is already too late, because the transcript has just claimed the work.*
 
 | | |
 |---|---|
-| 🧩 **Two lines, one card** | Under **Working Project Directory**: `File tools: bound`, or `NOT bound` naming every tool still on its placeholder |
-| 🔁 **It follows the retries** | The boot loop backs off to 3.2 s, so the line re-reads once a second through that window instead of showing a stale answer |
-| 🧾 **It carries the reason** | The last bind error sits in the line and its tooltip — the same sentence the console gets, where you were already looking |
-| ✅ **Guarded** | `tests/js/sandboxBinding.test.mjs` pins the report: the names, the failure reason, and clearing it after a later success |
+| 🚩 **Before the reply** | At the top of every turn the chat checks the file tools and says so in the transcript first, so the claim never stands alone |
+| 🧩 **Both halves named** | The page's binding and the server's jail are checked separately — `this page never bound write_file`, `the server has no allowed directory` — and both appear when both are true |
+| 🔁 **Cheap** | The binding is local; the jail status is one read, cached for 15 seconds, so a burst of turns does not poll |
+| ✅ **Guarded** | `tests/js/fileToolWarning.test.mjs` covers every shape: clean, unbound, empty jail, both, and a long list |
 
 ---
 

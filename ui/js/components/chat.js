@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=395';
-import { K as STORAGE_K } from '../storage.js?v=395';
+import { store } from '../store.js?v=396';
+import { K as STORAGE_K } from '../storage.js?v=396';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=395';
-import { persistence } from '../persistence.js?v=395';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork } from '../utils.js?v=395';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=395';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=395';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=395';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=395';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=395';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=395';
-import { usageFor } from '../rateGovernor.js?v=395';
-import { trace } from '../trace.js?v=395';
-import { latency } from '../latency.js?v=395';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=395';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=395';
-import { SlashCommands } from '../slashCommands.js?v=395';
-import { parseRoute, routingHelp } from '../routing.js?v=395';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=395';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=395';
-import { MessageRenderer, renderToolCalls } from './message.js?v=395';
-import { createAvatar } from './avatar.js?v=395';
-import * as comms from '../commsLog.js?v=395';
+import { api, errText } from '../api.js?v=396';
+import { persistence } from '../persistence.js?v=396';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning } from '../utils.js?v=396';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=396';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=396';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport } from '../tools.js?v=396';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=396';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=396';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=396';
+import { usageFor } from '../rateGovernor.js?v=396';
+import { trace } from '../trace.js?v=396';
+import { latency } from '../latency.js?v=396';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=396';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=396';
+import { SlashCommands } from '../slashCommands.js?v=396';
+import { parseRoute, routingHelp } from '../routing.js?v=396';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=396';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=396';
+import { MessageRenderer, renderToolCalls } from './message.js?v=396';
+import { createAvatar } from './avatar.js?v=396';
+import * as comms from '../commsLog.js?v=396';
 
 /**
  * How long an agent may keep working on a single task.
@@ -673,6 +673,11 @@ export class Chat {
       // null when the message was a plain broadcast.
       addressed: route.addressed };
     this._addMessage(userMsg);
+
+    // Say it BEFORE the reply. A model that could not write still reports the
+    // file as written, so a warning attached to its answer is the one place it
+    // arrives too late -- the transcript has already claimed the work.
+    this._warnFileTools();
 
     // Show typing
     const typingId = this._showTyping();
@@ -3044,6 +3049,44 @@ _makeLiveNode(agent) {
       this._busy.delete(agent.id);
       store.emit('agent:status', { agentId: agent.id, status: 'idle' });
     }
+  }
+
+  /**
+   * Put the state of the file tools in the transcript before any reply can
+   * claim work. Two independent halves: the browser may never have bound the
+   * tools (free to check), and the server may have no allowed directory (one
+   * status read, cached briefly so a burst of turns does not poll and a Config
+   * change is picked up soon after). Deliberately not awaited: the check must
+   * never delay the turn.
+   */
+  _warnFileTools() {
+    const fresh = this._jailStatusAt && (Date.now() - this._jailStatusAt) < 15000;
+    const local = sandboxBindingReport().unbound;
+    if (fresh) {
+      this._showFileToolWarning(this._jailStatus);
+      return;
+    }
+    if (!local.length) {
+      // Nothing local to report, but the jail is still unknown: ask once.
+    }
+    api.getSandboxStatus().then(status => {
+      this._jailStatus = status;
+      this._jailStatusAt = Date.now();
+      this._showFileToolWarning(status);
+    }, () => {
+      // An unreachable status route is not a reason to stay silent: the
+      // binding half is still checkable on its own.
+      this._showFileToolWarning(null);
+    });
+  }
+
+  /** One line per distinct problem, so a warned session does not repeat it. */
+  _showFileToolWarning(status) {
+    const text = fileToolWarning(sandboxBindingReport().unbound, status);
+    if (!text || text === this._lastFileToolWarning) return;
+    this._lastFileToolWarning = text;
+    this._addMessage({ role: 'agent', content: text, agentId: null, timestamp: Date.now() });
+    trace('note', 'file tools unavailable', { step: 'warn', detail: text });
   }
 
   _addMessage(msg) {

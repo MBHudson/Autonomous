@@ -24,10 +24,10 @@
 // Errors back off instead of spamming: a copy with no token (or no server)
 // would otherwise toast every few seconds forever.
 
-import { api } from './api.js?v=395';
-import { rerunApproved } from './tools.js?v=395';
-import { store } from './store.js?v=395';
-import { askServerApproval } from './approveDialog.js?v=395';
+import { api } from './api.js?v=396';
+import { rerunApproved } from './tools.js?v=396';
+import { store } from './store.js?v=396';
+import { askServerApproval } from './approveDialog.js?v=396';
 
 const POLL_MS = 6000;
 const MAX_BACKOFF_MS = 60000;
