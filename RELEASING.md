@@ -83,23 +83,26 @@ Helpers are consulted in order and the first answer wins, so putting a
 
 **Where the token lives.** `.gh-workflow-token` in the repository root: one
 classic personal access token (`ghp_...`, 40 characters, scopes `repo` and
-`workflow`), with no quotes and no second line. It is ignored through
-`.git/info/exclude`, which belongs to one clone -- a fresh clone does not have
-that line, so add the name to `.gitignore` before pushing a workflow file from
-one. Never commit it, and never paste it into a commit message, an issue or a
-chat.
+`workflow`), with no quotes and no second line. The name is in the tracked
+`.gitignore`, so every clone and every `freshClone.php` copy already refuses to
+stage it; this clone also lists it in `.git/info/exclude`, which covers the same
+name a second time and is worth knowing about when one of the two is edited.
+Never commit it, and never paste it into a commit message, an issue or a chat.
 
 **How this checkout is wired.** The repository-local config stops inheriting the
 system helpers and answers with that file instead:
 
 ```bash
-cd /path/to/repo
 git config --local credential.helper ""
 git config --local --add credential.helper '!f() {
   echo username=x-access-token
-  echo "password=$(tr -d "[:space:]" < "C:/Users/BinBash/Documents/Autonomous-master/.gh-workflow-token")"
+  echo "password=$(tr -d "[:space:]" < "$(git rev-parse --show-toplevel)/.gh-workflow-token")"
 }; f'
 ```
+
+The path is built from `git rev-parse --show-toplevel` rather than typed out: the
+helper runs from wherever git was invoked, and an absolute path to one machine's
+checkout is the kind of thing that works for its author and for nobody else.
 
 The `tr -d "[:space:]"` is load-bearing: a trailing newline or a CRLF paste ends
 up inside the Authorization header, and the push fails with a 403 that says

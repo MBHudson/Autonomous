@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v433 — the token name is ignored where it matters 🔐
+### 🆕 v434 — the push section works on someone else's machine 🔐
 
-*`.git/info/exclude` protects one clone. A fresh clone has never heard of `.gh-workflow-token`, so the first `git add -A` there would have committed a token that can write to this repo.*
+*The workflow-scope section shipped with this machine's absolute path in it, and with advice that v433 had already made stale.*
 
 | | |
 |---|---|
-| 🔐 **`.gitignore` carries the name now** | it is tracked, so every clone inherits the rule; the local exclude stays as the second line of defence |
-| 🧪 **Checked in a real clone, not by eye** | clone, create the file, `git status` stays empty and `git check-ignore -v` names the rule that caught it |
+| 🔐 **A path the helper can find anywhere** | it reads `$(git rev-parse --show-toplevel)/.gh-workflow-token`, so the snippet works from any clone instead of publishing one directory layout |
+| ✅ **The ignore advice matches the repo** | it says the tracked `.gitignore` already covers the name, and keeps `.git/info/exclude` named as the per-clone second line |
 ---
 
 ## 🧭 Contents

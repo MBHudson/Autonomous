@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔐 The push section works on someone else's machine *(`VERSION` 434, no browser file changed)*
+
+*`RELEASING.md` gained the workflow-scope section in v432, and two details in it were true only on the machine that wrote it.*
+
+**The credential helper read an absolute path.** `C:/Users/.../Autonomous-master/.gh-workflow-token` works here and is nonsense anywhere else -- and it put a reader's directory layout in the published doc. The snippet builds the path from `git rev-parse --show-toplevel` now, which is also the correct thing to do for a helper that runs from wherever git was invoked.
+
+**The ignore advice described the state before v433.** The section told the reader to add the name to `.gitignore`; the tracked `.gitignore` has carried it since, so the text says so and keeps `.git/info/exclude` named as the second, per-clone line rather than the only one.
+
 ## 🔐 The token name is ignored where it matters *(`VERSION` 433, no browser file changed)*
 
 *`.git/info/exclude` protects exactly one clone. A fresh clone has never heard of `.gh-workflow-token`, so its first `git add -A` would have committed a token that can write to this repository -- and pushed it.*
