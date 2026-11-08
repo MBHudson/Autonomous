@@ -10,9 +10,9 @@
 // PERSISTENCE.JS — localStorage abstraction layer
 // ============================================
 
-import { store } from './store.js?v=397';
-import { deepClone, makeAgentCode } from './utils.js?v=397';
-import { K, initStorage } from './storage.js?v=397';
+import { store } from './store.js?v=398';
+import { deepClone, makeAgentCode } from './utils.js?v=398';
+import { K, initStorage } from './storage.js?v=398';
 
 // Storage keys are namespaced per app directory so several copies served from
 // one host cannot overwrite each other's settings. See ui/js/storage.js.

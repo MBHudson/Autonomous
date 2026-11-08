@@ -37,16 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v397 — rebind the file tools without a reload 🔌
+### 🆕 v398 — the warning covers autonomous turns too 🚩
 
-*When the page missed its binding, the only cure was a reload — and if the cause was a route still starting, a reload could miss it again. The button runs one more attempt in the page you already have.*
+*The file-tool warning only ran on turns you typed. An always-on agent, or one you asked directly from its card, could claim a write with the chat still silent.*
 
 | | |
 |---|---|
-| 🔌 **A button where the problem is** | **BIND FILE TOOLS**, under Working Project Directory, runs one binding attempt and updates the line beside it |
-| 🧩 **The same attempt as boot** | `bindSandboxNow()` is what the five-step boot retry calls too, so "bound" has one definition and a click cannot disagree with the console |
-| 🧾 **Says what happened** | Bound: a toast and the line turns green. Still broken: the toast names the tools, and the line keeps the reason |
-| ✅ **Guarded** | `tests/js/sandboxBinding.test.mjs` covers the attempt's verdict and that a missing client cannot throw the handler |
+| 🚩 **Every entry point** | The composer, an always-on tick and a direct agent ask each run the check before the model speaks |
+| 🧩 **One check, one cache** | All three call the chat's `_warnFileTools()`, so the 15-second jail cache and the once-per-problem rule still hold |
+| 🧾 **Same sentence** | The warning, its fixes and its run-trace row are identical whichever path started the turn |
 
 ---
 

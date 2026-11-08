@@ -21,9 +21,9 @@
 // turn. There is no server-side runner: this stops when the tab closes, which
 // is why it is cheap to reason about.
 
-import { store } from './store.js?v=397';
-import { persistence } from './persistence.js?v=397';
-import { ALWAYS_ON_TOOLS } from './tools.js?v=397';
+import { store } from './store.js?v=398';
+import { persistence } from './persistence.js?v=398';
+import { ALWAYS_ON_TOOLS } from './tools.js?v=398';
 
 export class AlwaysOn {
   /**
@@ -301,6 +301,11 @@ export class AlwaysOn {
     // touching the user's turn or another agent's.
     const ac = new AbortController();
     this.aborters.set(agent.id, ac);
+
+    // An autonomous turn can claim a write exactly like a typed one, so the
+    // transcript gets the same file-tool warning before the model speaks. The
+    // chat owns the check and its cache; this is only a nudge to run it.
+    try { this.chat._warnFileTools?.(); } catch { /* warning is best-effort */ }
 
     // This run owns its node from dispatch, exactly like a typed turn.
     const live = this.chat._makeLiveNode?.(agent) || null;

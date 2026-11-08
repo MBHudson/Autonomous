@@ -18,6 +18,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🚩 The warning covers autonomous turns too *(`VERSION` 398, cache-buster v397 → v398)*
+
+*2026-11-08. The file-tool warning only ran on turns typed into the composer. An always-on agent, or one asked directly from its card, could report a file it never wrote with the chat still silent -- the same false claim, through a door the check did not cover.*
+
+**All three entry points.** `_warnFileTools()` is now called by `sendMessage()`, by `askAgentDirectly()` after its user-role message, and by the always-on scheduler in `_runFor()` before the live node is created. Each call site is a single line: the chat owns the logic.
+
+**One check, one cache.** Because every path goes through the same method, the 15-second jail cache still prevents polling and the once-per-distinct-problem rule still stops a warned session repeating itself. The wording, the fixes and the run-trace note are identical whichever path started the turn.
+
+**Scope note.** The topology's inline ASK box deliberately never touches the transcript, so it is not wired: there is no reply in the chat to contradict.
+
 ## 🔌 Rebind the file tools without a reload *(`VERSION` 397, cache-buster v396 → v397)*
 
 *2026-11-08. When the page missed its binding, the Config panel could say so but not fix it: the boot loop had already spent its five attempts, and a full reload was the only cure -- which, if the cause was a route still starting, could miss it again.*
