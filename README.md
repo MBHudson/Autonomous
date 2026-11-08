@@ -206,12 +206,14 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🧪 **API Lab** | Paste a curl → get it in 10 languages → actually send it server-side |
 | 🔀 **Routing chart** | Draw workflows: agents, loops, checkpoints, delays, parallel fan-out |
 | 🛠️ **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP |
-| ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling |
+| ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
 | 📊 **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
 | 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
 | 🧠 **Memory** | Private + collective long-term memory the agents actually use |
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
-| 🔒 **Verified calls** | Model and speech calls check the certificate; Auto exempts LAN and loopback so local runners keep working; pins are listed with fingerprints and expiry |
+| 🔒 **Verified calls** | Model and speech calls check the peer certificate *and* the hostname — **Auto** exempts LAN and loopback so local runners keep working, **Always** / **Never** are explicit choices saved as `tls.verify`, and `tls.ca_bundle` can point at a PEM you manage yourself |
+| 📌 **Pinned certificates** | Read the chain a host actually presents, see its SHA-256, and store it in `storage/tls/trusted.pem` — every pin is listed in Config → TLS / Certificates with fingerprint, expiry and pin date, and FORGET drops one |
+| ⚠️ **Expiry warnings** | A pin inside 30 days reads *EXPIRES IN n DAYS* in the list and raises a bell notification naming the host, so a renewed server certificate is re-pinned before it becomes an outage |
 | 🧭 **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
 | 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
