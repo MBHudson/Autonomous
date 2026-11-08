@@ -35,7 +35,7 @@
 
 ### 🆕 What's new
 
-**Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
+**Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
 ### 🆕 v374 — a runner's own reply shape stops arriving as JSON 🧩
 
@@ -46,96 +46,6 @@
 | 🧩 **The `output` envelope is read** | `message` / `output_text` / `text` blocks become the answer, a block whose content is itself an array of `{type:"text"}` parts is joined, `stats.input_tokens` and `stats.total_output_tokens` become the token counts, and `reasoning` / `thinking` blocks go to the thinking panel instead of the reply. Understood on the server, on the direct-call parser and on stream frames alike. |
 | 🛡️ **Thinking is not the answer** | A body carrying only a `reasoning` block reports no content rather than its private notes — the same rule every other shape already followed. |
 | 🫥 **An unknown body still shows** | The last-resort fallback that hands back a body it cannot read is deliberate, and stays: it is why this bug was visible at all, and nothing is silently swallowed. |
-
-### 🆕 v369–v373 — calls that check the certificate, a limiter that gives its slot back, and a harness you can pin 🔒
-
-*Every model and speech call used to accept any certificate it was handed. Now it verifies, the exceptions are visible, and a pinned certificate that is about to run out says so before it does.*
-
-| | |
-|---|---|
-| 🔒 **Certificates are checked** | Model, catalog and speech calls verify the peer — and the hostname with it. **Auto** (the default) verifies real providers and skips loopback, private ranges and single-word host names, so LM Studio, Ollama and a NAS keep working untouched; **Always verify** checks those too; **Never verify** exists for a network you trust and says so in the panel. Plain `http://` endpoints have no certificate at all and behave exactly as before. |
-| 📌 **Pinning, read then confirmed** | CHECK CERTIFICATE reads the chain a host actually presents and shows the subject, issuer, validity, chain length and SHA-256 — curl's own cert-info, so no openssl and no hand-made PEM. PIN stores it in `storage/tls/trusted.pem`, which is what verification then checks against. |
-| 📋 **A list, not a blind file** | Every pinned certificate is listed with its fingerprint, expiry and pin date, with FORGET to drop it. Removing the last one deletes the bundle instead of leaving an empty file curl would choke on. |
-| ⚠️ **Warned before it lapses** | Inside 30 days the row reads *EXPIRES IN n DAYS* and the notification bell names the host, so a server renewing its certificate does not turn into a silent outage. |
-| ⏱️ **A cancelled call frees its slot** | The limiter no longer benches a key when Stop cuts a wait short, a call that goes out early is rebooked at the moment it really started, and a learned 429 reaches callers already queued. |
-| 🧭 **Per-agent API shape** | Brain Lab → **API harness** pins OpenAI-compatible, Anthropic Messages, Google generateContent or Ollama for one agent, with a hint naming what detection would have used instead. |
-
-### 🆕 v368 — typing finds Store copies 🔧
-
-*`window_type` sees Windows 11's Notepad, waits for slow starters, and checks the focus before sending.*
-
-| | |
-|---|---|
-| 📦 **Store copies count** | A packaged program runs from a WindowsApps path nobody configured — the match now crosses that one alias boundary by file name, and only there. |
-| ⏳ **Waits, then tells the truth** | A just-opened program gets a few seconds to appear before `window_type` concludes nothing is running; the send verifies the window really came forward, so a stolen focus fails loudly. |
-
-### 🆕 v367 — watch it type ⌨️
-
-*`window_open` Notepad, `window_type` the words, watch them appear — with its own approval switch.*
-
-| | |
-|---|---|
-| ⌨️ **Live keystrokes** | `window_type` sends text into an open program's window: brought forward and typed in one motion, 2000 characters per call, special characters literal, newlines as ENTER. Typing into nothing throws instead of pretending. Windows only. |
-| 🙋 **Its own approval** | *Typing into programs* joins Opening and Closing in Config → Permissions (Ask by default), and the trace records that typing happened — never what was typed. |
-
-### 🆕 v366 — one name reaches the whole roster 📣
-
-*One call briefs every agent, and every quoted Config path matches the screen.*
-
-| | |
-|---|---|
-| 📣 ** `"ALL"` fans out** | `ask_agent` / `tell_agent` take `"ALL"` (also `everyone`/`everybody`, any case) as the agent name: ask each one in turn with replies labeled by agent, or post one instruction to every mailbox. An agent actually named "All" keeps its name; an empty roster says so plainly. |
-| 🧭 **Directions that exist** | Every pointer said *Config → Shell access → …*, but Shell access is a subsection inside the Permissions card. Agent replies, refusal messages and docs now quote *Config → Permissions → Shell access → …*. |
-
-### 🆕 v365 — the update prompt stops going quiet 🔔
-
-*Dismissing the offer no longer silences it for the whole release, and a fresh release is never more than an hour from being noticed.*
-
-| | |
-|---|---|
-| 🔔 **Every load, until installed** | The update prompt used to show once per version and then go quiet — CANCEL read as "never". Now it returns on each load while the release is pending. It still waits for a clear screen rather than covering a dialog or a streaming reply. |
-| ⏱️ **Noticed within the hour** | The cached "up to date" answer lived for six hours, so a copy that checked just before a push stayed blind all day. It now lives for one: reloads usually still cost no network, and a fresh release is announced within the hour. |
-
-### 🆕 v364 — a scroll button and a rail of your prompts ⬇️
-
-*The transcript stops being a one-way ride: scroll-to-latest follows until you scroll up, and every prompt gets a tick to jump back to.*
-
-| | |
-|---|---|
-| ⬇️ **Scroll to latest, on your terms** | With **Auto Scroll** off, scrolling up reveals a `∨` button bottom-center of the chat box — parked above the composer no matter how tall it grows. Clicking it jumps to the latest message and follows new output **until you scroll up again**. Scrolling up with Auto Scroll *on* now pauses the follow instead of letting the next message yank the transcript out from under you; returning to the bottom, pressing the button, or flipping the toggle resumes it. |
-| 💬 **A rail of your prompts** | One short tick per prompt down the right edge of the chat box, newest at the bottom. Hovering names the prompt, clicking jumps straight to it and flashes the landing. Rebuilds on send and session open, clears with the screen. |
-
-### 🆕 v363 — agent tool calls and shell execution that hold up 🛠️
-
-*Timeouts that 500'd on Windows, the argv shapes models actually emit, approvals that resume the agent, and background commands for servers and watchers.*
-
-| | |
-|---|---|
-| ⏱️ **Timeouts stop killing the turn** | The kill used a bare `SIGKILL`, which does not exist without pcntl — never on Windows — and turned every timed-out command into an HTTP 500. The signal now falls back, dead processes are terminated before the handle closes, and timeouts clamp below the PHP time limit so the child is never orphaned. `exec` and `run_code` take `"timeout"` (and `"max_bytes"`) instead of dying at 60/30 seconds with no say. |
-| ⌨️ **It runs what models type** | A one-element `["ls -la"]` splits server-side (words and quotes only — still no shell), numbers in argv coerce, near-miss field names (`parameters`, `input`) map to the arg, and prompt dialects run several sequential calls per reply instead of dropping all but the first. |
-| ✅ **Approvals resume the agent** | Approving a parked command in the dialog re-runs it at once and hands the result back — mid-turn it joins the live conversation, between turns it lands in the session for the next turn. |
-| 🚀 **Background commands** | `exec_start` runs a server, watcher or anything that never exits and returns a handle at once (same policy gate as `exec`); `exec_poll` reads its output and says if it is alive, `exec_kill` stops it. |
-| 🪟 **Windows + hardening** | `run_code` python falls back to `python.exe`, `.cmd`/`.bat` shims run through `cmd /c` with literal argv, inline-code flags are refused for known interpreters even when merely allowlisted, and the path guard covers unlisted commands too. |
-
-### 🆕 v362 — backups in parts, restores that land anywhere 📦
-
-*Named files, per-section pickers, partial and older files that restore instead of refusing — and nothing in a backup can lock you out of the copy you restore onto.*
-
-| | |
-|---|---|
-| 🏷️ **A name and a checklist** | **Config → FULL BACKUP** opens a dialog: a file name plus one checkbox per section — agents, providers & keys, models, settings, memory, pipelines, conversations, metrics, sessions, access & shell config, approval grants. The **models catalog** is backed up for the first time. |
-| 📥 **Restore only what you pick** | **RESTORE BACKUP** shows the file's name, date, release and the sections it carries. Anything the file does not carry is **left alone, never blanked** — so a partial file, or a backup from any older version, restores instead of refusing. |
-| 🔑 **No token dance** | A restore keeps **this copy's own** access token, gate and roots — even when the file came from a copy with a different token — and says so out loud. |
-| 🧾 **A report, not a reload** | After restoring, the dialog lists exactly what landed, what was skipped and why, and offers **Reload now** — nothing reloads underneath the report. |
-
-### 📱 v361 — the keyboard stops eating what you type, and Allow finally sticks
-
-*Two small fixes reported from a phone.*
-
-| | |
-|---|---|
-| ⌨️ **The composer rides above the keys** | On mobile the on-screen keyboard opens *over* the page — and in fullscreen it always overlays. The app now watches `window.visualViewport` and shrinks `.app` to the visible strip while the keyboard is open, so the composer rides above it and the chat stays pinned to the newest message. URL-bar wiggles are ignored and the desktop is untouched. |
-| ✅ **Opening/Closing choices stick** | The Permissions section rendered six per-tool Allow/Ask/Deny dropdowns but the change handler only listened to four — `window_open` and `window_close` wrote nothing, so the next re-render flipped them back to Ask. Both keys are in the loop now, so **Allow** for Opening/Closing Programs finally stays. |
 
 ---
 
@@ -205,10 +115,12 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🧠 **Brain Lab** | Every per-agent setting, locks, memory, files and custom tools in one rail |
 | 🧪 **API Lab** | Paste a curl → get it in 10 languages → actually send it server-side |
 | 🔀 **Routing chart** | Draw workflows: agents, loops, checkpoints, delays, parallel fan-out |
-| 🛠️ **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP |
+| 🛠️ **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP — with timeouts that end the process instead of the turn, argv shapes models actually write, and approvals that resume the agent where it left off |
+| 🚀 **Background commands** | `exec_start` runs a server, watcher or anything that never exits and hands back a handle at once; `exec_poll` reads its output and says whether it is alive, `exec_kill` stops it |
 | ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
 | 📊 **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
 | 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
+| 📣 **One name, the whole roster** | `ask_agent` / `tell_agent` take `"ALL"` (or `everyone` / `everybody`, any case): ask each agent in turn with replies labelled by agent, or post one instruction to every mailbox — and an agent really called "All" keeps its name |
 | 🧠 **Memory** | Private + collective long-term memory the agents actually use |
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
 | 🔒 **Verified calls** | Model and speech calls check the peer certificate *and* the hostname — **Auto** exempts LAN and loopback so local runners keep working, **Always** / **Never** are explicit choices saved as `tls.verify`, and `tls.ca_bundle` can point at a PEM you manage yourself |
@@ -221,7 +133,9 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🖼️ **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
 | 🎙️ **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
 | ⌨️ **Slash commands** | `/CODE`, `/ROLE`, `/NAME`, `/ALL`, `/?` — address agents from the composer |
-| 💾 **Export / import** | Take a session out, or back up the whole state — or just the sections you pick, under a name you choose — and restore either onto any copy |
+| ⬇️ **Scroll to latest** | With Auto Scroll off, scrolling up reveals a `∨` button parked above the composer; clicking it jumps to the newest message and follows new output until you scroll up again, and scrolling up with Auto Scroll on pauses the follow instead of yanking the transcript |
+| 💬 **Prompt rail** | One short tick per prompt down the right edge of the chat box, newest at the bottom — hovering names it, clicking jumps straight there and flashes the landing |
+| 💾 **Export / import** | Take a session out, or back up the whole state under a name you choose with one checkbox per section — agents, providers & keys, models, settings, memory, pipelines, conversations, metrics, sessions, shell config, approvals — and restore any of it onto any copy. A section the file lacks is left alone rather than blanked, and a restore keeps this copy's own token |
 | 🧠 **Dynamic tools** | Teaches each model the environment it's really in — and learns the tool dialect that works |
 | 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
 | 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
@@ -234,11 +148,12 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🖥️ **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
 | 🎛️ **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
 | 🌐 **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes every agent's outbound traffic through it |
-| 🔄 **Self-updates, one click** | A load-time check that names what shipped, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
+| 🔄 **Self-updates, one click** | A load-time check that names what shipped, asked again within the hour and offered on every load until installed, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
 | 🖥️ **Agent-opened programs** | An agent may **name** a program on your list and it opens **detached**, so the window outlives the reply — closed gracefully, always by the binary and never by name, and audited as *started* |
+| ⌨️ **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
 | 🕵️ **Masked reads** | The config routes answer `********` instead of your access token, keys and friend tokens — and the write path restores the real value |
 | 🏠 **Local-only mode** | Until a token is set, only requests from this machine are answered — anything else gets **403** |
-| 📱 **Mobile-first** | Built for the phone in your pocket |
+| 📱 **Mobile-first** | Built for the phone in your pocket: the composer rides above the open keyboard, URL-bar wiggles are ignored, and an **Allow** choice finally sticks |
 
 ---
 
@@ -892,6 +807,7 @@ The app checks its own published release, shows you **exactly what would change*
 - **🧬 Nothing ships with a token.** A fresh copy **refuses to serve anything** until you run `./setup-token.sh` (or the one-click installer does it for you) — a fresh install answers `503 {"error":"no token configured"}`. You literally cannot forget to set one.
 - **📵 The token never roams.** It is a **device-local credential**, *stripped from every state bundle* before it is mirrored to the server or synced to another device. One browser's empty field can never wipe another device's working paste.
 - **🔁 Rotate on demand** — `./setup-token.sh --force` mints a new one; the old value dies instantly.
+- **🧷 A restore cannot hand the gate away.** RESTORE keeps **this copy's own** access token, gate and roots even when the file came from an installation with a different token — so restoring someone else's backup can neither lock you out of your copy nor open it with theirs.
 - **🔎 Lost it? `./setup-token.sh --show` prints the one in use** and says whether the gate is on or off. It
   needs python **or** php — whichever answers, php being the one a running copy cannot be without — and on
   Windows `start.bat -Token` prints the same token with no interpreter at all.
@@ -911,6 +827,7 @@ The app checks its own published release, shows you **exactly what would change*
 - **↩️ The undo path is on screen, not in the docs.** A refusal names the exact place to fix it — *"delete the `explorer` line under **Config → Permissions → Shell access → Allow / Deny** (section 4), add it to section 2"* — and says why an approval can't do it (the denylist is checked first). In that panel, **Restore built-in defaults** reloads the shipped list even after a custom one replaced it, so you can always see what you replaced. An empty box falls back to the built-in defaults on purpose: clearing it must not silently un-deny `rm` and `sudo`. For a genuinely empty denylist, set `"exec_deny": []` in `storage/config.json` — which is what the panel's hint tells you.
 - **🧨 Tripwires for metacharacters** — `|`, `&&`, `eval`, `xargs`, `env` and friends are refused, so a model can't smuggle a second command through a "harmless" one.
 - **🎚️ Per-interpreter levels** — Blocked / Scripts only / Full — so `run_code` can be dialled from "no" to "quiet scripts" to "go wild" independently of `exec`.
+- **🚀 Background commands pass the same bouncer.** `exec_start` goes through the allowlist, the denylist and the approval prompt exactly as `exec` does — a server or watcher is not a way around the gate — and `exec_kill` stops the handle it was given. Inline-code flags stay refused for known interpreters even when merely allowlisted, and the path guard covers unlisted commands too.
 
 ### 🧱 4. The jail — a fence with no back gate
 - **🔒 Every path is resolved server-side.** `../`, `..\\`, absolute paths and **symlinks** are all resolved and then checked — anything outside your declared **read/write roots** is refused with a message the model can read, not a mysterious crash.
