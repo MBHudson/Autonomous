@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v431 — the badge that answers before you clone 📛
+### 🆕 v432 — the push that only fails at the end 📛
 
-*It took three releases to get the Linux runner green. A badge would have said so in five seconds.*
+*A commit that touches `.github/workflows/` is refused by a credential without `workflow` scope, and the error blames the OAuth app while a good token sits unread in the repo.*
 
 | | |
 |---|---|
-| 📛 **`tests.yml` status, beside the other badges** | green means both suites passed on a machine that is not this one — the box the test files were written against, plus a fresh copy of the tree |
-| 🔗 **It links to the runs, not to a promise** | the badge is the workflow's own `badge.svg`, and clicking it opens the run list, so the last result is a click away instead of quoted in the text |
+| 📛 **`RELEASING.md` names the trap** | helpers are consulted in order and `gh`'s wins, so git never asks the token that could do it |
+| 🔐 **Where that token lives, and how to check it** | `.gh-workflow-token` at the repo root, one `ghp_` line with `repo` + `workflow`, excluded locally and never committed — verified with a command that prints no part of it |
 ---
 
 ## 🧭 Contents

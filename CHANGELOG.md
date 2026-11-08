@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 📛 The push that only fails at the end *(`VERSION` 432, no browser file changed)*
+
+*A commit that touches `.github/workflows/` is refused by a credential without `workflow` scope -- and the refusal arrives after the objects are sent, naming the OAuth app while a working token sits unread in the repository.*
+
+**`RELEASING.md` names the trap.** `gh auth login` mints a token with `gist`, `read:org` and `repo` only, and installs itself as a git credential helper; helpers answer in order and the first one wins, so no amount of adding a `workflow`-scoped token changes a plain `git push`. The section quotes the exact rejection, says which commits trigger it, and shows the repository-local config that makes this checkout answer with the token that can.
+
+**Where the token lives, and how to check it without printing it.** `.gh-workflow-token` at the repository root -- one `ghp_` line with `repo` and `workflow`, ignored through `.git/info/exclude` and never committed, with the reason the trailing newline matters and two commands that report only the username and length. Ordinary releases never touch any of it.
+
 ## 📛 The badge that answers before you clone *(`VERSION` 431, no browser file changed)*
 
 *It took three releases to get the Linux runner green. A badge would have said so in five seconds.*
