@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔧 The warning carries its own fix *(`VERSION` 399, cache-buster v398 → v399)*
+
+*2026-11-08. "Reload the page" asked the operator to throw away the turn they were in the middle of, and a warning that only describes a problem is a dead end. The bubble now holds the button that fixes the half it can.*
+
+**A button in the bubble.** `_showFileToolWarning()` appends **BIND FILE TOOLS** to the warning when the page is the problem, using the `.message-body` element `_addMessage()` now returns. One click runs `bindSandboxNow()`, the same attempt the boot retry and the Config button use.
+
+**It reports back in place.** Bound: the bubble becomes `✓ File tools are bound — agents can read and write now` and the button is gone; the dedupe key is cleared so a later failure warns again. Still broken: the button turns into **TRY AGAIN** and a toast names what is unbound.
+
+**No button for the other half.** An empty jail is a server setting, so a rebind cannot change it and no button is offered; the warning still points at Working Project Directory. Offering one there would promise what it cannot do.
+
+**Tests.** `tests/js/fileToolWarning.test.mjs` now asserts the fix names BIND FILE TOOLS and no longer says Reload the page.
+
 ## 🚩 The warning covers autonomous turns too *(`VERSION` 398, cache-buster v397 → v398)*
 
 *2026-11-08. The file-tool warning only ran on turns typed into the composer. An always-on agent, or one asked directly from its card, could report a file it never wrote with the chat still silent -- the same false claim, through a door the check did not cover.*

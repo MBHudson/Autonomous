@@ -37,7 +37,8 @@ const unbound = fileToolWarning(['write_file', 'read_file'], jailOn);
 ok(unbound.includes('never bound write_file'), 'an unbound tool is named');
 ok(unbound.includes('read_file'), 'and so is the rest of the list');
 ok(unbound.includes('not on disk'), 'the consequence is stated, not implied');
-ok(unbound.includes('Reload the page'), 'the fix is actionable');
+ok(unbound.includes('BIND FILE TOOLS'), 'the fix points at the button in the same bubble');
+ok(!unbound.includes('Reload the page'), 'and no longer sends the operator to a reload');
 ok(!unbound.includes('no allowed directory'), 'a live jail is not blamed');
 
 // A long list is summarised rather than printed whole.

@@ -37,15 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v398 — the warning covers autonomous turns too 🚩
+### 🆕 v399 — the warning carries its own fix 🔧
 
-*The file-tool warning only ran on turns you typed. An always-on agent, or one you asked directly from its card, could claim a write with the chat still silent.*
+*"Reload the page" asked the operator to throw away the turn they were in the middle of, and a warning that only describes a problem is a dead end. The bubble now holds the button that fixes the half it can.*
 
 | | |
 |---|---|
-| 🚩 **Every entry point** | The composer, an always-on tick and a direct agent ask each run the check before the model speaks |
-| 🧩 **One check, one cache** | All three call the chat's `_warnFileTools()`, so the 15-second jail cache and the once-per-problem rule still hold |
-| 🧾 **Same sentence** | The warning, its fixes and its run-trace row are identical whichever path started the turn |
+| 🔧 **The fix is in the warning** | **BIND FILE TOOLS** sits inside the warning bubble and runs one binding attempt in the page you already have |
+| 🎯 **Only when it can help** | An unbound page gets the button; an empty jail does not, because that is a server setting the button cannot change |
+| 🧾 **The bubble reports back** | Bound: it becomes `✓ File tools are bound`. Still broken: the button turns into **TRY AGAIN** and the toast names what is left |
+| 🧩 **Same function as Config and boot** | `bindSandboxNow()`, so a click here, a click in Config and the boot retry cannot disagree |
 
 ---
 

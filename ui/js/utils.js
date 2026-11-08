@@ -127,7 +127,7 @@ export function fileToolWarning(unbound, status) {
   if (jail && jail.enabled === false) parts.push('the server has no allowed directory');
   if (!parts.length) return '';
   const fix = names.length
-    ? 'Reload the page; if it still says so, the sandbox route is not answering.'
+    ? 'Press BIND FILE TOOLS to retry in this page; if it still fails, the sandbox route is not answering.'
     : 'Set Working Project Directory in Config.';
   return `⚠ File tools are unavailable — ${parts.join('; ')}. Anything an agent reports writing is not on disk. ${fix}`;
 }
