@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v394 — the file tools get their folder back 🧱
+### 🆕 v395 — Config knows when the tools are bound 🧩
 
-*The sandbox route answered HTTP 200 on an install where every file tool refused, insisting it "defaults to this app's own folder" — a default that was never applied. Saving the programs list had created a `sandbox` block, and the code read "block exists" as "the operator chose roots".*
+*A bind failure lived in the console, the boot badge and a toast — and nowhere you were already looking. Config said where the jail pointed and nothing about whether the file tools could reach it, so an unbound tool read as the model being wrong about the disk.*
 
 | | |
 |---|---|
-| 🧱 **The keys decide** | Only `read_roots` / `write_roots` count as configured; a block that exists for the programs list, a proxy or the token no longer suppresses the default |
-| 🏠 **The default runs** | With neither key written the jail is the app folder (`/var/www` when shell access is on), so a fresh install's file tools work instead of reporting themselves disabled |
-| 🚫 **Off still means off** | An explicit empty list stays empty — that is how the file tools are turned off, and it is reported as a choice, not as `defaulted` |
-| ✅ **Guarded** | `tests/php/sandbox.test.php` pins both shapes: a block without roots gets the app folder, an explicit `[]` gets nothing |
+| 🧩 **Two lines, one card** | Under **Working Project Directory**: `File tools: bound`, or `NOT bound` naming every tool still on its placeholder |
+| 🔁 **It follows the retries** | The boot loop backs off to 3.2 s, so the line re-reads once a second through that window instead of showing a stale answer |
+| 🧾 **It carries the reason** | The last bind error sits in the line and its tooltip — the same sentence the console gets, where you were already looking |
+| ✅ **Guarded** | `tests/js/sandboxBinding.test.mjs` pins the report: the names, the failure reason, and clearing it after a later success |
 
 ---
 

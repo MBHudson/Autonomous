@@ -15,7 +15,8 @@
 // unbound write_file then answered with a placeholder a model read as success.
 // These assertions cover the check the retry loop in app.js is built on.
 
-import { unboundTools, SANDBOX_UNBOUND_MARKER, TOOL_REGISTRY } from '../../ui/js/tools.js';
+import { unboundTools, SANDBOX_UNBOUND_MARKER, TOOL_REGISTRY,
+  sandboxBindingReport, setSandboxBindError } from '../../ui/js/tools.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -63,6 +64,20 @@ ok(left.length === 2 && left.includes('write_file') && left.includes('exec'),
 let message = '';
 try { TOOL_REGISTRY.write_file.run({ path: 'x', content: 'y' }, null, {}); } catch (err) { message = err.message; }
 ok(message.includes('not bound'), 'an unbound call fails loudly instead of returning a status');
+
+// --- the report the Config panel reads --------------------------------------
+// Config shows this beside the working directory, so an unbound tool is
+// visible where the operator already is, without a console or a model failing
+// first. Same detection as the retry loop, so the two cannot disagree.
+const fresh = sandboxBindingReport();
+ok(Array.isArray(fresh.unbound) && fresh.unbound.includes('write_file'),
+  'the report names the tools still unbound');
+ok(fresh.error === '', 'and starts with no error recorded');
+setSandboxBindError('Sandbox tools still unbound after 5 attempts: write_file');
+ok(sandboxBindingReport().error.includes('5 attempts'), 'a failed bind is reported with its reason');
+ok(sandboxBindingReport().unbound.includes('write_file'), 'the reason does not replace the names');
+setSandboxBindError('');
+ok(sandboxBindingReport().error === '', 'a later successful bind clears the reason');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

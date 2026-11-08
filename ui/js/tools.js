@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=394';
-import { asText, compactText } from './utils.js?v=394';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=394';
-import { settingFor } from './agentConfig.js?v=394';
-import { trace } from './trace.js?v=394';
+import { store } from './store.js?v=395';
+import { asText, compactText } from './utils.js?v=395';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=395';
+import { settingFor } from './agentConfig.js?v=395';
+import { trace } from './trace.js?v=395';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -859,6 +859,25 @@ export function unboundTools(registry = TOOL_REGISTRY, placeholders = PLACEHOLDE
     if (String(run).includes(SANDBOX_UNBOUND_MARKER)) out.push(name);
   }
   return out;
+}
+
+// --- what the Config panel shows ------------------------------------------
+// Why the last bind attempt failed, kept beside the detection so the panel can
+// ask one place instead of reaching into app.js for a boot variable.
+let sandboxBindError = '';
+
+export function setSandboxBindError(message) {
+  sandboxBindError = String(message || '');
+}
+
+/**
+ * The browser-side half of the sandbox, for Config: which tools are still on
+ * their placeholder, and the reason the last attempt gave. The panel already
+ * said where the jail points; a tool left unbound on the other side was
+ * invisible until a model called it.
+ */
+export function sandboxBindingReport() {
+  return { unbound: unboundTools(), error: sandboxBindError };
 }
 
 export function bindSandboxTools(api) {

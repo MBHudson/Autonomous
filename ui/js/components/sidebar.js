@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=394';
-import { K } from '../storage.js?v=394';
-import { persistence } from '../persistence.js?v=394';
-import { api } from '../api.js?v=394';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=394';
-import { errText } from '../api.js?v=394';
-import { TOOL_REGISTRY } from '../tools.js?v=394';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=394';
-import { snapshot } from '../rateGovernor.js?v=394';
-import { resetBrowserEnabled } from '../toolManifest.js?v=394';
-import { perf } from '../perf.js?v=394';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=394';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=394';
+import { store } from '../store.js?v=395';
+import { K } from '../storage.js?v=395';
+import { persistence } from '../persistence.js?v=395';
+import { api } from '../api.js?v=395';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=395';
+import { errText } from '../api.js?v=395';
+import { TOOL_REGISTRY, sandboxBindingReport } from '../tools.js?v=395';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=395';
+import { snapshot } from '../rateGovernor.js?v=395';
+import { resetBrowserEnabled } from '../toolManifest.js?v=395';
+import { perf } from '../perf.js?v=395';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=395';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=395';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1586,6 +1586,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <input type="text" class="form-input" id="sbProjectDir" placeholder="/var/www/site/myproject" autocomplete="off" spellcheck="false">
           <div class="form-hint">The one folder every agent works in. They may read and write inside it, and nothing outside it. Full path on the server (<code>/var/www/site</code> or <code>C:\site</code>). Empty turns the file tools off; web search is unaffected.</div>
           <div class="form-hint" id="sbProjectStatus"></div>
+          <div class="form-hint" id="sbBindStatus"></div>
         </div>
 
         <div class="cfg-sublabel">Always-On Agents <span class="form-hint-inline">work on their own</span></div>
@@ -1943,6 +1944,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     // Working project directory — fetch the current value so the field shows
     // what the server is actually using, not a stale local copy.
     this._loadProjectDir();
+    this._loadBindState();
 
     // MCP servers live server-side (config.json); render the cached list and
     // refresh from the server in the background.
@@ -3201,6 +3203,36 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     } catch (err) {
       if (status) status.textContent = `Could not read the current setting: ${err.message}`;
     }
+  }
+
+  /**
+   * Whether this tab's file tools actually got their runners.
+   *
+   * The line above says where the jail points; this one says whether the tools
+   * can reach it. A tool still on its placeholder was invisible until a model
+   * called it, so a failure here looked like the model being wrong about the
+   * filesystem rather than the page being half-bound. Re-checks while the boot
+   * retries are still backing off, so opening Config early is not a stale read.
+   */
+  _loadBindState(tries = 0) {
+    const el = document.getElementById('sbBindStatus');
+    if (!el) return; // Config tab is not open, or has been rebuilt
+    const report = sandboxBindingReport();
+    if (!report.unbound.length) {
+      el.textContent = 'File tools: bound — agents can read and write in this tab.';
+      el.style.color = '';
+      el.title = '';
+      return;
+    }
+    el.textContent = 'File tools: NOT bound — ' + report.unbound.join(', ')
+      + ' still run their placeholders, so calls to them change nothing. Reload the page'
+      + (report.error ? ` (${report.error})` : '')
+      + '.';
+    el.style.color = 'var(--danger, #ff6b6b)';
+    el.title = report.error || '';
+    // Four retries after the first attempt, the last 3.2 s out; one look a
+    // second covers the whole window without a permanent timer.
+    if (tries < 6) setTimeout(() => this._loadBindState(tries + 1), 1000);
   }
 
   /**

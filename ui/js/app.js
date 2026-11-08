@@ -10,17 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=394';
-import { K } from './storage.js?v=394';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=394';
-import { esc, downloadFile } from './utils.js?v=394';
-import { startStateSync } from './stateSync.js?v=394';
-import { api } from './api.js?v=394';
-import { themeManager } from './themes.js?v=394';
-import { Sidebar } from './components/sidebar.js?v=394';
-import { Chat } from './components/chat.js?v=394';
-import { TopologyGraph } from './components/topology.js?v=394';
-import { initTopoPanel } from './components/topoPanel.js?v=394';
+import { store, APP_VERSION } from './store.js?v=395';
+import { K } from './storage.js?v=395';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=395';
+import { esc, downloadFile } from './utils.js?v=395';
+import { startStateSync } from './stateSync.js?v=395';
+import { api } from './api.js?v=395';
+import { themeManager } from './themes.js?v=395';
+import { Sidebar } from './components/sidebar.js?v=395';
+import { Chat } from './components/chat.js?v=395';
+import { TopologyGraph } from './components/topology.js?v=395';
+import { initTopoPanel } from './components/topoPanel.js?v=395';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -29,34 +29,34 @@ import { initTopoPanel } from './components/topoPanel.js?v=394';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=394')
+  return import('./components/topology3d/index.js?v=395')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=394';
-import { AgentEditor } from './components/agentEditor.js?v=394';
-import { ProviderEditor } from './components/providerEditor.js?v=394';
-import { Microphone } from './components/microphone.js?v=394';
-import { ConfigPanel } from './components/configPanel.js?v=394';
-import { ExportPanel } from './components/export.js?v=394';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=394';
-import { TerminalPanel } from './components/terminalPanel.js?v=394';
-import { MetricsPanel } from './components/metricsPanel.js?v=394';
-import { TracePanel } from './components/tracePanel.js?v=394';
-import { AgentRecord } from './components/agentRecord.js?v=394';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=394';
-import { bindMemoryTools, bindSandboxTools, initCustomTools, unboundTools } from './tools.js?v=394';
-import { initApprovals } from './approvals.js?v=394';
-import * as memory from './memory.js?v=394';
-import { audio } from './audio.js?v=394';
-import { AlwaysOn } from './alwaysOn.js?v=394';
-import { ApiLab } from './apiLab.js?v=394';
-import { BrainLab } from './brainlab.js?v=394';
-import { BrowserView } from './components/browserView.js?v=394';
-import { initKeyboardAvoid } from './keyboard.js?v=394';
+import { RoutingChart } from './components/routingChart.js?v=395';
+import { AgentEditor } from './components/agentEditor.js?v=395';
+import { ProviderEditor } from './components/providerEditor.js?v=395';
+import { Microphone } from './components/microphone.js?v=395';
+import { ConfigPanel } from './components/configPanel.js?v=395';
+import { ExportPanel } from './components/export.js?v=395';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=395';
+import { TerminalPanel } from './components/terminalPanel.js?v=395';
+import { MetricsPanel } from './components/metricsPanel.js?v=395';
+import { TracePanel } from './components/tracePanel.js?v=395';
+import { AgentRecord } from './components/agentRecord.js?v=395';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=395';
+import { bindMemoryTools, bindSandboxTools, initCustomTools, unboundTools, setSandboxBindError } from './tools.js?v=395';
+import { initApprovals } from './approvals.js?v=395';
+import * as memory from './memory.js?v=395';
+import { audio } from './audio.js?v=395';
+import { AlwaysOn } from './alwaysOn.js?v=395';
+import { ApiLab } from './apiLab.js?v=395';
+import { BrainLab } from './brainlab.js?v=395';
+import { BrowserView } from './components/browserView.js?v=395';
+import { initKeyboardAvoid } from './keyboard.js?v=395';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -177,6 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { bindSandboxTools(api); } catch (err) { threw = err; }
     const left = unboundTools();
     if (!left.length) {
+      setSandboxBindError('');
       if (attempt > 1) console.info(`Sandbox tools bound on attempt ${attempt}.`);
       return;
     }
@@ -186,6 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const why = `Sandbox tools still unbound after ${attempt} attempts: ${left.join(', ')}`
       + (threw ? ` (last error: ${threw.message})` : '');
+    setSandboxBindError(why);
     console.error(why);
     bootErrors.push(`[sandboxTools] ${why}`);
     showBootError();

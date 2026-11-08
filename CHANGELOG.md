@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧩 The Config panel knows when the tools are bound *(`VERSION` 395, cache-buster v394 → v395)*
+
+*2026-11-08. A bind failure was visible in the console, the boot badge and a toast -- and nowhere the operator was already looking. The Config card said where the jail pointed and nothing about whether the file tools could reach it, so an unbound tool read as the model being wrong about the filesystem rather than the page being half-bound.*
+
+**Two lines, one card.** Under Working Project Directory, the panel now shows `File tools: bound — agents can read and write in this tab`, or `File tools: NOT bound — read_file, write_file, ... still run their placeholders`, naming them and carrying the last bind error in the line and its tooltip.
+
+**It follows the retries.** The boot loop backs off to 3.2 s, so an early read of Config would show a stale answer; the line re-checks once a second for that window and stops as soon as the tools are bound.
+
+**One source of truth.** `sandboxBindingReport()` in `ui/js/tools.js` returns `{ unbound, error }` from the same `unboundTools()` the retry loop uses, and `app.js` records the reason through `setSandboxBindError()` -- cleared when a later attempt succeeds. There is no second list to drift.
+
+**Tests.** `tests/js/sandboxBinding.test.mjs` covers the report naming the unbound tools, recording a failed attempt's reason without displacing the names, and clearing it after a success.
+
 ## 🧱 The file tools get their folder back *(`VERSION` 394, cache-buster v393 → v394)*
 
 *2026-11-08. The sandbox route answered and refused every call: `GET /api/sandbox/status` returned 200 with `enabled: false` and no roots on an install that had never chosen a directory, while the refusal text promised "it defaults to this app's own folder".*
