@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v413 — “Is it safe?”, answered up front 🔒
+### 🆕 v414 — a skeptic's one-command check 🧪
 
-*Reviewers kept reaching the end without finding the security section, and filling the gap with the worst assumption. This puts the answer two screens above it, in the eight lines people actually ask about.*
+*The safety table names mechanisms; a reviewer who trusts none of it should not have to take any of it on faith. This is the same claim, written so it can fail.*
 
 | | |
 |---|---|
-| 🔒 **Eight assumptions, answered** | no accounts or analytics, nothing ships with a key, no CORS wildcard, argv not a shell, secrets refused even inside a root, private hosts blocked, dangerous tools off by default, guards tested by real requests |
-| ⚖️ **The caveat stays honest** | it is not a fence around the operator — the table says what it does not cover |
-| 🧭 **Now in Contents** | under *Start here*, with Quick start first, in the order the page actually reads |
+| 🧪 **A script that asserts refusals** | the token store, sessions, the test tree and `.git` must answer `403`/`404` — anything else prints **OPEN** and exits non-zero |
+| 🌐 **CORS checked too** | a foreign `Origin` must get no `Access-Control-Allow-Origin` header at all |
+| 🎚️ **Auth stated, not faked** | the four API codes and what each one means, including the `200` a token-less copy gives its own machine |
 ---
 
 ## 🧭 Contents
@@ -213,6 +213,36 @@ Short answer: it runs on your machine, against your keys, and every dangerous ca
 | 🧪 “Those guards are just prose” | Each is tested by making the real request — `guards`, `apacheGuards`, `nginxGuards`, `secrets`, `programs`, `tls` — in the suite you can run yourself. |
 
 > ⚖️ **What it is not:** a fence around the operator. Turn everything on, auto-approve writes and point the root at `/`, and you have built a very capable foot-gun. The design makes the safe choice the **default**, not mandatory — and it cannot read your mind. 💙
+
+**🧪 Prove it in one command.** Point this at your own copy — every line asserts a *refusal*, so it fails loudly instead of asking you to believe the table:
+
+```bash
+BASE=https://your-host/router        # or http://127.0.0.1:8080
+fail=0
+code() { curl -s -o /dev/null -w '%{http_code}' "$1"; }
+for p in storage/config.json storage/sessions tests/js/run.mjs .git/config; do
+  c=$(code "$BASE/$p")
+  case $c in
+    403|404) echo "refused  $p  -> $c" ;;
+    *)       echo "OPEN     $p  -> $c"; fail=1 ;;
+  esac
+done
+# A foreign Origin must get no Access-Control-Allow-Origin back at all.
+if curl -s -D - -o /dev/null -H 'Origin: https://evil.example' "$BASE/api/state" \
+     | grep -qi '^access-control-allow-origin'; then
+  echo "OPEN     cross-origin header returned"; fail=1
+else
+  echo "refused  cross-origin request"
+fi
+[ $fail -eq 0 ] && echo "storage, tests, dotfiles and CORS are all closed." \
+              || echo "Something above is OPEN — fix it before anything else."
+```
+
+It answers `403` (or `404` behind nginx, which refuses rather than denies) for the token store, the sessions folder, the test tree and `.git` — and the API sends no cross-origin header unless you listed that origin in `ROUTER_CORS_ORIGINS`. §16 has the per-route grid and each serving mode's rules.
+
+The API itself is deliberately not pass/fail there, because its status states *which posture you are in*: `401` when a token is set and the request omits it, `403` when the gate is off and you are calling from another machine, `503` on a fresh copy with no token at all, and `200` from this machine while a copy has no token — local-only mode working as documented, not a hole. Set a token and that last case closes.
+
+With the tree in hand, the other one-command proof is the suite: `node tests/run.mjs` ends with *All suites passed.* or a `FAIL` line, and the guards are among the files it runs.
 
 ---
 ## ✨ What's inside

@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧪 A skeptic's one-command check *(`VERSION` 414, no browser file changed)*
+
+*A table that says "every path is refused" is still an assertion. The README now carries a short bash script that makes the same requests a stranger would and prints `OPEN` (and exits non-zero) if any of them answers instead of refusing.*
+
+It checks the four paths that decide everything else -- `storage/config.json`, `storage/sessions`, `tests/js/run.mjs` and `.git/config` -- against the `403`/`404` the serving rules promise, then sends a foreign `Origin` and fails if any `Access-Control-Allow-Origin` comes back.
+
+The API status is described rather than graded, because the code is the posture: `401` with a token set and none supplied, `403` when the gate is off and the caller is another machine, `503` on a fresh copy with no token, and `200` from this machine while a copy has no token. That last one is local-only mode doing its job; grading it either way would teach the wrong lesson. With the tree in hand, `node tests/run.mjs` remains the other one-command proof.
+
 ## 🔒 "Is it safe?", answered up front *(`VERSION` 413, no browser file changed)*
 
 *The security section is long, deliberate and, by the account of the people leaving reviews, unread. The assumptions arrived first and filled the space: that it phones home, ships with keys, hands the model a shell, or can read the token. Each of those is answered in one line inside the section nobody got to, which is the wrong place for the answer to a question asked before reading.*
