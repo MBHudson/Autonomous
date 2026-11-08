@@ -19,6 +19,16 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🗨️ The map's ASK box is part of the conversation *(`VERSION` 381, cache-buster v380 → v381)*
+
+*2026-11-08. `askAgentInline` is deliberately outside the transcript, so its hops were announced to the graph and then forgotten: the question you typed on the map was the one exchange the Messages drawer could not show, even after the log learned to hold prompts and replies.*
+
+**Recorded, settled, and readable.** The inline ask records a `prompt` entry and holds it, settles it with the answer when the reply arrives, and settles it as a failure when the call is cancelled or errors -- so a question that got no answer reads as asked rather than disappearing. The beam carries `text` both ways now, so the map's Recent messages row and the hover tooltip show what was said.
+
+**Nothing else moved.** The inline reply still goes only to the floating box (it is not a transcript bubble), the metrics card is untouched, and the drawer gains the entry under *All communication*; *Agent to agent* still hides it, because you are not another agent.
+
+---
+
 ## 💬 Every message keeps its words, and Messages reads the whole conversation *(`VERSION` 380, cache-buster v379 → v380)*
 
 *2026-11-08. The map drew a line for every hop and could name the two agents at its ends, then showed nothing beneath the row. Only `ask_agent` / `tell_agent` / a mailbox ping were recorded with text; the three hops that make up almost every turn were emitted bare, so the card's list was a list of things that happened without any of the things that were said.*

@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=380';
-import { K as STORAGE_K } from '../storage.js?v=380';
+import { store } from '../store.js?v=381';
+import { K as STORAGE_K } from '../storage.js?v=381';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=380';
-import { persistence } from '../persistence.js?v=380';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=380';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=380';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=380';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=380';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=380';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=380';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=380';
-import { usageFor } from '../rateGovernor.js?v=380';
-import { trace } from '../trace.js?v=380';
-import { latency } from '../latency.js?v=380';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=380';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=380';
-import { SlashCommands } from '../slashCommands.js?v=380';
-import { parseRoute, routingHelp } from '../routing.js?v=380';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=380';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=380';
-import { MessageRenderer, renderToolCalls } from './message.js?v=380';
-import { createAvatar } from './avatar.js?v=380';
-import * as comms from '../commsLog.js?v=380';
+import { api, errText } from '../api.js?v=381';
+import { persistence } from '../persistence.js?v=381';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=381';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=381';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=381';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=381';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=381';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=381';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=381';
+import { usageFor } from '../rateGovernor.js?v=381';
+import { trace } from '../trace.js?v=381';
+import { latency } from '../latency.js?v=381';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=381';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=381';
+import { SlashCommands } from '../slashCommands.js?v=381';
+import { parseRoute, routingHelp } from '../routing.js?v=381';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=381';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=381';
+import { MessageRenderer, renderToolCalls } from './message.js?v=381';
+import { createAvatar } from './avatar.js?v=381';
+import * as comms from '../commsLog.js?v=381';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2925,12 +2925,21 @@ _makeLiveNode(agent) {
     this._busy.add(agent.id);
     const ctrl = new AbortController();
     store.emit('agent:status', { agentId: agent.id, status: 'thinking' });
-    store.emit('flow:start', { from: 'user', to: agent.id });
+    // The map's own ASK box is a conversation too, and it never touches the
+    // transcript -- so without this it was the one thing said to an agent that
+    // the Messages drawer could not show.
+    const exchange = comms.record({
+      fromId: 'user', fromName: 'you', toId: agent.id, toName: agent.name,
+      kind: 'prompt', text,
+    });
+    store.emit('flow:start', { from: 'user', to: agent.id, text: comms.clipText(text) });
     try {
       // No live node and no attachments: the reply is only ever rendered in
       // the topology's floating box, never as a transcript bubble.
       const reply = await this._callAgent(text, agent, ctrl.signal, null, null, { direct: true, inline: true });
-      store.emit('flow:respond', { from: agent.id });
+      const answer = (reply && reply.content) || '';
+      comms.settle(exchange, answer, true);
+      store.emit('flow:respond', { from: agent.id, text: comms.clipText(answer) });
       // Hand back the whole run, not just the closing sentence: every tool call
       // with its arguments and its output, plus any reasoning, so the graph's
       // box can show the actual work as raw text.
@@ -2941,6 +2950,9 @@ _makeLiveNode(agent) {
       };
     } catch (err) {
       const stopped = err && err.name === 'AbortError';
+      // Settled as a failure, so a question that never got an answer reads as
+      // asked-and-failed instead of the drawer losing it.
+      comms.settle(exchange, stopped ? 'cancelled' : (err?.message || String(err)), false);
       store.emit('flow:fail', { to: agent.id });
       return { error: stopped ? 'cancelled' : (err?.message || String(err)) };
     } finally {

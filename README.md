@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v380 — every message, with the words, inside Messages 💬
+### 🆕 v381 — a question asked on the map leaves a trace too 🗨️
 
-*The map could say two agents spoke and then show nothing beneath it: your prompt, the task a coordinator handed down and the answer coming back were drawn as beams but never carried their text, and the Messages drawer only knew agent-to-agent traffic.*
+*The inline ASK box was built to leave the transcript alone — and it left the log alone too, so a question you asked straight on the map was the one exchange Messages could never show.*
 
 | | |
 |---|---|
-| 💬 **The words travel with the hop** | Your prompt, the delegation it becomes and the reply that comes back are now recorded with their text, so a card's Recent messages row says what was said instead of only who said it and when — and a beam's hover tooltip reads *“You → Muse: …”* |
-| 📜 **Messages is the whole conversation** | The drawer lists every hop for that agent — your prompt, the task it was handed, what it said to a team-mate, the answer — each with its full text, newest first, under **All communication** / **Agent to agent** |
-| 🗺️ **Every door reaches it** | The 3D card's Messages button, a new one on the 2D agent metrics modal, and the Comms tab in Config → TRACE read the same log, so no two views can disagree about what was said |
+| 🗨️ **The ASK box is recorded** | A question typed on the map becomes a **prompt** entry, and the answer settles onto it like any other reply — so the drawer is not missing the one thing you just asked |
+| ↩️ **A failed ask is kept, marked failed** | An ASK that was cancelled or errored settles as a failure instead of vanishing, so a question that got no answer still reads as asked |
+| 🗺️ **Where it shows up** | The agent's **Messages** drawer under *All communication*, the **Comms** tab in Config → TRACE, and the card's Recent messages — the beam carries the question and the answer both |
 
 ---
 
