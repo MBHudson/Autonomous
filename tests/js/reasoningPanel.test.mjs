@@ -15,7 +15,9 @@
 // preference, so the remembering behaviour can be checked in Node without a
 // browser.
 
-import { reasoningOpenByDefault, REASONING_OPEN_CHARS } from '../../ui/js/utils.js';
+import {
+  reasoningOpenByDefault, REASONING_OPEN_CHARS, isReasoningEcho, REASONING_ECHO_SLACK,
+} from '../../ui/js/utils.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -51,6 +53,36 @@ ok(reasoningOpenByDefault('', true) === true, 'a remembered open holds even with
 
 // --- the threshold itself ----------------------------------------------------
 ok(REASONING_OPEN_CHARS === 400, 'the threshold is 400 characters');
+
+// --- reasoning that is really the reply --------------------------------------
+// Hiding the panel is right when the provider echoed the answer into the
+// reasoning field. It is wrong whenever the answer is merely PART of the trace:
+// that is what made a long trace vanish at the moment of commit.
+const longThought = 'Step one: list the agents, then read the roster. '
+  + 'x'.repeat(900)
+  + ' Final Answer: \\boxed{think}'
+  + ' y'.repeat(400);
+ok(isReasoningEcho('the same words', 'the same words') === true,
+  'identical text is an echo');
+ok(isReasoningEcho('  Same   WORDS\n', 'same words') === true,
+  'case and whitespace do not defeat the echo rule');
+ok(isReasoningEcho('Here is my answer: forty two', 'forty two') === true,
+  'a reply wrapped in a short preamble is still an echo');
+ok(isReasoningEcho('\\boxed{think}', '\\boxed{think}') === true,
+  'the junk a local model emits as both answer and thought is an echo');
+ok(isReasoningEcho(longThought, '\\boxed{think}') === false,
+  'a short reply inside a long trace is NOT an echo -- the panel keeps its thinking');
+ok(isReasoningEcho(longThought, 'think') === false,
+  'a one-word reply inside a long trace is not an echo');
+ok(isReasoningEcho(longThought, 'Step one: list the agents') === false,
+  'restating one sentence of a long trace does not make it an echo');
+ok(isReasoningEcho('', 'an answer') === false, 'no reasoning is not an echo');
+ok(isReasoningEcho('a long thought about the task', '') === false,
+  'a thoughts-only reply keeps its panel');
+ok(isReasoningEcho(null, null) === false, 'nothing at all is not an echo');
+ok(REASONING_ECHO_SLACK === 120, 'the wrapper allowance is 120 characters');
+ok(isReasoningEcho('forty two ' + 'and then some more words '.repeat(9), 'forty two') === false,
+  'a trace far longer than its reply is thinking, not an echo');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

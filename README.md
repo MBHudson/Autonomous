@@ -37,16 +37,17 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v386 — a smaller tree, same app 🧹
+### 🆕 v387 — the thought you watched is still there 🧠
 
-*Three files in the repo were housekeeping rather than product: a note to coding agents, a one-page hand-out for a friend, and a GitHub release body frozen at v368. They are gone, and the README no longer points at any of them.*
+*The reasoning box filled while the model thought and then emptied itself the moment the answer landed. The text was not lost — the copy button still produced it — but the renderer refused to draw it, and a turn that kept working for several rounds kept only the last round's thinking.*
 
 | | |
 |---|---|
-| 🗑️ **Removed** | `AGENTS.md`, `FRIENDS.md` and `RELEASE-NOTES.md` leave the tree — nothing the app loads or the server serves ever read them |
-| 🔗 **Links followed** | The MCP friend section now ends with the URL-and-token pair and the file-tree listing drops its entry, so the page has no pointer to a file that is not there |
-| 📋 **`RELEASING.md` stays** | It is the version checklist — which number to bump, the three places `APP_VERSION` must move together, and the suite command — and the README links it twice |
-| 🧮 **No cache-buster bump** | Nothing under `ui/` changed, so a browser has nothing to re-download; `VERSION` alone announces this release, which is the case the release number exists for |
+| 🔍 **The echo rule was too eager** | It hid the panel whenever either string contained the other, so a short answer that appears anywhere inside a long trace — a local model's `\boxed{think}`, a phrase the model reused — counted as "the reasoning is just the reply" and deleted the whole panel at commit |
+| ↔️ **One direction, with a size** | `isReasoningEcho()` hides only an identical trace, the reply plus up to 120 characters of wrapper, or reasoning that is most of a longer reply. A short answer inside a long trace is thinking, and the panel stays |
+| 🔁 **Every round keeps its share** | The trace is seeded from the live bubble between rounds, the way the prose already was, so a tool-heavy turn shows all of its thinking instead of the last round's |
+| 💭 **Thoughts-only replies keep the box** | An empty reply used to suppress the panel too — the one case where the panel is all there is |
+| ✅ **Guarded** | `tests/js/reasoningPanel.test.mjs` covers all of it, including the case that broke: a long trace whose answer is `\boxed{think}` |
 
 ---
 
@@ -733,7 +734,7 @@ changes until you ask:
 ---
 ## 💭 Thinking & reasoning
 
-Some models show their work. 💭🧩 When a provider streams a reasoning trace, the **thinking panel** opens and shows it live, so you can watch the model deliberate before the answer lands — handy for debugging a stubborn prompt without cluttering the reply. The trace is painted as it streams, accumulated across every step of the turn, and carried into the finished message, so what you watched does not vanish at the commit; a local model that thinks out loud in its reply text keeps those sentences in the same panel instead of losing them, and a "reasoning" block that is really the reply is still suppressed as an echo.
+Some models show their work. 💭🧩 When a provider streams a reasoning trace, the **thinking panel** opens and shows it live, so you can watch the model deliberate before the answer lands — handy for debugging a stubborn prompt without cluttering the reply. The trace is painted as it streams, accumulated across every step and every round of the turn, and carried into the finished message, so what you watched does not vanish at the commit; a local model that thinks out loud in its reply text keeps those sentences in the same panel instead of losing them, and a "reasoning" block that is really the reply is still suppressed as an echo. The panel is hidden only when the reasoning really is the reply repeated — an answer that happens to restate a phrase from a long trace no longer takes the trace with it.
 
 ---
 

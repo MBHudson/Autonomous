@@ -19,6 +19,24 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧠 A thought that ends in the answer is still a thought *(`VERSION` 387, cache-buster v385 → v387)*
+
+*2026-11-08. The reasoning box filled while the model thought and then emptied itself the moment the answer landed. The text was not lost -- the copy button still produced it -- but the renderer refused to draw it, and a turn that ran for several rounds kept only the last round's thinking.*
+
+**The echo rule was too eager.** Hiding the panel when a provider echoes the answer into the reasoning channel is right, but the test ran in both directions with no size check: `rNorm.includes(cNorm) || cNorm.includes(rNorm)`. So any short reply that appeared anywhere inside a long trace counted as "the reasoning is just the reply". A local model that ends `\boxed{think}` -- or restates one phrase from its own thinking -- matched on the first comparison and took a long trace with it at commit, which is exactly when it is worth reading.
+
+**One direction, with a size.** `isReasoningEcho()` in `ui/js/utils.js` hides the panel only when the two are identical after case and whitespace folding, when the reasoning is the reply plus at most `REASONING_ECHO_SLACK` (120) characters of wrapper, or when the reply contains the reasoning and the reasoning is at least 60% of it. A short answer inside a long trace is thinking, and it stays.
+
+**Thoughts-only replies keep their box.** An empty reply used to set the same flag, suppressing reasoning in the one case where the panel is all there is.
+
+**Every round keeps its share.** `_runToCompletion` seeded `turnText` and `turnProse` from the live node between rounds but seeded `turnReasoning` from `''`, so a tool-heavy turn committed only the last round's trace -- the same asymmetry v385 fixed within a round, one level up. Both the accumulator and the working value now start from what the bubble already shows.
+
+**Tests and docs.** `tests/js/reasoningPanel.test.mjs` gained 12 assertions for the new rule, including the case that broke: a long trace whose answer is `\boxed{think}`. README: the **What's new** entry for v387 (replacing v386, whose docs cleanup stays in this file) and a sentence in *Thinking & reasoning*.
+
+**Not changed.** A local model that writes tool-call syntax into its own thinking still gets those musings executed, so repeats are possible. With the trace readable, that loop is now diagnosable; changing what counts as a call is a separate decision.
+
+---
+
 ## 🧹 Three repo docs that don't belong in a clone *(`VERSION` 386, no cache-buster bump)*
 
 *2026-11-08. `AGENTS.md`, `FRIENDS.md` and `RELEASE-NOTES.md` were repository housekeeping rather than part of the app: a note to coding agents, a hand-out for a friend, and a GitHub release body frozen at v368. They are out of the tree, and README no longer points at any of them.*

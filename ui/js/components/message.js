@@ -10,13 +10,13 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault } from '../utils.js?v=385';
-import { renderMarkdown } from '../markdown.js?v=385';
-import { CodeBlock, splitFences } from './codeBlock.js?v=385';
-import { createAvatar } from './avatar.js?v=385';
-import { store } from '../store.js?v=385';
-import { persistence } from '../persistence.js?v=385';
-import { audio, AudioController } from '../audio.js?v=385';
+import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho } from '../utils.js?v=387';
+import { renderMarkdown } from '../markdown.js?v=387';
+import { CodeBlock, splitFences } from './codeBlock.js?v=387';
+import { createAvatar } from './avatar.js?v=387';
+import { store } from '../store.js?v=387';
+import { persistence } from '../persistence.js?v=387';
+import { audio, AudioController } from '../audio.js?v=387';
 
 const TOOL_DISPLAY_LIMIT = 8000;
 
@@ -286,17 +286,18 @@ export class MessageRenderer {
     const body = document.createElement('div');
     body.className = 'message-body';
 
-    // Real model reasoning ONLY — never when it's just the reply. Some
-    // providers echo content as reasoning (exact, wrapped, or embedded),
-    // so suppress whenever either normalized side contains the other.
-    const norm = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    // Real model reasoning ONLY — never when it's just the reply.
+    //
+    // Providers echo content as reasoning (exact, wrapped, or embedded), so an
+    // echo has to be hidden. The rule lives in utils.js because it is the one
+    // piece of this that can be tested without a DOM, and because the old
+    // inline version hid the panel whenever either string merely CONTAINED the
+    // other: an answer that restated a phrase from a long trace took the whole
+    // trace with it at commit. Tests: tests/js/reasoningPanel.test.mjs.
     const reasoningText = asText(msg.reasoning).trim();
-    const contentText = asText(msg.content).trim();
-    const rNorm = norm(reasoningText);
-    const cNorm = norm(contentText);
-    const isEcho = !rNorm || !cNorm || rNorm === cNorm
-      || rNorm.includes(cNorm) || cNorm.includes(rNorm);
-    if (!isEcho) body.appendChild(this._renderReasoning(reasoningText));
+    if (reasoningText && !isReasoningEcho(reasoningText, msg.content)) {
+      body.appendChild(this._renderReasoning(reasoningText));
+    }
 
     const toolCalls = renderToolCalls(msg.toolCalls);
     if (toolCalls) body.appendChild(toolCalls);

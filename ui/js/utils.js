@@ -32,6 +32,39 @@ export function reasoningOpenByDefault(text, remembered) {
   return String(text ?? '').trim().length >= REASONING_OPEN_CHARS;
 }
 
+/** How much wrapper a provider may add around the reply and still be echoing. */
+export const REASONING_ECHO_SLACK = 120;
+
+/**
+ * Is the reasoning channel just the reply again?
+ *
+ * Some providers echo the answer into the reasoning field -- exactly, or wrapped
+ * in a short preamble -- and drawing both reads as a duplication bug, so those
+ * are called echoes and the panel stays hidden.
+ *
+ * The comparison is one-directional and proportional. It used to hide the panel
+ * whenever EITHER string contained the other, which meant any short reply that
+ * happened to appear somewhere in a long trace counted as "reasoning is just
+ * the reply": a local model that ends `\boxed{think}`, or restates a phrase
+ * from its thinking, wiped out a thousand words of trace at the moment of
+ * commit -- precisely when it was worth reading.
+ */
+export function isReasoningEcho(reasoning, content) {
+  const norm = s => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const r = norm(reasoning);
+  const c = norm(content);
+  // Nothing to compare, or nothing but thoughts. A reply that is all thinking
+  // has no reply for the reasoning to duplicate, and that used to be the one
+  // case that suppressed the panel outright.
+  if (!r || !c) return false;
+  if (r === c) return true;
+  // Reasoning that IS the reply plus a wrapper ("Here is my answer: ...").
+  if (r.includes(c) && r.length - c.length <= REASONING_ECHO_SLACK) return true;
+  // The reply contains the reasoning: a runner that joins the two into one
+  // body. Only an echo when the reasoning is most of what was said.
+  return c.includes(r) && r.length >= c.length * 0.6;
+}
+
 /**
  * Rough token estimate for budgeting. Deliberately conservative: prose is
  * usually ~4 chars/token, but code and JSON tokenize denser, and non-ASCII
