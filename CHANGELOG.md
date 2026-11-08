@@ -19,6 +19,48 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧠 What a local model thinks no longer vanishes when it answers *(`VERSION` 385, cache-buster v384 → v385)*
+
+*2026-11-08. A local reasoning model streamed its thoughts, then the text disappeared the instant the turn completed and the tool calls and answer appeared in one block. Two separate gaps produced that: the live reasoning block was never painted, and the commit kept only the last step's text.*
+
+**`_paintReasoning` was never called.** The live bubble builds a Reasoning block, sizes it, hides it until there is something to show — and the streaming callback only did `reasoning = whole`, so nothing ever unhid it. A thinking model therefore thought into a variable for as long as its first token took, which from the outside is a hung request. `onReasoning` now paints, and the trace accumulates across steps instead of each step starting the panel over.
+
+**Narration was painted and then dropped.** A local model thinks out loud in its reply text. Those sentences went into `node.turnProse` for the live bubble, but `_commitAgentReply` committed `result.value.content` — the last step's chunk alone — so the swap at the end emptied the bubble of everything said before the final answer. The turn's prose now rides along as the message's `reasoning` when the provider's own reasoning channel supplied none, which keeps what was watched and lets the existing echo rule hide it when it *is* the answer.
+
+**Reasoning survives multiple steps.** `reasoning` held `res.reasoning` per step, so a think → tool → think turn committed only the last trace. It is accumulated now, and the abort path keeps the same text the bubble showed.
+
+**No request, dialect, prompt or tool changed.** This is display and commit only; `tests/js` and the PHP suite are unchanged by it.
+
+---
+
+## 🔎 The request itself, not just the reply *(`VERSION` 384, cache-buster v383 → v384)*
+
+*2026-11-08. "Why can't this model use tools?" had no answer inside the app, because the app only showed the answer. A model that ignores its schemas and a request that never carried any look identical from a reply — and the body is built twice, once as the browser's spec and again by `Harness::payload` in PHP, so nothing in the UI could say which had happened.*
+
+**Recorded where the body exists.** The new `SentLog` ring is written from `ModelManager::relayStream`, between `Harness::payload` and `Harness::auth` — the only point where the assembled JSON exists and the endpoint has not yet had a `?key=` appended. Each record keeps the harness family, model, endpoint, message roles, the schema names that went out, `tool_choice`, the byte size, and the whole body.
+
+**`GET /sent`, `DELETE /sent`.** A route beside `/exec`, gated like every other endpoint. GET answers the ring newest first; DELETE empties it. The browser gets `api.sent()` and `api.clearSent()`.
+
+**A SENT tab, with the badge that answers the question.** Config → TRACE's fourth tab lists the last 20 requests and shows **12 tools** or **no tools** per row, names the schemas, and opens the pretty-printed body under each entry. The empty case is red on purpose: a turn that was supposed to call tools and posted none is a different bug from a model that ignored them, and this is the only place the two are distinguishable.
+
+**Bounded, and no secrets.** 20 entries, each body cut at 120 000 characters with a `truncated` flag, written through a temp file and `rename()` so a reader never sees half a record; a corrupt file reads as empty rather than fataling. The API key is never in the body, and the endpoint's query string is stripped before it is stored.
+
+**Tests.** `tests/php/sentLog.test.php` covers the schema names, `tool_choice`, roles, endpoint stripping, the ring bound and its ordering, the truncation flag and cap, clearing, and a corrupt file.
+
+---
+
+## 🔧 A guessed tool call still runs *(`VERSION` 383, cache-buster v382 → v383)*
+
+*2026-11-08. An LM Studio model on the Ollama harness + JSON object protocol calls tools through the prompt dialect, and its failures were spelling failures. Asked to name its format it answered "in OLLAMA … `<|begin|>{"tool":…}<|end|>`", then called `list_agent` for `list_agents`. Both were refused — the registry check was exact and nothing claimed the `<|begin|>` wrapper — so a turn that meant to run a tool ended as prose. Same reply, same tools, one repo away from working.*
+
+**Names are repaired.** `repairToolName` folds case, separators and a stray `()`; drops a `functions.` / `tools.` prefix; accepts a plural or singular `s`; then allows a bounded edit distance — one character from five letters, two from ten — and only when the best match is unique. It is used everywhere a name was compared to `TOOL_REGISTRY`: the JSON form, Anthropic's `<invoke>`, the `function=` tag dialect and the native blocks. Exact names still win first, and an invented tool (`search_web`) still fails, because a wrong tool is worse than a clear refusal.
+
+**Wrappers are read.** `parseFenceToolCall` accepts `<|begin|> … <|end|>`, `<begin> … </begin>` and `<|tool|> … <|/tool|>` with the same three bodies the native parser takes — whole JSON, `name{…}`, bare name — and the fence joined `TOOL_BLOCK_PATTERNS`, so `stripToolCall` and the multi-call span walker remove it from the transcript once it has run. Prose inside a fence resolves to no tool and is left alone.
+
+**Nothing else moved.** No request shape, dialect, prompt block or tool list changed: this only reads a reply the app used to discard. `tests/js/toolCalls.test.mjs` gained twelve cases for the names and wrappers, including the invented-name and prose-fence negatives.
+
+---
+
 ## 💬 The release notes finally describe the message log *(`VERSION` 382, cache-buster v381 → v382)*
 
 *2026-11-08. v380 taught every hop to carry its words and made Messages the whole conversation; v381 recorded the map's ASK box. Both shipped, and neither was described where a reader looks: the What's New entry had been narrowed to the v381 slice, and the trace section still claimed the log held "300 exchanges" of what "agents actually said to each other".*

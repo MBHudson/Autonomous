@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=382';
-import { acquire, note429 } from './rateGovernor.js?v=382';
-import { latency } from './latency.js?v=382';
-import { detectFamily, outputText, outputUsage } from './harness.js?v=382';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=382';
+import { store } from './store.js?v=385';
+import { acquire, note429 } from './rateGovernor.js?v=385';
+import { latency } from './latency.js?v=385';
+import { detectFamily, outputText, outputUsage } from './harness.js?v=385';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=385';
 
 latency.bindStore(store);
 
@@ -297,6 +297,21 @@ class ApiClient {
       lines: opts.lines || 300,
       agent: opts.agent || '',
     });
+  }
+
+  /**
+   * The exact request each agent sent, newest first.
+   *
+   * Server-side on purpose: the body is built in PHP by Harness::payload, so
+   * the browser's own spec cannot say whether a tools array actually went out.
+   */
+  sent() {
+    return this.request('GET', '/sent');
+  }
+
+  /** Empty the request ring. */
+  clearSent() {
+    return this.request('DELETE', '/sent');
   }
 
   /**

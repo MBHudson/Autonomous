@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=382';
-import { K as STORAGE_K } from '../storage.js?v=382';
+import { store } from '../store.js?v=385';
+import { K as STORAGE_K } from '../storage.js?v=385';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=382';
-import { persistence } from '../persistence.js?v=382';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=382';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=382';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=382';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=382';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=382';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=382';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=382';
-import { usageFor } from '../rateGovernor.js?v=382';
-import { trace } from '../trace.js?v=382';
-import { latency } from '../latency.js?v=382';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=382';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=382';
-import { SlashCommands } from '../slashCommands.js?v=382';
-import { parseRoute, routingHelp } from '../routing.js?v=382';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=382';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=382';
-import { MessageRenderer, renderToolCalls } from './message.js?v=382';
-import { createAvatar } from './avatar.js?v=382';
-import * as comms from '../commsLog.js?v=382';
+import { api, errText } from '../api.js?v=385';
+import { persistence } from '../persistence.js?v=385';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=385';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=385';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=385';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=385';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=385';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=385';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=385';
+import { usageFor } from '../rateGovernor.js?v=385';
+import { trace } from '../trace.js?v=385';
+import { latency } from '../latency.js?v=385';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=385';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=385';
+import { SlashCommands } from '../slashCommands.js?v=385';
+import { parseRoute, routingHelp } from '../routing.js?v=385';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=385';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=385';
+import { MessageRenderer, renderToolCalls } from './message.js?v=385';
+import { createAvatar } from './avatar.js?v=385';
+import * as comms from '../commsLog.js?v=385';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1049,7 +1049,16 @@ _commitAgentReply(agent, result, live) {
         // identically. _saveDialog persists this same string.
         content: result.value.content ?? result.value.text,
         agentId: agent.id,
-        reasoning: result.value.reasoning || null,
+        // The thought trace, then whatever the turn narrated between tool
+        // calls. A local model thinks out loud in its reply text; those
+        // sentences are not the answer, but they are exactly what the operator
+        // watched arrive, and committing only the last step's text made the
+        // bubble empty itself the moment the answer landed. The renderer hides
+        // a "reasoning" block that is really an echo of the reply (see
+        // message.js), so nothing is duplicated when the two are the same.
+        reasoning: result.value.reasoning
+          || (live && asText(live.turnProse).trim())
+          || null,
         toolCalls: result.value.toolCalls || (live && live.toolCalls) || null,
         timestamp: Date.now()
       };
@@ -1080,7 +1089,7 @@ _commitAgentReply(agent, result, live) {
         content: stopped
           ? (partialText || 'Stopped by user.')
           : 'Error: ' + (result.reason?.message || 'Unknown error'),
-        reasoning: partialReason || null,
+        reasoning: partialReason || (live && asText(live.turnProse).trim()) || null,
         toolCalls: (live && live.toolCalls) || null,
         agentId: agent.id,
         timestamp: Date.now()
@@ -1729,6 +1738,11 @@ _makeLiveNode(agent) {
 
     let text = '';
     let reasoning = '';
+    // Every step's reasoning channel in this run. `reasoning` is what the
+    // CURRENT step has said so far, so a second step overwrote the first --
+    // a multi-step turn committed only the last thought trace it happened to
+    // end on, and the earlier one vanished with the live bubble.
+    let turnReasoning = '';
     // Every step's prose in this run. `text` only ever holds the CURRENT step's
     // stream, and a step that ends on a tool call holds nothing -- which is how a
     // finished turn came back with an empty answer and blanked the bubble the
@@ -1800,7 +1814,14 @@ _makeLiveNode(agent) {
             text = whole;
             this._paintStream(liveNode, _p, whole);
           },
-          onReasoning: (_p, whole) => { reasoning = whole; },
+          // Paint the thought trace as it streams. _paintReasoning existed and
+          // was called by nothing: this callback only stored the text, so a
+          // thinking model's block stayed hidden while it thought, and a model
+          // that thinks for a minute looked like a hung request.
+          onReasoning: (_p, whole) => {
+            reasoning = joinProse(turnReasoning, whole);
+            this._paintReasoning(liveNode, reasoning);
+          },
           onRetry: (attempt, err, delayMs) => store.emit('toast', {
             message: `${agent.name}: ${String(err.message).slice(0, 60)} — waiting ${Math.max(1, Math.round((delayMs || 0) / 1000))}s (retry ${attempt})`,
             type: 'info',
@@ -1852,7 +1873,12 @@ _makeLiveNode(agent) {
       }
 
       const chunk = res && res.content ? res.content : '';
-      if (res && res.reasoning) reasoning = res.reasoning;
+      // Accumulated, not replaced: a turn that thinks, calls a tool and thinks
+      // again should keep both traces, in the order they happened.
+      if (res && res.reasoning) {
+        turnReasoning = joinProse(turnReasoning, res.reasoning);
+        reasoning = turnReasoning;
+      }
       // Usage comes back on the streaming path too. Without this the streamed
       // turns — which is every turn in practice — recorded nothing, leaving
       // every agent panel and every model breakdown empty. The request is

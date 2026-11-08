@@ -755,6 +755,75 @@ body.agent-reordering .agent-editor:hover {
 
 .trace-fail { color: var(--accent-red); }
 
+/* SENT — the exact body an agent's request carried. */
+.sent-item {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sent-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.sent-model {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sent-meta,
+.sent-tools {
+  font-size: 10px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.sent-tools { margin-top: 2px; }
+
+.sent-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.sent-badge.has-tools {
+  color: var(--accent-cyan);
+  border-color: currentColor;
+}
+
+.sent-badge.no-tools {
+  color: var(--accent-red);
+  border-color: currentColor;
+}
+
+.sent-item summary {
+  margin-top: 5px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sent-pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 42vh;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .trace-row-open td { background: rgba(255, 71, 87, 0.05); }
 
 .trace-cmd {

@@ -195,6 +195,13 @@ class ModelManager {
             $payload[$k] = $v;
         }
 
+        // What actually leaves this process, kept for the Sent view. This is
+        // the only place the assembled body exists: the browser's spec knows
+        // what was asked for, not what Harness made of it, so "was a tools
+        // array posted" can only be answered here. Recorded before auth(),
+        // which is what appends a ?key= to the endpoint.
+        SentLog::record($spec, $payload, $endpoint, $family);
+
         $auth = Harness::auth($family, $endpoint, $apiKey, (string)($spec['provider'] ?? ''));
         $endpoint = $auth['endpoint'];
         $headers = array_merge($auth['headers'], ['Accept: text/event-stream']);

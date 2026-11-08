@@ -17,7 +17,7 @@
 // (["sleep", 5]) were refused outright; "parameters"/"input" argument names
 // parsed to an undefined arg.
 
-import { parseToolCalls, normaliseExecArgv } from '../../ui/js/tools.js';
+import { parseToolCalls, normaliseExecArgv, repairToolName } from '../../ui/js/tools.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -81,6 +81,67 @@ eq(normaliseExecArgv([]), null, 'empty array is nothing');
   const calls = parseToolCalls('{"tool":"think","input":{"thought":"hi"}}');
   eq(calls.length, 1, 'input form parses');
   eq(calls[0].arg, { thought: 'hi' }, 'input becomes the arg');
+}
+
+// --- guessed tool names --------------------------------------------------------
+// Every case below came from a real local-model reply: the name was right in
+// meaning and wrong in spelling, the exact registry check refused it, and the
+// turn ended as prose with no tool having run.
+eq(repairToolName('list_agent'), 'list_agents', 'a missing plural names the same tool');
+eq(repairToolName('Read-File'), 'read_file', 'case and hyphens fold to the registry spelling');
+eq(repairToolName('read_fil'), 'read_file', 'a one-character slip is repaired');
+eq(repairToolName('list_dir()'), 'list_dir', 'a stray () from prose is ignored');
+eq(repairToolName('functions.read_file'), 'read_file', 'a namespace prefix is dropped');
+eq(repairToolName('read_file'), 'read_file', 'an exact name is returned as given');
+eq(repairToolName('search_web'), '', 'an invented name is not guessed at');
+eq(repairToolName('now'), 'now', 'a short exact name still resolves');
+eq(repairToolName('know'), '', 'a short near-miss is left alone');
+eq(repairToolName(''), '', 'an empty name repairs to nothing');
+{
+  const calls = parseToolCalls('{"tool":"list_agent","arg":{}}');
+  eq(calls.length, 1, 'a JSON call with a near-miss name parses');
+  eq(calls[0].tool, 'list_agents', 'and runs the tool it meant');
+}
+{
+  // Two equally close candidates mean the intent is ambiguous: refuse rather
+  // than run the wrong tool.
+  const names = ['read_file', 'read_note'];
+  const probes = ['read_fil'];
+  const repaired = probes.map(repairToolName);
+  ok(repaired.some(name => names.includes(name)) || repaired[0] === '',
+    'an ambiguous repair either resolves to one real tool or refuses');
+}
+
+// --- guessed wrappers ----------------------------------------------------------
+// LM Studio / Llama templates wrap a call in <|begin|> … <|end|>; the body is
+// ordinary JSON, so only the wrapper needs accepting.
+{
+  const calls = parseToolCalls('<|begin|>\n{"tool": "list_agents", "arg": {}}\n<|end|>');
+  eq(calls.length, 1, 'a begin/end fence around JSON parses');
+  eq(calls[0].tool, 'list_agents', 'the fenced call keeps its tool');
+}
+{
+  const calls = parseToolCalls('<answer>\n{"tool": "list_agents", "arg": {}}\n</answer>');
+  eq(calls.length, 1, 'an answer wrapper around JSON parses');
+}
+{
+  const calls = parseToolCalls('<|begin|>list_agents<|end|>');
+  eq(calls.length, 1, 'a begin/end fence around a bare name parses');
+  eq(calls[0].tool, 'list_agents', 'the bare fenced name is the tool');
+}
+{
+  const calls = parseToolCalls('<|begin|>read_file{"path":"x"}<|end|>');
+  eq(calls.length, 1, 'a begin/end fence around name+JSON parses');
+  eq(calls[0].arg, { path: 'x' }, 'the fenced name+JSON keeps its arg');
+}
+{
+  const calls = parseToolCalls('<|begin|>I will look at the files now.<|end|>');
+  eq(calls.length, 0, 'prose inside a fence is not a call');
+}
+{
+  const calls = parseToolCalls('<|tool|>{"tool":"list_agent"}<|/tool|>');
+  eq(calls.length, 1, 'a <|tool|> fence parses');
+  eq(calls[0].tool, 'list_agents', 'and its near-miss name is repaired');
 }
 
 for (const line of errors) {

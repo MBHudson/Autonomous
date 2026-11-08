@@ -37,18 +37,17 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v382 — every message, with the words, in one place 💬
+### 🆕 v385 — what the model thinks stays on screen 🧠
 
-*The map could draw a line for every hop and name the two agents at its ends, then show nothing beneath the row. Only `ask_agent` and `tell_agent` traffic was ever recorded with its text, so your prompt, a coordinator's delegation and the answer coming back were drawn mute — and **Messages**, the one place built to show what was said, only knew the part that went agent-to-agent.*
+*Watching a local reasoning model work had two wrong endings: the text being typed vanished the moment the turn completed, and the answer arrived in one block after a silence. Both came from the same place — a live bubble that showed everything, and a commit that kept only the last step's text.*
 
 | | |
 |---|---|
-| 💬 **The words travel with the hop** | Your prompt rides `flow:start`, the same task rides `flow:delegate` when a coordinator hands it down, and the reply rides `flow:respond` — so a card's *Recent messages* row says what was said instead of only who said it and when, and a beam's hover tooltip reads *“You → Muse: …”* instead of stopping at the arrow |
-| 📜 **Messages is the whole conversation** | The drawer lists every hop for that agent — your prompt, the task it was handed, what it told a team-mate, the answer it produced, questions asked straight on the map — each with its full text, newest first, under **All communication** / **Agent to agent** |
-| 🗺️ **Every door reaches it** | The 3D card's **Messages →** button, a new one on the 2D agent metrics modal, and the **Comms** tab in Config → TRACE read the same log, so no two views can disagree about what was said — and Classic is no longer the one map with no way in |
-| 🗨️ **The ASK box is recorded too** | A question typed on the map becomes a **prompt** entry and the answer settles onto it like any other reply; a cancelled or errored ask settles as a failure, so it reads as asked instead of vanishing |
-| 🧮 **Bounded, in memory, on purpose** | 8 000 characters per entry and 600 hops per page-load — enough that a turn's own traffic cannot push out the question you are debugging, and nothing new is written to `storage/` |
-| 🎛️ **The card keeps every number** | Latency sparkline, p95, first token, queue wait, errors, tokens in/out, tool-call bars and Recent messages are exactly where they were: **Messages** adds the words, it does not replace the metrics |
+| 🧠 **Reasoning is painted as it arrives** | The block was built for the thought trace and the streaming callback never touched it, so a model could think for a minute with nothing on screen. It paints now, live |
+| 🔁 **Across steps, not just the last one** | A turn that thinks, calls a tool and thinks again keeps both traces in order, instead of committing whichever step it happened to finish on |
+| 📝 **Narration between tool calls is kept** | A local model thinks out loud in its reply text; those sentences were painted and then dropped at commit. They now ride along as the message's reasoning, so what you watched is still there afterwards |
+| ⏳ **No more silent gap** | The trace appears as it streams, so a slow first token reads as thinking rather than a hung request, and the answer no longer materialises out of nothing |
+| 🚫 **Still no echo** | A "reasoning" block that is really the reply is hidden by the existing echo rule, so nothing is shown twice |
 
 ---
 
@@ -614,6 +613,7 @@ No two models are alike — and the **free** ones are the fussiest of all. 🔧 
 
 - 🌍 **Speaks the model's language** — OpenAI-style JSON, Claude XML, native tags or plain JSON, detected from the provider + model id (or forced per agent).
 - 🛟 **One rescue retry** — if a reply *looks* like a tool call but parses to nothing, the loop re-teaches **once** with a different dialect instead of letting the near-miss become the answer.
+- 🩹 **Near misses are read, not dropped** — a guessed name (`list_agent` for `list_agents`, `Read-File`, `read_fil`, `functions.read_file`) is repaired to the tool it meant, and a guessed wrapper (`<|begin|> … <|end|>`, `<begin> … </begin>`, `<|tool|> … <|/tool|>`) parses exactly like `<|tool_call|>`. An invented name and a fence full of prose are still refused.
 - 🧠 **Learns the winner** — once a call parses, the dialect that worked is remembered per `provider + model` and tried first next time.
 - 🛑 **Off in one click** — Config → Labs → *Dynamic tools* restores the classic behaviour exactly, if you ever want it.
 
@@ -683,6 +683,7 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
   - **RUNS** — a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals.
   - **COMMS** — the whole conversation, with the text: your **prompt**, the task a coordinator **delegated**, each agent-to-agent **ask** with the answer that came back, one-way orders and pings, and the **reply** you were sent — each with its duration and a failure marker. Kept in memory (600 hops, 8 000 characters each) for the page-load; none of it is written to `storage/`.
   - **EXEC** — `storage/exec.log` parsed into runs, newest first: time, agent, command, working directory, duration, exit code, and a **no end** marker for a run that started and never reported back. Read-only — the UI has no button that can clear evidence.
+  - **SENT** — the exact body each agent posted, kept by the server in `storage/sent.json` (last 20): harness family, model, endpoint, message roles, and a **tools** badge naming the schemas that went out — or **no tools** when the request carried none. That distinction is the one a reply cannot make, and the full JSON is one click away under each row.
 - **🗣️ Per-agent, from the map** — an agent's card on the chart shows *Recent messages* with what was said, and **Messages →** opens a drawer scoped to that agent (**Talk** / **Runs**, filtered **All communication** / **Agent to agent**) without giving up a single metric the card already shows — the same button sits on the 2D agent metrics modal. Hovering a beam reads *"Agent A → Agent B: …"*.
 - **🧾 The audit trail is two-phase** — each `exec`/`run_code` run writes `phase=start` *before* the process spawns and `phase=end` afterwards, sharing one `run=` id and carrying `agent=<id>`. A command killed mid-run therefore leaves a visible start with no end instead of no record at all, and every line can be tied to the turn that asked for it.
 

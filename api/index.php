@@ -285,6 +285,9 @@ try {
         case 'exec':
             handleExec($method, $segments, $body);
             break;
+        case 'sent':
+            handleSent($method);
+            break;
         default:
             echo json_encode(['error' => 'Endpoint not found']);
     }
@@ -664,6 +667,30 @@ function handleRelay($method, $segments, $body) {
  * exposes nothing. Errors come back as {error} with a 400 so the tool harness
  * can show the model the actual reason instead of a bare HTTP failure.
  */
+/**
+ * The outgoing request ring (src/SentLog.php).
+ *
+ * GET    /sent   the last 20 requests this server posted, newest first
+ * DELETE /sent   empty it
+ *
+ * The body is assembled in PHP, so this is the only view of what was actually
+ * sent -- including whether a tools array went out and which schemas it held.
+ * No key is stored: it travels in a header and the endpoint's query string is
+ * stripped before an entry is written.
+ */
+function handleSent($method) {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    if ($method === 'DELETE' || $method === 'POST') {
+        \Src\SentLog::clear();
+    } elseif ($method !== 'GET') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed']);
+        return;
+    }
+    echo json_encode(['success' => true] + \Src\SentLog::read());
+}
+
 function handleExec($method, $segments, $body) {
     // The capability gate, answered before anything else so the browser can
     // show an agent why a command was refused.

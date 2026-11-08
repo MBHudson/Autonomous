@@ -10,13 +10,14 @@
 // TRACEPANEL.JS — the record of what happened
 // ============================================
 //
-// Three tabs over one modal, because these are three views of the same
+// Four tabs over one modal, because these are four views of the same
 // question ("what did the agents actually do?") and splitting them across
-// separate panels would mean hunting in three places for one run:
+// separate panels would mean hunting in four places for one run:
 //
 //   RUNS  — model turns and tool calls, with timing, tokens and success.
 //   COMMS — what the agents SAID to each other, not just that they spoke.
 //   EXEC  — storage/exec.log, paired into runs, newest first.
+//   SENT  — the exact body each agent posted, tools array included.
 //
 // RUNS and COMMS are page-load only (memory). EXEC is read from the server on
 // open, so it survives a reload and shows commands from earlier sessions —
@@ -25,11 +26,11 @@
 // The two renderers are exported so the per-agent drawer on the map can show
 // the same rows filtered to one agent instead of re-implementing them.
 
-import { store } from '../store.js?v=382';
-import { esc } from '../utils.js?v=382';
-import { recent, clear, stats } from '../trace.js?v=382';
-import { api } from '../api.js?v=382';
-import * as comms from '../commsLog.js?v=382';
+import { store } from '../store.js?v=385';
+import { esc } from '../utils.js?v=385';
+import { recent, clear, stats } from '../trace.js?v=385';
+import { api } from '../api.js?v=385';
+import * as comms from '../commsLog.js?v=385';
 
 function fmtTime(t) {
   try { return new Date(t).toLocaleTimeString([], { hour12: false }); } catch { return ''; }
@@ -126,6 +127,53 @@ export function execHtml(data) {
     </table>`;
 }
 
+/**
+ * The SENT list: one block per outgoing request, its whole body one click away.
+ *
+ * The badge is the point of the view. "no tools" on a turn that was supposed to
+ * call tools says the request never offered any — the opposite problem to a
+ * model that was handed schemas and ignored them, and the two are
+ * indistinguishable from the reply alone.
+ */
+export function sentHtml(data) {
+  const rows = (data && data.requests) || [];
+  if (!rows.length) {
+    return '<div class="trace-empty">No requests recorded yet. Each agent turn that reaches a provider is kept here, newest first.</div>';
+  }
+  return rows.map((r) => {
+    const tools = Array.isArray(r.tools) ? r.tools : [];
+    const badge = tools.length
+      ? `<span class="sent-badge has-tools">${tools.length} tool${tools.length === 1 ? '' : 's'}</span>`
+      : '<span class="sent-badge no-tools">no tools</span>';
+    const meta = [
+      fmtTime((Number(r.at) || 0) * 1000),
+      r.agent || 'no agent',
+      r.family || '',
+      r.bytes ? `${Math.round(Number(r.bytes) / 1024)} KB` : '',
+      r.truncated ? 'cut at the cap' : '',
+    ].filter(Boolean).join(' · ');
+    const choice = r.toolChoice == null
+      ? ''
+      : `tool_choice: ${typeof r.toolChoice === 'string' ? r.toolChoice : JSON.stringify(r.toolChoice)}`;
+    const roles = Array.isArray(r.roles) && r.roles.length ? `roles: ${r.roles.join(' → ')}` : '';
+    return `<div class="sent-item">
+      <div class="sent-head">${badge}<span class="sent-model">${esc(r.model || 'model')}</span><span class="sent-meta">${esc(meta)}</span></div>
+      <div class="sent-tools">${esc(r.endpoint || '(no endpoint)')}${choice ? ' · ' + esc(choice) : ''}</div>
+      ${roles ? `<div class="sent-tools">${esc(roles)}</div>` : ''}
+      ${tools.length ? `<div class="sent-tools">${esc(tools.join(', '))}</div>` : ''}
+      <details><summary>Payload</summary><pre class="sent-pre">${esc(prettyPayload(r))}</pre></details>
+    </div>`;
+  }).join('');
+}
+
+/** The stored body, indented when it parses and shown as-is when it was cut. */
+function prettyPayload(r) {
+  const raw = String((r && r.payload) || '');
+  if (!raw) return '(empty)';
+  try { return JSON.stringify(JSON.parse(raw), null, 2).slice(0, 20000); }
+  catch { return raw.slice(0, 20000); }
+}
+
 export class TracePanel {
   constructor() {
     this.el = null;
@@ -133,6 +181,9 @@ export class TracePanel {
     this.execData = null;
     this.execError = '';
     this.execLoading = false;
+    this.sentData = null;
+    this.sentError = '';
+    this.sentLoading = false;
   }
 
   init() {
@@ -141,7 +192,7 @@ export class TracePanel {
   }
 
   open(tab) {
-    if (tab === 'runs' || tab === 'comms' || tab === 'exec') this.tab = tab;
+    if (tab === 'runs' || tab === 'comms' || tab === 'exec' || tab === 'sent') this.tab = tab;
     this.el?.remove();
     const overlay = document.createElement('div');
     overlay.className = 'modal-bg open';
@@ -184,6 +235,7 @@ export class TracePanel {
   clearTab() {
     if (this.tab === 'runs') clear();
     else if (this.tab === 'comms') comms.clear();
+    else if (this.tab === 'sent') { this.clearSent(); return; }
     else return; // The exec log is the audit trail; the UI cannot delete it.
     this.render();
   }
@@ -200,7 +252,7 @@ export class TracePanel {
 
     body.innerHTML = `
       <div class="trace-tabs"></div>
-      <div class="trace-view" id="traceView">${this.tab === 'exec' ? this.execBody() : ''}</div>`;
+      <div class="trace-view" id="traceView">${this.tab === 'exec' ? this.execBody() : (this.tab === 'sent' ? this.sentBody() : '')}</div>`;
     this.renderTabs();
 
     if (this.tab === 'runs') {
@@ -218,8 +270,10 @@ export class TracePanel {
       body.querySelector('#traceView').innerHTML = `
         <div class="form-hint">What was said this page-load: your prompts, the tasks agents were handed, the agent-to-agent asks with their answers, and the replies. In memory only — none of it is written to storage.</div>
         <div class="trace-scroll">${commsHtml(comms.recent(comms.MAX))}</div>`;
-    } else {
+    } else if (this.tab === 'exec') {
       this.loadExec();
+    } else {
+      this.loadSent();
     }
   }
 
@@ -231,10 +285,12 @@ export class TracePanel {
     const tabs = this.el?.querySelector('.trace-tabs');
     if (!tabs) return;
     const execCount = this.execData ? (this.execData.entries || []).length : '';
+    const sentCount = this.sentData ? (this.sentData.requests || []).length : '';
     tabs.innerHTML = [
       ['runs', 'Runs', recent(300).length],
       ['comms', 'Comms', comms.count()],
       ['exec', 'Exec', execCount],
+      ['sent', 'Sent', sentCount],
     ].map(([id, label, n]) => `<button class="trace-tab${this.tab === id ? ' active' : ''}" data-trace-tab="${id}">
         ${esc(label)}${n !== '' && n != null ? `<span class="trace-count">${esc(String(n))}</span>` : ''}
       </button>`).join('');
@@ -292,6 +348,38 @@ export class TracePanel {
     this.renderTabs();
     const view = this.el?.querySelector('#traceView');
     if (view && this.tab === 'exec') view.innerHTML = this.execBody();
+  }
+
+  sentBody() {
+    if (this.sentLoading && !this.sentData) return '<div class="trace-empty">Reading storage/sent.json…</div>';
+    if (this.sentError) return `<div class="trace-empty">Could not read the request log — ${esc(this.sentError)}</div>`;
+    const hint = '<div class="form-hint">The exact body each agent posted, newest first — the harness family and model it went to, the message roles it carried, and whether a <b>tools</b> array went out, with the schemas it named. Kept by the server in <code>storage/sent.json</code> (last 20), because the body is built in PHP. No key is stored.</div>';
+    return hint + `<div class="trace-scroll">${sentHtml(this.sentData)}</div>`;
+  }
+
+  /** One fetch per open, like the exec log. */
+  async loadSent() {
+    if (this.sentLoading) return;
+    this.sentLoading = true;
+    this.sentError = '';
+    try {
+      const data = await api.sent();
+      if (!this.el) return; // closed while in flight
+      this.sentData = data;
+    } catch (err) {
+      this.sentError = err?.message || String(err);
+    } finally {
+      this.sentLoading = false;
+    }
+    this.renderTabs();
+    const view = this.el?.querySelector('#traceView');
+    if (view && this.tab === 'sent') view.innerHTML = this.sentBody();
+  }
+
+  async clearSent() {
+    try { await api.clearSent(); } catch { /* the reload below reports it */ }
+    this.sentData = null;
+    await this.loadSent();
   }
 
   close() {

@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=382';
-import { asText, compactText } from './utils.js?v=382';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=382';
-import { settingFor } from './agentConfig.js?v=382';
-import { trace } from './trace.js?v=382';
+import { store } from './store.js?v=385';
+import { asText, compactText } from './utils.js?v=385';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=385';
+import { settingFor } from './agentConfig.js?v=385';
+import { trace } from './trace.js?v=385';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1927,6 +1927,8 @@ function _parseToolCall(text) {
   if (invoke) return invoke;
   const fnTag = parseFunctionTagToolCall(raw);
   if (fnTag) return fnTag;
+  const fence = parseFenceToolCall(raw);
+  if (fence) return fence;
   return parseNativeToolCall(raw);
 }
 
@@ -1943,8 +1945,8 @@ function fromToolObject(source) {
 
   // {"function":"read_file","arguments":{...}} -- OpenAI function-call shape.
   const fn = obj.function;
-  const name = String(obj.tool || obj.name || (fn && (fn.name || fn.tool)) || '').trim();
-  if (!name || !Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name)) return null;
+  const name = repairToolName(obj.tool || obj.name || (fn && (fn.name || fn.tool)) || '');
+  if (!name) return null;
 
   let arg = obj.arg;
   if (arg === undefined && fn) arg = fn.arguments;
@@ -2084,12 +2086,24 @@ export function stripToolCall(text) {
 }
 
 // Containers before their contents: <function_calls> wraps <invoke>.
+/**
+ * A wrapper the model guessed at, e.g. `<|begin|>…<|end|>`.
+ *
+ * A local model with no tool schema in its context invents the fence instead
+ * of copying one: LM Studio/Llama templates use <|begin|> and <|end|>, some
+ * emit <begin>/<end>, others <|tool|>. Only the wrapper differs — the body is
+ * still JSON or `name{…}` — so one pattern and the ordinary body parsers cover
+ * all of them.
+ */
+const LABEL_FENCE_SRC = '<\\s*\\|?\\s*(?:begin|tool)\\s*\\|?\\s*>([\\s\\S]*?)(?:<\\s*\\|?\\s*\\/?\\s*(?:end|tool)\\s*\\|?\\s*>|$)';
+
 const TOOL_BLOCK_PATTERNS = [
   /<\s*function_calls\s*>[\s\S]*?<\s*\/\s*function_calls\s*>/gi,
   /<\s*invoke\b[\s\S]*?<\s*\/\s*invoke\s*>/gi,
   /<\s*function\b[\s\S]*?<\s*\/\s*function\s*>/gi,
   /<\s*tool_call\s*>[\s\S]*?<\s*\/\s*tool_call\s*>/gi,
   /<\s*\|?\s*tool[-_]call\s*\|?\s*>[\s\S]*?(?:<\s*\|?\s*\/?\s*\|?\s*tool[-_]call\s*\|?\s*>|$)/gi,
+  new RegExp(LABEL_FENCE_SRC, 'gi'),
 ];
 
 /** `<|tool_calls_begin|> … <|tool_call_end|>` (Qwen / GLM). */
@@ -2163,8 +2177,8 @@ function parseInvokeToolCall(text) {
   const src = normaliseNative(text);
   const hit = /<\s*invoke\s+name\s*=\s*["']([^"']+)["']\s*>([\s\S]*?)<\s*\/\s*invoke\s*>/i.exec(src);
   if (!hit) return null;
-  const name = hit[1].trim();
-  if (!Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name)) return null;
+  const name = repairToolName(hit[1]);
+  if (!name) return null;
   const body = hit[2];
   const arg = {};
   const paramRe = /<\s*parameter\s+name\s*=\s*["']([^"']+)["']\s*>([\s\S]*?)<\s*\/\s*parameter\s*>/gi;
@@ -2206,8 +2220,8 @@ function parseFunctionTagToolCall(text) {
   const src = normaliseNative(text);
   const hit = /<\s*function\s*(?:=\s*|name\s*=\s*["']?)([A-Za-z_][A-Za-z0-9_-]*)\s*["']?\s*>([\s\S]*?)<\s*\/\s*function\s*>/i.exec(src);
   if (!hit) return null;
-  const name = hit[1].trim();
-  if (!Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name)) return null;
+  const name = repairToolName(hit[1]);
+  if (!name) return null;
   const body = hit[2];
   const arg = {};
   const paramRe = /<\s*parameter\s*(?:=\s*|name\s*=\s*["']?)([A-Za-z_][A-Za-z0-9_-]*)\s*["']?\s*>([\s\S]*?)<\s*\/\s*parameter\s*>/gi;
@@ -2276,19 +2290,20 @@ function parseNativeToolCall(text) {
     const [, name, tail] = split;
     const tailTrim = NATIVE_CLOSE.test(tail) ? tail.replace(NATIVE_CLOSE, '') : tail;
     const inner = extractJsonObject(tailTrim);
-    if (Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name)) {
+    const tool = repairToolName(name);
+    if (tool) {
       let arg;
       if (tailTrim.trim()) {
         if (inner) { try { arg = JSON.parse(inner); } catch { arg = tailTrim.trim(); } }
         else arg = tailTrim.trim();
       }
-      return { tool: name, arg };
+      return { tool, arg };
     }
   }
 
   // Bare name with no arguments: <|tool_call|>list_agents<|tool_call|>
-  const bare = body.split(/[\s<|]/)[0].trim();
-  if (Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, bare)) {
+  const bare = repairToolName(body.split(/[\s<|]/)[0]);
+  if (bare) {
     return { tool: bare, arg: undefined };
   }
   return null;
@@ -2302,6 +2317,140 @@ function coerceArg(v) {
   if (s !== '' && !Number.isNaN(Number(s)) && /^-?\d+(\.\d+)?$/.test(s)) return Number(s);
   if (/^[[{]/.test(s)) { try { return JSON.parse(s); } catch { return s; } }
   return v;
+}
+
+/**
+ * Read a guessed wrapper: `<|begin|>{"tool":…}<|end|>`, `<begin>…</begin>`,
+ * `<|tool|>…<|/tool|>`.
+ *
+ * Text inside such a fence is still not a call: the body has to yield a name
+ * that resolves to a registry tool, so an answer wrapped in model markup falls
+ * through untouched.
+ */
+function parseFenceToolCall(text) {
+  const re = new RegExp(LABEL_FENCE_SRC, 'gi');
+  let m;
+  const src = String(text || '');
+  while ((m = re.exec(src)) !== null) {
+    const hit = parseCallBody(m[1]);
+    if (hit) return hit;
+    if (m.index === re.lastIndex) re.lastIndex++;   // never loop on a zero-width match
+  }
+  return null;
+}
+
+/** JSON, then `name{…}`, then a bare name — the native block's shapes. */
+function parseCallBody(rawBody) {
+  const body = String(rawBody || '').trim();
+  if (!body) return null;
+
+  if (body.startsWith('{')) {
+    const obj = extractJsonObject(body);
+    const hit = obj ? fromToolObject(obj) : null;
+    if (hit) return hit;
+  }
+
+  const split = /^([A-Za-z_][A-Za-z0-9_.:-]*)\s*([\s\S]*)$/.exec(body);
+  if (!split) return null;
+  const tool = repairToolName(split[1]);
+  if (!tool) return null;
+  const tail = split[2].trim();
+  if (!tail) return { tool, arg: undefined };
+  const inner = extractJsonObject(tail);
+  if (inner) {
+    try { return { tool, arg: JSON.parse(inner) }; } catch { /* keep the text */ }
+  }
+  return { tool, arg: tail };
+}
+
+/** Separators, case and stray punctuation folded to the registry's spelling. */
+function normaliseToolName(raw) {
+  return String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\(\s*\)$/, '')
+    .replace(/[\s./\\:-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/** Levenshtein distance, giving up as soon as it is certainly over `max`. */
+function editDistance(a, b, max) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = new Array(b.length + 1);
+  let cur = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    cur[0] = i;
+    let rowMin = cur[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (cur[j] < rowMin) rowMin = cur[j];
+    }
+    if (rowMin > max) return max + 1;
+    const swap = prev; prev = cur; cur = swap;
+  }
+  return prev[b.length];
+}
+
+/**
+ * The registry key a guessed name most likely meant, or '' when nothing is
+ * close enough to be that tool.
+ *
+ * Local models misspell in predictable ways: `list_agent` for list_agents,
+ * `Read-File` for read_file, `read_fil` for a one-character slip. Every one of
+ * those used to end the turn, because the registry check was exact — a real
+ * call in a real reply parsed to nothing and the prose became the answer.
+ *
+ * Deliberately conservative. Short names are never repaired at all, the edit
+ * distance is scaled by length, and the best match has to be unique: running
+ * the wrong tool because two names were equally close is worse than reporting
+ * an unknown tool and letting the model try again.
+ */
+export function repairToolName(raw) {
+  const given = String(raw ?? '').trim();
+  if (!given) return '';
+  if (Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, given)) return given;
+
+  const forms = new Set();
+  const add = (value) => {
+    const name = normaliseToolName(value);
+    if (name) forms.add(name);
+  };
+  add(given);
+  // functions.read_file / tools/list_agents: keep the part that names the tool.
+  const cut = Math.max(given.lastIndexOf('.'), given.lastIndexOf('/'));
+  if (cut !== -1) add(given.slice(cut + 1));
+
+  const has = name => Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name);
+  for (const form of forms) {
+    if (has(form)) return form;
+    // A name differing only by the plural "s" is the same tool: this is the
+    // "list_agent" case, and it is the commonest miss by a wide margin.
+    const singular = form.replace(/_?s$/, '');
+    if (singular !== form && has(singular)) return singular;
+    if (has(form + 's')) return form + 's';
+    const bare = form.replace(/^(?:functions?|tools?|api)_/, '');
+    if (bare !== form && has(bare)) return bare;
+  }
+
+  let best = '';
+  let bestDist = Infinity;
+  let tie = false;
+  for (const form of forms) {
+    const max = form.length >= 10 ? 2 : (form.length >= 5 ? 1 : 0);
+    if (!max) continue;
+    for (const name of Object.keys(TOOL_REGISTRY)) {
+      const d = editDistance(form, name, max);
+      if (d > max) continue;
+      if (d < bestDist) { bestDist = d; best = name; tie = false; }
+      else if (d === bestDist && name !== best) tie = true;
+    }
+  }
+  return tie ? '' : best;
 }
 
 /**
