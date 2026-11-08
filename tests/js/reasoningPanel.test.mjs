@@ -36,6 +36,13 @@ ok(reasoningOpenByDefault(undefined, undefined) === false, 'undefined reasoning 
 ok(reasoningOpenByDefault('x'.repeat(REASONING_OPEN_CHARS * 5), undefined) === true,
   'a very long trace opens');
 
+// --- Auto is a choice, not an absence ---------------------------------------
+ok(reasoningOpenByDefault('x'.repeat(REASONING_OPEN_CHARS), 'auto') === true,
+  'auto still opens a long trace');
+ok(reasoningOpenByDefault('short thought', 'auto') === false, 'auto still collapses a short one');
+ok(reasoningOpenByDefault('x'.repeat(REASONING_OPEN_CHARS - 1), 'auto') === false,
+  'auto keeps the threshold exactly');
+
 // --- a saved choice wins, whatever the length --------------------------------
 ok(reasoningOpenByDefault('short', true) === true, 'a remembered open wins over a short trace');
 ok(reasoningOpenByDefault('x'.repeat(REASONING_OPEN_CHARS * 5), false) === false,

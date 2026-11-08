@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=376';
-import { K } from '../storage.js?v=376';
-import { persistence } from '../persistence.js?v=376';
-import { api } from '../api.js?v=376';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=376';
-import { errText } from '../api.js?v=376';
-import { TOOL_REGISTRY } from '../tools.js?v=376';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=376';
-import { snapshot } from '../rateGovernor.js?v=376';
-import { resetBrowserEnabled } from '../toolManifest.js?v=376';
-import { perf } from '../perf.js?v=376';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=376';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=376';
+import { store } from '../store.js?v=377';
+import { K } from '../storage.js?v=377';
+import { persistence } from '../persistence.js?v=377';
+import { api } from '../api.js?v=377';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=377';
+import { errText } from '../api.js?v=377';
+import { TOOL_REGISTRY } from '../tools.js?v=377';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=377';
+import { snapshot } from '../rateGovernor.js?v=377';
+import { resetBrowserEnabled } from '../toolManifest.js?v=377';
+import { perf } from '../perf.js?v=377';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=377';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=377';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1384,6 +1384,11 @@ export class Sidebar {
 
     const themeLabel = { dark: 'Dark', matrix: 'Matrix', cyberpunk: 'Cyberpunk' }[settings.theme] || 'Dark';
     const iface = normalizeIface(settings.interfaceMode);
+    // Reasoning panels: true = always open, false = always collapsed, 'auto'
+    // (or absent) = the length rule. One key with three meanings, so a click on
+    // a panel and this switch cannot drift apart.
+    const reasoningMode = settings.reasoningOpen === true ? 'open'
+      : (settings.reasoningOpen === false ? 'closed' : 'auto');
 const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings.chartGhost || {}) };
     const mem = settings.historyTurns ?? DEFAULT_HISTORY_TURNS;
     const rpm = Number(settings.rateLimitRpm) || 0;
@@ -1413,6 +1418,15 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <div class="toggle ${settings.autoScroll ? 'active' : ''}" id="sbAutoScroll">
             <div class="toggle-knob"></div>
           </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reasoning panels <span class="form-hint-inline">${reasoningMode === 'auto' ? 'automatic' : (reasoningMode === 'open' ? 'always open' : 'collapsed')}</span></label>
+          <select class="form-select" id="sbReasoningPanel">
+            <option value="auto" ${reasoningMode === 'auto' ? 'selected' : ''}>Auto — open when the thinking is long (400+ characters)</option>
+            <option value="open" ${reasoningMode === 'open' ? 'selected' : ''}>Always open — every trace in full</option>
+            <option value="closed" ${reasoningMode === 'closed' ? 'selected' : ''}>Always collapsed — keep the transcript flat</option>
+          </select>
+          <div class="form-hint">How each reply's Reasoning panel starts. Opening or closing one by hand is still remembered — that click becomes your choice — and Auto puts the length rule back.</div>
         </div>
         <div class="toggle-row">
           <span class="toggle-label">Enter to Send</span>
@@ -2036,6 +2050,21 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       persistence.set('settings', store.get('settings'));
     });
     this._startGauges();
+
+    // Reasoning panels: Auto keeps the length rule, open/collapsed pin every
+    // message. Written at once like the other display preferences, so the next
+    // reply obeys it without a SAVE.
+    document.getElementById('sbReasoningPanel')?.addEventListener('change', (e) => {
+      const mode = e.target.value;
+      store.set('settings.reasoningOpen', mode === 'open' ? true : (mode === 'closed' ? false : 'auto'));
+      try { persistence.set('settings', store.get('settings')); } catch { /* view pref only */ }
+      store.emit('toast', {
+        message: mode === 'auto'
+          ? 'Reasoning panels follow the length again — 400 characters or more opens'
+          : (mode === 'open' ? 'Reasoning panels now start open' : 'Reasoning panels now start collapsed'),
+        type: 'info',
+      });
+    });
 
     this._initToggle('sbAutoScroll', (val) => store.set('settings.autoScroll', val));
     this._initToggle('sbEnterToSend', (val) => store.set('settings.enterToSend', val));

@@ -10,15 +10,15 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=376';
-import { persistence } from '../persistence.js?v=376';
-import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=376';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=376';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=376';
-import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=376';
-import { audio } from '../audio.js?v=376';
-import { api } from '../api.js?v=376';
-import * as memory from '../memory.js?v=376';
+import { store } from '../store.js?v=377';
+import { persistence } from '../persistence.js?v=377';
+import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=377';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=377';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=377';
+import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=377';
+import { audio } from '../audio.js?v=377';
+import { api } from '../api.js?v=377';
+import * as memory from '../memory.js?v=377';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };

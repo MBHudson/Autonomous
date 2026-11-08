@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v376 — the Reasoning box remembers, and opens when there is a lot to read 🧠
+### 🆕 v377 — a Reasoning switch in Config, so the default need not be taught by clicking 🎛️
 
-*The panel started collapsed every time, so a reply that thought for a thousand words hid all of it behind one click — and the one time you opened one, the next message was shut again.*
+*The panel remembered clicks, but the only way to set it was to open or close a message and hope the next reply followed. It is a switch in Config → Interface now, with Auto kept as a choice of its own.*
 
 | | |
 |---|---|
-| 🧠 **It remembers your choice** | Open a Reasoning panel and the next one starts open; close it and the next starts closed — including the message you are still watching stream. The choice is saved with the rest of your settings, so it survives a reload |
-| 📖 **Long thinking opens itself** | Until you have chosen, a reply carrying 400 characters or more of reasoning opens the panel on its own, while anything shorter stays collapsed so a two-line thought cannot push the answer down the page |
-| 🧵 **Only clicks are remembered** | The state is recorded from your clicks, never from the app's own opening, so a default cannot masquerade as a preference — and a panel you open mid-stream is not flipped back by the next token |
+| 🎛️ **Auto · Always open · Collapsed** | Config → Interface sets how every Reasoning panel starts — **Auto** keeps the length rule (400 characters or more opens), **Always open** shows every trace in full, **Collapsed** keeps the transcript flat. Written at once, no SAVE, and it survives a reload |
+| 🖱️ **A click still wins** | Opening or closing one panel teaches the app the way it always did — that click is saved as your choice — so the switch and the panels never disagree |
+| 📖 **Auto stays reachable** | Choosing **Auto** puts the length rule back, so pinning a preference once does not cost you the behaviour that opens long thinking by itself — and a panel opened mid-stream is still not flipped back by the next token |
 
 ---
 
@@ -127,7 +127,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 📌 **Pinned certificates** | Read the chain a host actually presents, see its SHA-256, and store it in `storage/tls/trusted.pem` — every pin is listed in Config → TLS / Certificates with fingerprint, expiry and pin date, and FORGET drops one |
 | ⚠️ **Expiry warnings** | A pin inside 30 days reads *EXPIRES IN n DAYS* in the list and raises a bell notification naming the host, so a renewed server certificate is re-pinned before it becomes an outage |
 | 🧭 **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
-| 🧠 **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message that remembers whether you keep it open and opens itself when the thinking is long |
+| 🧠 **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, and **Config → Interface** pins it Auto, always open or always collapsed |
 | 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
 | 🎨 **Themes** | Dark, Matrix, Cyberpunk |

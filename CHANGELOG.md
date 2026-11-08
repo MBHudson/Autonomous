@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🎛️ A Reasoning switch in Config → Interface *(`VERSION` 377, cache-buster v376 → v377)*
+
+*2026-11-08. The panel remembered clicks, so the only way to set it was to open or close a message and hope the next reply followed -- no way to say "always open" on purpose, and no way back to the length rule once a click had been made.*
+
+**Three choices, one key.** Config → Interface now carries **Reasoning panels**: *Auto* (open at 400+ characters of reasoning), *Always open*, or *Always collapsed*. It writes the same `settings.reasoningOpen` the panels read -- true, false, or the string `'auto'` -- so a hand click and the switch cannot disagree. The change applies to the next reply with no SAVE, is persisted with the rest of the settings, and says what it did in a toast.
+
+**Auto is a real choice.** `reasoningOpenByDefault()` treats `'auto'` like an absent preference, so picking Auto restores the length rule after a pinned one; a click on any panel still writes a boolean, which is the "remember what I did" half.
+
+**Tests and docs.** `tests/js/reasoningPanel.test.mjs` gained the `'auto'` cases (long opens, short collapses, the threshold exact). README: the **What's new** entry for v377 (replacing v376) and the *Reasoning, in its own box* row now names the Config switch.
+
+---
+
 ## 🧠 The Reasoning box remembers you, and opens when it has a lot to say *(`VERSION` 376, cache-buster v375 → v376)*
 
 *2026-11-08. Every reply's Reasoning panel started collapsed, so a model that thought at length hid it all behind a click, and the one time an operator opened it the next message was shut again.*

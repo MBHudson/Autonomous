@@ -19,14 +19,16 @@ export const REASONING_OPEN_CHARS = 400;
 /**
  * Whether a Reasoning panel starts open.
  *
- * The operator's last choice wins once they have made one -- that is the
- * remembering part, and it is saved with the rest of the settings. Until then a
- * reply that thought at length opens, because a collapsed box hides the very
- * thing the panel exists to show, while a two-line thought stays shut so it
- * cannot push the answer down the transcript.
+ * `remembered` is the saved preference: true = always open, false = always
+ * collapsed, 'auto' (or nothing) = decide by length. The operator's last choice
+ * wins once they have made one -- that is the remembering part, and it is saved
+ * with the rest of the settings. Until then a reply that thought at length
+ * opens, because a collapsed box hides the very thing the panel exists to show,
+ * while a two-line thought stays shut so it cannot push the answer down the
+ * transcript.
  */
 export function reasoningOpenByDefault(text, remembered) {
-  if (typeof remembered === 'boolean') return remembered;
+  if (remembered === true || remembered === false) return remembered;
   return String(text ?? '').trim().length >= REASONING_OPEN_CHARS;
 }
 
