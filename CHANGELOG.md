@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🐧 A fresh copy carries its permissions *(`VERSION` 430, no browser file changed)*
+
+*A clone honours the executable bit. `freshClone.php` builds its copy with `copy()`, which carries bytes only -- so the check that asks "would this work for someone who just cloned it?" was answering for a tree nobody would ever have.*
+
+**`./setup-token.sh --show` exited 126 in the copy**, exactly as it had on the runner moments earlier: the index had the file at `100644`, and the copy reproduced that without being told to. Every file whose source is executable is written `0755` now on POSIX, where the bit exists; Windows decides by extension and has no such bit to carry, so its copies are unchanged.
+
+**The runner's failure was the same fact twice** -- the mode in the index and the mode in the copy -- which is why correcting one only moved the red step one place to the right. Both are corrected.
+
 ## 🐧 Green on a machine that is not this one *(`VERSION` 429, no browser file changed)*
 
 *The first CI run failed in three test files, and none of the failures was a broken feature: the suite had never run on a host that is not this one.*

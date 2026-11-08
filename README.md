@@ -38,15 +38,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v429 — green on a machine that is not this one 🐧
+### 🆕 v430 — a fresh copy carries its permissions 🐧
 
-*The first CI run failed in three test files, and none of the failures was a broken feature.*
+*A clone honours the executable bit; a plain `copy()` does not, so the fresh-copy check was testing a tree nobody would ever have.*
 
 | | |
 |---|---|
-| 🐧 **`setup-token.sh` was never executable** | it shipped `100644` — invisible on Windows, fatal on Linux, where `./setup-token.sh --show` exits 126 before reading a line |
-| 🔗 **A masked URL is still a URL** | `json_encode` escapes slashes, so the secrets test now parses the response instead of grepping for a spelling JSON never contains |
-| 🪟 **Platform-specific refusals say so** | the launcher's detached launch and pid lookup, the twin copy it opens, the policy wording (`program` vs `executable`) and typing's own input refusals are each asserted on the platform they describe, and print a skip elsewhere |
+| 🐧 **`setup-token.sh` runs in the copy too** | it shipped `100644` and the fresh copy kept it that way, so `./setup-token.sh --show` exited 126 on Linux and again in the copy |
+| 🔗 **A masked URL is still a URL** | `json_encode` escapes slashes, so the secrets test parses the response instead of grepping for a spelling JSON never contains |
+| 🪟 **Platform-specific refusals say so** | the detached launch, the twin copy, the policy wording and typing's input refusals are asserted where they exist and print a skip elsewhere |
 ---
 
 ## 🧭 Contents

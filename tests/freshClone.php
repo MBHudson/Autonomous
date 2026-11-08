@@ -186,6 +186,13 @@ if ($head) {
         if (!@copy($src, $to)) {
             stop('Could not copy ' . $rel . ' into the fresh copy.');
         }
+        // A plain copy() carries bytes, not permissions. A clone honours the
+        // executable bit in the tree, so a fresh copy without it is not the tree
+        // someone would clone: setup-token.sh lands 0644 and ./setup-token.sh
+        // exits 126 before it runs a line. Windows has no such bit to carry.
+        if (DIRECTORY_SEPARATOR !== '\\' && @is_executable($src)) {
+            @chmod($to, 0755);
+        }
         $copied++;
     }
     echo "copy: the working tree as git sees it -- " . $copied . " files"
