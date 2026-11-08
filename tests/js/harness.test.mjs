@@ -101,6 +101,8 @@ eq(envU.prompt, 2, 'outputUsage: prompt');
 eq(envU.completion, 3, 'outputUsage: completion');
 eq(envU.total, 5, 'outputUsage: total');
 eq(outputUsage({ usage: {} }), null, 'outputUsage: no stats -> null');
+eq(outputText({ output: [{ type: 'reasoning', content: 'a' }, { type: 'message', content: 'x' }, { type: 'reasoning', content: 'b' }] }, ['reasoning']), 'a\n\nb',
+  'outputText: blocks stay separated');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

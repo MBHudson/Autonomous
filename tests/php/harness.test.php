@@ -166,6 +166,18 @@ $u = Harness::usage($env, 'openrouter');
 ok($u['prompt'] === 2 && $u['completion'] === 3 && $u['total'] === 5, 'usage: stats envelope');
 ok(Harness::reasoning(['output' => [['type' => 'reasoning', 'content' => 'why']]], 'openrouter') === 'why',
     'reasoning: envelope reasoning block');
+ok(Harness::reasoning(['output' => [
+    ['type' => 'reasoning', 'content' => 'a'],
+    ['type' => 'message', 'content' => 'x'],
+    ['type' => 'reasoning', 'content' => 'b'],
+]], 'openrouter') === "a\n\nb", 'reasoning: several envelope blocks stay separated');
+
+// Google marks its working on a part; it is shown, never spoken.
+$go = ['candidates' => [['content' => ['parts' => [['text' => 'ans'], ['text' => 'hmm', 'thought' => true]]]]]];
+ok(Harness::content($go, 'google') === 'ans', 'content: google thought part kept out of the answer');
+ok(Harness::reasoning($go, 'google') === 'hmm', 'reasoning: google thought part read');
+ok(Harness::content(['candidates' => [['content' => ['parts' => [['text' => 'hmm', 'thought' => true]]]]]], 'google') === null,
+    'content: a thoughts-only google reply is not an answer');
 ok(Harness::content(['nope' => 1], 'openrouter') === null, 'content: none -> null');
 
 // --- usage --------------------------------------------------------------

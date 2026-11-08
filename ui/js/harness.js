@@ -30,9 +30,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=374';
-import { store } from './store.js?v=374';
-import { persistence } from './persistence.js?v=374';
+} from './harness.data.js?v=375';
+import { store } from './store.js?v=375';
+import { persistence } from './persistence.js?v=375';
 
 export { API_FAMILIES };
 
@@ -331,21 +331,23 @@ export function describeHarness(spec = {}) {
 export function outputText(data, kinds = ['message', 'output_text', 'text']) {
   const blocks = data && Array.isArray(data.output) ? data.output : null;
   if (!blocks) return null;
-  let out = '';
+  const pieces = [];
   for (const block of blocks) {
     if (!block || typeof block !== 'object') continue;
     const type = String(block.type ?? 'message');
     if (kinds && kinds.length && !kinds.includes(type)) continue;
     let text = block.content ?? block.text ?? '';
     if (Array.isArray(text)) {
+      // Inside one block the fragments are a single stream of text.
       text = text.map(part => {
         if (typeof part === 'string') return part;
         return part && typeof part.text === 'string' ? part.text : '';
       }).join('');
     }
-    if (typeof text === 'string') out += text;
+    if (typeof text === 'string' && text !== '') pieces.push(text);
   }
-  return out === '' ? null : out;
+  // Separate blocks are separate thoughts; keep the break the author wrote.
+  return pieces.length ? pieces.join('\n\n') : null;
 }
 
 /** Token counts from that envelope's `stats` block, or null. */

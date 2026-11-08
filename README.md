@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v374 — a runner's own reply shape stops arriving as JSON 🧩
+### 🆕 v375 — every thought in its own box, whatever shape the runner speaks 🧠
 
-*Some model servers answer in their own envelope — `{"output":[{"type":"message","content":"…"}],"stats":{…}}` — instead of the OpenAI shape. Nothing recognised it, so the raw body was posted into the transcript as the agent's reply.*
+*Reasoning only appeared when a provider happened to use OpenAI's field: Google's `thought: true` parts were joined into the reply itself, a runner's own reasoning blocks fed a panel nothing filled, and several blocks ran together as one sentence. Every shape's thinking is read now, kept out of the answer, and shown — verbose and collapsible, on the message it belongs to.*
 
 | | |
 |---|---|
-| 🧩 **The `output` envelope is read** | `message` / `output_text` / `text` blocks become the answer, a block whose content is itself an array of `{type:"text"}` parts is joined, `stats.input_tokens` and `stats.total_output_tokens` become the token counts, and `reasoning` / `thinking` blocks go to the thinking panel instead of the reply. Understood on the server, on the direct-call parser and on stream frames alike. |
-| 🛡️ **Thinking is not the answer** | A body carrying only a `reasoning` block reports no content rather than its private notes — the same rule every other shape already followed. |
-| 🫥 **An unknown body still shows** | The last-resort fallback that hands back a body it cannot read is deliberate, and stays: it is why this bug was visible at all, and nothing is silently swallowed. |
+| 🧠 **Every shape's thinking is read** | `reasoning_content` / `reasoning` beside an OpenAI-compatible answer, Anthropic `thinking` and `redacted_thinking` blocks, Google parts marked `thought: true`, and a runner's own `{"type":"reasoning"}` blocks all become the message's **Reasoning** panel instead of being dropped |
+| 🙈 **…and never the answer** | Google thought parts used to be concatenated into the reply text, so a model's notes were presented as something it said. The answer now takes only parts that are not thoughts, and a reply that carries nothing else reports no content rather than its private work |
+| 📜 **Verbose, separated, collapsible** | Several reasoning blocks keep the blank line the author wrote between them instead of running into one sentence, the panel closes when you want the transcript flat, and both the streamed and the one-shot paths fill it — including the runner envelope that used to arrive as raw JSON |
 
 ---
 
@@ -127,6 +127,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 📌 **Pinned certificates** | Read the chain a host actually presents, see its SHA-256, and store it in `storage/tls/trusted.pem` — every pin is listed in Config → TLS / Certificates with fingerprint, expiry and pin date, and FORGET drops one |
 | ⚠️ **Expiry warnings** | A pin inside 30 days reads *EXPIRES IN n DAYS* in the list and raises a bell notification naming the host, so a renewed server certificate is re-pinned before it becomes an outage |
 | 🧭 **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
+| 🧠 **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, verbose and never mixed into the reply |
 | 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
 | 🎨 **Themes** | Dark, Matrix, Cyberpunk |

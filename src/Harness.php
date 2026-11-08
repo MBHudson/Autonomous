@@ -375,13 +375,16 @@ class Harness {
                 return null;
 
             case 'google':
-                if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-                    return $data['candidates'][0]['content']['parts'][0]['text'];
-                }
+                // A part marked `thought: true` is the model's working, not its
+                // answer. reasoning() reads it and the thinking panel shows it;
+                // joining it into the reply is how Gemini's notes used to end up
+                // presented as the model's words.
                 if (isset($data['candidates'][0]['content']['parts']) && is_array($data['candidates'][0]['content']['parts'])) {
                     $out = '';
                     foreach ($data['candidates'][0]['content']['parts'] as $p) {
-                        if (is_array($p) && isset($p['text'])) $out .= $p['text'];
+                        if (is_array($p) && empty($p['thought']) && isset($p['text']) && is_string($p['text'])) {
+                            $out .= $p['text'];
+                        }
                     }
                     if ($out !== '') return $out;
                 }
@@ -421,13 +424,14 @@ class Harness {
         if (!is_array($data) || !isset($data['output']) || !is_array($data['output'])) {
             return null;
         }
-        $out = '';
+        $pieces = array();
         foreach ($data['output'] as $block) {
             if (!is_array($block)) { continue; }
             $type = (string)($block['type'] ?? 'message');
             if ($kinds && !in_array($type, $kinds, true)) { continue; }
             $text = $block['content'] ?? $block['text'] ?? '';
             if (is_array($text)) {
+                // Inside one block the fragments are one stream of text.
                 $joined = '';
                 foreach ($text as $part) {
                     if (is_string($part)) { $joined .= $part; }
@@ -435,9 +439,11 @@ class Harness {
                 }
                 $text = $joined;
             }
-            if (is_string($text)) { $out .= $text; }
+            if (is_string($text) && $text !== '') { $pieces[] = $text; }
         }
-        return $out === '' ? null : $out;
+        // Separate blocks are separate thoughts: a runner that sends three of
+        // them should read as three, not as one run-on sentence.
+        return $pieces === array() ? null : implode("\n\n", $pieces);
     }
 
     /**

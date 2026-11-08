@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧠 Thoughts get their own box, whatever shape the runner speaks *(`VERSION` 375, cache-buster v374 → v375)*
+
+*2026-11-08. Reasoning reached the transcript only when a provider happened to use OpenAI's field. Google's `thought: true` parts were joined into the answer, a runner's own reasoning blocks fed a panel nothing filled, and several blocks ran together as one sentence.*
+
+**Every shape is read.** `Harness::reasoning()` already knew OpenAI's `reasoning_content` / `reasoning`, Anthropic's `thinking` and `redacted_thinking`, Google's `thought: true` parts and a runner's `{"type":"reasoning"}` blocks; the browser did not know Google's, so `_parseReasoning()` gained it and the stream parser now splits a Gemini frame into answer and thoughts instead of concatenating both into the reply. `outputText()` joins separate blocks with a blank line, so three thoughts read as three rather than as one run-on sentence, and the same join is used by `Harness::outputText()`.
+
+**Never the answer.** `Harness::content()` and `_parseProviderResponse()` keep Google parts marked `thought: true` out of the reply, so a model's working is no longer presented as something it said; a thoughts-only reply reports no content, and the streaming path reports it as reasoning-only rather than as an empty reply.
+
+**Docs and guards.** README: the **What's new** entry for v375 (replacing v374, whose envelope work is now in the *Auto-fitting harness* row and the provider-harness section) and a new **Reasoning, in its own box** row in **What's inside**. `tests/php/docs.test.php` enforces that one-release rule and that every Contents anchor resolves, so neither the entry nor the table can silently drift again. `tests/php/harness.test.php` and `tests/js/harness.test.mjs` cover the split and the block separation.
+
+---
+
 ## 🧩 A runner's own reply envelope no longer arrives as JSON *(`VERSION` 374, cache-buster v373 → v374)*
 
 *2026-11-08. Some runners answer `{output:[{type:"message",content:"…"}],stats:{…}}` instead of the OpenAI shape. Nothing recognised it, so the raw-body fallback handed the whole envelope to the tool loop and the JSON was posted into the transcript as the agent's reply.*

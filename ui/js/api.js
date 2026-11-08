@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=374';
-import { acquire, note429 } from './rateGovernor.js?v=374';
-import { latency } from './latency.js?v=374';
-import { detectFamily, outputText, outputUsage } from './harness.js?v=374';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=374';
+import { store } from './store.js?v=375';
+import { acquire, note429 } from './rateGovernor.js?v=375';
+import { latency } from './latency.js?v=375';
+import { detectFamily, outputText, outputUsage } from './harness.js?v=375';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=375';
 
 latency.bindStore(store);
 
@@ -837,11 +837,19 @@ class ApiClient {
       // Google stream would arrive and be silently thrown away.
       if (!piece && !thought && Array.isArray(obj.candidates)) {
         const parts = obj.candidates?.[0]?.content?.parts || [];
-        const gtext = parts.map(p => (p && typeof p.text === 'string') ? p.text : '').join('');
+        // Gemini marks its working with `thought: true` on a part. That text is
+        // the thinking panel's, not the reply's -- joining it into the answer is
+        // how a model's notes used to be presented as something it said.
+        const gtext = parts.map(p => (p && !p.thought && typeof p.text === 'string') ? p.text : '').join('');
         if (gtext) {
           sawDelta = true;
           content += gtext;
           onDelta?.(gtext, content);
+        }
+        const gthink = parts.map(p => (p && p.thought && typeof p.text === 'string') ? p.text : '').join('');
+        if (gthink) {
+          reasoning += gthink;
+          onReasoning?.(gthink, reasoning);
         }
         if (obj.usageMetadata) {
           const p = Number(obj.usageMetadata.promptTokenCount) || 0;
@@ -1021,6 +1029,15 @@ class ApiClient {
         .join('\n\n');
       if (thinking) return thinking;
     }
+    // Google marks its working with `thought: true` on a content part.
+    const gParts = data.candidates?.[0]?.content?.parts;
+    if (Array.isArray(gParts)) {
+      const thoughts = gParts
+        .filter(p => p && p.thought && typeof p.text === 'string')
+        .map(p => p.text)
+        .join('');
+      if (thoughts) return thoughts;
+    }
     // Ollama
     if (typeof data.thinking === 'string' && data.thinking.trim()) {
       return data.thinking;
@@ -1076,9 +1093,14 @@ class ApiClient {
     if (data.content?.[0]?.text) {
       return data.content[0].text;
     }
-    // Google
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      return data.candidates[0].content.parts[0].text;
+    // Google: only parts that are not marked as thoughts are the answer.
+    const gParts = data.candidates?.[0]?.content?.parts;
+    if (Array.isArray(gParts)) {
+      const answer = gParts
+        .filter(p => p && !p.thought && typeof p.text === 'string')
+        .map(p => p.text)
+        .join('');
+      if (answer) return answer;
     }
     // Ollama
     if (data.response) {
