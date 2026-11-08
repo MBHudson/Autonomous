@@ -100,6 +100,29 @@ ok(!empty($s['ok']), 'status ok');
 ok(in_array(rtrim(str_replace('\\','/',$readOnly),'/'), $s['read_roots']), 'status read_roots');
 ok(in_array(rtrim(str_replace('\\','/',$writeDir),'/'), $s['write_roots']), 'status write_roots');
 
+// 1a. Roots default to the app's own folder when the roots KEYS are absent,
+// even though the sandbox block itself exists. Saving the programs list (or a
+// proxy, or the token) creates that block without ever choosing a directory,
+// and that used to count as "configured" -- so the default never applied and
+// every file tool refused, quoting a default it was not using.
+file_put_contents($configPath, json_encode(
+    ['sandbox' => ['programs_enabled' => false]], JSON_PRETTY_PRINT));
+$sDef = Sandbox::status();
+$appDirDefault = rtrim(str_replace('\\', '/', Sandbox::appDir()), '/');
+ok($sDef['enabled'] === true, 'a block without root keys still gets the app dir');
+ok(in_array($appDirDefault, $sDef['read_roots'], true), 'the default read root is the app dir');
+ok(in_array($appDirDefault, $sDef['write_roots'], true), 'the default write root is the app dir');
+ok($sDef['defaulted'] === true, 'status reports roots it defaulted');
+
+// 1b. An explicit empty list is a decision, not a default: the file tools stay
+// off, which is the only way to turn them off.
+file_put_contents($configPath, json_encode(
+    ['sandbox' => ['read_roots' => [], 'write_roots' => []]], JSON_PRETTY_PRINT));
+$sOff = Sandbox::status();
+ok($sOff['enabled'] === false, 'an explicit empty root list still turns the file tools off');
+ok($sOff['defaulted'] === false, 'and that is not reported as a default');
+file_put_contents($configPath, json_encode($cfg, JSON_PRETTY_PRINT));   // restore
+
 // 2. list writable root -> writable true
 $ls = Sandbox::listDir('.', 200, $writeDir);
 ok($ls['writable'] === true, 'list writable root writable');

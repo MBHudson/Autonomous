@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧱 The file tools get their folder back *(`VERSION` 394, cache-buster v393 → v394)*
+
+*2026-11-08. The sandbox route answered and refused every call: `GET /api/sandbox/status` returned 200 with `enabled: false` and no roots on an install that had never chosen a directory, while the refusal text promised "it defaults to this app's own folder".*
+
+**What was wrong.** `Sandbox::config()` defaulted to the app directory only when there was no `sandbox` key at all. Saving anything else into that block -- the programs list (`programs_enabled`), a proxy, the access token -- creates the block, and its presence was read as "roots were configured", so the default never ran and the jail had no allowed directories. The shape found here: `sandbox` holding `programs_enabled`/`programs`, no `read_roots`, `defaulted: false`.
+
+**The test is now the keys.** Each list checks `array_key_exists('read_roots', $sb)` on its own. An explicit `[]` still means off -- otherwise there is no way to turn the file tools off -- so the two states stay distinct, and `status()['defaulted']` now reports that the roots themselves were defaulted rather than that the block is absent.
+
+**Verified on this install.** `php -S 127.0.0.1:8199 serve.php`, then `GET /api/sandbox/status` gives `enabled: true`, `defaulted: true`, read/write roots `C:/Users/.../Autonomous-master`; `POST /sandbox/list` lists it, and a write/read round trip outside the protected list works. `storage/` is still refused by the protected list, which is the secrets guard doing its job.
+
+**Tests.** `tests/php/sandbox.test.php`: 124 passed, 0 failed, including the programs-only block and the explicit-empty case.
+
 
 ## 📎 The sandbox binds, or says so *(`VERSION` 393, cache-buster v392 → v393)*
 
@@ -25,7 +37,7 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 **Why nothing noticed.** `bindSandboxTools(api)` was called exactly once, behind `try/catch` that logs to the console and shows a boot badge nobody was reading. Nothing asked afterwards whether the assignment had happened, and the placeholders were indistinguishable from real runners until a model called one.
 
-**Unbound is now a query.** `unboundTools()` in `ui/js/tools.js` reads the placeholder's message off each `run` function (`SANDBOX_UNBOUND_MARKER`) and returns the names still unbound. No hardcoded list, so a tool added later is covered, and a missing or non-function runner is not mistaken for a failure.
+**Unbound is now a query.** `unboundTools()` in `ui/js/tools.js` compares each `run` against the placeholder runners captured at import and returns the names still unbound, so a reworded message cannot break it. No hardcoded list, so a tool added later is covered, and a missing or non-function runner is not mistaken for a failure.
 
 **Bind, verify, retry.** `app.js` retries up to five times with backoff (400 / 800 / 1600 / 3200 ms), which covers a cold server or a script that landed late. If tools are still unbound it now says so where it cannot be missed: console, `bootErrors` (which the boot badge renders), and a toast -- with the names and the last thrown error, so "write_file does not work" becomes "write_file, edit_file, apply_patch are unbound after 5 attempts: <reason>".
 

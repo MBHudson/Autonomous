@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v393 — the sandbox binds, or says so 📎
+### 🆕 v394 — the file tools get their folder back 🧱
 
-*The file tools were never bound to the sandbox in that session, and nothing retried them. Binding ran once inside `safeInit`, whose whole job is to swallow the error, so one failure left every file tool on its placeholder for the life of the page — quietly.*
+*The sandbox route answered HTTP 200 on an install where every file tool refused, insisting it "defaults to this app's own folder" — a default that was never applied. Saving the programs list had created a `sandbox` block, and the code read "block exists" as "the operator chose roots".*
 
 | | |
 |---|---|
-| 🔁 **Bind, verify, retry** | After binding, the app asks which tools are still on their placeholder and retries with backoff (400 ms, 800 ms, 1.6 s, 3.2 s) instead of assuming one call was enough |
-| 📋 **It names what is left** | Still unbound after five attempts? The tool names go to the console, the boot-error badge and a toast, with the last error attached |
-| 🔎 **Unbound is measurable** | `unboundTools()` finds a placeholder by its message, so the check needs no hardcoded list and covers tools added later |
-| ✅ **Guarded** | `tests/js/sandboxBinding.test.mjs` pins the detection, partial binding, and the failure an unbound call now raises |
+| 🧱 **The keys decide** | Only `read_roots` / `write_roots` count as configured; a block that exists for the programs list, a proxy or the token no longer suppresses the default |
+| 🏠 **The default runs** | With neither key written the jail is the app folder (`/var/www` when shell access is on), so a fresh install's file tools work instead of reporting themselves disabled |
+| 🚫 **Off still means off** | An explicit empty list stays empty — that is how the file tools are turned off, and it is reported as a choice, not as `defaulted` |
+| ✅ **Guarded** | `tests/php/sandbox.test.php` pins both shapes: a block without roots gets the app folder, an explicit `[]` gets nothing |
 
 ---
 

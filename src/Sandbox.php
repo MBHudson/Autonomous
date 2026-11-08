@@ -75,21 +75,28 @@ class Sandbox {
         // Default to this app's own directory, so the file tools work on a
         // fresh install instead of reporting themselves as disabled.
         //
-        // "No sandbox key at all" and "sandbox key with empty lists" mean
+        // The test is whether a ROOT KEY exists, not whether the sandbox block
+        // does. Saving anything else in that block -- the programs list, a
+        // proxy, the token -- used to suppress the default, so an install that
+        // had never touched the roots ran with no allowed directories at all
+        // and every file tool refused with "the sandbox has no allowed
+        // directories (it defaults to this app's own folder)", which claimed a
+        // default that was not being applied.
+        //
+        // "No roots key" and "roots key with an empty list" still mean
         // different things: the first has never been configured and gets the
-        // app dir; the second is somebody who cleared the field on purpose,
-        // and gets nothing. Otherwise there would be no way to turn the file
-        // tools off.
+        // app dir; the second is somebody who cleared the field on purpose, and
+        // gets nothing. Otherwise there would be no way to turn the file tools
+        // off.
         $appDir = self::appDir();
         // Shell access widens the default jail to the whole of /var/www, so a
         // fresh install with exec enabled can actually grep the site. An
         // explicit read_roots/write_roots always wins.
         $execOn = !empty($sb['exec_enabled']);
         $wwwRoot = is_dir('/var/www') ? '/var/www' : null;
-        $roots = $hasSandboxKey ? $list('read_roots')
-            : ($execOn && $wwwRoot ? [$wwwRoot] : ($appDir ? [$appDir] : []));
-        $writes = $hasSandboxKey ? $list('write_roots')
-            : ($execOn && $wwwRoot ? [$wwwRoot] : ($appDir ? [$appDir] : []));
+        $defaultRoots = $execOn && $wwwRoot ? [$wwwRoot] : ($appDir ? [$appDir] : []);
+        $roots = array_key_exists('read_roots', $sb) ? $list('read_roots') : $defaultRoots;
+        $writes = array_key_exists('write_roots', $sb) ? $list('write_roots') : $defaultRoots;
 
         // MCP server root: friends' tool calls are jailed to their own scratch
         // directory, and for the per-call scope check to pass that directory
@@ -405,13 +412,20 @@ class Sandbox {
     /** Public view of the sandbox config, with secrets stripped. */
     public static function status() {
         $c = self::config();
+        $storedCfg = Config::loadConfig();
+        $storedSb = is_array($storedCfg) && is_array($storedCfg['sandbox'] ?? null)
+            ? $storedCfg['sandbox'] : [];
+        // Defaulted means neither root key was ever written. An empty list is
+        // the operator turning the file tools off, and is not a default.
+        $defaulted = !array_key_exists('read_roots', $storedSb)
+            && !array_key_exists('write_roots', $storedSb);
         return [
             'ok' => true,
             'enabled' => !empty($c['read_roots']) || !empty($c['write_roots']),
             'read_roots' => $c['read_roots'],
             'write_roots' => $c['write_roots'],
             'app_dir' => self::appDir(),
-            'defaulted' => !array_key_exists('sandbox', (array) Config::loadConfig()),
+            'defaulted' => $defaulted,
             'search_engine' => $c['search_engine'],
             'search_configured' => !empty($c['read_roots']) || !empty($c['write_roots'])
                 || $c['search_engine'] === 'ddg',
