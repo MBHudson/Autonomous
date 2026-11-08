@@ -1,5 +1,19 @@
 <!--
- ## ⏳ The button says which half is running *(`VERSION` 405, cache-buster v404 → v405)*
+ ## ⚡ The first real call repairs the binding *(`VERSION` 406, cache-buster v405 → v406)*
+
+*2026-11-08. Binding happens once, at boot, inside a try/catch. When it throws partway every tool after the failure keeps the placeholder that throws "not bound", and the first agent to call one burned a model step to learn it should reload a page the operator was still using.*
+
+**Once, before the policy check.** `runTool()` compares the requested tool's runner against the placeholder captured at load; when they match it makes one `autoBindSandboxOnce()` attempt, before approval, so an approved call is the call that runs rather than a prompt followed by an error.
+
+**The client is remembered.** `setSandboxClient()` is called by the binder itself, so an attempt that threw partway still leaves the API client in hand for the repair that follows.
+
+**Once per page, never retried.** A silent repair on every call would hide an install that cannot bind at all -- that is what the warning bubble and its button are for. With no client, or after the automatic attempt fails, the call fails loudly with the same marker as before.
+
+**A successful repair emits `sandbox:bound`**, the signal Config and the editor already send, so the transcript re-reads the jail and drops warnings that are no longer true.
+
+**Tests.** `sandboxBinding.test.mjs` now 28: with no client the call fails loudly and no attempt is invented; with one, the first `read_file` call binds, runs and reports bound to Config; a second automatic attempt declines.
+
+## ⏳ The button says which half is running *(`VERSION` 405, cache-buster v404 → v405)*
 
 *2026-11-08. The rebind button disabled itself on click and left its label alone. Binding is a synchronous walk over the registry, but the follow-up -- a `/sandbox/status` read that decides what the bubble may claim -- is a round trip, and for its duration the control looked broken rather than busy.*
 

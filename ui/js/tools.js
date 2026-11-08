@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=405';
-import { asText, compactText } from './utils.js?v=405';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=405';
-import { settingFor } from './agentConfig.js?v=405';
-import { trace } from './trace.js?v=405';
+import { store } from './store.js?v=406';
+import { asText, compactText } from './utils.js?v=406';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=406';
+import { settingFor } from './agentConfig.js?v=406';
+import { trace } from './trace.js?v=406';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -880,6 +880,49 @@ export function sandboxBindingReport() {
   return { unbound: unboundTools(), error: sandboxBindError };
 }
 
+// --- the client, remembered -------------------------------------------------
+// The boot bind is one shot in app.js. When it throws partway, some tools keep
+// their placeholder and nothing tries again until the operator clicks. Keeping
+// the client lets the first real call finish that job itself -- see runTool.
+let sandboxClient = null;
+let sandboxAutoBound = false;
+
+/** Hand the tool harness the sandbox client. Binding calls this itself. */
+export function setSandboxClient(api) {
+  if (api) sandboxClient = api;
+}
+
+/** Is this tool still on the placeholder runner it shipped with? */
+function isUnboundTool(name) {
+  const original = PLACEHOLDER_RUNS.get(name);
+  const def = TOOL_REGISTRY[name];
+  return Boolean(original && def && def.run === original);
+}
+
+/**
+ * One automatic binding attempt, made when the first real call arrives at a
+ * tool whose binding never happened.
+ *
+ * Deliberately once per page and never retried: a silent repair on every call
+ * would hide an install that cannot bind at all, and the warning bubble is
+ * where that belongs. Reports whether it tried, so a caller can tell "already
+ * repaired" from "nothing left to repair".
+ */
+export function autoBindSandboxOnce() {
+  if (sandboxAutoBound || !sandboxClient) {
+    return { attempted: false, unbound: unboundTools() };
+  }
+  sandboxAutoBound = true;
+  const verdict = bindSandboxNow(sandboxClient);
+  if (!verdict.unbound.length) {
+    // The same signal Config and the editor send, so the transcript's stale
+    // warnings get re-checked and removed.
+    store.emit('sandbox:bound');
+    try { trace('note', 'file tools bound automatically', { step: 'bind' }); } catch { /* best-effort */ }
+  }
+  return { attempted: true, ...verdict };
+}
+
 /**
  * One binding attempt, with the verdict.
  *
@@ -901,6 +944,7 @@ export function bindSandboxNow(api) {
 }
 
 export function bindSandboxTools(api) {
+  setSandboxClient(api);
   const lines = rows => rows.map(r => (typeof r === 'string' ? r : r.join(' '))).join('\n');
   const scopeOf = ctx => (ctx && ctx.sandboxRoot) || undefined;
 
@@ -1977,6 +2021,11 @@ async function approve(tool, arg, ctx) {
 export async function runTool(name, arg, noteName, ctx) {
   const def = TOOL_REGISTRY[name];
   if (!def) return `denied: unknown tool ${name}`;
+  // A tool still on its placeholder is the first real call's problem to fix.
+  // Binding is synchronous and local, so repair it here -- before the policy
+  // check, so an approved call is the call that actually runs -- instead of
+  // paying a model step to learn "reload the page".
+  if (isUnboundTool(name)) autoBindSandboxOnce();
   if (def.custom) {
     const agent = agentFromCtx(ctx);
     const enabled = agent

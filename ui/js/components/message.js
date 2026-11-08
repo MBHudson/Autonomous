@@ -10,13 +10,13 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho } from '../utils.js?v=405';
-import { renderMarkdown } from '../markdown.js?v=405';
-import { CodeBlock, splitFences } from './codeBlock.js?v=405';
-import { createAvatar } from './avatar.js?v=405';
-import { store } from '../store.js?v=405';
-import { persistence } from '../persistence.js?v=405';
-import { audio, AudioController } from '../audio.js?v=405';
+import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho } from '../utils.js?v=406';
+import { renderMarkdown } from '../markdown.js?v=406';
+import { CodeBlock, splitFences } from './codeBlock.js?v=406';
+import { createAvatar } from './avatar.js?v=406';
+import { store } from '../store.js?v=406';
+import { persistence } from '../persistence.js?v=406';
+import { audio, AudioController } from '../audio.js?v=406';
 
 const TOOL_DISPLAY_LIMIT = 8000;
 

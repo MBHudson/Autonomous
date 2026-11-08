@@ -37,17 +37,17 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v405 — the button says which half is running ⏳
+### 🆕 v406 — the first call fixes the binding itself ⚡
 
-*Binding the page is instant; asking the server whether it has a directory is not. Between the click and that answer the button sat disabled under its old label.*
+*The boot bind is one shot in `app.js`. When it threw partway, every tool after the failure kept its placeholder, and the first call to one of them spent a whole model step learning "reload the page".*
 
 | | |
 |---|---|
-| ⏳ **BINDING, then CHECKING** | The label follows the two halves, so the wait has a name |
-| ⚠️ **No premature claim** | The warning stays readable until the verdict lands; the bubble is written once, from the answer |
-| 🧯 **A throw still settles** | A follow-up that throws or rejects writes the page-half confirmation, never a spinner |
-| 🖱️ **One attempt at a time** | A second click during the check does nothing; a failed bind re-arms as `TRY AGAIN` |
-| ✅ **Guarded** | `rebindButton.test.mjs` holds a follow-up promise open and checks the label, the intact warning and the settled bubble |
+| ⚡ **The first call repairs it** | `runTool()` spots a tool still on its placeholder and binds before the policy check, so the call you approved is the call that runs |
+| 🧠 **The client is remembered** | The binder keeps the API client it was handed, so a boot attempt that threw partway still leaves one in hand |
+| 🚫 **Once, never on a loop** | One automatic attempt per page; with no client, or after a failure, the call fails loudly with the same marker as before |
+| 🧹 **Warnings follow the repair** | A successful auto-bind emits `sandbox:bound`, so the transcript re-checks the jail and drops warnings that are no longer true |
+| ✅ **Guarded** | `sandboxBinding.test.mjs` covers no client, one repair, and the refusal to try twice |
 
 ---
 

@@ -16,7 +16,8 @@
 // These assertions cover the check the retry loop in app.js is built on.
 
 import { unboundTools, SANDBOX_UNBOUND_MARKER, TOOL_REGISTRY,
-  sandboxBindingReport, setSandboxBindError, bindSandboxNow } from '../../ui/js/tools.js';
+  sandboxBindingReport, setSandboxBindError, bindSandboxNow,
+  setSandboxClient, autoBindSandboxOnce, runTool } from '../../ui/js/tools.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -78,6 +79,27 @@ ok(sandboxBindingReport().error.includes('5 attempts'), 'a failed bind is report
 ok(sandboxBindingReport().unbound.includes('write_file'), 'the reason does not replace the names');
 setSandboxBindError('');
 ok(sandboxBindingReport().error === '', 'a later successful bind clears the reason');
+
+// --- the first real call finishes a missed bind ------------------------------
+// The boot bind is one shot. When it throws partway -- or never runs -- the
+// tools keep their placeholder and the first call to one of them used to be the
+// end of it: the model got "reload the page" and the operator had to guess.
+// runTool now makes that one attempt itself, so the call it was asked for is the
+// call that runs. Order matters here: this block needs the real placeholders.
+const noClient = await runTool('read_file', 'notes.txt');
+ok(String(noClient).includes('not bound'), 'with no client a call still fails loudly');
+const unasked = autoBindSandboxOnce();
+ok(unasked.attempted === false && unasked.unbound.length > 0,
+  'and no attempt is invented without one');
+
+const fakeApi = { sandbox: async () => ({ path: 'notes.txt', bytes: 5, content: 'hello' }) };
+setSandboxClient(fakeApi);
+const firstCall = await runTool('read_file', 'notes.txt');
+ok(firstCall.includes('hello') && !firstCall.includes('not bound'),
+  'the first real call binds and then runs, without a reload');
+ok(sandboxBindingReport().unbound.length === 0, 'and the repair is visible to Config');
+ok(autoBindSandboxOnce().attempted === false, 'the automatic attempt happens once per page');
+ok((typeof fakeApi.sandbox === 'function'), 'the remembered client is the one that was used');
 
 // --- the Config button's one attempt ------------------------------------------
 // Binding assigns a runner to every tool without calling the server, so an

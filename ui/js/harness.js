@@ -30,9 +30,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=405';
-import { store } from './store.js?v=405';
-import { persistence } from './persistence.js?v=405';
+} from './harness.data.js?v=406';
+import { store } from './store.js?v=406';
+import { persistence } from './persistence.js?v=406';
 
 export { API_FAMILIES };
 
