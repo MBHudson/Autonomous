@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=396';
-import { K } from '../storage.js?v=396';
-import { persistence } from '../persistence.js?v=396';
-import { api } from '../api.js?v=396';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=396';
-import { errText } from '../api.js?v=396';
-import { TOOL_REGISTRY, sandboxBindingReport } from '../tools.js?v=396';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=396';
-import { snapshot } from '../rateGovernor.js?v=396';
-import { resetBrowserEnabled } from '../toolManifest.js?v=396';
-import { perf } from '../perf.js?v=396';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=396';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=396';
+import { store } from '../store.js?v=397';
+import { K } from '../storage.js?v=397';
+import { persistence } from '../persistence.js?v=397';
+import { api } from '../api.js?v=397';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=397';
+import { errText } from '../api.js?v=397';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=397';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=397';
+import { snapshot } from '../rateGovernor.js?v=397';
+import { resetBrowserEnabled } from '../toolManifest.js?v=397';
+import { perf } from '../perf.js?v=397';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=397';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=397';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1587,6 +1587,9 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <div class="form-hint">The one folder every agent works in. They may read and write inside it, and nothing outside it. Full path on the server (<code>/var/www/site</code> or <code>C:\site</code>). Empty turns the file tools off; web search is unaffected.</div>
           <div class="form-hint" id="sbProjectStatus"></div>
           <div class="form-hint" id="sbBindStatus"></div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn btn-secondary btn-sm" id="sbBindRetry">BIND FILE TOOLS</button>
+          </div>
         </div>
 
         <div class="cfg-sublabel">Always-On Agents <span class="form-hint-inline">work on their own</span></div>
@@ -1945,6 +1948,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     // what the server is actually using, not a stale local copy.
     this._loadProjectDir();
     this._loadBindState();
+    document.getElementById('sbBindRetry')?.addEventListener('click', () => this._rebindFileTools());
 
     // MCP servers live server-side (config.json); render the cached list and
     // refresh from the server in the background.
@@ -3233,6 +3237,23 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     // Four retries after the first attempt, the last 3.2 s out; one look a
     // second covers the whole window without a permanent timer.
     if (tries < 6) setTimeout(() => this._loadBindState(tries + 1), 1000);
+  }
+
+  /**
+   * Bind the file tools again in this page, without a reload.
+   *
+   * The boot loop already retried five times; if it still failed -- a route
+   * that was starting, a script that landed late -- a full reload was the only
+   * cure. This runs one more attempt through the same function the boot loop
+   * uses, then reports the verdict in the line above and as a toast, so the
+   * answer appears where the question was asked.
+   */
+  _rebindFileTools() {
+    const { unbound } = bindSandboxNow(api);
+    this._loadBindState();
+    store.emit('toast', unbound.length
+      ? { message: `Still unbound: ${unbound.join(', ')}`, type: 'error' }
+      : { message: 'File tools bound — agents can read and write now', type: 'info' });
   }
 
   /**

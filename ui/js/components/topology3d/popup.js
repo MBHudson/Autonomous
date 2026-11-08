@@ -10,10 +10,10 @@
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=396';
-import { esc, escAttr } from '../../utils.js?v=396';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=396';
-import { McpPanel } from './mcpPanel.js?v=396';
+import { store } from '../../store.js?v=397';
+import { esc, escAttr } from '../../utils.js?v=397';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=397';
+import { McpPanel } from './mcpPanel.js?v=397';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',

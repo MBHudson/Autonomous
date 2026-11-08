@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔌 Rebind the file tools without a reload *(`VERSION` 397, cache-buster v396 → v397)*
+
+*2026-11-08. When the page missed its binding, the Config panel could say so but not fix it: the boot loop had already spent its five attempts, and a full reload was the only cure -- which, if the cause was a route still starting, could miss it again.*
+
+**A button where the problem is shown.** The Permissions card gains **BIND FILE TOOLS** directly under the binding line. One click runs an attempt and updates that line in place: bound, or still unbound with the names and reason.
+
+**The same attempt as boot.** `bindSandboxNow()` in `ui/js/tools.js` performs the bind, asks `unboundTools()` what is left, records the reason, and returns `{ unbound, error, threw }`. `app.js`'s retry loop now calls it instead of keeping its own copy, so a click and a boot attempt cannot disagree about what "bound" means.
+
+**One honest limit.** Binding assigns runners without calling the server, so a tool counts as bound even when the server is unreachable -- the failure then belongs to the call, which is where the jail refusal is reported. Saying "unbound" there would refuse work that may well succeed.
+
+**Tests.** `tests/js/sandboxBinding.test.mjs` gains the attempt's verdict, the report following it, and that a missing client does not throw the handler.
+
 ## 🚩 A warning before the reply, not after *(`VERSION` 396, cache-buster v395 → v396)*
 
 *2026-11-08. A model with no working file tools still reports the file as written, and the warning that said otherwise arrived attached to that reply -- the one place it is already too late. The transcript had just claimed work the disk never saw.*

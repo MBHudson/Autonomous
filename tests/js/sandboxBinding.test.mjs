@@ -16,7 +16,7 @@
 // These assertions cover the check the retry loop in app.js is built on.
 
 import { unboundTools, SANDBOX_UNBOUND_MARKER, TOOL_REGISTRY,
-  sandboxBindingReport, setSandboxBindError } from '../../ui/js/tools.js';
+  sandboxBindingReport, setSandboxBindError, bindSandboxNow } from '../../ui/js/tools.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -78,6 +78,18 @@ ok(sandboxBindingReport().error.includes('5 attempts'), 'a failed bind is report
 ok(sandboxBindingReport().unbound.includes('write_file'), 'the reason does not replace the names');
 setSandboxBindError('');
 ok(sandboxBindingReport().error === '', 'a later successful bind clears the reason');
+
+// --- the Config button's one attempt ------------------------------------------
+// Binding assigns a runner to every tool without calling the server, so an
+// empty client is enough to prove the verdict: unbound goes empty, the reason
+// clears, and the report the panel reads agrees.
+const rebound = bindSandboxNow({});
+ok(Array.isArray(rebound.unbound) && rebound.unbound.length === 0,
+  'one attempt reports what is left (nothing, here)');
+ok(rebound.error === '', 'and clears the recorded reason');
+ok(sandboxBindingReport().unbound.length === 0, 'the panel report follows the attempt');
+ok(sandboxBindingReport().error === '', 'and shows no stale reason');
+ok(bindSandboxNow(null).unbound.length === 0, 'a missing client does not throw the button handler');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

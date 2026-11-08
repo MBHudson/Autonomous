@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v396 — the chat warns before the reply, not after 🚩
+### 🆕 v397 — rebind the file tools without a reload 🔌
 
-*A model with no working file tools still reports the file as written. The warning used to arrive with the answer — the one place it is already too late, because the transcript has just claimed the work.*
+*When the page missed its binding, the only cure was a reload — and if the cause was a route still starting, a reload could miss it again. The button runs one more attempt in the page you already have.*
 
 | | |
 |---|---|
-| 🚩 **Before the reply** | At the top of every turn the chat checks the file tools and says so in the transcript first, so the claim never stands alone |
-| 🧩 **Both halves named** | The page's binding and the server's jail are checked separately — `this page never bound write_file`, `the server has no allowed directory` — and both appear when both are true |
-| 🔁 **Cheap** | The binding is local; the jail status is one read, cached for 15 seconds, so a burst of turns does not poll |
-| ✅ **Guarded** | `tests/js/fileToolWarning.test.mjs` covers every shape: clean, unbound, empty jail, both, and a long list |
+| 🔌 **A button where the problem is** | **BIND FILE TOOLS**, under Working Project Directory, runs one binding attempt and updates the line beside it |
+| 🧩 **The same attempt as boot** | `bindSandboxNow()` is what the five-step boot retry calls too, so "bound" has one definition and a click cannot disagree with the console |
+| 🧾 **Says what happened** | Bound: a toast and the line turns green. Still broken: the toast names the tools, and the line keeps the reason |
+| ✅ **Guarded** | `tests/js/sandboxBinding.test.mjs` covers the attempt's verdict and that a missing client cannot throw the handler |
 
 ---
 

@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=396';
-import { asText, compactText } from './utils.js?v=396';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=396';
-import { settingFor } from './agentConfig.js?v=396';
-import { trace } from './trace.js?v=396';
+import { store } from './store.js?v=397';
+import { asText, compactText } from './utils.js?v=397';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=397';
+import { settingFor } from './agentConfig.js?v=397';
+import { trace } from './trace.js?v=397';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -878,6 +878,26 @@ export function setSandboxBindError(message) {
  */
 export function sandboxBindingReport() {
   return { unbound: unboundTools(), error: sandboxBindError };
+}
+
+/**
+ * One binding attempt, with the verdict.
+ *
+ * The boot retry loop and the Config button both call this, so "bound" has one
+ * definition and a click that fails produces the same sentence the console
+ * would. A tool whose `run` is assigned counts as bound even when the server is
+ * unreachable: the failure then belongs to the call, and saying otherwise here
+ * would refuse work that may well succeed.
+ */
+export function bindSandboxNow(api) {
+  let threw = null;
+  try { bindSandboxTools(api); } catch (err) { threw = err; }
+  const unbound = unboundTools();
+  const error = unbound.length
+    ? `Sandbox tools still unbound: ${unbound.join(', ')}${threw ? ` (last error: ${threw.message})` : ''}`
+    : '';
+  setSandboxBindError(error);
+  return { unbound, error, threw };
 }
 
 export function bindSandboxTools(api) {
