@@ -1910,18 +1910,36 @@ function handleUpdate($method, $segments, $body) {
             return;
         }
         if ($action === 'check') {
-            $needsCurl();
-            // GET respects the cache; POST asks GitHub now. This is the cheap
-            // probe the UI runs at page load: it reads only the published
-            // ui/js/store.js and parses APP_VERSION out of it, so the check
-            // costs a few kilobytes instead of an 11 MB archive. It reports
-            // whether a newer release exists, never what changed inside one.
+            // The cache is read BEFORE curl is demanded. This used to enforce
+            // curl first, so a PHP without it refused a cached answer that was
+            // already on disk -- "cannot reach the internet" about a record it
+            // never opened. Only a forced POST needs the network.
             if ($method !== 'GET' && $method !== 'POST') {
                 http_response_code(405);
                 echo json_encode(['error' => 'GET or POST only']);
                 return;
             }
-            echo json_encode(Src\Update::check($method === 'POST'));
+            if ($method === 'POST') {
+                $needsCurl();
+            }
+            // GET respects the cache; POST asks GitHub now. This is the cheap
+            // probe the UI runs at page load: it reads only the published
+            // ui/js/store.js and parses APP_VERSION out of it, so the check
+            // costs a few kilobytes instead of an 11 MB archive. It reports
+            // whether a newer release exists, never what changed inside one.
+            $result = Src\Update::check($method === 'POST');
+            if ($method === 'GET' && empty($result['cached']) && !function_exists('curl_init')) {
+                // No cache and no curl: this is the case the gate was written
+                // for, and its sentence is better than the raw function error.
+                try {
+                    $needsCurl();
+                } catch (\RuntimeException $e) {
+                    $result['ok'] = false;
+                    $result['updateAvailable'] = false;
+                    $result['error'] = $e->getMessage();
+                }
+            }
+            echo json_encode($result);
             return;
         }
         if ($action === 'download') {

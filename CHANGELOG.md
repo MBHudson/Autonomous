@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧰 An install stops before it starts *(`VERSION` 420, no browser file changed)*
+
+*An install that got as far as `tools/check-guards.sh` stopped there, after the write probe at the app root had already passed. The folder that could not be written was discovered halfway through replacing the release.*
+
+**The probe only asked about the root.** `Install::preflight()` wrote one dotfile into the app folder and called the tree writable. A release touches a dozen folders, and on a host where one of them has different permissions -- `tools/` was the one here -- that answer stays yes right up until the first file that needs it. The operator learned the truth from a stopped install instead of from the button.
+
+**Every folder the release writes into is probed now.** `Install::writeTargets()` reduces the plan to the distinct folders it will touch (unchanged files left out, because nothing is written over them), and preflight writes and removes a probe in each. The first folder that refuses is named in the problems list before a single app file is replaced, and it says what to do: give the web server write access, or run `install-update.php` from a terminal with your own account.
+
+**The cache is read before curl is required.** A GET to `/api/update/check` enforced the curl gate before asking `Update::check()`, so a PHP without curl refused a cached answer that was already on disk -- reporting that it could not reach the internet about a record it never opened. Only a forced POST needs curl now; a GET with no cache still gets the same message.
+
 ## ⚠️ A half-finished check says so *(`VERSION` 419, cache-buster v418 → v419)*
 
 *The release that went unseen for six versions failed silently: the VERSION probe threw, the store.js probe answered, and the answer was printed as "up to date". A partial check now says it is partial.*

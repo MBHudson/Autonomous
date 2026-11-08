@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v419 — a half-finished check says so ⚠️
+### 🆕 v420 — an install stops before it starts 🧰
 
-*The failure that hid six releases was already known to the server. It just never reached the screen.*
+*A write probe at the app root said yes, and the install still died on `tools/` — the folder that was actually unwritable.*
 
 | | |
 |---|---|
-| ⚠️ **The warning reaches the panel** | a probe that throws now yields `warnings` beside `ok`, and Config → Updates says "Not fully checked" instead of "up to date" |
-| 🗣️ **It names what is missing** | *"The published VERSION could not be read …, so only the cache-buster was compared"* — and which releases that hides |
-| 🧠 **The cache keeps it** | `check.json` stores the warning with the answer, so an hour-old partial check cannot drift back into looking clean |
-| 🏆 **A real update still wins** | the line prefers "Update available" when there is one; the warning rides along with it |
+| 🔎 **Every folder is probed** | `writeTargets()` reduces the plan to the folders it touches, and preflight writes a probe in each before the button is offered |
+| 🛑 **Named, not guessed** | the first unwritable folder appears in the problems list, and nothing has been replaced when it does |
+| 🗃️ **The cache comes first** | a GET answers from `check.json` on a PHP without curl, instead of refusing an answer it already had |
+| 🔧 **Terminal fallback still works** | `php install-update.php` applies a downloaded release with your own account |
 ---
 
 ## 🧭 Contents

@@ -39,6 +39,22 @@ function ok($cond, $name)
     else { $fail++; $errors[] = "FAIL: $name"; }
 }
 
+// --- 0. which folders a release will write into -------------------------
+//
+// Preflight probes these. Permission is a folder property, so a plan has to be
+// reduced to its folders before anything is written -- the install that stopped
+// on tools/check-guards.sh had already passed a probe of the app root.
+$planDirs = Install::writeTargets(array('files' => array(
+    array('path' => 'tools/check-guards.sh', 'status' => 'changed'),
+    array('path' => 'tools/other.sh', 'status' => 'new'),
+    array('path' => 'README.md', 'status' => 'same'),
+    array('path' => 'index.html', 'status' => 'changed'),
+    array('path' => 'ui/js/store.js', 'status' => 'changed'),
+)));
+ok($planDirs === array('', 'tools', 'ui/js'),
+    'writeTargets names each folder once and skips unchanged files (' . json_encode($planDirs) . ')');
+ok(Install::writeTargets(array()) === array(), 'a plan with no files has no folders to probe');
+
 function throws($fn, $name, $needle = '')
 {
     try {

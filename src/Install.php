@@ -165,6 +165,31 @@ class Install
         return '';
     }
 
+    /**
+     * The distinct folders a plan will write into.
+     *
+     * A plan is a file list, but permission is a folder property: on hosts
+     * where one directory has different rights, "the app folder is writable"
+     * is true and useless. Unchanged files are left out because nothing is
+     * written over them.
+     */
+    public static function writeTargets($plan)
+    {
+        $dirs = array();
+        foreach ((array) ($plan['files'] ?? array()) as $f) {
+            $rel = (string) (is_array($f) ? ($f['path'] ?? '') : '');
+            $status = (string) (is_array($f) ? ($f['status'] ?? '') : '');
+            if ($rel === '' || $status === 'same') {
+                continue;
+            }
+            $dir = str_replace('\\', '/', dirname($rel));
+            $dirs[$dir === '.' ? '' : $dir] = true;
+        }
+        $out = array_keys($dirs);
+        sort($out);
+        return $out;
+    }
+
     /** What the UI needs before it offers the button. */
     public static function preflight()
     {
@@ -188,6 +213,29 @@ class Install
         } else {
             $problems[] = 'The web server cannot write to the app folder, so it cannot replace app files. '
                 . 'Run install-update.php from a terminal instead.';
+        }
+
+        // The root answering yes does not mean every folder under it will. An
+        // install that stopped on tools/check-guards.sh passed the probe above
+        // and only met the refusal halfway through the release; this asks each
+        // folder the plan actually writes into, so the button can say which one
+        // is shut BEFORE a single app file is replaced.
+        if ($writable && $plan) {
+            foreach (self::writeTargets($plan) as $dir) {
+                if ($dir === '') {
+                    continue;   // the root probe above is this folder
+                }
+                $p = self::appDir() . '/' . $dir . '/.router-write-probe';
+                $can = @file_put_contents($p, 'probe') !== false;
+                if ($can) {
+                    @unlink($p);
+                    continue;
+                }
+                $problems[] = 'The web server cannot write to ' . $dir . '/, which this release updates. '
+                    . 'Nothing has been changed. Give the web server write access to that folder, or run '
+                    . 'install-update.php from a terminal with your own account.';
+                break;
+            }
         }
 
         if (!is_dir(self::workDir()) && !@mkdir(self::workDir(), 0755, true) && !is_dir(self::workDir())) {
