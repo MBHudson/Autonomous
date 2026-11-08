@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🐧 Green on a machine that is not this one *(`VERSION` 429, no browser file changed)*
+
+*The first CI run failed in three test files, and none of the failures was a broken feature: the suite had never run on a host that is not this one.*
+
+**`setup-token.sh` shipped without its executable bit.** `100644` is invisible on Windows and fatal on Linux: `./setup-token.sh --show` exits 126 before the script runs a line, which is why three assertions about a locked-out operator failed on the runner. The mode is `100755` now, which is how the docs already tell people to call it.
+
+**The secrets test was failing on its own escaping.** `json_encode` writes `https:\/\/mcp.example\/v1`, so a raw `strpos($body, 'https://...')` could never match -- a test failing on its own encoding rather than on anything the route did. It decodes the response and compares the server's `url` now. Reproduced locally with a curl-enabled PHP, which is the only way that route half runs at all.
+
+**The programs harness now asserts each refusal where it exists.** Its launch and pid-lookup sections detach a copy of `sleep` and find it again through the host's process table, which is built for this machine; the twin copy it opens is chmod'ed first, because a copied binary inherits bytes and not permissions (`0644` on POSIX, refused as "not executable"). The policy wording differs by platform -- an extension on Windows, the missing exec bit elsewhere -- so that assertion reads the message the host actually writes. Typing's own input refusals (no text, over the per-call limit, not running) sit behind the Windows check, so they are asserted on Windows and print a skip here; the bad-path refusal comes first and runs everywhere.
+
 ## 🐧 The Linux runner's three refusals *(`VERSION` 428, no browser file changed)*
 
 *The first CI run failed in three files, and not one of them was a broken feature: the suite had never run on a host that is not this one.*

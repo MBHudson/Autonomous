@@ -38,15 +38,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v428 — the Linux runner's three refusals 🐧
+### 🆕 v429 — green on a machine that is not this one 🐧
 
-*The first CI run failed in three files, and none of them was a broken feature.*
+*The first CI run failed in three test files, and none of the failures was a broken feature.*
 
 | | |
 |---|---|
 | 🐧 **`setup-token.sh` was never executable** | it shipped `100644` — invisible on Windows, fatal on Linux, where `./setup-token.sh --show` exits 126 before reading a line |
 | 🔗 **A masked URL is still a URL** | `json_encode` escapes slashes, so the secrets test now parses the response instead of grepping for a spelling JSON never contains |
-| 🪟 **The launcher's pid lookup is Windows-only here** | the programs harness prints a skip instead of failing, and chmods the twin copy it opens |
+| 🪟 **Platform-specific refusals say so** | the launcher's detached launch and pid lookup, the twin copy it opens, the policy wording (`program` vs `executable`) and typing's own input refusals are each asserted on the platform they describe, and print a skip elsewhere |
 ---
 
 ## 🧭 Contents

@@ -209,9 +209,13 @@ throws(function () {
 throws(function () {
     Programs::open('nope');
 }, 'the refusal says where to fix the list', 'Config');
+// The refusal differs by platform -- an extension on Windows, the missing
+// executable bit on POSIX -- and either one is the policy speaking, which is
+// what this asserts. Grepping for "program" only held on one of them.
 throws(function () {
     Programs::open('plain');
-}, 'a program the policy refuses is refused at open() too', 'program');
+}, 'a program the policy refuses is refused at open() too',
+    $platform === 'windows' ? 'program' : 'executable');
 
 // close() on something with no path is an answer, not a failure: nothing there
 // can be running, and a thrown error would send a model round the loop.
@@ -234,19 +238,26 @@ write_cfg($configPath, true, $apps);
 throws(function () {
     Programs::type('nope', ['text' => 'hi']);
 }, 'type at an unknown name is refused', 'is configured');
-throws(function () {
-    Programs::type('sleeper', ['text' => '']);
-}, 'type with no text is refused', 'Nothing to type');
-throws(function () {
-    Programs::type('sleeper', ['text' => str_repeat('x', Programs::MAX_TYPE + 1)]);
-}, 'type over the per-call limit is refused', 'at most');
+// Typing refusals below are asserted where typing exists: on this host the
+// platform refusal comes first, so a check of the text would be asserting a
+// message type() never reaches. Its bad-path check does come first, so that
+// one runs everywhere.
 throws(function () {
     Programs::type('ghost', ['text' => 'hi']);
 }, 'type at a bad path is refused', 'nothing on this machine matches');
-throws(function () {
-    Programs::type('sleeper', ['text' => 'hi']);
-}, 'type at a program that is not running is refused', 'is running');
+if ($platform === 'windows') {
+    throws(function () {
+        Programs::type('sleeper', ['text' => '']);
+    }, 'type with no text is refused', 'Nothing to type');
+    throws(function () {
+        Programs::type('sleeper', ['text' => str_repeat('x', Programs::MAX_TYPE + 1)]);
+    }, 'type over the per-call limit is refused', 'at most');
+    throws(function () {
+        Programs::type('sleeper', ['text' => 'hi']);
+    }, 'type at a program that is not running is refused', 'is running');
+}
 if ($platform !== 'windows') {
+    echo "  SKIP: typing's own input refusals are asserted on Windows only\n";
     throws(function () {
         Programs::handle(['action' => 'type', 'name' => 'bare-name', 'text' => 'hi']);
     }, 'type() refuses off Windows instead of half-working', 'only built for Windows');
