@@ -150,6 +150,22 @@ ok(Harness::content(['content' => [['type' => 'text', 'text' => 'hi']]], 'anthro
 ok(Harness::content(['candidates' => [['content' => ['parts' => [['text' => 'hi']]]]]], 'google') === 'hi', 'content: google');
 ok(Harness::content(['message' => ['content' => 'hi']], 'ollama') === 'hi', 'content: ollama chat');
 ok(Harness::content(['response' => 'hi'], 'ollama') === 'hi', 'content: ollama generate');
+
+// Envelope shape some local runners answer with: {output:[…], stats:{…}}.
+// Before this was read, the whole JSON body became the agent's message.
+$env = [
+    'output' => [['type' => 'message', 'content' => 'hi']],
+    'stats' => ['input_tokens' => 2, 'total_output_tokens' => 3],
+];
+ok(Harness::content($env, 'openrouter') === 'hi', 'content: output[] envelope');
+ok(Harness::content(['output' => [['type' => 'message', 'content' => [['type' => 'text', 'text' => 'a'], ['type' => 'text', 'text' => 'b']]]]], 'openrouter') === 'ab',
+    'content: envelope block content array joins');
+ok(Harness::content(['output' => [['type' => 'reasoning', 'content' => 'why']]], 'openrouter') === null,
+    'content: envelope reasoning is not the answer');
+$u = Harness::usage($env, 'openrouter');
+ok($u['prompt'] === 2 && $u['completion'] === 3 && $u['total'] === 5, 'usage: stats envelope');
+ok(Harness::reasoning(['output' => [['type' => 'reasoning', 'content' => 'why']]], 'openrouter') === 'why',
+    'reasoning: envelope reasoning block');
 ok(Harness::content(['nope' => 1], 'openrouter') === null, 'content: none -> null');
 
 // --- usage --------------------------------------------------------------

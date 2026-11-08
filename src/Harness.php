@@ -355,6 +355,12 @@ class Harness {
         if (!is_array($data)) {
             return null;
         }
+        // Envelope shape ({output:[…]}): the answer is one of the blocks, not
+        // the body.
+        $envelope = self::outputText($data, ['message', 'output_text', 'text']);
+        if ($envelope !== null) {
+            return $envelope;
+        }
         switch ($id) {
             case 'anthropic':
                 if (isset($data['content'][0]['text'])) return $data['content'][0]['text'];
@@ -399,12 +405,57 @@ class Harness {
     }
 
     /**
+     * Text out of a body that keeps its answer in an `output` list instead of
+     * any of the shapes above, e.g.
+     * {"output":[{"type":"message","content":"…"}],"stats":{…}}.
+     *
+     * Some local runners answer like this. Nothing recognised the shape, so the
+     * reply fell through to the raw-body fallback and the whole JSON envelope
+     * was shown in chat as the agent's message.
+     *
+     * @param mixed    $data  decoded body
+     * @param string[] $kinds block types to read; empty reads every block
+     * @return string|null the text, or null when there is no output list
+     */
+    private static function outputText($data, array $kinds) {
+        if (!is_array($data) || !isset($data['output']) || !is_array($data['output'])) {
+            return null;
+        }
+        $out = '';
+        foreach ($data['output'] as $block) {
+            if (!is_array($block)) { continue; }
+            $type = (string)($block['type'] ?? 'message');
+            if ($kinds && !in_array($type, $kinds, true)) { continue; }
+            $text = $block['content'] ?? $block['text'] ?? '';
+            if (is_array($text)) {
+                $joined = '';
+                foreach ($text as $part) {
+                    if (is_string($part)) { $joined .= $part; }
+                    elseif (is_array($part) && isset($part['text']) && is_string($part['text'])) { $joined .= $part['text']; }
+                }
+                $text = $joined;
+            }
+            if (is_string($text)) { $out .= $text; }
+        }
+        return $out === '' ? null : $out;
+    }
+
+    /**
      * Token usage, normalised to ['prompt'=>int,'completion'=>int,'total'=>int].
      * Returns null when the provider sent none.
      */
     public static function usage($data, $id) {
         if (!is_array($data)) {
             return null;
+        }
+        // The same envelope carries its counts in `stats`, not `usage`.
+        if (isset($data['stats']) && is_array($data['stats'])) {
+            $s = $data['stats'];
+            if (isset($s['input_tokens']) || isset($s['total_output_tokens']) || isset($s['output_tokens'])) {
+                $prompt = (int)($s['input_tokens'] ?? 0);
+                $completion = (int)($s['total_output_tokens'] ?? $s['output_tokens'] ?? 0);
+                return ['prompt' => $prompt, 'completion' => $completion, 'total' => $prompt + $completion];
+            }
         }
         $u = null;
         switch ($id) {
@@ -458,6 +509,9 @@ class Harness {
         if (!is_array($data)) {
             return null;
         }
+        // The envelope shape names its thinking blocks by type.
+        $envelopeThinking = self::outputText($data, ['reasoning', 'thinking']);
+        if ($envelopeThinking !== null) return $envelopeThinking;
         // OpenAI-compatible "reasoning" models (DeepSeek, NVIDIA, Groq, …) put
         // it beside the content.
         if (isset($data['choices'][0]['message']) && is_array($data['choices'][0]['message'])) {

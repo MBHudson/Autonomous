@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧩 A runner's own reply envelope no longer arrives as JSON *(`VERSION` 374, cache-buster v373 → v374)*
+
+*2026-11-08. Some runners answer `{output:[{type:"message",content:"…"}],stats:{…}}` instead of the OpenAI shape. Nothing recognised it, so the raw-body fallback handed the whole envelope to the tool loop and the JSON was posted into the transcript as the agent's reply.*
+
+**The shape.** `Harness::content()`, `usage()` and `reasoning()` read an `output` block list: text blocks (`message` / `output_text` / `text`) become the answer, a block whose content is itself an array of `{type:"text"}` parts is joined, `reasoning` / `thinking` blocks become the thinking panel, and `stats` (`input_tokens`, `total_output_tokens`) become the token counts. The browser copy adds the same three readers to `ui/js/harness.js` (`outputText`, `outputUsage`), used by the direct-call parser, the stream parser and the reasoning/usage parsers, so the shape is understood whether it arrives as one body or as stream frames.
+
+**Not the answer.** A `reasoning`-only envelope reports no content rather than its thinking, so the loop does not take the model's private notes for its reply — the same rule the other shapes already follow. The raw-body fallback stays: an unrecognised body is still shown rather than swallowed, which is what made this bug visible.
+
+`tests/php/harness.test.php` and `tests/js/harness.test.mjs` cover the envelope: the message block, a joined block array, a reasoning block kept out of the content, the `stats` counts, and an empty or absent `output` list returning nothing. Both suites green: `node tests/js/run.mjs` and `php tests/php/run.php`.
+
+---
+
 ## ⚠️ A pinned certificate warns before it lapses *(`VERSION` 373, cache-buster v372 → v373)*
 
 *2026-11-07. Pinning is only half the job: when the server renews its certificate the pin stops matching, and an expired one fails every verified call with an error nobody connects to last year's decision.*

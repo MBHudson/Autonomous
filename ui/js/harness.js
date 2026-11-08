@@ -30,9 +30,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=373';
-import { store } from './store.js?v=373';
-import { persistence } from './persistence.js?v=373';
+} from './harness.data.js?v=374';
+import { store } from './store.js?v=374';
+import { persistence } from './persistence.js?v=374';
 
 export { API_FAMILIES };
 
@@ -314,4 +314,48 @@ export function defaultRpmFor(endpoint) {
 export function describeHarness(spec = {}) {
   const h = harnessFor(spec);
   return `${h.label} · ${protocolLabel(h.toolProtocol).replace(/ \(.*\)$/, '')}`;
+}
+
+/**
+ * Text out of a body that keeps its answer in an `output` list instead of one
+ * of the vendor shapes, e.g. {output:[{type:'message', content:'…'}], stats:{…}}.
+ *
+ * Some local runners answer like this. Nothing recognised the shape, so the
+ * reply fell through to the raw-body fallback and the whole JSON envelope was
+ * shown in chat as the agent's message.
+ *
+ * @param {object} data   decoded body
+ * @param {string[]} kinds block types to read; empty reads every block
+ * @returns {string|null} the text, or null when there is no output list
+ */
+export function outputText(data, kinds = ['message', 'output_text', 'text']) {
+  const blocks = data && Array.isArray(data.output) ? data.output : null;
+  if (!blocks) return null;
+  let out = '';
+  for (const block of blocks) {
+    if (!block || typeof block !== 'object') continue;
+    const type = String(block.type ?? 'message');
+    if (kinds && kinds.length && !kinds.includes(type)) continue;
+    let text = block.content ?? block.text ?? '';
+    if (Array.isArray(text)) {
+      text = text.map(part => {
+        if (typeof part === 'string') return part;
+        return part && typeof part.text === 'string' ? part.text : '';
+      }).join('');
+    }
+    if (typeof text === 'string') out += text;
+  }
+  return out === '' ? null : out;
+}
+
+/** Token counts from that envelope's `stats` block, or null. */
+export function outputUsage(data) {
+  const s = data && data.stats && typeof data.stats === 'object' ? data.stats : null;
+  if (!s) return null;
+  const p = Number(s.input_tokens);
+  const c = Number(s.total_output_tokens ?? s.output_tokens);
+  if (!Number.isFinite(p) && !Number.isFinite(c)) return null;
+  const prompt = Number.isFinite(p) ? p : 0;
+  const completion = Number.isFinite(c) ? c : 0;
+  return { prompt, completion, total: prompt + completion };
 }

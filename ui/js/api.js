@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=373';
-import { acquire, note429 } from './rateGovernor.js?v=373';
-import { latency } from './latency.js?v=373';
-import { detectFamily } from './harness.js?v=373';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=373';
+import { store } from './store.js?v=374';
+import { acquire, note429 } from './rateGovernor.js?v=374';
+import { latency } from './latency.js?v=374';
+import { detectFamily, outputText, outputUsage } from './harness.js?v=374';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=374';
 
 latency.bindStore(store);
 
@@ -854,6 +854,25 @@ class ApiClient {
           };
         }
       }
+      // Envelope frames ({output:[…]}): a runner that keeps its own shape on a
+      // stream. Read the text out of the block list rather than dropping it.
+      if (!piece && !thought && Array.isArray(obj.output)) {
+        const envText = outputText(obj) || '';
+        if (envText) {
+          sawDelta = true;
+          content += envText;
+          onDelta?.(envText, content);
+        }
+        const envThinking = outputText(obj, ['reasoning', 'thinking']) || '';
+        if (envThinking) {
+          reasoning += envThinking;
+          onReasoning?.(envThinking, reasoning);
+        }
+        if (!usage) {
+          const envUsage = outputUsage(obj);
+          if (envUsage) usage = envUsage;
+        }
+      }
       // Same for a Google frame that only carries usage.
       if (!piece && !thought && !Array.isArray(obj.candidates) && obj.usageMetadata) {
         const p = Number(obj.usageMetadata.promptTokenCount) || 0;
@@ -974,6 +993,9 @@ class ApiClient {
 
   _parseReasoning(data) {
     if (!data || typeof data !== 'object') return null;
+    // Envelope shape: thinking blocks are marked by type.
+    const envelopeThinking = outputText(data, ['reasoning', 'thinking']);
+    if (envelopeThinking) return envelopeThinking;
     // OpenAI-compatible reasoning fields (DeepSeek, NVIDIA, OpenRouter)
     const msg = data.choices?.[0]?.message;
     if (msg) {
@@ -1008,6 +1030,9 @@ class ApiClient {
 
   _parseUsage(data, provider) {
     if (!data || typeof data !== 'object') return null;
+    // Envelope shape: counts ride in `stats`, not `usage`.
+    const envelopeUsage = outputUsage(data);
+    if (envelopeUsage) return envelopeUsage;
     // OpenAI-compatible (OpenRouter, NVIDIA, OpenAI, Groq, Together, LM Studio)
     if (data.usage && typeof data.usage.prompt_tokens === 'number') {
       return {
@@ -1058,6 +1083,13 @@ class ApiClient {
     // Ollama
     if (data.response) {
       return data.response;
+    }
+    // Envelope shape used by some local runners. Without this the reply fell
+    // through to the fallback below and the whole JSON body was shown in chat
+    // as if the model had said it.
+    const envelopeText = outputText(data);
+    if (envelopeText) {
+      return envelopeText;
     }
     // Fallback
     return typeof data === 'string' ? data : JSON.stringify(data);

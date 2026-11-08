@@ -12,7 +12,7 @@
 //
 // Pure functions only; no browser globals. Exits 0 on success, 1 on failure.
 
-import { detectFamily, harnessFor, autoProtocol, toolProtocolFor, harnessOverride, defaultRpmFor, contextLimitFor } from '../../ui/js/harness.js';
+import { detectFamily, harnessFor, autoProtocol, toolProtocolFor, harnessOverride, defaultRpmFor, contextLimitFor, outputText, outputUsage } from '../../ui/js/harness.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -87,6 +87,20 @@ eq(defaultRpmFor('https://unknown.example/v1/x'), 20, 'default rpm: unknown host
 // context windows from the generated table
 eq(contextLimitFor('nvidia/nemotron-3-super-120b-a12b'), 131072, 'context: nemotron 128k');
 eq(contextLimitFor('mystery-model'), null, 'context: unknown null');
+
+// response envelopes from local runners: {output:[…], stats:{…}} -----------
+eq(outputText({ output: [{ type: 'message', content: 'hi' }] }), 'hi', 'outputText: message block');
+eq(outputText({ output: [{ type: 'message', content: [{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }] }] }), 'ab',
+  'outputText: content block array joins');
+eq(outputText({ output: [{ type: 'reasoning', content: 'why' }] }), null, 'outputText: reasoning is not the answer');
+eq(outputText({ output: [{ type: 'reasoning', content: 'why' }] }, ['reasoning']), 'why', 'outputText: kinds select blocks');
+eq(outputText({ output: [] }), null, 'outputText: empty output -> null');
+eq(outputText({ choices: [] }), null, 'outputText: no output list -> null');
+const envU = outputUsage({ stats: { input_tokens: 2, total_output_tokens: 3 } });
+eq(envU.prompt, 2, 'outputUsage: prompt');
+eq(envU.completion, 3, 'outputUsage: completion');
+eq(envU.total, 5, 'outputUsage: total');
+eq(outputUsage({ usage: {} }), null, 'outputUsage: no stats -> null');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
