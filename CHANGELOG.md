@@ -8,12 +8,26 @@
 
 # Changelog
 
-All work in this session. UI changes shipped with a full `ui/` sync and the
-`?v=` cache-buster bumped (v281 → **v348**, in `ui/js/store.js` → `APP_VERSION`).
-PHP changes need only the usual file deploy.
+All work in this session. UI changes ship with a full `ui/` sync and the
+`?v=` cache-buster bumped in `ui/js/store.js` → `APP_VERSION`, kept equal to
+`VERSION` at the repo root; each entry's heading names the release it belongs
+to, so nothing here has to guess the current number. PHP changes need only the
+usual file deploy.
 
 `VERSION` at the repo root carries the release number, which the update check now
 reads and compares alongside that cache-buster — see the first entry below.
+
+---
+
+## 📄 The CHANGELOG stops dating itself *(`VERSION` 379, cache-buster v378 → v379)*
+
+*2026-11-08. Documentation only. The CHANGELOG header had hard-coded the claim that the cache-buster was v348, which stopped being true thirty releases ago -- a reader following it would have looked for the wrong number in `store.js`.*
+
+**A pointer, not a number.** The header now names where the buster lives -- `ui/js/store.js` → `APP_VERSION`, kept equal to `VERSION` at the repo root -- and leaves the actual value to each entry's heading. Nothing left in the prose can drift out of step with the code.
+
+**Released, not merely committed.** The update check compares `VERSION`, so a docs-only change with no bump is invisible to it: the tree would carry the correction while the app still reported being current. This entry exists so the fix, and the v377/v378 README work already behind it, actually arrive when you press update.
+
+**Checks.** `node tests/run.mjs`; `tests/php/docs.test.php` still holds one README release entry matching `VERSION`, every Contents anchor resolving, so a missing or duplicated What's-new entry fails the suite.
 
 ---
 

@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v378 — the Config switch follows a hand-toggled panel 🎛️
+### 🆕 v379 — the CHANGELOG stops dating itself, and the app can deliver it 📄
 
-*The switch could set the preference, but not read it back: opening a panel by hand while Config was on screen left the dropdown describing the old choice until the section was reopened.*
+*A documentation release. The CHANGELOG header still claimed the current cache-buster was v348 — thirty releases of drift, because that sentence hard-coded a number instead of pointing at the two files that hold it.*
 
 | | |
 |---|---|
-| 🔄 **One setting, followed live** | The dropdown subscribes to `settings.reasoningOpen`, so a panel opened or closed by hand updates the switch and its state label on the spot — both write the same key, and neither can now describe the other wrongly |
-| 🧹 **No pile-up** | Config → Interface rebuilds its markup every time it opens, so the previous subscription is dropped before a new one is made: reopening the tab fifty times leaves one listener, not fifty |
-| 🎛️ **Auto · Always open · Collapsed** | The three choices are unchanged: **Auto** opens a trace of 400 characters or more, **Always open** shows every one, **Collapsed** keeps the transcript flat — written at once, no SAVE, and a hand toggle is still saved as your choice |
+| 📄 **No fixed number left to go stale** | The header now says where the buster lives — `ui/js/store.js` → `APP_VERSION`, kept equal to `VERSION` at the repo root — so the next forty releases cannot leave a sentence behind telling you the wrong one |
+| 🔢 **One number, two files** | `VERSION` and `APP_VERSION` still move together, and each entry below names its own release, so the docs guard can check the newest README entry against `VERSION` instead of trusting a header |
+| 🔁 **Shipped as a release, not a stray commit** | Update compares `VERSION`, so a docs-only change with no bump is invisible to it: the tree would carry the correction and the app would still say you are current. This one carries a number, so pressing update actually delivers these pages |
 
 ---
 

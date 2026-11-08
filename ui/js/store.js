@@ -23,7 +23,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 378;
+export const APP_VERSION = 379;
 
 class Store {
   constructor() {
