@@ -19,6 +19,20 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🚫 "Done" is not evidence *(`VERSION` 392, cache-buster v391 → v392)*
+
+*2026-11-08. A reply said `write_file` had created the file and the disk was untouched. The tool that was meant to do it had never been bound to the sandbox, and when it was called it answered "sandbox tools are not bound yet" as ordinary output -- so `runTool` marked the call ok and the model read that sentence as confirmation.*
+
+**Unbound is an error.** Every placeholder runner in `TOOL_REGISTRY` (`write_file`, `str_replace_editor`, `edit_file`, `apply_patch`, `mcp_list`, `mcp_call`) returned that sentence as a normal result. They throw now: `runTool` catches it, records `ok: false` with the message in the trace, and hands the model `error: the sandbox file API is not bound ...`. A model that receives an error has something to report; a model that receives a friendly sentence has a success.
+
+**A false claim is labelled.** `claimsCompletedToolWork()` in `ui/js/utils.js` recognises a reply that names a tool together with a completion verb -- `write_file completed the task` -- and `_finalMsg` prefixes such a reply with `No tool call ran this turn, so nothing was changed` when the turn made no calls at all. Only a NAMED tool counts, so "the file was created" in prose, or a future intention, does not trigger it; a turn with calls is left alone because a failed call is already visible in the tool box.
+
+**Tests and docs.** `tests/js/finalMessage.test.mjs` gained eight assertions for the claim rule, including the sentence that started this and the three that must stay quiet. README: the **What's new** entry for v392 (replacing v391, which stays in this file).
+
+**Not fixed here.** Why the sandbox API was unbound in that run -- the server's sandbox route, or a page loaded before the binding ran -- is a diagnostic question, not a parsing one. The reply now says so instead of claiming success.
+
+---
+
 ## 🧾 "[called exec]" was never an answer *(`VERSION` 391, cache-buster v390 → v391)*
 
 *2026-11-08. Ask a local agent to make a file and the reply was `[called exec]`. That string is the app's own stand-in -- the text it gave the model for a tool call made without words -- and the model learned to send it back as the answer, so the turn ended with a caption where the result belonged.*

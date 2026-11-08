@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=391';
-import { K as STORAGE_K } from '../storage.js?v=391';
+import { store } from '../store.js?v=392';
+import { K as STORAGE_K } from '../storage.js?v=392';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=391';
-import { persistence } from '../persistence.js?v=391';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer } from '../utils.js?v=391';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=391';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=391';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=391';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=391';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=391';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=391';
-import { usageFor } from '../rateGovernor.js?v=391';
-import { trace } from '../trace.js?v=391';
-import { latency } from '../latency.js?v=391';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=391';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=391';
-import { SlashCommands } from '../slashCommands.js?v=391';
-import { parseRoute, routingHelp } from '../routing.js?v=391';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=391';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=391';
-import { MessageRenderer, renderToolCalls } from './message.js?v=391';
-import { createAvatar } from './avatar.js?v=391';
-import * as comms from '../commsLog.js?v=391';
+import { api, errText } from '../api.js?v=392';
+import { persistence } from '../persistence.js?v=392';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork } from '../utils.js?v=392';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=392';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=392';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=392';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=392';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=392';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=392';
+import { usageFor } from '../rateGovernor.js?v=392';
+import { trace } from '../trace.js?v=392';
+import { latency } from '../latency.js?v=392';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=392';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=392';
+import { SlashCommands } from '../slashCommands.js?v=392';
+import { parseRoute, routingHelp } from '../routing.js?v=392';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=392';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=392';
+import { MessageRenderer, renderToolCalls } from './message.js?v=392';
+import { createAvatar } from './avatar.js?v=392';
+import * as comms from '../commsLog.js?v=392';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1265,12 +1265,27 @@ _makeLiveNode(agent) {
     // A reply that is only `[called exec]` is the harness's own placeholder
     // echoed back, not an answer: it says nothing about what the tool returned
     // and reads as the turn having gone nowhere. Treated as no content, below.
-    if (asText(m.content).trim() && !isPlaceholderReply(m.content)) return m;
-    const streamed = asText(node && node.turnProse).trim();
-    if (streamed && !isPlaceholderReply(streamed)) return { ...m, content: streamed };
     const calls = (Array.isArray(m.toolCalls) && m.toolCalls.length)
       ? m.toolCalls
       : ((node && Array.isArray(node.toolCalls)) ? node.toolCalls : []);
+    const own = asText(m.content).trim();
+    const streamed = asText(node && node.turnProse).trim();
+    const said = (own && !isPlaceholderReply(own))
+      ? own
+      : (streamed && !isPlaceholderReply(streamed) ? streamed : '');
+    // A reply that reports tool work it never did. A model cannot be trusted to
+    // know whether it acted, and "write_file completed the task" next to an
+    // untouched disk is the worst thing to leave unqualified, so the difference
+    // is stated rather than implied. Only with NO calls: one failed call is
+    // already visible in the tool box, and guessing from prose alone there
+    // would be noise.
+    if (said && !calls.length && claimsCompletedToolWork(said)) {
+      return {
+        ...m,
+        content: '\u26a0 No tool call ran this turn, so nothing was changed. The model said:\n\n' + said,
+      };
+    }
+    if (said) return { ...m, content: said };
     // The tool's own output, not a count of calls: whether the file was created
     // is in the result, and that is the thing the operator asked for.
     return { ...m, content: finishedWithoutAnswer(calls) };

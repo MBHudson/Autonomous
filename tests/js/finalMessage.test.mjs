@@ -16,6 +16,7 @@
 
 import {
   isPlaceholderReply, finishedWithoutAnswer, TOOL_RESULT_NOTICE_CHARS,
+  claimsCompletedToolWork,
 } from '../../ui/js/utils.js';
 
 let pass = 0, fail = 0;
@@ -64,6 +65,22 @@ ok(!long.includes('x'.repeat(TOOL_RESULT_NOTICE_CHARS + 1)), 'and stops exactly 
 
 const messy = finishedWithoutAnswer([{ tool: 'exec', result: 'line one\r\n\n  line two\t' }]);
 ok(messy.includes('exec \u2192 line one line two'), 'whitespace is collapsed into one line');
+
+// --- a claim of work that never happened -------------------------------------
+// The reply that started this: no tool call, and a past-tense report that the
+// write had happened.
+ok(claimsCompletedToolWork('No tool call needed — write_file completed the task straightforwardly.') === true,
+  'write_file reported as completed is a claim');
+ok(claimsCompletedToolWork('The tool\'s arguments were set correctly, and no further actions are required.') === false,
+  'talking about the tool without claiming completion is not a claim');
+ok(claimsCompletedToolWork('I will use write_file to create the file.') === false,
+  'a future intention is not a past-tense claim');
+ok(claimsCompletedToolWork('The file was created in the sandbox.') === false,
+  'no named tool means no claim (too broad otherwise)');
+ok(claimsCompletedToolWork('exec saved the output to disk') === true, 'exec counts as a named tool');
+ok(claimsCompletedToolWork('git_commit finished') === true, 'git_commit counts as a named tool');
+ok(claimsCompletedToolWork('') === false, 'empty text claims nothing');
+ok(claimsCompletedToolWork(null) === false, 'missing text claims nothing');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

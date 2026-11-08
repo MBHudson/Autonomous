@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=391';
-import { asText, compactText } from './utils.js?v=391';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=391';
-import { settingFor } from './agentConfig.js?v=391';
-import { trace } from './trace.js?v=391';
+import { store } from './store.js?v=392';
+import { asText, compactText } from './utils.js?v=392';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=392';
+import { settingFor } from './agentConfig.js?v=392';
+import { trace } from './trace.js?v=392';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -157,26 +157,42 @@ export const TOOL_REGISTRY = {
     arg: 'argv',
     describe: 'Run one program with an argv array, e.g. ["grep","-rn","x","."]. Pass "timeout" seconds for slow commands (default 60, max 600). There is no shell: no pipes, redirects, && or $().',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   exec_start: {
     label: 'exec_start',
     arg: '{"argv":["python","server.py"],"timeout":300}',
     describe: 'Start a command in the BACKGROUND for servers, watchers and anything that never exits. Returns a handle at once; read it with exec_poll, stop it with exec_kill. Same policy gate as exec.',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   exec_poll: {
     label: 'exec_poll',
     arg: '{"handle":"..."}',
     describe: 'Read new output from a background command started with exec_start. Reports whether it is still running.',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   exec_kill: {
     label: 'exec_kill',
     arg: '{"handle":"..."}',
     describe: 'Stop a background command started with exec_start.',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Server-backed tools (see bindSandboxTools) ---
@@ -184,44 +200,72 @@ export const TOOL_REGISTRY = {
     label: 'web_search',
     arg: 'query',
     describe: 'Search the internet (DuckDuckGo, no API key)',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   fetch_url: {
     label: 'fetch_url',
     arg: 'url',
     describe: 'Read a web page and get back its text',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   read_file: {
     label: 'read_file',
     arg: 'path',
     describe: 'Read a file on the server (numbered lines)',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   list_dir: {
     label: 'list_dir',
     arg: 'path',
     describe: 'List a directory the sandbox is allowed to read',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   glob_files: {
     label: 'glob_files',
     arg: 'pattern',
     describe: 'Find files by name pattern, e.g. ui/js/**/*.js',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   grep_code: {
     label: 'grep_code',
     arg: 'pattern',
     describe: 'Search file contents for a regular expression',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   write_file: {
     label: 'write_file',
     arg: '{"path":"...","content":"..."}',
     describe: 'Create or edit a file inside the writable sandbox',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Familiar editor tools (Claude / Cursor / Aider shape) ---
@@ -233,21 +277,33 @@ export const TOOL_REGISTRY = {
     arg: '{"command":"view|create|str_replace|insert","path":"...","old_str":"...","new_str":"...","file_text":"...","insert_line":0,"view_range":[1,40]}',
     describe: 'Anthropic-style file editor: view, create, str_replace, insert',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   edit_file: {
     label: 'edit_file',
     arg: '{"path":"...","old_string":"...","new_string":"...","replace_all":false}',
     describe: 'Replace an exact string in a file (search/replace edit)',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   apply_patch: {
     label: 'apply_patch',
     arg: 'patch',
     describe: 'Apply a Codex/GPT V4A patch (*** Begin Patch ... *** End Patch) to add, update, move or delete files',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Git, run jailed and shell-free ---
@@ -264,7 +320,11 @@ export const TOOL_REGISTRY = {
         'rev-parse', 'blame', 'shortlog', 'describe', 'tag', 'grep', 'whatchanged',
         'reflog', 'ls-tree'].includes(sub);
     },
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Arbitrary HTTP (API work), not just GET ---
@@ -272,7 +332,11 @@ export const TOOL_REGISTRY = {
     label: 'http_request',
     arg: '{"method":"GET","url":"...","headers":{},"body":"..."}',
     describe: 'Make an HTTP request with a method, headers and a body',
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Apply several edits atomically, and commit ---
@@ -281,14 +345,22 @@ export const TOOL_REGISTRY = {
     arg: '{"edits":[{"path":"...","old_string":"...","new_string":"..."}]}',
     describe: 'Apply several search/replace edits at once, all-or-nothing',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
   git_commit: {
     label: 'git_commit',
     arg: '{"message":"...","paths":["src/app.js"]}',
     describe: 'Stage the given paths (or everything) and commit',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Code interpreter (off unless the operator enables it) ---
@@ -297,7 +369,11 @@ export const TOOL_REGISTRY = {
     arg: '{"language":"python|node|bash","code":"..."}',
     describe: 'Run a snippet with an interpreter in the sandbox (no state between calls; files persist). Pass "timeout" seconds for slow code (default 30, max 600).',
     needsApproval: true,
-    run: () => 'sandbox tools are not bound yet',
+    // A THROW, not a string. These ran returned "sandbox tools are not bound
+    // yet" as ordinary output, so runTool marked the call ok, the model read a
+    // benign sentence as confirmation, and a turn could report a file it never
+    // wrote. runTool turns a throw into `error: ...` with ok:false.
+    run: () => { throw new Error('the sandbox file API is not bound — reload the page, and if it persists the server\'s sandbox route is unreachable'); },
   },
 
   // --- Planning + reasoning ---

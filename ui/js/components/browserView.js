@@ -19,10 +19,10 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=391';
-import { api } from '../api.js?v=391';
-import { esc } from '../utils.js?v=391';
-import { k } from '../storage.js?v=391';
+import { store } from '../store.js?v=392';
+import { api } from '../api.js?v=392';
+import { esc } from '../utils.js?v=392';
+import { k } from '../storage.js?v=392';
 
 /** Live auto-refresh is a sticky preference, not a per-visit toggle. */
 const LIVE_KEY = k('browserLive');

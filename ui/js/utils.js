@@ -90,6 +90,23 @@ export function isPlaceholderReply(text) {
  * TOOL_RESULT_NOTICE_CHARS -- so `exec -> <stdout or refusal>` reaches the
  * transcript instead of a shrug.
  */
+/**
+ * Did a reply claim that tool work was already carried out?
+ *
+ * A model that cannot tell whether it acted will report the action as done in
+ * the past tense -- "write_file completed the task" -- and the transcript then
+ * says a file exists when nothing ran. Only a NAMED tool plus a completion verb
+ * counts: a reply discussing a plan in the abstract is not a claim, and the
+ * warning this drives must stay rare to stay believable.
+ */
+export function claimsCompletedToolWork(text) {
+  const s = String(text ?? '');
+  if (!s.trim()) return false;
+  const named = /\b(write_file|edit_file|multi_edit|apply_patch|str_replace_editor|exec_start|exec|run_code|git_commit|mcp_call)\b/i.test(s);
+  if (!named) return false;
+  return /\b(completed|created|written|wrote|saved|succeeded|applied|done|finished)\b/i.test(s);
+}
+
 export function finishedWithoutAnswer(calls) {
   const list = Array.isArray(calls) ? calls.filter(Boolean) : [];
   if (!list.length) return 'The agent finished without writing a reply.';

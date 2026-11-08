@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v391 — “`[called exec]`” was never an answer 🧾
+### 🆕 v392 — “done” is not evidence 🚫
 
-*Ask for a file and the reply was `[called exec]`. That string was the app's own note-to-itself — the stand-in text it handed the model for a tool call made without words — and the model learned to send it back as the answer. The turn ended with a caption where the result should be.*
+*A reply said `write_file` had created the file. The disk was untouched. The tool that was supposed to do it had never been bound to the sandbox, and when called it answered “sandbox tools are not bound yet” as ordinary output — so the app marked the call **ok** and the model read that sentence as confirmation.*
 
 | | |
 |---|---|
-| 🚫 **No more fabricated turns** | A call with no prose now enters the conversation as the call itself, `{"tool":"exec","arg":{…}}`, instead of `[called exec]` — nothing plausible for a model to parrot back |
-| 📄 **The result is the reply** | A turn that ends on tool calls answers with the last tool's output, whitespace collapsed and cut at 600 characters, instead of “finished after running N tool calls” |
-| 🧹 **A stored echo heals** | Content that is nothing but `[called x]` is treated as no answer, so a message already saved that way re-renders as the tool-result notice |
-| ✅ **Guarded** | `tests/js/finalMessage.test.mjs` pins the placeholder rule, the last-result excerpt, the cutting and the whitespace collapsing |
+| 🚫 **Unbound is now an error** | The placeholder runners throw instead of returning a sentence, so `runTool` records `ok: false` and the model is handed `error: …` it has to deal with |
+| 🔍 **A false claim is labelled** | A reply that names a tool in the past tense with no tool call in the turn is committed behind a plain warning: `⚠ No tool call ran this turn, so nothing was changed` |
+| 🧾 **The tool box tells the truth** | A refused or unbound call shows as a failure in the message's tool box, which the copy button and the transcript both read |
+| ✅ **Guarded** | `tests/js/finalMessage.test.mjs` pins the claim rule — including the sentence that started this — and the cases that must stay quiet |
 
 ---
 
