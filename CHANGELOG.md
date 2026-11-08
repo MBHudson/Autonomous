@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧪 The suites run on every push *(`VERSION` 427, no browser file changed)*
+
+*The tests were something someone remembered to run, so a branch could sit green in a local folder and break the moment it left it.*
+
+**One job, three steps, each fatal on its own.** `.github/workflows/tests.yml` runs `node tests/run.mjs`, then both suites again in a copy of the tree (`php tests/freshClone.php`) -- which is what catches "works here, not in a clone" -- then the serving refusals by making the real requests against `serve.php` (`tools/check-guards.sh --serve`). Separating them means a red build says which kind of breakage it is.
+
+**PHP comes from the runner image, and its extensions are asserted.** A loop over `curl`, `mbstring`, `fileinfo`, `zip`, `json` and `openssl` exits non-zero when one is missing, so a green build cannot mean the network paths quietly SKIPped. Files that genuinely cannot run there -- Apache and IIS are not installed on the runner -- print why they skip; a skip is reported and never counted as a pass.
+
+**Narrow by construction.** `permissions: contents: read`, one concurrency group per ref with `cancel-in-progress`, a 25-minute timeout, and Node pinned to 22. Nothing is published from CI; it only reads the tree and runs it.
+
 ## 🎬 The tour link says where it came from *(`VERSION` 426, no browser file changed)*
 
 *The diagram badge reported its README clicks and the video badge did not, so a click from the page and a click from anywhere else looked identical.*

@@ -1,0 +1,72 @@
+#
+# Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+#
+# Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
+#
+# BryceFromIndiana@gmail.com
+#
+# ============================================
+# TESTS -- both suites, a fresh copy, and the serving refusals
+# ============================================
+#
+# The suites are the app's own guards, so they run on every push rather than
+# when somebody remembers. Three steps, each of which fails the job on its own:
+#
+#   1. node tests/run.mjs        PHP suite, then the JS suite
+#   2. php tests/freshClone.php  both suites again, in a copy of the tree, which
+#                               is what catches "works here, not in a clone"
+#   3. tools/check-guards.sh     storage/, tests/, dotfiles and CORS, by making
+#                               the real requests against serve.php
+#
+# PHP comes from the runner image (8.3+ on ubuntu-latest) rather than a
+# third-party action, and the extension step below turns a missing curl or zip
+# into a red build instead of a silent SKIP line. Some files still skip on
+# Linux -- Apache and IIS are not installed -- and each prints why; a skip is
+# reported, never counted as a pass.
+
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suites:
+    name: suites and serving refusals
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: PHP and the extensions the app needs
+        run: |
+          php -v
+          php -r 'foreach (["curl","mbstring","fileinfo","zip","json","openssl"] as $e) {
+            if (!extension_loaded($e)) { fwrite(STDERR, "missing PHP extension: $e\n"); exit(1); }
+          } echo "extensions present\n";'
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Both suites
+        run: node tests/run.mjs
+
+      - name: Both suites in a fresh copy
+        run: php tests/freshClone.php
+
+      - name: Serving refusals
+        run: ./tools/check-guards.sh --serve

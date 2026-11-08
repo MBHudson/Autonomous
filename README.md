@@ -38,14 +38,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v426 — the tour link says where it came from 🎬
+### 🆕 v427 — the suites run on every push 🧪
 
-*A click from the README and a click from anywhere else looked the same, so the tour's own numbers could not say the page was working.*
+*The tests were something someone remembered to run, so a broken branch could sit green in a local folder.*
 
 | | |
 |---|---|
-| 🎬 **The same parameters as the diagram badge** | `?utm_source=readme&utm_medium=badge` on the video link, so both header links report the same way |
-| 📈 **One campaign, two buttons** | source and medium agree, and the target path keeps the tour separate from the diagram |
+| 🧪 **Three steps, any one of which fails the job** | `node tests/run.mjs`, then the same suites in a fresh copy (`php tests/freshClone.php`), then the serving refusals with `./tools/check-guards.sh --serve` |
+| 🔌 **Extensions are asserted, not skipped** | the job fails when curl, mbstring, fileinfo, zip, json or openssl is missing, so a green build means the network paths really ran |
+| 🐧 **Skips stay visible** | Apache and IIS are not on the runner, so those files print why they skip — a skip is reported, never counted as a pass, and `permissions: contents: read` is the job's whole authority |
 ---
 
 ## 🧭 Contents
