@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=379';
-import { K as STORAGE_K } from '../storage.js?v=379';
+import { store } from '../store.js?v=380';
+import { K as STORAGE_K } from '../storage.js?v=380';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=379';
-import { persistence } from '../persistence.js?v=379';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=379';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=379';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=379';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=379';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=379';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=379';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=379';
-import { usageFor } from '../rateGovernor.js?v=379';
-import { trace } from '../trace.js?v=379';
-import { latency } from '../latency.js?v=379';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=379';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=379';
-import { SlashCommands } from '../slashCommands.js?v=379';
-import { parseRoute, routingHelp } from '../routing.js?v=379';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=379';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=379';
-import { MessageRenderer, renderToolCalls } from './message.js?v=379';
-import { createAvatar } from './avatar.js?v=379';
-import * as comms from '../commsLog.js?v=379';
+import { api, errText } from '../api.js?v=380';
+import { persistence } from '../persistence.js?v=380';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=380';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=380';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=380';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=380';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=380';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=380';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=380';
+import { usageFor } from '../rateGovernor.js?v=380';
+import { trace } from '../trace.js?v=380';
+import { latency } from '../latency.js?v=380';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=380';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=380';
+import { SlashCommands } from '../slashCommands.js?v=380';
+import { parseRoute, routingHelp } from '../routing.js?v=380';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=380';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=380';
+import { MessageRenderer, renderToolCalls } from './message.js?v=380';
+import { createAvatar } from './avatar.js?v=380';
+import * as comms from '../commsLog.js?v=380';
 
 /**
  * How long an agent may keep working on a single task.
@@ -748,10 +748,24 @@ export class Chat {
         // two replies, one of them truncated because both were streaming into
         // the same live node.
         this._busy.add(agent.id);
-        store.emit('flow:start', { from: 'user', to: agent.id });
+        // The words travel with the hop now. A row that said "these two spoke"
+        // and nothing else was why the map card looked empty: the prompt was
+        // right here, it just never left the composer.
+        const task = comms.clipText(text);
+        comms.record({
+          fromId: 'user', fromName: 'you', toId: agent.id, toName: agent.name,
+          kind: 'prompt', text: task,
+        });
+        store.emit('flow:start', { from: 'user', to: agent.id, text: task });
         store.emit('agent:status', { agentId: agent.id, status: 'thinking' });
         if (coord && coord.id !== agent.id) {
-          store.emit('flow:delegate', { from: coord.id, to: agent.id });
+          // A coordinator handing the same task down is communication too, and
+          // it is the hop most turns are made of.
+          comms.record({
+            fromId: coord.id, fromName: coord.name, toId: agent.id, toName: agent.name,
+            kind: 'delegate', text: task,
+          });
+          store.emit('flow:delegate', { from: coord.id, to: agent.id, text: task });
         }
       });
       // Parallel fan-out: all agents dispatch at the same time so turns run
@@ -774,7 +788,11 @@ export class Chat {
         uniqueAgents.map((agent, i) => this._callAgent(text, agent, this.aborter.signal, turnNodes[i], pending).then(
           value => {
             this._busy.delete(agent.id);
-            store.emit('flow:respond', { from: agent.id });
+            // The answer rides back to You on the same beam, and into the log.
+            store.emit('flow:respond', {
+              from: agent.id,
+              text: comms.clipText(value?.content ?? value?.text ?? ''),
+            });
             const result = { status: 'fulfilled', value };
             this._commitAgentReply(agent, result, turnNodes[i]);
             return result;
@@ -1035,6 +1053,13 @@ _commitAgentReply(agent, result, live) {
         toolCalls: result.value.toolCalls || (live && live.toolCalls) || null,
         timestamp: Date.now()
       };
+      // The answer, in the same log the questions live in, so a turn reads end
+      // to end in one place instead of a beam and a hope.
+      comms.record({
+        fromId: agent.id, fromName: agent.name,
+        toId: 'user', toName: 'you',
+        kind: 'reply', text: agentMsg.content || '',
+      });
       // If a streaming node was already on screen, swap it for the fully
       // rendered message rather than appending a duplicate. The swap happens
       // WHERE THE NODE SITS, so finishing early does not reorder the turn.
@@ -1060,6 +1085,13 @@ _commitAgentReply(agent, result, live) {
         agentId: agent.id,
         timestamp: Date.now()
       };
+      // A refusal is communication too: it belongs in the transcript beside
+      // the question that provoked it, not only in the bubble.
+      comms.record({
+        fromId: agent.id, fromName: agent.name,
+        toId: 'user', toName: 'you',
+        kind: 'reply', text: errorMsg.content || '',
+      });
       if (live) { this._replaceLiveNode(live, errorMsg); }
       else { this._addMessage(errorMsg); }
       store.emit('agent:status', { agentId: agent.id, status: 'idle' });
@@ -2144,7 +2176,7 @@ _makeLiveNode(agent) {
       toId: targetId, toName: target?.name,
       kind: 'ask', text: question,
     });
-    store.emit('flow:speak', { from: ctx?.agentId, to: targetId, text: question });
+    store.emit('flow:speak', { from: ctx?.agentId, to: targetId, text: comms.clipText(question) });
     store.emit('toast', {
       message: `${me?.name || 'An agent'} asked ${target.name}…`, type: 'info',
     });
@@ -2183,7 +2215,7 @@ _makeLiveNode(agent) {
       // The answer travelling back. Settled even on failure, so a refusal is
       // readable in the log instead of an ask that looks unanswered forever.
       comms.settle(exchange, answer, answered);
-      store.emit('flow:speak', { from: targetId, to: ctx?.agentId, text: answer });
+      store.emit('flow:speak', { from: targetId, to: ctx?.agentId, text: comms.clipText(answer) });
       store.emit('agent:status', { agentId: targetId, status: 'active' });
       setTimeout(() => store.emit('agent:status', { agentId: targetId, status: 'idle' }), 2500);
     }

@@ -10,9 +10,9 @@
 // METRICSPANEL.JS — Per-session usage metrics modal
 // ============================================
 
-import { store } from '../store.js?v=379';
-import { api } from '../api.js?v=379';
-import { esc, agentCode } from '../utils.js?v=379';
+import { store } from '../store.js?v=380';
+import { api } from '../api.js?v=380';
+import { esc, agentCode } from '../utils.js?v=380';
 
 function fmt(n) {
   n = Math.round(n || 0);
@@ -189,9 +189,16 @@ export class MetricsPanel {
     if (!agent) return;
     const { rows, totals } = this._agentEntry(agentId);
     this._open(`${esc(agentCode(agent))} ${esc(agent.name)} — Usage`, agent.color,
-      this._allTimeHtml()
+      `<div class="metrics-actions"><button class="btn btn-ghost" id="mtrMessages">Messages →</button></div>`
+      + this._allTimeHtml()
       + `<div class="form-label" style="margin:12px 0 6px">This agent</div>`
       + this._totalsHtml(totals) + this._rowsHtml(rows));
+    // The 2D map's door to the same drawer the 3D card opens, so Classic is not
+    // the one view where what an agent said cannot be reached at all.
+    this.modal?.querySelector('#mtrMessages')?.addEventListener('click', () => {
+      this.close();
+      store.emit('comms:showAgent', { agentId });
+    });
   }
 
   /**

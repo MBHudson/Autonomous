@@ -101,6 +101,14 @@ ok(events === 3, 'settle emits a change too, so an open view can repaint');
 off?.();
 comms.record({ fromId: 'a1', toId: 'b2', text: 'three' });
 ok(events === 3, 'a listener that unsubscribed stops hearing about changes');
+// A reply recorded after the fact counts as a change too, or an open drawer
+// would show the question and never the answer. A fresh listener, because the
+// one above proved it stopped hearing anything.
+const off2 = store.on('comms:changed', () => { events++; });
+const late = comms.record({ fromId: 'a1', toId: 'b2', text: 'later' });
+comms.settle(late, 'answered later');
+off2?.();
+ok(events === 5, 'record and settle each notify once');
 
 // --- per-agent filtering ----------------------------------------------------
 comms.clear();
@@ -129,6 +137,34 @@ eq(comms.count(), comms.MAX, `the log holds at most MAX (${comms.MAX}) entries`)
 const kept = comms.recent(comms.MAX);
 eq(kept[0].text, `m${comms.MAX + 5}`, 'the newest entry survives the cap');
 eq(kept[kept.length - 1].text, 'm6', 'the five oldest entries were dropped');
+
+// --- the whole conversation, not only agent-to-agent ------------------------
+//
+// The map card was silent because the hops that make up a turn were never
+// recorded: you -> agent, coordinator -> agent, agent -> you. They are entries
+// now, so "Messages" can answer with the words instead of only the names.
+comms.clear();
+const p = comms.record({ fromId: 'user', fromName: 'you', toId: 'a1', toName: 'North', kind: 'prompt', text: 'ship the release' });
+const d = comms.record({ fromId: 'boss', fromName: 'Boss', toId: 'a1', toName: 'North', kind: 'delegate', text: 'ship the release' });
+const r = comms.record({ fromId: 'a1', fromName: 'North', toId: 'user', toName: 'you', kind: 'reply', text: 'shipped' });
+eq(p.kind, 'prompt', 'the operator prompt is its own kind');
+eq(d.kind, 'delegate', 'a delegation is recorded, not just drawn');
+eq(r.kind, 'reply', 'the answer coming back is recorded');
+eq(comms.forAgent('a1').map(e => e.kind), ['reply', 'delegate', 'prompt'],
+  "one agent's whole conversation, newest first");
+
+// --- the text cap -----------------------------------------------------------
+const long = 'x'.repeat(comms.TEXT_MAX + 50);
+const big = comms.record({ fromId: 'a1', toId: 'b2', text: long });
+ok(big.text.length === comms.TEXT_MAX, `text is capped at TEXT_MAX (${comms.TEXT_MAX}), got ${big.text.length}`);
+ok(big.text.endsWith('…'), 'a cut text says so rather than trailing off');
+eq(comms.clipText(undefined), '', 'clipText treats a missing value as empty');
+eq(comms.clipText('short'), 'short', 'clipText leaves short text alone');
+eq(comms.clipText('y'.repeat(comms.TEXT_MAX)).length, comms.TEXT_MAX,
+  'a text exactly at the cap is not shortened');
+
+// --- the bound --------------------------------------------------------------
+eq(comms.MAX, 600, 'the log holds 600 hops now that prompts and replies are in it');
 
 // --- clear ------------------------------------------------------------------
 comms.clear();

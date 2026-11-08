@@ -10,10 +10,10 @@
 // TOPOLOGY3D / POPUP.JS — click-a-node metrics card
 // ============================================
 
-import { store } from '../../store.js?v=379';
-import { esc, escAttr } from '../../utils.js?v=379';
-import { latency, fmtMs, latencyTier } from '../../latency.js?v=379';
-import { McpPanel } from './mcpPanel.js?v=379';
+import { store } from '../../store.js?v=380';
+import { esc, escAttr } from '../../utils.js?v=380';
+import { latency, fmtMs, latencyTier } from '../../latency.js?v=380';
+import { McpPanel } from './mcpPanel.js?v=380';
 
 const KIND_LABEL = {
   message: 'prompt', response: 'reply', delegate: 'delegate',
@@ -369,7 +369,7 @@ export class PopupCard {
       ${this._recentBlock(n.id)}
       <div class="t3d-pop-foot">
         <button class="t3d-ask" data-act="ask" title="Ask this model directly — nobody else is consulted">ASK</button>
-        <button class="t3d-link" data-act="talk" title="Every exchange this agent sent or received, with the text">Messages →</button>
+        <button class="t3d-link" data-act="talk" title="Every message this agent sent or received — your prompt, the task it was handed, what it said to a team-mate, and the replies — with the full text">Messages →</button>
         <button class="t3d-link" data-act="report">Full token report →</button>
       </div>`;
   }

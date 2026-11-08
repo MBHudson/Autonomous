@@ -14,21 +14,28 @@
 // whose card you clicked: what it SAID (both halves of each exchange, with the
 // text) and what it RAN (its lines in storage/exec.log).
 //
+// Talk now holds the agent's whole side of the conversation, not only the part
+// that went to another agent: your prompt, the task a coordinator handed it,
+// what it told a team-mate, and the reply it produced. That is why the scope
+// filter exists -- All communication by default, Agent to agent for the narrower
+// question the drawer used to answer on its own.
+//
 // Opened by `comms:showAgent` — emitted by the Messages button on a 3D agent
-// card. The renderers are the trace panel's, so there is one implementation of
-// each row and two doors to it.
+// card and by the same button on the 2D metrics modal. The renderers are the
+// trace panel's, so there is one implementation of each row and three doors.
 
-import { store } from '../store.js?v=379';
-import { esc } from '../utils.js?v=379';
-import { api } from '../api.js?v=379';
-import * as comms from '../commsLog.js?v=379';
-import { commsHtml, execHtml } from './tracePanel.js?v=379';
+import { store } from '../store.js?v=380';
+import { esc } from '../utils.js?v=380';
+import { api } from '../api.js?v=380';
+import * as comms from '../commsLog.js?v=380';
+import { commsHtml, execHtml } from './tracePanel.js?v=380';
 
 export class AgentRecord {
   constructor() {
     this.el = null;
     this.agentId = null;
     this.tab = 'talk';
+    this.scope = 'all';
     this.execData = null;
     this.execError = '';
     this.execLoading = false;
@@ -49,6 +56,7 @@ export class AgentRecord {
     if (this.el && this.agentId === agentId) { this.render(); return; }
     this.agentId = agentId;
     this.tab = 'talk';
+    this.scope = 'all';
     this.execData = null;
     this.execError = '';
     this.el?.remove();
@@ -76,6 +84,12 @@ export class AgentRecord {
       if (tab && tab.dataset.arTab !== this.tab) {
         this.tab = tab.dataset.arTab;
         this.render();
+        return;
+      }
+      const scopeBtn = e.target.closest?.('[data-ar-scope]');
+      if (scopeBtn && scopeBtn.dataset.arScope !== this.scope) {
+        this.scope = scopeBtn.dataset.arScope;
+        this.render();
       }
     });
     this.render();
@@ -91,8 +105,12 @@ export class AgentRecord {
         + `<span class="agent-record-sub">${esc(a.role || a.model || '')}</span>`;
     }
 
+    const all = comms.forAgent(this.agentId, comms.MAX);
+    const entries = this.scope === 'agent'
+      ? all.filter(e => e.kind === 'ask' || e.kind === 'tell' || e.kind === 'ping')
+      : all;
     const counts = {
-      talk: comms.forAgent(this.agentId, comms.MAX).length,
+      talk: all.length,
       runs: this.tab === 'runs' ? (this.execData?.entries?.length ?? '') : '',
     };
     const tabs = this.el.querySelector('#arTabs');
@@ -106,8 +124,12 @@ export class AgentRecord {
     const body = this.el.querySelector('#arBody');
     if (!body) return;
     if (this.tab === 'talk') {
-      body.innerHTML = `<div class="form-hint">Everything ${esc(name)} sent or received this page-load. Agent chat is not written to storage.</div>`
-        + `<div class="trace-scroll">${commsHtml(comms.forAgent(this.agentId, 200), `${name} has not spoken to another agent yet.`)}</div>`;
+      const scopeBtn = (id, label) => `<button class="trace-tab${this.scope === id ? ' active' : ''}" data-ar-scope="${id}">${esc(label)}</button>`;
+      body.innerHTML = `<div class="form-hint">Everything ${esc(name)} sent or received this page-load — your prompt, the task it was handed, what it said to another agent, and every reply. Nothing here is written to storage.</div>`
+        + `<div class="agent-scope" id="arScope">${scopeBtn('all', 'All communication')}${scopeBtn('agent', 'Agent to agent')}</div>`
+        + `<div class="trace-scroll">${commsHtml(entries, this.scope === 'agent'
+          ? `${name} has not spoken to another agent yet.`
+          : `${name} has not said anything yet this page-load.`)}</div>`;
       return;
     }
     // First look at RUNS: fetch once, then render from what came back. A

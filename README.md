@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v379 — the CHANGELOG stops dating itself, and the app can deliver it 📄
+### 🆕 v380 — every message, with the words, inside Messages 💬
 
-*A documentation release. The CHANGELOG header still claimed the current cache-buster was v348 — thirty releases of drift, because that sentence hard-coded a number instead of pointing at the two files that hold it.*
+*The map could say two agents spoke and then show nothing beneath it: your prompt, the task a coordinator handed down and the answer coming back were drawn as beams but never carried their text, and the Messages drawer only knew agent-to-agent traffic.*
 
 | | |
 |---|---|
-| 📄 **No fixed number left to go stale** | The header now says where the buster lives — `ui/js/store.js` → `APP_VERSION`, kept equal to `VERSION` at the repo root — so the next forty releases cannot leave a sentence behind telling you the wrong one |
-| 🔢 **One number, two files** | `VERSION` and `APP_VERSION` still move together, and each entry below names its own release, so the docs guard can check the newest README entry against `VERSION` instead of trusting a header |
-| 🔁 **Shipped as a release, not a stray commit** | Update compares `VERSION`, so a docs-only change with no bump is invisible to it: the tree would carry the correction and the app would still say you are current. This one carries a number, so pressing update actually delivers these pages |
+| 💬 **The words travel with the hop** | Your prompt, the delegation it becomes and the reply that comes back are now recorded with their text, so a card's Recent messages row says what was said instead of only who said it and when — and a beam's hover tooltip reads *“You → Muse: …”* |
+| 📜 **Messages is the whole conversation** | The drawer lists every hop for that agent — your prompt, the task it was handed, what it said to a team-mate, the answer — each with its full text, newest first, under **All communication** / **Agent to agent** |
+| 🗺️ **Every door reaches it** | The 3D card's Messages button, a new one on the 2D agent metrics modal, and the Comms tab in Config → TRACE read the same log, so no two views can disagree about what was said |
 
 ---
 
@@ -119,7 +119,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🚀 **Background commands** | `exec_start` runs a server, watcher or anything that never exits and hands back a handle at once; `exec_poll` reads its output and says whether it is alive, `exec_kill` stops it |
 | ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
 | 📊 **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
-| 🗣️ **Conversations, in words** | Agent-to-agent messages keep their **text**: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer opened from the map, and a beam you can hover to read *“A → B: …”*. |
+| 🗣️ **Conversations, in words** | Every hop keeps its **text** — your prompt, the task a coordinator hands down, an agent-to-agent ask with its answer, and the reply: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer (All / agent-to-agent) opened from either map, and a beam you can hover to read *“A → B: …”*. |
 | 📣 **One name, the whole roster** | `ask_agent` / `tell_agent` take `"ALL"` (or `everyone` / `everybody`, any case): ask each agent in turn with replies labelled by agent, or post one instruction to every mailbox — and an agent really called "All" keeps its name |
 | 🧠 **Memory** | Private + collective long-term memory the agents actually use |
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |

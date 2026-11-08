@@ -877,6 +877,17 @@ body.agent-reordering .agent-editor:hover {
   border-bottom: 1px solid var(--border);
 }
 
+/* The Messages drawer's scope filter: everything, or agent-to-agent only. */
+.agent-scope {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+
+.metrics-actions {
+  margin: 0 0 10px;
+}
+
 .agent-record-body {
   flex: 1;
   min-height: 0;

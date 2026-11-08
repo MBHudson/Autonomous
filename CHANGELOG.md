@@ -19,6 +19,20 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 💬 Every message keeps its words, and Messages reads the whole conversation *(`VERSION` 380, cache-buster v379 → v380)*
+
+*2026-11-08. The map drew a line for every hop and could name the two agents at its ends, then showed nothing beneath the row. Only `ask_agent` / `tell_agent` / a mailbox ping were recorded with text; the three hops that make up almost every turn were emitted bare, so the card's list was a list of things that happened without any of the things that were said.*
+
+**The words were already in scope.** `chat.js` dispatches with the prompt in hand, and `_commitAgentReply` holds the answer. `flow:start` now carries your prompt, `flow:delegate` carries the same task a coordinator hands down, and `flow:respond` carries the reply — through `topology.js`'s `_flowRespond(from, text)` and into the beam, so the 2D hover tooltip (`A → B: …`) stopped being mute too. Each hop is cut at 8 000 characters (`comms.clipText`), because a prompt can be a pasted file and the history ring is bounded.
+
+**One log, the whole conversation.** `commsLog.js` gains `prompt`, `delegate` and `reply` beside `ask` / `tell` / `ping`, recorded from the same call sites, with the per-entry text capped at 8 000 characters and `MAX_EXCHANGES` raised 300 → 600 so a turn's own traffic cannot push out the questions being debugged. Still in memory, page-load only: nothing new reaches `storage/`.
+
+**Everything goes in Messages, and every metric stays where it was.** The 3D card keeps its latency sparkline, tokens, tool calls and recent hops untouched; its **Messages →** button opens the drawer, which now lists the agent's whole side of the conversation with the full text — and an **All communication** / **Agent to agent** filter for the narrower view it used to answer alone. The 2D agent metrics modal gained the same **Messages →** button, so Classic is no longer the one map with no way to read what was said, and Config → TRACE's Comms tab shows the same log for everyone.
+
+**Tests.** `tests/js/commsLog.test.mjs`: the three new kinds, one agent's whole conversation newest-first, `forAgent` across a prompt / delegation / reply, the text cap (exactly at the cap, and a truncated entry that says so), `clipText` on a missing value, the new bound, and change events for a reply recorded after the fact.
+
+---
+
 ## 📄 The CHANGELOG stops dating itself *(`VERSION` 379, cache-buster v378 → v379)*
 
 *2026-11-08. Documentation only. The CHANGELOG header had hard-coded the claim that the cache-buster was v348, which stopped being true thirty releases ago -- a reader following it would have looked for the wrong number in `store.js`.*

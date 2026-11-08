@@ -10,9 +10,9 @@
 // TOPOLOGY.JS — SVG network graph
 // ============================================
 
-import { store } from '../store.js?v=379';
-import { api } from '../api.js?v=379';
-import { esc, agentCode } from '../utils.js?v=379';
+import { store } from '../store.js?v=380';
+import { api } from '../api.js?v=380';
+import { esc, agentCode } from '../utils.js?v=380';
 
 // How long a hop stays bright while in flight, and how long it then lingers as
 // a faint record of the exchange before it fades out and is dropped.
@@ -125,7 +125,7 @@ export class TopologyGraph {
       // reads it back.
       text: d?.text,
     }));
-    store.on('flow:respond', (d) => this._flowRespond(d?.from));
+    store.on('flow:respond', (d) => this._flowRespond(d?.from, d?.text));
     store.on('flow:fail', (d) => this._flowFadeTo(d?.to));
 
     // MCP traffic. Outgoing calls are announced by the tool layer; incoming
@@ -826,14 +826,14 @@ export class TopologyGraph {
     }
   }
 
-  _flowRespond(agentId) {
+  _flowRespond(agentId, text) {
     if (!agentId) return;
     // Fade the inbound prompt + delegation lines into this agent...
     this._flowFadeTo(agentId);
     // ...while the reply line flows back toward the user. The reply is the
     // payload; let it sit bright a moment longer than an inbound hop so you can
     // actually see the answer travel.
-    this._flowAdd({ from: agentId, to: 'user', kind: 'response', holdMs: RESPONSE_HOLD_MS });
+    this._flowAdd({ from: agentId, to: 'user', kind: 'response', holdMs: RESPONSE_HOLD_MS, text });
   }
 
   _flowFadeTo(agentId) {

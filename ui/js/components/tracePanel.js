@@ -25,11 +25,11 @@
 // The two renderers are exported so the per-agent drawer on the map can show
 // the same rows filtered to one agent instead of re-implementing them.
 
-import { store } from '../store.js?v=379';
-import { esc } from '../utils.js?v=379';
-import { recent, clear, stats } from '../trace.js?v=379';
-import { api } from '../api.js?v=379';
-import * as comms from '../commsLog.js?v=379';
+import { store } from '../store.js?v=380';
+import { esc } from '../utils.js?v=380';
+import { recent, clear, stats } from '../trace.js?v=380';
+import { api } from '../api.js?v=380';
+import * as comms from '../commsLog.js?v=380';
 
 function fmtTime(t) {
   try { return new Date(t).toLocaleTimeString([], { hour12: false }); } catch { return ''; }
@@ -54,7 +54,10 @@ function fmtAuditTime(sec) {
   return fmtTime(sec * 1000);
 }
 
-const KIND_LABEL = { ask: 'ask', tell: 'tell', ping: 'ping' };
+const KIND_LABEL = {
+  ask: 'ask', tell: 'tell', ping: 'ping',
+  prompt: 'prompt', delegate: 'delegate', reply: 'reply',
+};
 
 /**
  * The COMMS list: one block per exchange, both halves together.
@@ -213,8 +216,8 @@ export class TracePanel {
         <div class="trace-scroll">${this.runsTable()}</div>`;
     } else if (this.tab === 'comms') {
       body.querySelector('#traceView').innerHTML = `
-        <div class="form-hint">What the agents actually said to each other: the question, and the answer that came back. Kept in memory for this page-load — agent chat is not written to storage.</div>
-        <div class="trace-scroll">${commsHtml(comms.recent(300))}</div>`;
+        <div class="form-hint">What was said this page-load: your prompts, the tasks agents were handed, the agent-to-agent asks with their answers, and the replies. In memory only — none of it is written to storage.</div>
+        <div class="trace-scroll">${commsHtml(comms.recent(comms.MAX))}</div>`;
     } else {
       this.loadExec();
     }
