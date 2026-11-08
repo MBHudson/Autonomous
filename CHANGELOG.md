@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧹 A fixed warning leaves the transcript *(`VERSION` 403, cache-buster v402 → v403)*
+
+*2026-11-08. The file-tool warning is added to the conversation before a turn, so a model that could not write cannot report the file as written. Nothing removed it. Once the tools were fixed, every stored session still said the writes were not landing -- false, and in the direction that makes an operator distrust work that did happen.*
+
+**The note knows what it is.** New warnings carry `fileToolWarning: true`. The ones already in saved conversations have no such field, so `isFileToolWarning()` also recognises the sentence they begin with -- and only for an agent message with no `agentId`, because those notes are written with `agentId: null` while a real reply carries its author. A model quoting the warning therefore keeps its reply.
+
+**Cleared only when it is no longer true.** `_clearFileToolWarnings()` filters every conversation in the store plus the open one, persists the result, removes the matching bubbles from the transcript, and reports one toast with the count. It runs from three places, each of which has already verified both halves: a turn whose check finds nothing to warn about, a successful `_confirmRebind()`, and a `sandbox:bound` event from the Config tab or the agent editor, which the chat answers by re-reading `/sandbox/status` before deleting anything.
+
+**A bound page with an empty jail keeps its warning**, and so does a bubble whose content was corrected to a confirmation -- that one is no longer a warning, and it is deliberately left in place.
+
+**Tests.** `tests/js/staleFileToolWarning.test.mjs` covers detection with and without the flag, the role and author guards, both halves removed in one pass, the corrected bubble, an already-clean conversation, and non-array arguments.
+
 ## 🧾 The editor says what this agent can do *(`VERSION` 402, cache-buster v401 → v402)*
 
 *2026-11-08. The agent editor is where the file tools are chosen for one agent, so it is the one panel where the state of those tools belongs -- and it had none. `_describeToolPermissions()` ran once at init, looking for `#toolHint` before any modal existed, so the explanation never appeared. When a hint did appear it was the static "None selected = plain replies."*

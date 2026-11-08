@@ -10,16 +10,16 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=402';
-import { persistence } from '../persistence.js?v=402';
-import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=402';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=402';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=402';
-import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=402';
-import { sandboxRootFor } from '../agentConfig.js?v=402';
-import { audio } from '../audio.js?v=402';
-import { api } from '../api.js?v=402';
-import * as memory from '../memory.js?v=402';
+import { store } from '../store.js?v=403';
+import { persistence } from '../persistence.js?v=403';
+import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=403';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=403';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=403';
+import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=403';
+import { sandboxRootFor } from '../agentConfig.js?v=403';
+import { audio } from '../audio.js?v=403';
+import { api } from '../api.js?v=403';
+import * as memory from '../memory.js?v=403';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
@@ -92,6 +92,10 @@ export class AgentEditor {
         const { unbound } = bindSandboxNow(api);
         if (unbound.length) {
           store.emit('toast', { message: `Still unbound: ${unbound.join(', ')}`, type: 'error' });
+        } else {
+          // The transcript's warning was asked for by this failure; let the
+          // chat re-check both halves and take it down once they hold.
+          store.emit('sandbox:bound');
         }
         api.getSandboxStatus().then(paint, () => paint(null));
       });

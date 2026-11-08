@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=402';
-import { K } from '../storage.js?v=402';
-import { persistence } from '../persistence.js?v=402';
-import { api } from '../api.js?v=402';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=402';
-import { errText } from '../api.js?v=402';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=402';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=402';
-import { snapshot } from '../rateGovernor.js?v=402';
-import { resetBrowserEnabled } from '../toolManifest.js?v=402';
-import { perf } from '../perf.js?v=402';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=402';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=402';
+import { store } from '../store.js?v=403';
+import { K } from '../storage.js?v=403';
+import { persistence } from '../persistence.js?v=403';
+import { api } from '../api.js?v=403';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=403';
+import { errText } from '../api.js?v=403';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=403';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=403';
+import { snapshot } from '../rateGovernor.js?v=403';
+import { resetBrowserEnabled } from '../toolManifest.js?v=403';
+import { perf } from '../perf.js?v=403';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=403';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=403';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -3254,6 +3254,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     store.emit('toast', unbound.length
       ? { message: `Still unbound: ${unbound.join(', ')}`, type: 'error' }
       : { message: 'File tools bound — agents can read and write now', type: 'info' });
+    if (!unbound.length) store.emit('sandbox:bound');
   }
 
   /**

@@ -192,6 +192,39 @@ export function agentToolState({ unbound, status, root } = {}) {
   };
 }
 
+/** How every "the file tools are unusable" note in a transcript begins. */
+export const FILE_TOOL_WARNING_PREFIX = '⚠ File tools are unavailable';
+
+/**
+ * Is this stored message a file-tool warning?
+ *
+ * The flag is the reliable answer for notes written since the field existed;
+ * the prefix catches the ones already in saved conversations, which have no
+ * flag because nothing put one there. The role/agentId guard keeps a model's
+ * own reply from being deleted just because it quoted the sentence: these notes
+ * are written with `agentId: null`, and a real reply carries its author.
+ */
+export function isFileToolWarning(msg) {  if (!msg || typeof msg !== 'object') return false;
+  if (msg.fileToolWarning === true) return true;
+  if (msg.role !== 'agent' || msg.agentId) return false;
+  return asText(msg.content).trim().startsWith(FILE_TOOL_WARNING_PREFIX);
+}
+
+/**
+ * Drop stale file-tool warnings from a message list.
+ *
+ * A warning is true when it is written and false the moment the tools come
+ * back, but a transcript is a record of what was said, so nothing removed it:
+ * every fixed install kept telling the operator that its writes were not
+ * landing. This returns the list without those notes plus how many went, so the
+ * caller can say whether anything changed.
+ */
+export function withoutFileToolWarnings(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  const kept = list.filter(m => !isFileToolWarning(m));
+  return { messages: kept, removed: list.length - kept.length };
+}
+
 export function finishedWithoutAnswer(calls) {
   const list = Array.isArray(calls) ? calls.filter(Boolean) : [];
   if (!list.length) return 'The agent finished without writing a reply.';

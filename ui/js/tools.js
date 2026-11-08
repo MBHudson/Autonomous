@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=402';
-import { asText, compactText } from './utils.js?v=402';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=402';
-import { settingFor } from './agentConfig.js?v=402';
-import { trace } from './trace.js?v=402';
+import { store } from './store.js?v=403';
+import { asText, compactText } from './utils.js?v=403';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=403';
+import { settingFor } from './agentConfig.js?v=403';
+import { trace } from './trace.js?v=403';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;

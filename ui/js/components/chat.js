@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=402';
-import { K as STORAGE_K } from '../storage.js?v=402';
+import { store } from '../store.js?v=403';
+import { K as STORAGE_K } from '../storage.js?v=403';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,28 +20,28 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=402';
-import { persistence } from '../persistence.js?v=402';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning } from '../utils.js?v=402';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=402';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=402';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=402';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=402';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=402';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=402';
-import { usageFor } from '../rateGovernor.js?v=402';
-import { trace } from '../trace.js?v=402';
-import { offerRebind } from './rebindOffer.js?v=402';
-import { latency } from '../latency.js?v=402';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=402';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=402';
-import { SlashCommands } from '../slashCommands.js?v=402';
-import { parseRoute, routingHelp } from '../routing.js?v=402';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=402';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=402';
-import { MessageRenderer, renderToolCalls } from './message.js?v=402';
-import { createAvatar } from './avatar.js?v=402';
-import * as comms from '../commsLog.js?v=402';
+import { api, errText } from '../api.js?v=403';
+import { persistence } from '../persistence.js?v=403';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings } from '../utils.js?v=403';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=403';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=403';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=403';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=403';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=403';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=403';
+import { usageFor } from '../rateGovernor.js?v=403';
+import { trace } from '../trace.js?v=403';
+import { offerRebind } from './rebindOffer.js?v=403';
+import { latency } from '../latency.js?v=403';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=403';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=403';
+import { SlashCommands } from '../slashCommands.js?v=403';
+import { parseRoute, routingHelp } from '../routing.js?v=403';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=403';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=403';
+import { MessageRenderer, renderToolCalls } from './message.js?v=403';
+import { createAvatar } from './avatar.js?v=403';
+import * as comms from '../commsLog.js?v=403';
 
 /**
  * How long an agent may keep working on a single task.
@@ -355,6 +355,18 @@ export class Chat {
         this.currentSessionId = null;
         try { localStorage.removeItem(CURRENT_SESSION_KEY); } catch {}
       }
+    });
+
+    // A bind elsewhere -- Config, the agent editor -- is the fix those warnings
+    // asked for, so the transcript should stop saying they are broken. Both
+    // halves are re-checked first: binding with no server directory is still
+    // a broken install, and clearing then would hide a true warning.
+    store.on('sandbox:bound', () => {
+      api.getSandboxStatus().then(status => {
+        this._jailStatus = status;
+        this._jailStatusAt = Date.now();
+        if (!fileToolWarning([], status)) this._clearFileToolWarnings();
+      }).catch(() => { /* unknown is not fixed */ });
     });
 
     sendBtn.addEventListener('click', () => this.sendMessage());
@@ -3088,9 +3100,14 @@ _makeLiveNode(agent) {
   _showFileToolWarning(status) {
     const report = sandboxBindingReport();
     const text = fileToolWarning(report.unbound, status);
-    if (!text || text === this._lastFileToolWarning) return;
+    if (!text) {
+      // Nothing is wrong now, so anything said earlier is no longer true.
+      this._clearFileToolWarnings();
+      return;
+    }
+    if (text === this._lastFileToolWarning) return;
     this._lastFileToolWarning = text;
-    const msg = { role: 'agent', content: text, agentId: null, timestamp: Date.now() };
+    const msg = { role: 'agent', content: text, agentId: null, fileToolWarning: true, timestamp: Date.now() };
     const el = this._addMessage(msg);
     trace('note', 'file tools unavailable', { step: 'warn', detail: text });
     // The page half is fixable here; an empty jail is a server setting, so no
@@ -3136,7 +3153,9 @@ _makeLiveNode(agent) {
         // A later failure is a new problem and deserves a new warning.
         this._lastFileToolWarning = '';
         msg.content = done;
+        msg.fileToolWarning = false;   // this bubble is a confirmation now
         store.emit('toast', { message: 'File tools bound', type: 'info' });
+        this._clearFileToolWarnings();
         return done;
       }
       // Bound but still unusable: keep the warning, and keep it deduped so the
@@ -3159,6 +3178,63 @@ _makeLiveNode(agent) {
       store.emit('toast', { message: 'File tools bound; could not reach the server', type: 'info' });
       return unknown;
     }
+  }
+
+  /**
+   * Take stale file-tool warnings out of the transcripts, open and stored.
+   *
+   * A warning is true only while the tools are broken, but a transcript is a
+   * record of what was said, so nothing ever removed one: a repaired install
+   * kept telling the operator -- in every saved session -- that its writes were
+   * not landing. This runs only once both halves have been checked and the
+   * tools actually work.
+   *
+   * Old notes carry no flag, because nothing put one there when they were
+   * written, so `withoutFileToolWarnings()` also recognises the sentence they
+   * begin with. The open transcript is matched the same way: those bubbles have
+   * no id to look up.
+   */
+  _clearFileToolWarnings() {
+    let removed = 0;
+    let changed = false;
+    const convs = store.get('conversations') || [];
+    for (const conv of convs) {
+      const { messages, removed: n } = withoutFileToolWarnings(conv.messages);
+      if (!n) continue;
+      conv.messages = messages;
+      removed += n;
+      changed = true;
+    }
+    const current = store.get('currentConversation');
+    if (current) {
+      const { messages, removed: n } = withoutFileToolWarnings(current.messages);
+      if (n) {
+        current.messages = messages;
+        removed += n;
+        changed = true;
+      }
+    }
+    if (changed) {
+      if (current) store.set('currentConversation', current);
+      store.set('conversations', [...convs]);
+      persistence.set('conversations', store.get('conversations'));
+      store.emit('conversations:changed');
+    }
+    const box = document.getElementById('chatMessages');
+    if (box) {
+      for (const el of [...box.querySelectorAll('.message')]) {
+        const body = el.querySelector('.message-body');
+        const text = String(body && body.textContent || '').trim();
+        if (text.startsWith(FILE_TOOL_WARNING_PREFIX)) el.remove();
+      }
+    }
+    if (!removed) return;
+    this._lastFileToolWarning = '';
+    trace('note', 'file tools healthy', { step: 'clear', detail: `${removed} warning(s) removed` });
+    store.emit('toast', {
+      message: `Cleared ${removed} stale file-tool warning${removed === 1 ? '' : 's'}`,
+      type: 'info',
+    });
   }
 
   _addMessage(msg) {

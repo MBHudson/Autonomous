@@ -37,18 +37,18 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v402 — the editor says what this agent can do 🧾
+### 🆕 v403 — a fixed warning leaves the transcript 🧹
 
-*The tool hint in the agent editor was written once at startup, before the modal that contains it existed, so it described nothing — and even when it appeared it spoke about the sandbox in general, never about the agent on screen.*
+*The warning is written before a turn so a model cannot claim a write that never happened. Nothing ever took it back out: after the repair, every saved session still said the writes were not landing — no longer true, and wrong in the opposite direction.*
 
 | | |
 |---|---|
-| 🧾 **Painted on open** | The hint is rebuilt every time an agent is opened, so the sentence that explains the tools is actually shown beside them |
-| 🏠 **Both halves, one line** | Whether this page bound the tools, and whether the server has a directory — the same two facts the chat warns about, in the panel where the tools are chosen |
-| 🎯 **The per-agent root** | An agent jailed to a folder outside the allowlist is flagged here: the server refuses that scope, and no global line would ever say so |
-| 🔧 **Fix in place** | When the page never bound, `BIND FILE TOOLS` sits next to the sentence that names the problem |
-| 📡 **Unknown stays unknown** | A status route that does not answer reads as "could not be checked", never as a promise that writes land |
-| ✅ **Guarded** | `agentToolState.test.mjs` — 34 assertions over every combination, Windows path spellings included |
+| 🧹 **Removed when it stops being true** | Once both halves check out, the notes are stripped from the open transcript and from every saved conversation |
+| 🔎 **Old notes included** | Recognised by the sentence they begin with, because the warnings already stored carry no flag |
+| 🛡️ **A quote is not a warning** | Only an agent note with no author counts, so a model repeating the sentence keeps its reply |
+| 🧯 **Still true stays** | Bound with an empty jail keeps the warning, and an unverifiable status deletes nothing |
+| ⚡ **Wherever the fix happens** | Config, the agent editor and the chat bubble all announce the bind, and the chat re-checks both halves before removing anything |
+| ✅ **Guarded** | `staleFileToolWarning.test.mjs` covers old notes with no flag, a quoted sentence, the corrected bubble, and the clean-conversation no-op |
 
 ---
 
