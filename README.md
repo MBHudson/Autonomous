@@ -5,6 +5,9 @@
 
   BryceFromIndiana@gmail.com
 -->
+[![Watch a one-minute video tour of autonomous](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/mbhudson/autonomous/video)
+
+
 [![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
 # 🧠 Autonomous Loop Studio
 
