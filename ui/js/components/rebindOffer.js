@@ -66,7 +66,20 @@ export function offerRebind(bubble, { bind, doneText, onBound, onFail } = {}) {
     body.textContent = doneText || '✓ File tools are bound.';
     btn.disabled = true;
     if (typeof btn.remove === 'function') btn.remove();
-    if (onBound) onBound();
+    // The bubble can be corrected after the click. Binding is only the page
+    // half; whether the server has a directory is a second fact, and claiming
+    // it before asking is the false confidence this warning exists to remove.
+    // `onBound` may therefore return a string or a promise for one.
+    if (onBound) {
+      try {
+        const verdict = onBound();
+        if (verdict && typeof verdict.then === 'function') {
+          verdict.then(text => {
+            if (text) body.textContent = text;
+          }).catch(() => { /* the provisional text stands */ });
+        }
+      } catch { /* the bubble already says it bound */ }
+    }
   });
 
   body.appendChild(btn);

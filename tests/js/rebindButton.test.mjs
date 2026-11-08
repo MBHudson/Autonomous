@@ -175,6 +175,48 @@ function bubble(text = '⚠ File tools are unavailable') {
   ok(btn.disabled === true, 'and an absent attempt counts as nothing left to do');
 }
 
+// --- a follow-up verdict can correct the bubble -----------------------------
+// Binding is the page half only. The server's jail is a second fact, so the
+// module lets onBound answer later and rewrite the confirmation.
+{
+  const { wrap, body } = bubble();
+  const btn = offerRebind(wrap, {
+    bind: () => ({ unbound: [] }),
+    doneText: 'PROVISIONAL',
+    onBound: () => Promise.resolve('CORRECTED: the server has no directory'),
+  });
+  btn.click();
+  ok(body.textContent === 'PROVISIONAL', 'the confirmation appears immediately');
+  await new Promise(r => setTimeout(r, 0));
+  ok(body.textContent === 'CORRECTED: the server has no directory',
+    'a later verdict replaces it');
+}
+
+// A failed follow-up must not swallow the confirmation or reject unhandled.
+{
+  const { wrap, body } = bubble();
+  const btn = offerRebind(wrap, {
+    bind: () => ({ unbound: [] }),
+    doneText: 'STILL FINE',
+    onBound: () => Promise.reject(new Error('status unreachable')),
+  });
+  btn.click();
+  await new Promise(r => setTimeout(r, 0));
+  ok(body.textContent === 'STILL FINE', 'a failed follow-up leaves the confirmation intact');
+}
+
+// A synchronous throw in onBound is equally survivable.
+{
+  const { wrap, body } = bubble();
+  const btn = offerRebind(wrap, {
+    bind: () => ({ unbound: [] }),
+    doneText: 'SAFE',
+    onBound: () => { throw new Error('boom'); },
+  });
+  btn.click();
+  ok(body.textContent === 'SAFE', 'a throwing follow-up does not undo the confirmation');
+}
+
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 for (const e of errors) console.log('  ' + e);

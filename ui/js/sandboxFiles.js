@@ -6,12 +6,12 @@
  * BryceFromIndiana@gmail.com
  */
 
-import { store } from './store.js?v=400';
-import { persistence } from './persistence.js?v=400';
-import { api } from './api.js?v=400';
-import { esc, escAttr } from './utils.js?v=400';
-import { renderMarkdown } from './markdown.js?v=400';
-import { sandboxRootFor } from './agentConfig.js?v=400';
+import { store } from './store.js?v=401';
+import { persistence } from './persistence.js?v=401';
+import { api } from './api.js?v=401';
+import { esc, escAttr } from './utils.js?v=401';
+import { renderMarkdown } from './markdown.js?v=401';
+import { sandboxRootFor } from './agentConfig.js?v=401';
 
 const TEXT_EXT = new Set([
   'txt', 'md', 'markdown', 'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',

@@ -18,6 +18,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🏠 A rebind confirms the jail too *(`VERSION` 401, cache-buster v400 → v401)*
+
+*2026-11-08. A successful rebind only proved the page had runners. The bubble then said "agents can read and write now" without asking whether the server had a directory -- the same false confidence the warning exists to remove, this time arriving from the fix.*
+
+**The follow-up.** `_confirmRebind()` runs after the button binds: it re-reads `sandbox/status`, stores the fresh result in the jail cache, and decides what the bubble should say. `offerRebind()` now accepts a promise from `onBound` and replaces the provisional confirmation with whatever it resolves to, so the correction happens in the bubble rather than in a toast nobody connects to it.
+
+**Three outcomes, all honest.** Jail live: `✓ File tools are bound — agents can read and write now`, and the dedupe key clears so a future failure warns again. Jail empty: the bubble becomes that warning (naming Working Project Directory), and the dedupe key holds it so the next turn does not stack a duplicate. Status unreachable: the bubble claims only the page half -- "the server's working directory could not be checked" -- and the cache is left cold so the next turn asks again.
+
+**Tests.** `rebindButton.test.mjs` gains the deferred-verdict paths: a resolved promise replaces the confirmation, a rejected one leaves it intact, and a synchronous throw in `onBound` cannot undo it.
+
 ## 🧪 The rebind button is exercised, not just described *(`VERSION` 400, cache-buster v399 → v400)*
 
 *2026-11-08. The warning bubble's button was wired and unverified. The suite could test the sentence; nothing ran the control. A click path that only exists in a browser is a click path nobody has run, and the failure mode -- a button stuck disabled, or one that binds twice -- is exactly the kind that reads as "the app is broken".*

@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=400';
-import { K as STORAGE_K } from '../storage.js?v=400';
+import { store } from '../store.js?v=401';
+import { K as STORAGE_K } from '../storage.js?v=401';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,28 +20,28 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=400';
-import { persistence } from '../persistence.js?v=400';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning } from '../utils.js?v=400';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=400';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=400';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=400';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=400';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=400';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=400';
-import { usageFor } from '../rateGovernor.js?v=400';
-import { trace } from '../trace.js?v=400';
-import { offerRebind } from './rebindOffer.js?v=400';
-import { latency } from '../latency.js?v=400';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=400';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=400';
-import { SlashCommands } from '../slashCommands.js?v=400';
-import { parseRoute, routingHelp } from '../routing.js?v=400';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=400';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=400';
-import { MessageRenderer, renderToolCalls } from './message.js?v=400';
-import { createAvatar } from './avatar.js?v=400';
-import * as comms from '../commsLog.js?v=400';
+import { api, errText } from '../api.js?v=401';
+import { persistence } from '../persistence.js?v=401';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning } from '../utils.js?v=401';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=401';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=401';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=401';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=401';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=401';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=401';
+import { usageFor } from '../rateGovernor.js?v=401';
+import { trace } from '../trace.js?v=401';
+import { offerRebind } from './rebindOffer.js?v=401';
+import { latency } from '../latency.js?v=401';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=401';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=401';
+import { SlashCommands } from '../slashCommands.js?v=401';
+import { parseRoute, routingHelp } from '../routing.js?v=401';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=401';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=401';
+import { MessageRenderer, renderToolCalls } from './message.js?v=401';
+import { createAvatar } from './avatar.js?v=401';
+import * as comms from '../commsLog.js?v=401';
 
 /**
  * How long an agent may keep working on a single task.
@@ -3109,16 +3109,56 @@ _makeLiveNode(agent) {
     offerRebind(el, {
       bind: () => bindSandboxNow(api),
       doneText: '✓ File tools are bound — agents can read and write now.',
-      onBound: () => {
-        // A later failure is a new problem and deserves a new warning.
-        this._lastFileToolWarning = '';
-        msg.content = '✓ File tools are bound — agents can read and write now.';
-        store.emit('toast', { message: 'File tools bound', type: 'info' });
-      },
+      onBound: () => this._confirmRebind(msg),
       onFail: unbound => store.emit('toast', {
         message: `Still unbound: ${unbound.join(', ')}`, type: 'error',
       }),
     });
+  }
+
+  /**
+   * Confirm the OTHER half after a successful rebind.
+   *
+   * Binding only proves the page has runners; the server may still have no
+   * allowed directory, in which case "agents can read and write now" would be
+   * precisely the false confidence this warning exists to remove. So the jail
+   * is re-read, the cache updated, and the bubble corrected if there is more
+   * to say. Returns the text the bubble should end up with.
+   */
+  async _confirmRebind(msg) {
+    const done = '✓ File tools are bound — agents can read and write now.';
+    try {
+      const status = await api.getSandboxStatus();
+      this._jailStatus = status;
+      this._jailStatusAt = Date.now();
+      const jailWarn = fileToolWarning([], status);
+      if (!jailWarn) {
+        // A later failure is a new problem and deserves a new warning.
+        this._lastFileToolWarning = '';
+        msg.content = done;
+        store.emit('toast', { message: 'File tools bound', type: 'info' });
+        return done;
+      }
+      // Bound but still unusable: keep the warning, and keep it deduped so the
+      // next turn does not stack a second copy of the same sentence.
+      this._lastFileToolWarning = jailWarn;
+      msg.content = jailWarn;
+      store.emit('toast', {
+        message: 'File tools are bound; the server still has no working directory',
+        type: 'error',
+      });
+      return jailWarn;
+    } catch {
+      // Unknown is not the same as fine. Say only what was proven, and leave
+      // the cache cold so the next turn asks again.
+      this._jailStatus = null;
+      this._jailStatusAt = 0;
+      this._lastFileToolWarning = '';
+      const unknown = '✓ File tools are bound in this page — the server\'s working directory could not be checked.';
+      msg.content = unknown;
+      store.emit('toast', { message: 'File tools bound; could not reach the server', type: 'info' });
+      return unknown;
+    }
   }
 
   _addMessage(msg) {

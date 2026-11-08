@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v400 — the rebind button is exercised, not just described 🧪
+### 🆕 v401 — a rebind confirms the jail too 🏠
 
-*The warning bubble's button was wired and unverified: the suite could test the sentence, not the control. A click path that only exists in a browser is a click path nobody has run.*
+*A successful rebind only proved the page had runners. The bubble then said "agents can read and write now" without asking whether the server had a directory — the same false confidence the warning exists to remove, arriving from the other direction.*
 
 | | |
 |---|---|
-| 🧪 **A harness, not a dependency** | `tests/js/rebindButton.test.mjs` builds a fake element with the handful of methods the button uses — no jsdom, no new packages |
-| 🔧 **The bubble is extracted** | `offerRebind()` lives in its own module, so the button can be driven without booting the chat |
-| 🎯 **The paths that matter** | Lands in `.message-body`, click binds once, success rewrites the bubble and removes the button, failure re-arms it as TRY AGAIN, a throw recovers, success is still possible on a second click |
-| ✅ **25 assertions** | Including that a bubble without a body, or no bubble at all, simply gets no button |
+| 🏠 **Both halves before the claim** | After binding, the chat re-reads `sandbox/status` and only then decides what the bubble says |
+| 🧾 **Three honest outcomes** | Jail live: the confirmation. Jail empty: the bubble becomes that warning again, naming Working Project Directory. Status unreachable: it claims the page half only |
+| 🔁 **The cache is refreshed** | A successful read replaces the 15-second cache with fresh data, so the next turn does not contradict the bubble |
+| ✅ **Guarded** | `rebindButton.test.mjs` covers a later verdict replacing the text, a rejected follow-up leaving it intact, and a throwing one surviving |
 
 ---
 
