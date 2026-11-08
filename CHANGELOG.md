@@ -18,6 +18,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧪 The rebind button is exercised, not just described *(`VERSION` 400, cache-buster v399 → v400)*
+
+*2026-11-08. The warning bubble's button was wired and unverified. The suite could test the sentence; nothing ran the control. A click path that only exists in a browser is a click path nobody has run, and the failure mode -- a button stuck disabled, or one that binds twice -- is exactly the kind that reads as "the app is broken".*
+
+**The button moved to its own module.** `ui/js/components/rebindOffer.js` owns the element, the label, the click handler and the bubble rewrite; `chat.js` keeps the toasts, the trace and the message bookkeeping. That split is what makes the control drivable without booting the chat.
+
+**A harness instead of a dependency.** `tests/js/rebindButton.test.mjs` defines a fake element with only `appendChild`, `remove`, `addEventListener`, `click`, `querySelector`, `className`, `textContent`, `style` and `disabled` -- the surface this module touches. No jsdom, no new package, and the suite stays runnable with plain `node`.
+
+**What it proves (25 assertions).** The button lands in `.message-body` and leaves the warning text alone; a click calls the binding attempt exactly once; success rewrites the bubble, removes the button and disables it, and a stray click afterwards does nothing; failure re-enables it as **TRY AGAIN** and reports the names; a second click can still succeed; a throwing attempt is reported and recovers instead of staying dead; and a missing bubble, missing body or missing bind function all degrade without throwing.
+
+**Also corrected.** The warning now says "Press BIND FILE TOOLS to retry in this page" instead of "Reload the page", so the sentence and the control agree (asserted in `fileToolWarning.test.mjs`).
+
 ## 🔧 The warning carries its own fix *(`VERSION` 399, cache-buster v398 → v399)*
 
 *2026-11-08. "Reload the page" asked the operator to throw away the turn they were in the middle of, and a warning that only describes a problem is a dead end. The bubble now holds the button that fixes the half it can.*

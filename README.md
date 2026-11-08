@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v399 — the warning carries its own fix 🔧
+### 🆕 v400 — the rebind button is exercised, not just described 🧪
 
-*"Reload the page" asked the operator to throw away the turn they were in the middle of, and a warning that only describes a problem is a dead end. The bubble now holds the button that fixes the half it can.*
+*The warning bubble's button was wired and unverified: the suite could test the sentence, not the control. A click path that only exists in a browser is a click path nobody has run.*
 
 | | |
 |---|---|
-| 🔧 **The fix is in the warning** | **BIND FILE TOOLS** sits inside the warning bubble and runs one binding attempt in the page you already have |
-| 🎯 **Only when it can help** | An unbound page gets the button; an empty jail does not, because that is a server setting the button cannot change |
-| 🧾 **The bubble reports back** | Bound: it becomes `✓ File tools are bound`. Still broken: the button turns into **TRY AGAIN** and the toast names what is left |
-| 🧩 **Same function as Config and boot** | `bindSandboxNow()`, so a click here, a click in Config and the boot retry cannot disagree |
+| 🧪 **A harness, not a dependency** | `tests/js/rebindButton.test.mjs` builds a fake element with the handful of methods the button uses — no jsdom, no new packages |
+| 🔧 **The bubble is extracted** | `offerRebind()` lives in its own module, so the button can be driven without booting the chat |
+| 🎯 **The paths that matter** | Lands in `.message-body`, click binds once, success rewrites the bubble and removes the button, failure re-arms it as TRY AGAIN, a throw recovers, success is still possible on a second click |
+| ✅ **25 assertions** | Including that a bubble without a body, or no bubble at all, simply gets no button |
 
 ---
 
