@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v421 — a refused install hands you the command ⌨️
+### 🆕 v422 — a missing extension is a 503 🚦
 
-*The panel could say `tools/` is not writable and still leave you to work out what to type.*
+*A server without curl answered "400 Bad Request" about a request that was perfectly well formed.*
 
 | | |
 |---|---|
-| ⌨️ **The command comes with the refusal** | preflight reports `blocked` (the folder) and `command` (`php install-update.php`) beside its problems |
-| 🖥️ **Config → Updates prints it** | the disabled install button's hint adds the line in monospace, ready to paste in the app folder |
-| 🛡️ **Same refusals either way** | the terminal path runs the identical checks; `--status`, `--finish` and `--rollback` are unchanged |
+| 🚦 **503 for the missing extension** | the update routes report the server's inability as 503 with `code: curl_missing`, the same shape the other network routes already use |
+| 🧾 **400 still means "you asked wrong"** | a refused host, a non-release archive or a write refusal keeps its 400 and its message |
+| 🔁 **The distinction matters** | 400 tells a client to stop; 503 says the server cannot act right now, which is what a missing extension is |
 ---
 
 ## 🧭 Contents

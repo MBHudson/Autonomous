@@ -1884,10 +1884,15 @@ function handleUpdate($method, $segments, $body) {
     // Only the two actions that talk to GitHub need curl. The rest work on
     // files that are already here, so they must not inherit the gate above:
     // "install the update you already downloaded" cannot require a network.
-    $needsCurl = function () {
+    // Set when the failure is the missing extension rather than a bad request.
+    // The catch below answers 503 for that and 400 for everything else: the two
+    // are different claims about whose fault the request is.
+    $curlMissing = false;
+    $needsCurl = function () use (&$curlMissing) {
         if (function_exists('curl_init')) {
             return;
         }
+        $curlMissing = true;
         throw new \RuntimeException("PHP's curl extension is not enabled, so this server cannot reach the internet. "
             . 'Start the app with start.bat / start.sh (they switch it on), or enable '
             . '"extension=curl" in php.ini' . (php_ini_loaded_file() ? ' (' . php_ini_loaded_file() . ')' : ' (this PHP has no php.ini at all)')
@@ -2031,10 +2036,18 @@ function handleUpdate($method, $segments, $body) {
         http_response_code(404);
         echo json_encode(['error' => 'Unknown update action']);
     } catch (\Throwable $e) {
-        // 400, not 500: a refusal (bad host, not our archive, no write access)
-        // is a normal outcome with a message meant for the operator.
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        // A refusal (bad host, not our archive, no write access) is a normal
+        // outcome with a message meant for the operator, so 400. The exception is
+        // the missing curl extension: that is this server being unable to act at
+        // all, not the request being wrong, and 503 is what a client reads as
+        // "try later" instead of "stop asking". The code matches the gate at the
+        // top of this file, so both paths report the same condition the same way.
+        http_response_code($curlMissing ? 503 : 400);
+        $out = ['ok' => false, 'error' => $e->getMessage()];
+        if ($curlMissing) {
+            $out['code'] = 'curl_missing';
+        }
+        echo json_encode($out);
     }
 }
 ?>

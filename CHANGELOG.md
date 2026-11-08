@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🚦 A missing extension is a 503 *(`VERSION` 422, no browser file changed)*
+
+*The update routes answered `400 Bad Request` when PHP had no curl extension: a request that was perfectly well formed, blamed for the server's inability to act.*
+
+**The gate and the handler disagreed.** The top of `api/index.php` already answers `503` with `code: curl_missing` for the routes that talk to the network. `handleUpdate()` carried its own copy of that check, and it threw into a catch written for refusals -- so `/api/update/check` and `/api/update/download` came back as 400.
+
+**One flag, two statuses.** The closure now records that the refusal was the extension, and the catch chooses: `503` with `code: curl_missing` for that case, `400` for everything else -- a refused host, an archive that is not a release, a folder the web server cannot write. The messages themselves are unchanged.
+
+**Why it matters.** A 400 tells a client its request is wrong and to stop asking; a 503 says the server cannot act right now. A proxy, a retry and the operator all read those differently, and the app's own UI reports the second as "this server cannot reach the internet".
+
 ## ⌨️ A refused install hands you the command *(`VERSION` 421, cache-buster v419 → v421)*
 
 *The panel could say the web server cannot write `tools/` and still leave the operator to work out what to do about it.*
