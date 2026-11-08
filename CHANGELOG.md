@@ -84,6 +84,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 📖 The README, audited *(`VERSION` 411, no browser file changed)*
+
+*2026-11-08. The document was read line by line against the code. The typos were the least of it: one section described the proxy as it worked before v408, the test figures came from a suite half this size, and Quick start had ended up 1,300 lines down the page, behind the whole feature tour.*
+
+**Quick start moved above the security section.** It had drifted to the very bottom, after the API table and Troubleshooting. It now sits just under the Labs walkthroughs and before Security, so the on-ramp is on the way in and the guardrails are one section further down rather than demoted to the end — which is where the reviewers who never reach them would still never reach them.
+
+**The Proxy section now matches the code.** It described loopback-only bypassing via `NO_PROXY` and a per-request proxy that still won; since v408 every private, link-local and `.local` endpoint is called directly, v409 stopped the browser sending a proxy at all, and v410 makes the tab name the hosts it skips. The section says all three, and that clearing writes both sides.
+
+**Figures re-measured.** The fresh-copy claim said `14 files, 840 assertions`; it is `20 files, 1,129` for PHP and `24 files, 681` for JS, about 38s end to end on this machine, and the tree is 306 files rather than 281. The JS test list and the architecture tree name the files that exist.
+
+**Smaller corrections.** The three refusal codes are stated once each (`401` with a token set, `503` before one exists, `403` for a LAN caller when the gate is off), Troubleshooting gained the 403 case, the IIS footnote no longer implies a `web.config` ships, `Resource Monitor` became `Resource Manager`, and its / veiled / actions lost their typos.
+
 ## 🔁 The button comes back with the warning *(`VERSION` 404, cache-buster v403 → v404)*
 
 *2026-11-08. Clearing a stale warning only helps after the tools work. Before that, a reload replayed the sentence as an ordinary agent bubble -- and the `BIND FILE TOOLS` control that the live warning carries does not exist in stored text, so the transcript told the operator to press a button that was not on the screen.*

