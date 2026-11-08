@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v423 — even the uncached GET says 503 🚦
+### 🆕 v424 — the suite proves the 503 without curl 🧪
 
-*A server without curl answered the load-time check with `200 OK` and a body admitting it had failed.*
+*Those answers were checked by hand on a PHP whose php.ini had no curl — not something a suite can assume.*
 
 | | |
 |---|---|
-| 🚦 **All three paths agree** | the gate, the POST routes and now the uncached GET all answer 503 with `code: curl_missing` |
-| 🧾 **The reason replaces the symptom** | the probe warnings ("undefined function curl_init") give way to the gate's sentence and the folder to fix it in |
-| 🗃️ **A cached answer is still 200** | with `check.json` on disk the server has something true to say, and says it |
+| 🧪 **The condition is manufactured** | `tests/php/curlMissing.test.php` boots the app with `-d disable_functions=curl_init,…`, so `function_exists('curl_init')` is false with every other extension intact |
+| 🚦 **Four answers, asserted** | uncached GET 503 with `code: curl_missing` and no probe warnings · POST check 503 · POST download 503 · cached GET 200 `cached: true` |
+| 🗃️ **The cache is put back** | `storage/updates/check.json` is read before seeding and restored afterwards; a copy that needs an access token SKIPs with the reason |
 ---
 
 ## 🧭 Contents

@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧪 The suite proves the 503 without curl *(`VERSION` 424, no browser file changed)*
+
+*The 503 answers were verified by hand on a PHP whose php.ini had no curl -- a condition no suite can assume the machine it runs on is in.*
+
+**The condition is manufactured, not hoped for.** `tests/php/curlMissing.test.php` starts the app with `-d disable_functions=curl_init,curl_exec,...`, which removes those functions from the function table exactly as a missing extension does, while leaving every other extension in place. `function_exists('curl_init')` is then false and `Update::check()` takes its "cannot reach the internet" branch, so the routes answer for the reason the last two releases argued about rather than for a port that happened to be busy.
+
+**Four answers, asserted.** An uncached GET is 503 with `code: curl_missing`, `ok: false`, no probe warnings, and `localVersion` intact; a POST is 503 with the same code; `/api/update/download` is refused by the same gate; and a seeded `check.json` still comes back 200 with `cached: true` and no `code` field.
+
+**It puts back what it uses.** `storage/updates/check.json` belongs to the operator, so the file reads it first and restores it afterwards -- including when it was not there at all. A copy that requires an access token SKIPs the HTTP half with the reason, because loopback is refused then and a 401 counted as a pass is the exact failure the file exists to prevent.
+
 ## 🚦 Even the cached GET says 503 *(`VERSION` 423, no browser file changed)*
 
 *A server without curl answered the load-time check with `200 OK` and a body that admitted it had failed.*
