@@ -37,15 +37,18 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v381 — a question asked on the map leaves a trace too 🗨️
+### 🆕 v382 — every message, with the words, in one place 💬
 
-*The inline ASK box was built to leave the transcript alone — and it left the log alone too, so a question you asked straight on the map was the one exchange Messages could never show.*
+*The map could draw a line for every hop and name the two agents at its ends, then show nothing beneath the row. Only `ask_agent` and `tell_agent` traffic was ever recorded with its text, so your prompt, a coordinator's delegation and the answer coming back were drawn mute — and **Messages**, the one place built to show what was said, only knew the part that went agent-to-agent.*
 
 | | |
 |---|---|
-| 🗨️ **The ASK box is recorded** | A question typed on the map becomes a **prompt** entry, and the answer settles onto it like any other reply — so the drawer is not missing the one thing you just asked |
-| ↩️ **A failed ask is kept, marked failed** | An ASK that was cancelled or errored settles as a failure instead of vanishing, so a question that got no answer still reads as asked |
-| 🗺️ **Where it shows up** | The agent's **Messages** drawer under *All communication*, the **Comms** tab in Config → TRACE, and the card's Recent messages — the beam carries the question and the answer both |
+| 💬 **The words travel with the hop** | Your prompt rides `flow:start`, the same task rides `flow:delegate` when a coordinator hands it down, and the reply rides `flow:respond` — so a card's *Recent messages* row says what was said instead of only who said it and when, and a beam's hover tooltip reads *“You → Muse: …”* instead of stopping at the arrow |
+| 📜 **Messages is the whole conversation** | The drawer lists every hop for that agent — your prompt, the task it was handed, what it told a team-mate, the answer it produced, questions asked straight on the map — each with its full text, newest first, under **All communication** / **Agent to agent** |
+| 🗺️ **Every door reaches it** | The 3D card's **Messages →** button, a new one on the 2D agent metrics modal, and the **Comms** tab in Config → TRACE read the same log, so no two views can disagree about what was said — and Classic is no longer the one map with no way in |
+| 🗨️ **The ASK box is recorded too** | A question typed on the map becomes a **prompt** entry and the answer settles onto it like any other reply; a cancelled or errored ask settles as a failure, so it reads as asked instead of vanishing |
+| 🧮 **Bounded, in memory, on purpose** | 8 000 characters per entry and 600 hops per page-load — enough that a turn's own traffic cannot push out the question you are debugging, and nothing new is written to `storage/` |
+| 🎛️ **The card keeps every number** | Latency sparkline, p95, first token, queue wait, errors, tokens in/out, tool-call bars and Recent messages are exactly where they were: **Messages** adds the words, it does not replace the metrics |
 
 ---
 
@@ -119,7 +122,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 🚀 **Background commands** | `exec_start` runs a server, watcher or anything that never exits and hands back a handle at once; `exec_poll` reads its output and says whether it is alive, `exec_kill` stops it |
 | ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
 | 📊 **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
-| 🗣️ **Conversations, in words** | Every hop keeps its **text** — your prompt, the task a coordinator hands down, an agent-to-agent ask with its answer, and the reply: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer (All / agent-to-agent) opened from either map, and a beam you can hover to read *“A → B: …”*. |
+| 🗣️ **Conversations, in words** | Every hop keeps its **text** — your prompt, the task a coordinator hands down, an agent-to-agent ask with its answer, the reply, and a question typed in the map's ASK box: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer (All / agent-to-agent) opened from either map, a failed ask that stays visible, and a beam you can hover to read *“A → B: …”*. |
 | 📣 **One name, the whole roster** | `ask_agent` / `tell_agent` take `"ALL"` (or `everyone` / `everybody`, any case): ask each agent in turn with replies labelled by agent, or post one instruction to every mailbox — and an agent really called "All" keeps its name |
 | 🧠 **Memory** | Private + collective long-term memory the agents actually use |
 | 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
@@ -678,9 +681,9 @@ Agents leak. 🕵️ By default every model call, every `web_search`, every `fet
 - **Agent cards** show a live line: `⚡ tokens/budget · N req · up 2h · 40/min` — with a tooltip of in/out tokens, billed calls, output cap, context window and last call. Set a **token budget** (Config → Limits) and it shows `used/limit (%)`.
 - **🔎 Run trace** (Config → TRACE) is one viewer with three tabs:
   - **RUNS** — a sequenced timeline of every model turn and tool call: time, agent, model/tool, **ms**, **ok/fail**, and token cost — plus totals.
-  - **COMMS** — what the agents actually *said* to each other, with the text: the question, the answer that came back, one-way orders and pings, each with its duration and a failure marker. Kept in memory (300 exchanges) for the page-load; agent chat is never written to `storage/`.
+  - **COMMS** — the whole conversation, with the text: your **prompt**, the task a coordinator **delegated**, each agent-to-agent **ask** with the answer that came back, one-way orders and pings, and the **reply** you were sent — each with its duration and a failure marker. Kept in memory (600 hops, 8 000 characters each) for the page-load; none of it is written to `storage/`.
   - **EXEC** — `storage/exec.log` parsed into runs, newest first: time, agent, command, working directory, duration, exit code, and a **no end** marker for a run that started and never reported back. Read-only — the UI has no button that can clear evidence.
-- **🗣️ Per-agent, from the map** — an agent's card on the chart shows *Recent messages* with what was said, and **Messages →** opens a drawer scoped to that agent (**Talk** / **Runs**). Hovering a beam reads *"Agent A → Agent B: …"*.
+- **🗣️ Per-agent, from the map** — an agent's card on the chart shows *Recent messages* with what was said, and **Messages →** opens a drawer scoped to that agent (**Talk** / **Runs**, filtered **All communication** / **Agent to agent**) without giving up a single metric the card already shows — the same button sits on the 2D agent metrics modal. Hovering a beam reads *"Agent A → Agent B: …"*.
 - **🧾 The audit trail is two-phase** — each `exec`/`run_code` run writes `phase=start` *before* the process spawns and `phase=end` afterwards, sharing one `run=` id and carrying `agent=<id>`. A command killed mid-run therefore leaves a visible start with no end instead of no record at all, and every line can be tied to the turn that asked for it.
 
 ---

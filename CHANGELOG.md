@@ -19,6 +19,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 💬 The release notes finally describe the message log *(`VERSION` 382, cache-buster v381 → v382)*
+
+*2026-11-08. v380 taught every hop to carry its words and made Messages the whole conversation; v381 recorded the map's ASK box. Both shipped, and neither was described where a reader looks: the What's New entry had been narrowed to the v381 slice, and the trace section still claimed the log held "300 exchanges" of what "agents actually said to each other".*
+
+**One entry, the feature it really is.** What's new now covers the message log as it behaves -- prompt / delegation / reply text on the beams, Messages as the full transcript with **All communication** / **Agent to agent**, three doors in (3D card, 2D metrics modal, Comms tab), the ASK box and its failed asks, the 8 000-character / 600-hop bounds -- and states plainly that the card's metrics were not traded away for any of it.
+
+**Stale claims corrected.** The **COMMS** bullet under *Metrics & Run trace* under-reported both the size (300 → 600 entries, plus the per-entry cap) and the scope (agent-to-agent → prompts, delegations and replies included); the per-agent bullet now names the filter and the 2D door. The feature table's *Conversations, in words* row gained the ASK box and the failed ask.
+
+**No code moved.** Every number here was already true at v381; this release makes the documentation match it, and carries its own `VERSION` so the update check can actually deliver the corrected pages.
+
+---
+
 ## 🗨️ The map's ASK box is part of the conversation *(`VERSION` 381, cache-buster v380 → v381)*
 
 *2026-11-08. `askAgentInline` is deliberately outside the transcript, so its hops were announced to the graph and then forgotten: the question you typed on the map was the one exchange the Messages drawer could not show, even after the log learned to hold prompts and replies.*
