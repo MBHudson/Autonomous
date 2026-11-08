@@ -5,6 +5,7 @@
 
   BryceFromIndiana@gmail.com
 -->
+[![Watch a one-minute video tour of autonomous](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/mbhudson/autonomous/video)
 [![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
 # 🧠 Autonomous Loop Studio
 
@@ -37,15 +38,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v424 — the suite proves the 503 without curl 🧪
+### 🆕 v425 — a one-minute tour, from the top of the page 🎬
 
-*Those answers were checked by hand on a PHP whose php.ini had no curl — not something a suite can assume.*
+*A README can explain the app for a thousand lines; a minute of it running does what the first screen cannot.*
 
 | | |
 |---|---|
-| 🧪 **The condition is manufactured** | `tests/php/curlMissing.test.php` boots the app with `-d disable_functions=curl_init,…`, so `function_exists('curl_init')` is false with every other extension intact |
-| 🚦 **Four answers, asserted** | uncached GET 503 with `code: curl_missing` and no probe warnings · POST check 503 · POST download 503 · cached GET 200 `cached: true` |
-| 🗃️ **The cache is put back** | `storage/updates/check.json` is read before seeding and restored afterwards; a copy that needs an access token SKIPs with the reason |
+| 🎬 **A video badge above the diagram badge** | the header opens a one-minute tour of the studio running, before the architecture link |
+| 🧭 **Both stay in the first lines** | the two things a newcomer wants — what it looks like moving, and how it is built — are the first two links on the page |
 ---
 
 ## 🧭 Contents

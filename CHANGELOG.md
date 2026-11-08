@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🎬 A one-minute tour at the top of the README *(`VERSION` 425, no browser file changed)*
+
+*A visitor met a thousand lines of README before seeing the app move; the header offered the architecture and nothing that runs.*
+
+**The video badge sits above the diagram badge**, linking to this project's one-minute tour. Both stay in the first lines of the page, so the two things a newcomer wants -- what it looks like running and how it is built -- are the first two links.
+
+**No app files changed.** This is a README edit with the release number moved, because a release the update check cannot see is a change the other copy never gets.
+
 ## 🧪 The suite proves the 503 without curl *(`VERSION` 424, no browser file changed)*
 
 *The 503 answers were verified by hand on a PHP whose php.ini had no curl -- a condition no suite can assume the machine it runs on is in.*
