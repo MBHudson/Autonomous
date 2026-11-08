@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🎬 The tour link says where it came from *(`VERSION` 426, no browser file changed)*
+
+*The diagram badge reported its README clicks and the video badge did not, so a click from the page and a click from anywhere else looked identical.*
+
+**Same parameters, same reporting.** The video link now carries `?utm_source=readme&utm_medium=badge`, matching the diagram badge. Source and medium agree, so a click from the header is a click from the header whichever button was pressed, and the target path still keeps the two apart.
+
+**No app files changed.** This is a README edit with the release number moved, because a release the update check cannot see is a change the other copy never gets.
+
 ## 🎬 A one-minute tour at the top of the README *(`VERSION` 425, no browser file changed)*
 
 *A visitor met a thousand lines of README before seeing the app move; the header offered the architecture and nothing that runs.*

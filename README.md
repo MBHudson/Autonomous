@@ -5,7 +5,7 @@
 
   BryceFromIndiana@gmail.com
 -->
-[![Watch a one-minute video tour of autonomous](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/mbhudson/autonomous/video)
+[![Watch a one-minute video tour of autonomous](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/mbhudson/autonomous/video?utm_source=readme&utm_medium=badge)
 [![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
 # 🧠 Autonomous Loop Studio
 
@@ -38,14 +38,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v425 — a one-minute tour, from the top of the page 🎬
+### 🆕 v426 — the tour link says where it came from 🎬
 
-*A README can explain the app for a thousand lines; a minute of it running does what the first screen cannot.*
+*A click from the README and a click from anywhere else looked the same, so the tour's own numbers could not say the page was working.*
 
 | | |
 |---|---|
-| 🎬 **A video badge above the diagram badge** | the header opens a one-minute tour of the studio running, before the architecture link |
-| 🧭 **Both stay in the first lines** | the two things a newcomer wants — what it looks like moving, and how it is built — are the first two links on the page |
+| 🎬 **The same parameters as the diagram badge** | `?utm_source=readme&utm_medium=badge` on the video link, so both header links report the same way |
+| 📈 **One campaign, two buttons** | source and medium agree, and the target path keeps the tour separate from the diagram |
 ---
 
 ## 🧭 Contents
