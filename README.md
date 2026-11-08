@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v415 — the refusal check, as a script 🛡️
+### 🆕 v417 — the updater can see a release again 🧭
 
-*The README's one-command proof worked when pasted, and a check nobody keeps running is a check that rots. The same requests now live in `tools/check-guards.sh`.*
+*Six releases bumped `VERSION` and nothing else, and the check that looks for one was reading an empty answer the whole time — so a copy on v410 was told "up to date" every time it asked.*
 
 | | |
 |---|---|
-| 🛡️ **`--serve` checks this tree** | boots `serve.php` on a free port, makes the requests, and kills only the server it started |
-| 🌍 **or point it at a deployment** | `./tools/check-guards.sh https://host/router`; `--token` also requires an authenticated `200` |
-| 🚦 **Exit codes, not prose** | `0` when every refusal held, `1` when something answered, `2` on a usage or setup problem |
-| 🔍 **The API is reported, not graded** | unless `--token` is passed it prints the code and which posture that is |
+| 🧭 **The probe reused the archive floor** | `Update::probeText()` reads through `fetch()`, which refuses any body under 1024 bytes as a truncated download — but `VERSION` is four bytes |
+| 🙈 **The failure was silent** | the `store.js` probe beside it still answered, so `check()` returned `ok: true` with no release number and compared the cache-buster 410 against 410 |
+| 🧪 **It broke exactly the case that mattered** | a PHP-only or docs-only release moves `VERSION` and nothing else — the signal the two-number check was added for |
+| ✅ **Fixed where the floor belongs** | archives keep the 1024-byte minimum; probes ask for one byte |
 ---
 
 ## 🧭 Contents

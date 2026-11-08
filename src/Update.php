@@ -553,8 +553,15 @@ class Update
         return array('ok' => true, 'discarded' => true);
     }
 
-    /** curl with https-only redirects, a size ceiling and a host check after. */
-    private static function fetch($url, $dest, $timeout = 180, $allowMissing = false)
+    /**
+     * curl with https-only redirects, a size ceiling and a host check after.
+     *
+     * `$minBytes` is the archive floor, NOT a universal one: it exists to catch
+     * a truncated release download, and 1024 bytes silently rejected every
+     * small published file a probe asks for -- VERSION is four bytes, so the
+     * release signal never arrived at all. Probes pass 1 explicitly.
+     */
+    private static function fetch($url, $dest, $timeout = 180, $allowMissing = false, $minBytes = 1024)
     {
         $fp = @fopen($dest, 'wb');
         if ($fp === false) {
@@ -601,7 +608,7 @@ class Update
         self::assertSafeSource($finalUrl);
 
         $bytes = (int) @filesize($dest);
-        if ($bytes < 1024) {
+        if ($bytes < max(1, (int) $minBytes)) {
             throw new \RuntimeException('That download was empty (' . $bytes . ' bytes).');
         }
         if ($bytes > self::MAX_ARCHIVE_BYTES) {
@@ -859,7 +866,9 @@ class Update
     {
         $dest = self::workDir() . '/probe-' . bin2hex(random_bytes(4)) . '.txt';
         try {
-            $info = self::fetch($url, $dest, $timeout, true);
+            // 1 byte, not the archive floor: the published VERSION is a four
+            // byte file, and the floor is what used to make this probe fail.
+            $info = self::fetch($url, $dest, $timeout, true, 1);
             if ($info === null) {
                 return null;
             }

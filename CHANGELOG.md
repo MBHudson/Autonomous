@@ -84,6 +84,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧭 The updater can see a release again *(`VERSION` 417, no browser file changed)*
+
+*Every release since v410 bumped `VERSION` and touched no browser file, and the check that looks for one has been reading an empty answer the whole time. A copy on v410 was told "up to date" for six releases in a row.*
+
+**The probe reused the archive floor.** `Update::probeText()` reads a published file through `fetch()`, and that function refuses any body under 1024 bytes as a truncated download. `VERSION` is four bytes, so the release probe failed on every single check.
+
+**And the failure was swallowed.** The `store.js` probe beside it still succeeded, so `check()` took the success branch: `ok: true`, `error: null`, `remoteRelease: null`. It then compared the only number it had -- the cache-buster, 410 -- against the local 410 and concluded there was nothing to install. The sidebar printed "this copy is the newer one" and the panel offered no update.
+
+**Why it stayed invisible.** The two-signal check exists so a PHP-only or docs-only release can be announced, and that is precisely the kind of release whose `VERSION` file is the only thing that moves. A UI change still bumped `APP_VERSION`, which worked, so the check looked healthy on exactly the releases that never needed it.
+
+**One line, where the floor belongs.** `fetch()` now takes its minimum size from the caller: the archive download keeps the 1024-byte floor that catches a truncated transfer, and a probe asks for one byte. A four-byte file is a complete file, not an empty one.
+
 ## 🛡️ The refusal check, as a script *(`VERSION` 415, no browser file changed)*
 
 *The README carried the check as something to paste, which is fine for a sceptic and useless for CI: a proof that lives in a document runs exactly as often as somebody copies it. `tools/check-guards.sh` is the same set of requests, with an exit code.*
