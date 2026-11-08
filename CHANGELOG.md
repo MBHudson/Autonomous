@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## ⌨️ A refused install hands you the command *(`VERSION` 421, cache-buster v419 → v421)*
+
+*The panel could say the web server cannot write `tools/` and still leave the operator to work out what to do about it.*
+
+**The command is part of the answer.** `Install::preflight()` now reports the folder that refused (`blocked`) and the exact line that finishes the job with the account that owns the files (`command`: `php install-update.php`). Both travel with the problems list, so the UI prints what the server decided on instead of inventing advice.
+
+**Config → Updates prints it.** When the install button is disabled for a permission problem, the hint keeps the reason and adds the command in monospace, ready to paste in the app folder. Nothing else about the flow changes: the terminal path runs the same refusals, and `--status`, `--finish` and `--rollback` are still the same script.
+
+**A writable tree offers nothing.** `blocked` stays null unless a probe actually failed, so a normal install shows no terminal advice at all.
+
 ## 🧰 An install stops before it starts *(`VERSION` 420, no browser file changed)*
 
 *An install that got as far as `tools/check-guards.sh` stopped there, after the write probe at the app root had already passed. The folder that could not be written was discovered halfway through replacing the release.*

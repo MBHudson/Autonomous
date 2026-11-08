@@ -37,16 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v420 — an install stops before it starts 🧰
+### 🆕 v421 — a refused install hands you the command ⌨️
 
-*A write probe at the app root said yes, and the install still died on `tools/` — the folder that was actually unwritable.*
+*The panel could say `tools/` is not writable and still leave you to work out what to type.*
 
 | | |
 |---|---|
-| 🔎 **Every folder is probed** | `writeTargets()` reduces the plan to the folders it touches, and preflight writes a probe in each before the button is offered |
-| 🛑 **Named, not guessed** | the first unwritable folder appears in the problems list, and nothing has been replaced when it does |
-| 🗃️ **The cache comes first** | a GET answers from `check.json` on a PHP without curl, instead of refusing an answer it already had |
-| 🔧 **Terminal fallback still works** | `php install-update.php` applies a downloaded release with your own account |
+| ⌨️ **The command comes with the refusal** | preflight reports `blocked` (the folder) and `command` (`php install-update.php`) beside its problems |
+| 🖥️ **Config → Updates prints it** | the disabled install button's hint adds the line in monospace, ready to paste in the app folder |
+| 🛡️ **Same refusals either way** | the terminal path runs the identical checks; `--status`, `--finish` and `--rollback` are unchanged |
 ---
 
 ## 🧭 Contents

@@ -10,20 +10,20 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=419';
-import { K } from '../storage.js?v=419';
-import { persistence } from '../persistence.js?v=419';
-import { api } from '../api.js?v=419';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=419';
-import { errText } from '../api.js?v=419';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=419';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=419';
-import { snapshot } from '../rateGovernor.js?v=419';
-import { resetBrowserEnabled } from '../toolManifest.js?v=419';
-import { perf } from '../perf.js?v=419';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=419';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=419';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=419';
+import { store } from '../store.js?v=421';
+import { K } from '../storage.js?v=421';
+import { persistence } from '../persistence.js?v=421';
+import { api } from '../api.js?v=421';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=421';
+import { errText } from '../api.js?v=421';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=421';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=421';
+import { snapshot } from '../rateGovernor.js?v=421';
+import { resetBrowserEnabled } from '../toolManifest.js?v=421';
+import { perf } from '../perf.js?v=421';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=421';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=421';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=421';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -4235,7 +4235,16 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       if (!work) {
         hint.textContent = '';
       } else if (pre && !pre.ok) {
-        hint.textContent = (pre.problems || []).join(' ');
+        // A permission refusal is the one problem the operator can finish from
+        // a terminal, so the server sends the exact line and this prints it.
+        // Telling someone the folder is shut without saying what to type is
+        // how an update sits unfinished.
+        const problems = (pre.problems || []).join(' ');
+        if (pre.blocked !== null && pre.blocked !== undefined && pre.command) {
+          hint.innerHTML = `${esc(problems)} Run this in the app folder: <code>${esc(pre.command)}</code>`;
+        } else {
+          hint.textContent = problems;
+        }
       } else {
         const from = plan.currentVersion?.label ?? '?';
         const to = plan.targetVersion?.label ?? '?';

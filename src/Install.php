@@ -56,6 +56,9 @@ class Install
     /** A lock older than this is from a run that died, not one in progress. */
     const LOCK_TTL = 900;
 
+    /** The one line that finishes an install the web server was refused. */
+    const TERMINAL_COMMAND = 'php install-update.php';
+
     /**
      * How many times a later request will try to restart a stuck hand-off.
      *
@@ -206,13 +209,16 @@ class Install
         // Can the web user actually write over the app? On Windows/XAMPP the
         // answer is yes; on a Linux host with root-owned files it is usually
         // no. Finding that out here costs one file, not a half-finished install.
+        // The folder that refused, so the UI can print a command instead of
+        // paraphrasing one. null means nothing was refused.
+        $blocked = null;
         $probe = self::appDir() . '/.router-write-probe';
         $writable = @file_put_contents($probe, 'probe') !== false;
         if ($writable) {
             @unlink($probe);
         } else {
-            $problems[] = 'The web server cannot write to the app folder, so it cannot replace app files. '
-                . 'Run install-update.php from a terminal instead.';
+            $blocked = '';
+            $problems[] = 'The web server cannot write to the app folder, so it cannot replace app files.';
         }
 
         // The root answering yes does not mean every folder under it will. An
@@ -231,9 +237,10 @@ class Install
                     @unlink($p);
                     continue;
                 }
+                $blocked = $dir;
                 $problems[] = 'The web server cannot write to ' . $dir . '/, which this release updates. '
                     . 'Nothing has been changed. Give the web server write access to that folder, or run '
-                    . 'install-update.php from a terminal with your own account.';
+                    . self::TERMINAL_COMMAND . ' from a terminal with your own account.';
                 break;
             }
         }
@@ -251,6 +258,11 @@ class Install
             'ok' => !$problems,
             'problems' => $problems,
             'writable' => $writable,
+            // A refusal is an instruction, not a diagnosis: `blocked` names the
+            // folder and `command` is the exact line that finishes the install
+            // with the account that owns the files. The UI prints it as given.
+            'blocked' => $blocked,
+            'command' => $blocked === null ? null : self::TERMINAL_COMMAND,
             'currentVersion' => self::version(),
             'targetVersion' => $target,
             'staged' => (bool) ($staged && is_dir($staged)),

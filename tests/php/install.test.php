@@ -163,6 +163,12 @@ $pre = Install::preflight();
 ok($pre['ok'] === true, 'preflight passes with a staged release');
 ok($pre['targetVersion'] === '354', 'preflight reports the target version');
 ok($pre['writable'] === true, 'preflight sees a writable app folder');
+ok(array_key_exists('blocked', $pre) && $pre['blocked'] === null,
+    'a writable tree names no blocked folder');
+ok(array_key_exists('command', $pre) && $pre['command'] === null,
+    'no refusal, no terminal command offered (the key exists and is null, which ?? would hide)');
+ok(Install::TERMINAL_COMMAND === 'php install-update.php',
+    'the command the panel prints is the script that exists in the app folder');
 
 $res = Install::apply();
 ok($res['ok'] === true, 'install returns ok');
