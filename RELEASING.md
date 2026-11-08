@@ -52,7 +52,8 @@ no cached asset changed, so it cannot report one.
 5. **Update [RELEASE-NOTES.md](RELEASE-NOTES.md)** if what shipped changed:
    tag, title and body are what the release page will say. A release whose notes
    still describe the previous build reads as an accident.
-6. **Run both suites:** `php tests/php/run.php` and `node tests/js/run.mjs`.
+6. **Run both suites:** `php tests/php/run.php` and `node tests/run.mjs` (which
+   runs the PHP suite first, then the JS one).
    `tests/php/update.test.php` fails when `VERSION` is behind `APP_VERSION`,
    which is the mistake this checklist exists to prevent.
 7. **Push.** Running copies get a notification in the bell on their next page
