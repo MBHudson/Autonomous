@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v418 — the header names the release 🏷️
+### 🆕 v419 — a half-finished check says so ⚠️
 
-*Six releases went by with the header saying v410 — not lying, showing the wrong number.*
+*The failure that hid six releases was already known to the server. It just never reached the screen.*
 
 | | |
 |---|---|
-| 🏷️ **The badge showed the cache-buster** | `APP_VERSION` moves only when a browser file changes, so a PHP or docs release left the header at 410 while the app was up to date |
-| 📛 **Now it shows the release** | `GET /api/version` reads `VERSION` from the copy that is serving, and the header paints v418 |
-| 🧩 **Both numbers still travel** | the payload carries the cache-buster too, and it is the fallback when the server cannot answer |
-| 🚫 **Never cached** | `Cache-Control: no-store`, so a reload after an update shows the new number |
+| ⚠️ **The warning reaches the panel** | a probe that throws now yields `warnings` beside `ok`, and Config → Updates says "Not fully checked" instead of "up to date" |
+| 🗣️ **It names what is missing** | *"The published VERSION could not be read …, so only the cache-buster was compared"* — and which releases that hides |
+| 🧠 **The cache keeps it** | `check.json` stores the warning with the answer, so an hour-old partial check cannot drift back into looking clean |
+| 🏆 **A real update still wins** | the line prefers "Update available" when there is one; the warning rides along with it |
 ---
 
 ## 🧭 Contents
@@ -1291,6 +1291,7 @@ The app checks its own published release, shows you **exactly what would change*
 - 🔎 **That row opens.** *What's new* is a disclosure, not a teaser: closed it names the release and its opening sentence, opened it lists the entry's **own lines** — every bullet with its bold lead-in, sub-points indented — read from the same parse that produced the one-liner, so the two can never disagree. It is capped at 60 lines / 4000 characters and scrolls in place, because the text arrives over the network; when a cap bites it says so rather than pretending the entry ended. Every line is remote text and is placed as **text**, never as markup — the bold lead-in is a real element built around escaped content.
 - 🎛️ **The switch is in Config → Updates:** *Check for updates when the app loads*, **on by default**, with **CHECK NOW** to ask immediately and a one-line answer beneath it (*"Published v337, this copy v344 — this copy is the newer one"*). Both numbers are always shown, because the published copy can be **behind** a local one and an arrow would read as an upgrade that takes you backwards. Off silences the load-time check only — CHECK NOW and DOWNLOAD UPDATE always work.
 - 🔇 **A check that cannot run says nothing.** Offline, behind a proxy, or on a PHP with no curl, the load-time check stays quiet: it never blocks boot, never throws, and never claims you are out of date. A failed check is remembered briefly (15 minutes) so an offline machine is not retrying on every reload. The announcement names the *release*; the file-by-file **diff** still takes DOWNLOAD UPDATE.
+- ⚠️ **A half-finished check says so.** If one of the two probes cannot be read — a timeout, an HTTP error, a mangled file — the check still answers with the signal it got, but **Config → Updates** stops short of *"up to date"*: it says *"Not fully checked — this copy is v…"* with the reason on the line and the full text in the tooltip, and it names which releases that dead signal would have hidden. The warning is cached with the answer, so an hour-old partial check cannot drift back into reading as a clean one; a hard failure still reports its `error` instead. Silently treating one dead signal as "nothing new" is how six releases went unnoticed.
 - 🧭 **One answer, then it runs.** The load-time announcement is a **prompt** with three answers: **BACK UP, THEN UPDATE** (your settings, saved to this machine's Downloads folder as `router-backup-<version>-<timestamp>.json` — that file holds your keys and token, so keep it safe), **UPDATE WITHOUT A BACKUP**, or **CANCEL**. Pick either of the first two and the whole chain runs unattended: download → verify → diff → install → reload. No second confirmation, because the click *was* the confirmation.
 - 🛠️ **The install.** **Config → Updates → INSTALL UPDATE…** copies the staged release over the app's own files. It refuses `storage/`, `.git`, `node_modules`, `.freebuff`, `screenshots/` and `sandbox/` **before it looks at any file**, never writes over a file in place (new bytes land in a dotfile sibling and are `rename()`d over the target, so a reader sees the old file or the new one and never half of either), and **deletes nothing** — a file the release dropped simply stays.
 - ↩️ **Always a way back.** Before the first write it copies the current tree to `storage/backups/<version>-<timestamp>/` with a `manifest.json` (path, size, sha256). **Config → Updates → ROLL BACK** restores it, and if the installed files report a different version than the release claimed, the installer **rolls itself back** and says so. Two rollback copies are kept, pruned oldest-first.

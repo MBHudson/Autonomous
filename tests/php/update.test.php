@@ -446,6 +446,27 @@ $sameBoth = array(
 ok((Update::applyCache($sameBoth, $local, $now)['updateAvailable'] ?? null) === false,
     'a cached copy that matches on both signals is not an update', $pass, $fail, $errors);
 
+// A PARTIAL check is the case that hid a release for six versions: one probe
+// dead, the other answering, the answer printed as "up to date". The warning is
+// part of the answer, so it has to survive both the cache write and the read.
+$partial = array(
+    'checkedAt' => $now - 60,
+    'remoteRelease' => null,
+    'remoteApp' => array('label' => '345', 'source' => 'APP_VERSION'),
+    'remoteChange' => null,
+    'error' => null,
+    'warnings' => array('The published VERSION could not be read (timed out).'),
+);
+$cachedPartial = Update::applyCache($partial, $local, $now);
+ok((($cachedPartial['warnings'][0] ?? null)) === 'The published VERSION could not be read (timed out).',
+    'a cached partial check keeps its warning instead of reading as clean', $pass, $fail, $errors);
+ok((Update::applyCache($sameBoth, $local, $now)['warnings'] ?? null) === array(),
+    'a clean cached check reads as an empty warning list', $pass, $fail, $errors);
+
+$failedRec = array('checkedAt' => $now - 60, 'error' => 'GitHub answered HTTP 503.', 'warnings' => array('stale'));
+ok((Update::applyCache($failedRec, $local, $now)['warnings'] ?? null) === array(),
+    'a failed check reports its error, not stale warnings', $pass, $fail, $errors);
+
 // --- naming the release: the top CHANGELOG entry --------------------------
 //
 // The notification says WHAT shipped, read from the top of the published

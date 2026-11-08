@@ -256,6 +256,13 @@ class Update
 
         $remote = array('release' => null, 'app' => null);
         $problems = array();
+        // A PARTIAL failure is not an error, but it is also not silence. One
+        // probe answering leaves a usable check, so the result stays ok -- yet
+        // the signal that failed can hide a release, and that is exactly how a
+        // broken VERSION probe looked healthy for six releases. Every failure
+        // travels to the caller as a warning, and is kept in the cache with the
+        // answer so a cached read cannot launder it back into a clean check.
+        $warnings = array();
         // Probed separately so that one unreachable file does not discard the
         // other's answer: VERSION alone is enough to know about a release, and
         // it is the smaller request. A 404 is not a failure -- it means the
@@ -265,17 +272,22 @@ class Update
             $remote['release'] = self::versionFromText(self::probeText(self::RELEASE_PROBE, 8));
         } catch (\Throwable $e) {
             $problems[] = 'VERSION: ' . $e->getMessage();
+            $warnings[] = 'The published VERSION could not be read (' . $e->getMessage()
+                . '), so only the cache-buster was compared. A release that moved just the release number would not show up here.';
         }
         try {
             $remote['app'] = self::versionFromJs(self::probeText(self::APP_PROBE, 12));
         } catch (\Throwable $e) {
             $problems[] = 'store.js: ' . $e->getMessage();
+            $warnings[] = 'The published store.js could not be read (' . $e->getMessage()
+                . '), so only the release number was compared. A release that changed only browser files would not show up here.';
         }
 
         if ($remote['release'] === null && $remote['app'] === null) {
             $result = array(
                 'ok' => false,
                 'cached' => false,
+                'warnings' => $warnings,
                 'error' => $problems
                     ? implode('; ', $problems)
                     : 'The published copy answered, but carried no version in either file.',
@@ -295,6 +307,7 @@ class Update
             $result = array(
                 'ok' => true,
                 'cached' => false,
+                'warnings' => $warnings,
                 'error' => null,
                 'checkedAt' => $now,
                 'localVersion' => self::preferred($local),
@@ -390,6 +403,9 @@ class Update
             // CHANGELOG fetch, and re-earning it on every cached read would
             // defeat the cache entirely.
             'remoteChange' => $failed ? null : ($cache['remoteChange'] ?? null),
+            // A hard failure is already carried by `error`; the warnings belong
+            // to a check that DID answer, and are passed through with it.
+            'warnings' => $failed ? array() : (is_array($cache['warnings'] ?? null) ? $cache['warnings'] : array()),
             'updateAvailable' => $failed ? false : self::isNewerVersion($remote, $local),
             'source' => self::RELEASE_PROBE,
         );
@@ -466,6 +482,10 @@ class Update
                 'remoteApp' => $result['remoteApp'] ?? null,
                 'remoteChange' => $result['remoteChange'] ?? null,
                 'error' => $result['error'] ?? null,
+                // Kept with the answer: the panel shows this record for the next
+                // hour, and forgetting the warning here would make a partial
+                // check read as a clean one until it expired.
+                'warnings' => is_array($result['warnings'] ?? null) ? $result['warnings'] : array(),
                 'source' => self::RELEASE_PROBE,
             );
             @file_put_contents(self::checkPath(), json_encode($record, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

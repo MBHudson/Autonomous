@@ -10,20 +10,20 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=418';
-import { K } from '../storage.js?v=418';
-import { persistence } from '../persistence.js?v=418';
-import { api } from '../api.js?v=418';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=418';
-import { errText } from '../api.js?v=418';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=418';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=418';
-import { snapshot } from '../rateGovernor.js?v=418';
-import { resetBrowserEnabled } from '../toolManifest.js?v=418';
-import { perf } from '../perf.js?v=418';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=418';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=418';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=418';
+import { store } from '../store.js?v=419';
+import { K } from '../storage.js?v=419';
+import { persistence } from '../persistence.js?v=419';
+import { api } from '../api.js?v=419';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=419';
+import { errText } from '../api.js?v=419';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=419';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=419';
+import { snapshot } from '../rateGovernor.js?v=419';
+import { resetBrowserEnabled } from '../toolManifest.js?v=419';
+import { perf } from '../perf.js?v=419';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=419';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=419';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=419';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -4437,6 +4437,13 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     const remote = String(r.remoteVersion?.label ?? '?');
     const when = r.checkedAt ? new Date(r.checkedAt * 1000).toLocaleTimeString() : '';
     const tail = `${when ? ` · checked ${when}` : ''}${r.cached ? ' (cached)' : ''}`;
+    // A partial check is not a clean one. One dead probe used to disappear into
+    // "up to date", which is the exact sentence that hid six releases: the
+    // server knew, and the panel was never told. The whole reason goes in the
+    // tooltip; the line carries the first one.
+    const warnings = Array.isArray(r.warnings) ? r.warnings : [];
+    const warn = warnings.length ? ` · ⚠ ${warnings[0]}` : '';
+    out.title = warnings.join('\n');
 
     // What shipped, from the top of the published CHANGELOG. Shown here as well
     // as in the bell because a notification is raised ONCE per release and the
@@ -4444,9 +4451,13 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     // lived only there is gone. This is where it can still be read later.
     this._paintChangeNotes(r.updateAvailable ? r.remoteChange : null);
     if (r.updateAvailable) {
-      out.textContent = `Update available: published v${remote}, this copy v${local}${tail}`;
+      out.textContent = `Update available: published v${remote}, this copy v${local}${tail}${warn}`;
     } else if (Number(remote) < Number(local)) {
-      out.textContent = `Published v${remote}, this copy v${local} — this copy is the newer one${tail}`;
+      out.textContent = `Published v${remote}, this copy v${local} — this copy is the newer one${tail}${warn}`;
+    } else if (warnings.length) {
+      // The claim that was wrong: with a dead signal there is no "up to date",
+      // only "I could not see everything".
+      out.textContent = `Not fully checked — this copy is v${local}${tail}${warn}`;
     } else {
       out.textContent = `Up to date at v${local}${tail}`;
     }

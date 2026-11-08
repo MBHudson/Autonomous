@@ -84,6 +84,18 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## ⚠️ A half-finished check says so *(`VERSION` 419, cache-buster v418 → v419)*
+
+*The release that went unseen for six versions failed silently: the VERSION probe threw, the store.js probe answered, and the answer was printed as "up to date". A partial check now says it is partial.*
+
+**The failure was collected, then dropped.** `check()` gathered a `$problems` entry for the dead probe, but only the both-null branch ever used it -- with one signal alive the result came back `ok: true, error: null`, and the panel painted its confident line. The evidence existed the whole time; the UI was simply never told.
+
+**A warning travels with the answer.** Each probe failure now also produces a plain-language warning naming what could not be read and which releases it would hide, carried in `warnings` beside `ok`. The both-null branch still reports `error`, because there the check genuinely did not happen.
+
+**The cache keeps it.** `check.json` records `warnings` with the rest of the answer and a cached read passes them through -- otherwise the panel would return to a clean "up to date" for the rest of the hour, which is the same bug with a shorter memory. A hard failure still clears them, since its `error` already says what happened.
+
+**Config → Updates stops short of the claim.** With a warning and nothing newer, the line reads "Not fully checked — this copy is v419" plus the reason, the full text sitting in the tooltip; a real update still wins the line and carries the warning after it.
+
 ## 🏷️ The header names the release *(`VERSION` 418, cache-buster v410 → v418)*
 
 *Six releases went by with the header saying v410. It was not lying -- it was showing the wrong number.*
