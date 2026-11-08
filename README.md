@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v417 — the updater can see a release again 🧭
+### 🆕 v418 — the header names the release 🏷️
 
-*Six releases bumped `VERSION` and nothing else, and the check that looks for one was reading an empty answer the whole time — so a copy on v410 was told "up to date" every time it asked.*
+*Six releases went by with the header saying v410 — not lying, showing the wrong number.*
 
 | | |
 |---|---|
-| 🧭 **The probe reused the archive floor** | `Update::probeText()` reads through `fetch()`, which refuses any body under 1024 bytes as a truncated download — but `VERSION` is four bytes |
-| 🙈 **The failure was silent** | the `store.js` probe beside it still answered, so `check()` returned `ok: true` with no release number and compared the cache-buster 410 against 410 |
-| 🧪 **It broke exactly the case that mattered** | a PHP-only or docs-only release moves `VERSION` and nothing else — the signal the two-number check was added for |
-| ✅ **Fixed where the floor belongs** | archives keep the 1024-byte minimum; probes ask for one byte |
+| 🏷️ **The badge showed the cache-buster** | `APP_VERSION` moves only when a browser file changes, so a PHP or docs release left the header at 410 while the app was up to date |
+| 📛 **Now it shows the release** | `GET /api/version` reads `VERSION` from the copy that is serving, and the header paints v418 |
+| 🧩 **Both numbers still travel** | the payload carries the cache-buster too, and it is the fallback when the server cannot answer |
+| 🚫 **Never cached** | `Cache-Control: no-store`, so a reload after an update shows the new number |
 ---
 
 ## 🧭 Contents

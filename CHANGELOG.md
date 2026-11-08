@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🏷️ The header names the release *(`VERSION` 418, cache-buster v410 → v418)*
+
+*Six releases went by with the header saying v410. It was not lying -- it was showing the wrong number.*
+
+**The badge showed the cache-buster.** `app.js` painted `APP_VERSION`, the number that moves when a browser file changes. A release that touches only PHP or docs correctly leaves it alone, so the badge stayed at 410 across v411 to v417 while the copy itself was up to date. Reading the header was enough to conclude the update never arrived.
+
+**Now it shows the release.** `GET /api/version` returns both numbers from the copy that is actually serving -- `Src\Update::versionPairIn`, the same reader the update check uses -- and the header paints the release. The cache-buster stays in the payload for anything that needs to know whether cached assets moved, and remains the fallback when the server cannot answer, so an offline page still says what it is.
+
+**One small request, never cached.** The route answers with `Cache-Control: no-store` and reads two files, so a reload after an update shows the new number instead of a remembered one.
+
 ## 🧭 The updater can see a release again *(`VERSION` 417, no browser file changed)*
 
 *Every release since v410 bumped `VERSION` and touched no browser file, and the check that looks for one has been reading an empty answer the whole time. A copy on v410 was told "up to date" for six releases in a row.*

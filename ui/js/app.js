@@ -10,17 +10,17 @@
 // APP.JS — Bootstrap & wiring only
 // ============================================
 
-import { store, APP_VERSION } from './store.js?v=410';
-import { K } from './storage.js?v=410';
-import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=410';
-import { esc, downloadFile } from './utils.js?v=410';
-import { startStateSync } from './stateSync.js?v=410';
-import { api } from './api.js?v=410';
-import { themeManager } from './themes.js?v=410';
-import { Sidebar } from './components/sidebar.js?v=410';
-import { Chat } from './components/chat.js?v=410';
-import { TopologyGraph } from './components/topology.js?v=410';
-import { initTopoPanel } from './components/topoPanel.js?v=410';
+import { store, APP_VERSION } from './store.js?v=418';
+import { K } from './storage.js?v=418';
+import { persistence, DEFAULT_AGENTS, DEFAULT_PROVIDERS } from './persistence.js?v=418';
+import { esc, downloadFile } from './utils.js?v=418';
+import { startStateSync } from './stateSync.js?v=418';
+import { api } from './api.js?v=418';
+import { themeManager } from './themes.js?v=418';
+import { Sidebar } from './components/sidebar.js?v=418';
+import { Chat } from './components/chat.js?v=418';
+import { TopologyGraph } from './components/topology.js?v=418';
+import { initTopoPanel } from './components/topoPanel.js?v=418';
 
 /**
  * The 3D topology pulls in three.js (~700KB) through the import map. Loaded
@@ -29,34 +29,34 @@ import { initTopoPanel } from './components/topoPanel.js?v=410';
  * of taking the whole app down with a failed static import.
  */
 function loadTopology3D() {
-  return import('./components/topology3d/index.js?v=410')
+  return import('./components/topology3d/index.js?v=418')
     .then(m => m.Topology3D)
     .catch(err => {
       console.warn('[topology] 3D view unavailable, using the 2D chart:', err);
       return null;
     });
 }
-import { RoutingChart } from './components/routingChart.js?v=410';
-import { AgentEditor } from './components/agentEditor.js?v=410';
-import { ProviderEditor } from './components/providerEditor.js?v=410';
-import { Microphone } from './components/microphone.js?v=410';
-import { ConfigPanel } from './components/configPanel.js?v=410';
-import { ExportPanel } from './components/export.js?v=410';
-import { ThinkingPanel } from './components/thinkingPanel.js?v=410';
-import { TerminalPanel } from './components/terminalPanel.js?v=410';
-import { MetricsPanel } from './components/metricsPanel.js?v=410';
-import { TracePanel } from './components/tracePanel.js?v=410';
-import { AgentRecord } from './components/agentRecord.js?v=410';
-import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=410';
-import { bindMemoryTools, bindSandboxNow, initCustomTools } from './tools.js?v=410';
-import { initApprovals } from './approvals.js?v=410';
-import * as memory from './memory.js?v=410';
-import { audio } from './audio.js?v=410';
-import { AlwaysOn } from './alwaysOn.js?v=410';
-import { ApiLab } from './apiLab.js?v=410';
-import { BrainLab } from './brainlab.js?v=410';
-import { BrowserView } from './components/browserView.js?v=410';
-import { initKeyboardAvoid } from './keyboard.js?v=410';
+import { RoutingChart } from './components/routingChart.js?v=418';
+import { AgentEditor } from './components/agentEditor.js?v=418';
+import { ProviderEditor } from './components/providerEditor.js?v=418';
+import { Microphone } from './components/microphone.js?v=418';
+import { ConfigPanel } from './components/configPanel.js?v=418';
+import { ExportPanel } from './components/export.js?v=418';
+import { ThinkingPanel } from './components/thinkingPanel.js?v=418';
+import { TerminalPanel } from './components/terminalPanel.js?v=418';
+import { MetricsPanel } from './components/metricsPanel.js?v=418';
+import { TracePanel } from './components/tracePanel.js?v=418';
+import { AgentRecord } from './components/agentRecord.js?v=418';
+import { preloadAvatars, wireAvatarThinking } from './components/avatar.js?v=418';
+import { bindMemoryTools, bindSandboxNow, initCustomTools } from './tools.js?v=418';
+import { initApprovals } from './approvals.js?v=418';
+import * as memory from './memory.js?v=418';
+import { audio } from './audio.js?v=418';
+import { AlwaysOn } from './alwaysOn.js?v=418';
+import { ApiLab } from './apiLab.js?v=418';
+import { BrainLab } from './brainlab.js?v=418';
+import { BrowserView } from './components/browserView.js?v=418';
+import { initKeyboardAvoid } from './keyboard.js?v=418';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -99,10 +99,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Keep the header badge in step with store.APP_VERSION, which is the single
-  // source of truth for the version number.
+  // The header badge names the RELEASE -- the number a release is called by and
+  // the one the update check compares. APP_VERSION is the CACHE-BUSTER: it
+  // correctly does not move when a release changes no browser file, so painting
+  // it here made a v417 copy advertise itself as v410 for six releases running.
+  // It stays as the fallback, because an offline page should still say what it
+  // is rather than nothing.
   const badge = document.getElementById('appVersion');
-  if (badge) badge.textContent = 'v' + APP_VERSION;
+  const paintVersion = (label) => {
+    const n = label === null || label === undefined ? '' : String(label).trim();
+    if (badge && n) badge.textContent = 'v' + n.replace(/^v/i, '');
+  };
+  paintVersion(APP_VERSION);
+  safeInit('version', () => {
+    api.version()
+      .then((r) => paintVersion(r && (r.version || r.release)))
+      .catch(() => { /* offline: the cache-buster stays, which is still honest */ });
+  });
 
   // ?debug=1: on-screen diagnostics for phones, which have no console. Shows
   // the path (which copy is actually open), versions, store counts, whether a

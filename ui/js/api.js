@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=410';
-import { acquire, note429 } from './rateGovernor.js?v=410';
-import { latency } from './latency.js?v=410';
-import { detectFamily, outputText, outputUsage } from './harness.js?v=410';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=410';
+import { store } from './store.js?v=418';
+import { acquire, note429 } from './rateGovernor.js?v=418';
+import { latency } from './latency.js?v=418';
+import { detectFamily, outputText, outputUsage } from './harness.js?v=418';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=418';
 
 latency.bindStore(store);
 
@@ -394,6 +394,13 @@ class ApiClient {
   // the client that can replace a file on the server.
   updateStatus() {
     return this.request('GET', '/update');
+  }
+
+  // What this copy calls itself: `version` is the RELEASE number from VERSION
+  // (what the header shows), `app` the browser cache-buster beside it. Read
+  // from the copy that is serving, so the header cannot drift from the files.
+  version() {
+    return this.request('GET', '/version');
   }
 
   // The cheap probe: reads only the published ui/js/store.js and compares its

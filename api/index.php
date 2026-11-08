@@ -252,6 +252,9 @@ try {
         case 'import':
             handleImport($method, $segments, $body);
             break;
+        case 'version':
+            handleVersion($method, $segments, $body);
+            break;
         case 'diag':
             handleDiag($method, $segments, $body);
             break;
@@ -1490,6 +1493,24 @@ function serverFacts() {
  * path and reports DNS/TLS/connect errors with their actual text instead of
  * collapsing them into "network error".
  */
+function handleVersion($method, $segments, $body) {
+    if ($method !== 'GET') {
+        http_response_code(405);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'GET only']);
+        return;
+    }
+    $pair = Src\Update::versionPairIn(Src\Update::appDir());
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'ok' => true,
+        'version' => $pair['release']['label'] ?? ($pair['app']['label'] ?? null),
+        'release' => $pair['release']['label'] ?? null,
+        'app' => $pair['app']['label'] ?? null,
+    ]);
+}
+
 function handleDiag($method, $segments, $body) {
     // GET identifies the running server. Every "it works on my other copy"
     // debugging session ended in not knowing WHICH copy the browser was

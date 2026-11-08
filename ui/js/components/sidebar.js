@@ -10,20 +10,20 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=410';
-import { K } from '../storage.js?v=410';
-import { persistence } from '../persistence.js?v=410';
-import { api } from '../api.js?v=410';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=410';
-import { errText } from '../api.js?v=410';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=410';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=410';
-import { snapshot } from '../rateGovernor.js?v=410';
-import { resetBrowserEnabled } from '../toolManifest.js?v=410';
-import { perf } from '../perf.js?v=410';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=410';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=410';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=410';
+import { store } from '../store.js?v=418';
+import { K } from '../storage.js?v=418';
+import { persistence } from '../persistence.js?v=418';
+import { api } from '../api.js?v=418';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=418';
+import { errText } from '../api.js?v=418';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=418';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=418';
+import { snapshot } from '../rateGovernor.js?v=418';
+import { resetBrowserEnabled } from '../toolManifest.js?v=418';
+import { perf } from '../perf.js?v=418';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=418';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=418';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=418';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
