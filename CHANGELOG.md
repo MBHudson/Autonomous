@@ -1,5 +1,15 @@
 <!--
- ## 📵 The door says why it is shut *(`VERSION` 407, cache-buster v406 → v407)*
+ ## 🔌 A proxy is for leaving the network *(`VERSION` 408, cache-buster v407 → v408)*
+
+*2026-11-08. After activating a proxy in the Proxy tab, a local LM Studio stopped answering for every client -- and turning the proxy off changed nothing. Two faults, and only one of them was the proxy being dead.*
+
+**Clearing wrote half the setting.** `_setActiveProxy()` saved the choice in the browser and on the server. `_clearActiveProxy()` -- the Clear Selection button -- wrote only the browser one, then toasted "Proxy cleared -- using direct connection", while `sandbox.proxy_active` in `storage/config.json` kept sending every relay, stream and audio call through it. Removing the active entry had the same hole. Both now clear the server too, and say so only when it confirms.
+
+**A proxy cannot reach the LAN.** `ModelManager::activeProxy()` returned the selected proxy for any endpoint, and a per-request `proxy` from the browser won outright -- so a runner at `http://10.0.0.128:1235/...` was asked for through a public proxy that has no route to it. Loopback, private, link-local and `.local` endpoints now always go direct, whichever side supplied the proxy; a public endpoint still uses it.
+
+**Why the model list looked alive while chat did not.** Reading a provider catalog and talking to a model are different requests, and the failure text for a proxied call is a curl error, which reads as a dead server. The endpoint also decides the catalog URL: `.../api/v1/chat` derives `.../api/v1/models`.
+
+## 📵 The door says why it is shut *(`VERSION` 407, cache-buster v406 → v407)*
 
 *2026-11-08. A phone stopped reaching the local LM Studio after an update; the desktop kept working. The cause was not the model. With `require_token` off, `/api/*` answers only loopback peers, and a phone is a LAN peer, so every call got `403 local requests only`. Proven by serving the app on `0.0.0.0`: `/api/state` is 200 over loopback and 403 over the LAN address.*
 

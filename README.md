@@ -37,17 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v407 — a refusal that says what to do 📵
+### 🆕 v408 — a proxy is for leaving the network 🔌
 
-*With the token gate off, the server answers only this machine; anything else gets `403 local requests only`. A phone is anything else, so every call fails — and the UI showed a status code, which reads as a dead model server.*
+*A proxy is how this server reaches the outside world. A runner on the LAN is not out there, and pointing a free proxy at one failed every local call while the Proxy tab reported traffic as direct.*
 
 | | |
 |---|---|
-| 📵 **Two refusals, one door** | A wrong token is a 401; the gate being off is a 403 that names no fix in the UI |
-| 🔑 **The recovery UI, not a code** | That 403 raises the same token banner and toast a 401 does, and both tap through to Config's token field |
-| 💬 **The server's own sentence** | Its `detail` is carried into the error, so the phone says to set an access token |
-| 🚏 **Both request paths** | The streaming call chat tries first, and the plain JSON call behind it |
-| 🔍 **Why it looked like LM Studio** | The server makes the model call; the model was fine, the phone never got past the API |
+| 🔌 **LAN endpoints go direct** | `activeProxy()` returns nothing for loopback, private and link-local hosts, even when the browser sent a proxy of its own |
+| 🧹 **Clear means clear** | Clear Selection and removing the active entry now write the server setting too; before, the tab said "direct" while `sandbox.proxy_active` kept routing |
+| 🗣️ **No false confirmation** | If the server does not confirm the clear, the toast says so instead of claiming success |
+| ✅ **Guarded** | `tls.test.php` covers LAN, loopback and public endpoints |
 
 ---
 

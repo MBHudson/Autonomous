@@ -133,7 +133,15 @@ class ModelManager {
      * than the exceptional one. The operator picks the proxy knowingly, and the
      * status line in the Proxy tab says whether the last sweep reached it.
      */
-    private static function activeProxy(array $spec) {
+    public static function activeProxy(array $spec) {
+        // The endpoint decides first. A proxy is how this server leaves its own
+        // network; a LAN runner -- LM Studio or Ollama on another box -- is not
+        // reachable through one, and pointing a free proxy at it failed every
+        // local call while the Proxy tab said traffic was direct. Loopback,
+        // private and link-local hosts therefore always go direct, including
+        // when the browser sent a proxy of its own.
+        $endpoint = (string)($spec['endpoint'] ?? '');
+        if ($endpoint !== '' && Tls::isLocalUrl($endpoint)) { return null; }
         if (!empty($spec['proxy'])) return (string)$spec['proxy'];
         try {
             $cfg = Config::loadConfig();
@@ -548,7 +556,11 @@ class ModelManager {
         // hands off to callModel(). Proxy support existed on relayStream and
         // relayRaw only, so selecting a proxy appeared to do nothing at all
         // for any call that did not stream.
-        $proxyForCall = $model['proxy'] ?? self::activeProxy([]);
+        // Same rule here, for the non-streaming path: a local endpoint is
+        // called directly whatever the browser or the model entry says.
+        $proxyForCall = Tls::isLocalUrl((string)$model['endpoint'])
+            ? null
+            : ($model['proxy'] ?? self::activeProxy(['endpoint' => (string)$model['endpoint']]));
         if ($proxyForCall) {
             curl_setopt($ch, CURLOPT_PROXY, $proxyForCall);
             curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);

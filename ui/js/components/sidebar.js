@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=407';
-import { K } from '../storage.js?v=407';
-import { persistence } from '../persistence.js?v=407';
-import { api } from '../api.js?v=407';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=407';
-import { errText } from '../api.js?v=407';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=407';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=407';
-import { snapshot } from '../rateGovernor.js?v=407';
-import { resetBrowserEnabled } from '../toolManifest.js?v=407';
-import { perf } from '../perf.js?v=407';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=407';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=407';
+import { store } from '../store.js?v=408';
+import { K } from '../storage.js?v=408';
+import { persistence } from '../persistence.js?v=408';
+import { api } from '../api.js?v=408';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=408';
+import { errText } from '../api.js?v=408';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=408';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=408';
+import { snapshot } from '../rateGovernor.js?v=408';
+import { resetBrowserEnabled } from '../toolManifest.js?v=408';
+import { perf } from '../perf.js?v=408';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=408';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=408';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1017,21 +1017,43 @@ export class Sidebar {
     this._renderProxyList();
   }
 
-  _clearActiveProxy() {
+  /**
+   * Clear the proxy on BOTH sides, and say only what actually happened.
+   *
+   * This used to write the browser setting and nothing else, then toast "Proxy
+   * cleared — using direct connection". The relay runs on the server, where
+   * `sandbox.proxy_active` was still set, so every model call kept going
+   * through a proxy the tab said was gone -- and a dead one broke the local
+   * runner with nothing on screen to explain it. Selecting a proxy always
+   * wrote both; clearing has to as well.
+   */
+  async _clearActiveProxy() {
     store.set('settings.proxyActive', '');
     persistence.set('settings', store.get('settings'));
-    store.emit('toast', { message: 'Proxy cleared — using direct connection', type: 'info' });
     this._renderProxyList();
+    try {
+      await api.setActiveProxy('');
+      store.emit('toast', { message: 'Proxy cleared — using direct connection', type: 'info' });
+    } catch (err) {
+      // Unknown is not cleared: the server may still be routing through it.
+      store.emit('toast', {
+        message: `Proxy cleared here, but the server did not confirm: ${err.message}`,
+        type: 'error',
+      });
+    }
   }
 
   _removeProxy(proxyStr) {
     this._proxies = this._proxies.filter(x => x.proxy !== proxyStr);
     const favorites = store.get('settings.proxyFavorites') || [];
     store.set('settings.proxyFavorites', favorites.filter(x => x !== proxyStr));
-    if (store.get('settings.proxyActive') === proxyStr) {
-      store.set('settings.proxyActive', '');
-    }
     persistence.set('settings', store.get('settings'));
+    // Removing the ACTIVE proxy is the same problem as clearing it: the list
+    // entry goes, the server keeps routing through it.
+    if (store.get('settings.proxyActive') === proxyStr) {
+      this._clearActiveProxy();
+      return;
+    }
     this._renderProxyList();
   }
 

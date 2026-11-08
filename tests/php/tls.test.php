@@ -192,6 +192,20 @@ if (!function_exists('curl_setopt_array')) {
     curl_close($ch);
 }
 
+// --- a LAN endpoint is called directly, whatever a proxy says ---------------
+// The Proxy tab governs how this server LEAVES its own network. A local runner
+// is not on the far side of a web proxy, and pointing one at it failed every
+// local call while the tab reported traffic as direct.
+$lanSpec = ['endpoint' => 'http://10.0.0.128:1235/api/v1/chat', 'proxy' => '1.2.3.4:8080'];
+ok(\Src\ModelManager::activeProxy($lanSpec) === null, 'a LAN endpoint ignores a per-request proxy');
+$loopSpec = ['endpoint' => 'http://localhost:1234/v1/chat/completions', 'proxy' => '1.2.3.4:8080'];
+ok(\Src\ModelManager::activeProxy($loopSpec) === null, 'loopback too');
+$pubSpec = ['endpoint' => 'https://api.openai.com/v1/chat/completions', 'proxy' => '1.2.3.4:8080'];
+ok(\Src\ModelManager::activeProxy($pubSpec) === '1.2.3.4:8080',
+    'a public endpoint still uses the proxy it was given');
+ok(\Src\ModelManager::activeProxy(['endpoint' => 'http://192.168.1.50:1234/v1']) === null,
+    'a LAN endpoint with no proxy in the spec goes direct too');
+
 // --- origin(): where a certificate would be read from ---------------------
 ok(Tls::origin('https://192.168.1.50:1234/v1/chat') === 'https://192.168.1.50:1234/',
     'origin keeps a non-default port and drops the path');
