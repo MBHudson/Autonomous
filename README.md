@@ -37,16 +37,17 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v404 — the button comes back with the warning 🔁
+### 🆕 v405 — the button says which half is running ⏳
 
-*Clearing stale warnings fixed the transcript after a repair, not before it. On reload a stored warning returned as plain text, so the one control that could fix the page was missing exactly when it was needed.*
+*Binding the page is instant; asking the server whether it has a directory is not. Between the click and that answer the button sat disabled under its old label.*
 
 | | |
 |---|---|
-| 🔁 **Re-offered on load** | Every message replayed from a stored session is checked, and a warning gets its `BIND FILE TOOLS` button back |
-| 🎯 **Only where it is true** | Offered only while this tab's tools are still unbound — a bound page with an empty jail gets no button it cannot make work |
-| 📝 **The record, not a copy** | The stored message is handed to the button, so a confirmed rebind rewrites the saved bubble instead of a throwaway copy |
-| ✅ **Guarded** | `staleFileToolWarning.test.mjs` now checks that a warning survives the storage round-trip it takes on reload |
+| ⏳ **BINDING, then CHECKING** | The label follows the two halves, so the wait has a name |
+| ⚠️ **No premature claim** | The warning stays readable until the verdict lands; the bubble is written once, from the answer |
+| 🧯 **A throw still settles** | A follow-up that throws or rejects writes the page-half confirmation, never a spinner |
+| 🖱️ **One attempt at a time** | A second click during the check does nothing; a failed bind re-arms as `TRY AGAIN` |
+| ✅ **Guarded** | `rebindButton.test.mjs` holds a follow-up promise open and checks the label, the intact warning and the settled bubble |
 
 ---
 

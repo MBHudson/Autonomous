@@ -45,6 +45,10 @@ export function offerRebind(bubble, { bind, doneText, onBound, onFail } = {}) {
   btn.addEventListener('click', () => {
     if (btn.disabled) return;
     btn.disabled = true;
+    // Disabled with the old label reads as a dead control. Binding is a
+    // synchronous walk over the registry, but the button still says what it
+    // is doing, because the half that follows is not synchronous at all.
+    btn.textContent = 'BINDING…';
 
     let unbound = [];
     try {
@@ -63,22 +67,28 @@ export function offerRebind(bubble, { bind, doneText, onBound, onFail } = {}) {
       return;
     }
 
-    body.textContent = doneText || '✓ File tools are bound.';
-    btn.disabled = true;
-    if (typeof btn.remove === 'function') btn.remove();
-    // The bubble can be corrected after the click. Binding is only the page
-    // half; whether the server has a directory is a second fact, and claiming
-    // it before asking is the false confidence this warning exists to remove.
-    // `onBound` may therefore return a string or a promise for one.
-    if (onBound) {
-      try {
-        const verdict = onBound();
-        if (verdict && typeof verdict.then === 'function') {
-          verdict.then(text => {
-            if (text) body.textContent = text;
-          }).catch(() => { /* the provisional text stands */ });
-        }
-      } catch { /* the bubble already says it bound */ }
+    // Do not claim the outcome before it is known. Binding is only the page
+    // half; whether the server has a directory is a second fact, and the
+    // answer takes a round trip. So the warning stays readable, the button
+    // carries the progress, and the bubble is written once -- from the
+    // verdict rather than in front of it.
+    const settle = (text) => {
+      body.textContent = text || doneText || '✓ File tools are bound.';
+      if (typeof btn.remove === 'function') btn.remove();
+    };
+    if (!onBound) { settle(doneText); return; }
+
+    btn.textContent = 'CHECKING…';
+    try {
+      const verdict = onBound();
+      if (verdict && typeof verdict.then === 'function') {
+        verdict.then(text => settle(text)).catch(() => settle(doneText));
+      } else {
+        settle(verdict);
+      }
+    } catch {
+      // A follow-up that throws cannot undo a binding that happened.
+      settle(doneText);
     }
   });
 

@@ -1,5 +1,17 @@
 <!--
-  Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+ ## ⏳ The button says which half is running *(`VERSION` 405, cache-buster v404 → v405)*
+
+*2026-11-08. The rebind button disabled itself on click and left its label alone. Binding is a synchronous walk over the registry, but the follow-up -- a `/sandbox/status` read that decides what the bubble may claim -- is a round trip, and for its duration the control looked broken rather than busy.*
+
+**Two labels, one click.** `offerRebind()` writes `BINDING…` before the attempt and `CHECKING…` once the page half is done, then keeps the button as the progress indicator instead of deleting it. A failed bind re-arms as `TRY AGAIN`; a second click during the check is ignored because the button stays disabled.
+
+**The bubble waits for the answer.** It used to print `doneText` immediately and correct itself, repeating in miniature the false confidence the warning exists to remove. It is now written once: the verdict when there is one, `doneText` when not, and `doneText` if the follow-up throws or rejects -- so a broken status route leaves neither a spinner nor a blank bubble.
+
+**The agent editor's button follows the same labels**, then shows `TRY AGAIN` if anything is still unbound.
+
+**Tests.** `rebindButton.test.mjs` holds a follow-up promise open: the label reads `CHECKING…`, the warning is still readable, a second click changes nothing, and the released verdict settles the bubble.
+
+ Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
 
   Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
 

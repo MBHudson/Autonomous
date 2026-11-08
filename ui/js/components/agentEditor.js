@@ -10,16 +10,16 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=404';
-import { persistence } from '../persistence.js?v=404';
-import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=404';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=404';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=404';
-import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=404';
-import { sandboxRootFor } from '../agentConfig.js?v=404';
-import { audio } from '../audio.js?v=404';
-import { api } from '../api.js?v=404';
-import * as memory from '../memory.js?v=404';
+import { store } from '../store.js?v=405';
+import { persistence } from '../persistence.js?v=405';
+import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=405';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=405';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=405';
+import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=405';
+import { sandboxRootFor } from '../agentConfig.js?v=405';
+import { audio } from '../audio.js?v=405';
+import { api } from '../api.js?v=405';
+import * as memory from '../memory.js?v=405';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
@@ -89,10 +89,15 @@ export class AgentEditor {
       btn.style.marginLeft = '8px';
       btn.addEventListener('click', () => {
         btn.disabled = true;
+        btn.textContent = 'BINDING…';
         const { unbound } = bindSandboxNow(api);
         if (unbound.length) {
+          btn.textContent = 'TRY AGAIN';
           store.emit('toast', { message: `Still unbound: ${unbound.join(', ')}`, type: 'error' });
         } else {
+          // The line below is not written until the status answers, so the
+          // button says the wait is the read, not a stall.
+          btn.textContent = 'CHECKING…';
           // The transcript's warning was asked for by this failure; let the
           // chat re-check both halves and take it down once they hold.
           store.emit('sandbox:bound');

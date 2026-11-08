@@ -186,10 +186,32 @@ function bubble(text = '⚠ File tools are unavailable') {
     onBound: () => Promise.resolve('CORRECTED: the server has no directory'),
   });
   btn.click();
-  ok(body.textContent === 'PROVISIONAL', 'the confirmation appears immediately');
+  ok(btn.textContent === 'CHECKING…', 'the button reports the status re-read');
+  ok(body.textContent.startsWith('⚠'), 'and the warning is not replaced before the answer lands');
   await new Promise(r => setTimeout(r, 0));
   ok(body.textContent === 'CORRECTED: the server has no directory',
-    'a later verdict replaces it');
+    'the verdict writes the bubble');
+  ok(!body.children.includes(btn), 'then the button leaves');
+}
+
+// The progress label has to survive a pending follow-up, not just a resolved one.
+{
+  const { wrap, body } = bubble();
+  let release;
+  const btn = offerRebind(wrap, {
+    bind: () => ({ unbound: [] }),
+    doneText: 'DONE',
+    onBound: () => new Promise(r => { release = r; }),
+  });
+  btn.click();
+  ok(btn.textContent === 'CHECKING…' && btn.disabled === true,
+    'the label and the disabled state hold while the check is in flight');
+  btn.click();
+  ok(body.children.includes(btn), 'a second click cannot start another attempt');
+  release('FINAL');
+  await new Promise(r => setTimeout(r, 0));
+  ok(body.textContent === 'FINAL', 'the pending verdict settles the bubble');
+  ok(!body.children.includes(btn), 'and removes the progress control');
 }
 
 // A failed follow-up must not swallow the confirmation or reject unhandled.
