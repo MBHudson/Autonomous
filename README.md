@@ -37,15 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v414 — a skeptic's one-command check 🧪
+### 🆕 v415 — the refusal check, as a script 🛡️
 
-*The safety table names mechanisms; a reviewer who trusts none of it should not have to take any of it on faith. This is the same claim, written so it can fail.*
+*The README's one-command proof worked when pasted, and a check nobody keeps running is a check that rots. The same requests now live in `tools/check-guards.sh`.*
 
 | | |
 |---|---|
-| 🧪 **A script that asserts refusals** | the token store, sessions, the test tree and `.git` must answer `403`/`404` — anything else prints **OPEN** and exits non-zero |
-| 🌐 **CORS checked too** | a foreign `Origin` must get no `Access-Control-Allow-Origin` header at all |
-| 🎚️ **Auth stated, not faked** | the four API codes and what each one means, including the `200` a token-less copy gives its own machine |
+| 🛡️ **`--serve` checks this tree** | boots `serve.php` on a free port, makes the requests, and kills only the server it started |
+| 🌍 **or point it at a deployment** | `./tools/check-guards.sh https://host/router`; `--token` also requires an authenticated `200` |
+| 🚦 **Exit codes, not prose** | `0` when every refusal held, `1` when something answered, `2` on a usage or setup problem |
+| 🔍 **The API is reported, not graded** | unless `--token` is passed it prints the code and which posture that is |
 ---
 
 ## 🧭 Contents
@@ -243,6 +244,8 @@ It answers `403` (or `404` behind nginx, which refuses rather than denies) for t
 The API itself is deliberately not pass/fail there, because its status states *which posture you are in*: `401` when a token is set and the request omits it, `403` when the gate is off and you are calling from another machine, `503` on a fresh copy with no token at all, and `200` from this machine while a copy has no token — local-only mode working as documented, not a hole. Set a token and that last case closes.
 
 With the tree in hand, the other one-command proof is the suite: `node tests/run.mjs` ends with *All suites passed.* or a `FAIL` line, and the guards are among the files it runs.
+
+The same checks ship as a script, so CI or an operator never has to paste them: `./tools/check-guards.sh --serve` boots a throwaway copy of this tree and checks itself, `./tools/check-guards.sh https://your-host/router` checks a deployment, and `--token ABC` additionally requires the API to answer `200`. Exit codes are the verdict — `0` every refusal held, `1` something answered, `2` a usage or setup problem.
 
 ---
 ## ✨ What's inside
@@ -1457,6 +1460,7 @@ Either half runs on its own, which is what you want while working on one of them
 | 🐘 `php tests/php/run.php` | PHP only — sandbox, **desktop programs** (`programs.test.php`: the operator's list as the whole allowlist, the detached launch, binary-path matching, real kill verdicts and the un-forgeable trace), **masked secrets** (`secrets.test.php`: masks going out, restores coming back, and who may ask when there is no token), the **token recovery script** (`setupToken.test.php`), harness, MCP client/server, HTTP guards (`serve.php`, Apache `.htaccess`, and the nginx rules via PCRE), and the CSS/JS **layer audit** |
 | 🟨 `node tests/js/run.mjs` | JS only — 24 files: context, curl, harness, interface mode, latency, native tools, tool calls and markup stripping, sandbox binding, the rebind button, backup sections, comms, rate governor, `localEndpoints` |
 | 🌱 `php tests/freshClone.php` | **Both suites, in a fresh copy** of the tree in the temp dir — the same check a clone gets, run every time (needs `git`, which supplies the file list). `--head` clones the last commit instead of the working tree; `--keep` keeps the copy. Deleted on success, kept when something fails. Ends every run — pass or fail — with its measured total, split by phase: `took: 37.6s  (copy 6.9s, PHP 28.3s, JS 2.4s)` |
+| 🛡️ `./tools/check-guards.sh` | The serving refusals against a live copy — `--serve` boots `serve.php` on a free port and checks this tree, or pass a URL; `--token` requires an authenticated `200` |
 
 - **The layer audit is a stylesheet test.** `tests/php/layers.test.php` parses `ui/css/*.css` (and the handful of `z-index` values set from `ui/js` and `index.html`) and fails if any **surface** — panel, drawer, pane, menu — ties or outranks a dialog. Notices are exempt by name with a reason: the fatal banners, the boot splash, the CRT scanline overlay, toasts and the approval prompt, which must be visible over a dialog. It reads the dialog's number and the ladder comment in `modals.css` rather than hardcoding them, so moving the layer means updating both. It exists because dialogs once sat *below* the built-in Browser pane and an agent's ⋮ menu at 3000, and nothing failed.
 - **Each test file is its own process**, exactly as if you had run it by hand, so one file's globals or a failed import cannot colour another's result — and **several run at the same time** (4 by default; `php tests/php/run.php --jobs 1` for one after another, `--jobs N` for a different width). Results are still printed in **file-name order**, whatever order they finish in, so two runs of the same tree read the same way and a failure's full output still sits under its own `FAIL` line. That is only safe because the two things the files used to share are gone: **the port each server binds** — a walk that starts from a number derived from the file's own process id ([tests/php/free-port.php](tests/php/free-port.php), required by the three files that start a server), rather than `tcp://127.0.0.1:0`, which hands the same port to two files that ask in the same moment and leaves one of them binding an occupied port or talking to the other one's server — and **the log each file writes** — `exec.log` and `mcp.log` are appends in the install's `storage/`, and a test that truncates the trace back to the size it found it at would delete a line another file was about to read, so each file is given a log directory of its own (`ROUTER_LOG_DIR`). One side effect worth having: the suites no longer write the operator's `storage/exec.log` or `storage/mcp.log` at all.

@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🛡️ The refusal check, as a script *(`VERSION` 415, no browser file changed)*
+
+*The README carried the check as something to paste, which is fine for a sceptic and useless for CI: a proof that lives in a document runs exactly as often as somebody copies it. `tools/check-guards.sh` is the same set of requests, with an exit code.*
+
+`--serve` boots `serve.php` on a pid-derived port, waits for it to answer, makes every request and kills only the server it started -- so a fresh checkout can prove itself with one command and no deployment. Passing a URL points it at a running copy instead, and `--token` adds the one graded API check (an authenticated `200`).
+
+Four paths must answer `403`/`404` (`storage/config.json`, `storage/sessions`, `tests/js/run.mjs`, `.git/config`), a foreign `Origin` must come back with no `Access-Control-Allow-Origin`, and anything else prints `OPEN` and exits `1`. The unauthenticated API status is printed with the posture it means rather than graded, because `200` is correct for a token-less copy talking to its own machine.
+
+Verified both ways before it shipped: `--serve` on this tree prints five refusals and exits `0`; against a plain `php -S` with no router it prints three `OPEN` paths and exits `1`.
+
 ## 🧪 A skeptic's one-command check *(`VERSION` 414, no browser file changed)*
 
 *A table that says "every path is refused" is still an assertion. The README now carries a short bash script that makes the same requests a stranger would and prints `OPEN` (and exits non-zero) if any of them answers instead of refusing.*
