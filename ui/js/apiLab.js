@@ -26,18 +26,18 @@
 // SECRETS: key-shaped headers are masked on screen and never written to the log
 // pane. The mask is display-only -- copy and send still use the real value.
 
-import { api } from './api.js?v=375';
-import { store } from './store.js?v=375';
-import { persistence } from './persistence.js?v=375';
-import { esc, copyToClipboard } from './utils.js?v=375';
+import { api } from './api.js?v=376';
+import { store } from './store.js?v=376';
+import { persistence } from './persistence.js?v=376';
+import { esc, copyToClipboard } from './utils.js?v=376';
 import {
   LANGUAGES, reqFromCode, guessLanguage, generate,
   prettyJson, maskSecret, isSecretHeader,
-} from './apiLabConvert.js?v=375';
+} from './apiLabConvert.js?v=376';
 // normalizePastedText belongs to the curl parser (it is what turns a pasted
 // snippet into something a tokenizer can read) rather than to the Lab, so it
 // is imported from its owner instead of being re-exported through the Lab.
-import { normalizePastedText } from './curlParser.js?v=375';
+import { normalizePastedText } from './curlParser.js?v=376';
 
 const STORAGE_KEY = 'als.apiLab.v1';
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];

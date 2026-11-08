@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v375 — every thought in its own box, whatever shape the runner speaks 🧠
+### 🆕 v376 — the Reasoning box remembers, and opens when there is a lot to read 🧠
 
-*Reasoning only appeared when a provider happened to use OpenAI's field: Google's `thought: true` parts were joined into the reply itself, a runner's own reasoning blocks fed a panel nothing filled, and several blocks ran together as one sentence. Every shape's thinking is read now, kept out of the answer, and shown — verbose and collapsible, on the message it belongs to.*
+*The panel started collapsed every time, so a reply that thought for a thousand words hid all of it behind one click — and the one time you opened one, the next message was shut again.*
 
 | | |
 |---|---|
-| 🧠 **Every shape's thinking is read** | `reasoning_content` / `reasoning` beside an OpenAI-compatible answer, Anthropic `thinking` and `redacted_thinking` blocks, Google parts marked `thought: true`, and a runner's own `{"type":"reasoning"}` blocks all become the message's **Reasoning** panel instead of being dropped |
-| 🙈 **…and never the answer** | Google thought parts used to be concatenated into the reply text, so a model's notes were presented as something it said. The answer now takes only parts that are not thoughts, and a reply that carries nothing else reports no content rather than its private work |
-| 📜 **Verbose, separated, collapsible** | Several reasoning blocks keep the blank line the author wrote between them instead of running into one sentence, the panel closes when you want the transcript flat, and both the streamed and the one-shot paths fill it — including the runner envelope that used to arrive as raw JSON |
+| 🧠 **It remembers your choice** | Open a Reasoning panel and the next one starts open; close it and the next starts closed — including the message you are still watching stream. The choice is saved with the rest of your settings, so it survives a reload |
+| 📖 **Long thinking opens itself** | Until you have chosen, a reply carrying 400 characters or more of reasoning opens the panel on its own, while anything shorter stays collapsed so a two-line thought cannot push the answer down the page |
+| 🧵 **Only clicks are remembered** | The state is recorded from your clicks, never from the app's own opening, so a default cannot masquerade as a preference — and a panel you open mid-stream is not flipped back by the next token |
 
 ---
 
@@ -127,7 +127,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | 📌 **Pinned certificates** | Read the chain a host actually presents, see its SHA-256, and store it in `storage/tls/trusted.pem` — every pin is listed in Config → TLS / Certificates with fingerprint, expiry and pin date, and FORGET drops one |
 | ⚠️ **Expiry warnings** | A pin inside 30 days reads *EXPIRES IN n DAYS* in the list and raises a bell notification naming the host, so a renewed server certificate is re-pinned before it becomes an outage |
 | 🧭 **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
-| 🧠 **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, verbose and never mixed into the reply |
+| 🧠 **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message that remembers whether you keep it open and opens itself when the thinking is long |
 | 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
 | 🎨 **Themes** | Dark, Matrix, Cyberpunk |

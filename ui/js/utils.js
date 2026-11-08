@@ -13,6 +13,23 @@
 /** How many prior user turns an agent remembers by default. 0 = stateless. */
 export const DEFAULT_HISTORY_TURNS = 5;
 
+/** Characters of reasoning that count as "a lot" and open the panel by itself. */
+export const REASONING_OPEN_CHARS = 400;
+
+/**
+ * Whether a Reasoning panel starts open.
+ *
+ * The operator's last choice wins once they have made one -- that is the
+ * remembering part, and it is saved with the rest of the settings. Until then a
+ * reply that thought at length opens, because a collapsed box hides the very
+ * thing the panel exists to show, while a two-line thought stays shut so it
+ * cannot push the answer down the transcript.
+ */
+export function reasoningOpenByDefault(text, remembered) {
+  if (typeof remembered === 'boolean') return remembered;
+  return String(text ?? '').trim().length >= REASONING_OPEN_CHARS;
+}
+
 /**
  * Rough token estimate for budgeting. Deliberately conservative: prose is
  * usually ~4 chars/token, but code and JSON tokenize denser, and non-ASCII

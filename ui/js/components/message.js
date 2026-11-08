@@ -10,12 +10,13 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText } from '../utils.js?v=375';
-import { renderMarkdown } from '../markdown.js?v=375';
-import { CodeBlock, splitFences } from './codeBlock.js?v=375';
-import { createAvatar } from './avatar.js?v=375';
-import { store } from '../store.js?v=375';
-import { audio, AudioController } from '../audio.js?v=375';
+import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault } from '../utils.js?v=376';
+import { renderMarkdown } from '../markdown.js?v=376';
+import { CodeBlock, splitFences } from './codeBlock.js?v=376';
+import { createAvatar } from './avatar.js?v=376';
+import { store } from '../store.js?v=376';
+import { persistence } from '../persistence.js?v=376';
+import { audio, AudioController } from '../audio.js?v=376';
 
 const TOOL_DISPLAY_LIMIT = 8000;
 
@@ -462,6 +463,10 @@ export class MessageRenderer {
   _renderReasoning(text) {
     const details = document.createElement('details');
     details.className = 'reasoning-block';
+    // Open when the operator last kept one open, or -- before they have chosen --
+    // when this reply thought at length. Collapsed was the old hard default, and
+    // it hid a thousand words of reasoning behind a click.
+    details.open = reasoningOpenByDefault(text, store.get('settings.reasoningOpen'));
 
     const summary = document.createElement('summary');
     summary.className = 'reasoning-summary';
@@ -478,6 +483,16 @@ export class MessageRenderer {
     summary.appendChild(label);
     summary.appendChild(hint);
     details.appendChild(summary);
+
+    // A click on the summary is a decision, so every later message honours it.
+    // Read the state back on the next tick: the browser applies the toggle as
+    // the click's default action, after this handler returns.
+    summary.addEventListener('click', () => {
+      setTimeout(() => {
+        store.set('settings.reasoningOpen', details.open);
+        try { persistence.set('settings', store.get('settings')); } catch { /* view pref only */ }
+      }, 0);
+    });
 
     const inner = document.createElement('div');
     inner.className = 'reasoning-content';

@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧠 The Reasoning box remembers you, and opens when it has a lot to say *(`VERSION` 376, cache-buster v375 → v376)*
+
+*2026-11-08. Every reply's Reasoning panel started collapsed, so a model that thought at length hid it all behind a click, and the one time an operator opened it the next message was shut again.*
+
+**Remembered.** `MessageRenderer._renderReasoning()` reads `settings.reasoningOpen` and the live streaming block in `chat.js` reads the same key, so the state is one preference rather than two behaviours. It is written from a click on the `<summary>`, read back on the next tick because the browser applies the toggle as the click's default action, and persisted with the rest of the settings. The app's own opening never writes it, so a default cannot look like a choice.
+
+**Opens itself until then.** `reasoningOpenByDefault()` in `ui/js/utils.js` returns the saved boolean when there is one, and otherwise opens only a trace of `REASONING_OPEN_CHARS` (400) or more. The live block follows the same rule on its first paint, and later paints only add text — a panel opened or closed mid-stream is not flipped back by the next token.
+
+**Tests and docs.** `tests/js/reasoningPanel.test.mjs` covers the threshold exactly, both remembered states, whitespace and empty input. README: the **What's new** entry for v376 (replacing v375, whose shape work stays in the *Reasoning, in its own box* row) and that row now names the remembering and the automatic opening.
+
+---
+
 ## 🧠 Thoughts get their own box, whatever shape the runner speaks *(`VERSION` 375, cache-buster v374 → v375)*
 
 *2026-11-08. Reasoning reached the transcript only when a provider happened to use OpenAI's field. Google's `thought: true` parts were joined into the answer, a runner's own reasoning blocks fed a panel nothing filled, and several blocks ran together as one sentence.*

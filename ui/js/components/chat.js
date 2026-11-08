@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=375';
-import { K as STORAGE_K } from '../storage.js?v=375';
+import { store } from '../store.js?v=376';
+import { K as STORAGE_K } from '../storage.js?v=376';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=375';
-import { persistence } from '../persistence.js?v=375';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted } from '../utils.js?v=375';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=375';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=375';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=375';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=375';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=375';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=375';
-import { usageFor } from '../rateGovernor.js?v=375';
-import { trace } from '../trace.js?v=375';
-import { latency } from '../latency.js?v=375';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=375';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=375';
-import { SlashCommands } from '../slashCommands.js?v=375';
-import { parseRoute, routingHelp } from '../routing.js?v=375';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=375';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=375';
-import { MessageRenderer, renderToolCalls } from './message.js?v=375';
-import { createAvatar } from './avatar.js?v=375';
-import * as comms from '../commsLog.js?v=375';
+import { api, errText } from '../api.js?v=376';
+import { persistence } from '../persistence.js?v=376';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=376';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=376';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=376';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=376';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=376';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=376';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=376';
+import { usageFor } from '../rateGovernor.js?v=376';
+import { trace } from '../trace.js?v=376';
+import { latency } from '../latency.js?v=376';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=376';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=376';
+import { SlashCommands } from '../slashCommands.js?v=376';
+import { parseRoute, routingHelp } from '../routing.js?v=376';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=376';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=376';
+import { MessageRenderer, renderToolCalls } from './message.js?v=376';
+import { createAvatar } from './avatar.js?v=376';
+import * as comms from '../commsLog.js?v=376';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1119,9 +1119,18 @@ _makeLiveNode(agent) {
     // as they stream instead of arriving all at once at the end.
     const rDetails = document.createElement('details');
     rDetails.className = 'reasoning-block';
-    rDetails.open = true;
+    // The first paint of real reasoning decides whether this starts open (see
+    // _paintReasoning); until then the block is hidden anyway.
+    rDetails.open = false;
     const rSum = document.createElement('summary');
     rSum.className = 'reasoning-summary';
+    // Same rule as a finished message: a click is a decision, and it is saved.
+    rSum.addEventListener('click', () => {
+      setTimeout(() => {
+        store.set('settings.reasoningOpen', rDetails.open);
+        try { persistence.set('settings', store.get('settings')); } catch { /* view pref only */ }
+      }, 0);
+    });
     rSum.innerHTML = '<span class="reasoning-caret">\u25BC</span>'
       + '<span class="reasoning-label">Reasoning</span>'
       + '<span class="reasoning-hint">streaming</span>';
@@ -1272,7 +1281,14 @@ _makeLiveNode(agent) {
   _paintReasoning(node, whole) {
     if (!node) return;
     node.reasoning = whole;
-    if (node.reasonBlock) node.reasonBlock.style.display = '';
+    if (node.reasonBlock) {
+      // Only the first paint chooses the state: a panel opened or closed while
+      // it streamed must not be flipped back by the next token.
+      if (node.reasonBlock.style.display === 'none') {
+        node.reasonBlock.open = reasoningOpenByDefault(whole, store.get('settings.reasoningOpen'));
+      }
+      node.reasonBlock.style.display = '';
+    }
     if (node.reasonEl) node.reasonEl.textContent = whole;
     this._scrollToBottom();
   }
