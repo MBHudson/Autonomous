@@ -10,15 +10,16 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=401';
-import { persistence } from '../persistence.js?v=401';
-import { esc, uuid, makeAgentCode, agentCode, asText } from '../utils.js?v=401';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=401';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=401';
-import { TOOL_REGISTRY, defaultTools } from '../tools.js?v=401';
-import { audio } from '../audio.js?v=401';
-import { api } from '../api.js?v=401';
-import * as memory from '../memory.js?v=401';
+import { store } from '../store.js?v=402';
+import { persistence } from '../persistence.js?v=402';
+import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=402';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=402';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=402';
+import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=402';
+import { sandboxRootFor } from '../agentConfig.js?v=402';
+import { audio } from '../audio.js?v=402';
+import { api } from '../api.js?v=402';
+import * as memory from '../memory.js?v=402';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
@@ -36,18 +37,24 @@ export class AgentEditor {
   }
 
   init() {
-    this._describeToolPermissions();
     store.on('agent:edit', (id) => this.open(id));
     store.on('agent:add', () => this.open(null));
   }
 
   /**
-   * Spell out where each tool actually runs, and whether the sandbox is
-   * configured at all. The tool list mixes browser-local tools with ones that
-   * hit the server, so "nothing is executed on the server" would be a lie the
-   * moment somebody ticks write_file.
+   * Spell out where each tool actually runs, and whether this agent's file
+   * tools can do anything right now.
+   *
+   * The tool list mixes browser-local tools with ones that hit the server, so
+   * "nothing is executed on the server" would be a lie the moment somebody
+   * ticks write_file. It is painted on every open now: the hint lives inside
+   * the modal, so describing it once at init described an element that did not
+   * exist yet.
+   *
+   * The state line is per agent, because a per-agent root can point at a folder
+   * the server does not allow -- which no global line would ever mention.
    */
-  _describeToolPermissions() {
+  _describeToolPermissions(agent = null) {
     const hint = document.getElementById('toolHint');
     if (!hint) return;
     hint.innerHTML =
@@ -56,14 +63,51 @@ export class AgentEditor {
       + 'internet, and read or write files inside the directories you allow in Settings → Sandbox. '
       + '<code>write_file</code> asks you before every write.';
 
-    api.getSandboxStatus()
-      .then(s => {
-        if (s.enabled) return;
-        hint.innerHTML += ' <b>No working directory is set</b>, so the file tools will report '
-          + 'themselves as disabled — set one in the left panel\'s '
-          + '<b>Config tab → Working Project Directory</b>. Web search works already.';
-      })
-      .catch(() => { /* the hint above still tells the truth */ });
+    const state = document.createElement('div');
+    state.className = 'tool-state';
+    state.id = 'toolState';
+    state.style.marginTop = '6px';
+    hint.appendChild(state);
+
+    const root = sandboxRootFor(agent);
+    const paint = (jail) => {
+      if (!state.isConnected && !document.getElementById('toolState')) return;
+      const report = sandboxBindingReport();
+      const { tone, text } = agentToolState({ unbound: report.unbound, status: jail, root });
+      state.textContent = text;
+      state.style.color = tone === 'warn' ? 'var(--danger, #ff6b6b)'
+        : tone === 'ok' ? 'var(--accent-cyan, #00e5ff)'
+          : 'var(--text-muted, #8a93a6)';
+      if (!report.unbound.length) return;
+      // The page half is fixable from here, so the same button the warning
+      // bubble carries sits beside the sentence that names the problem.
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary btn-sm';
+      btn.id = 'toolStateBind';
+      btn.textContent = 'BIND FILE TOOLS';
+      btn.style.marginLeft = '8px';
+      btn.addEventListener('click', () => {
+        btn.disabled = true;
+        const { unbound } = bindSandboxNow(api);
+        if (unbound.length) {
+          store.emit('toast', { message: `Still unbound: ${unbound.join(', ')}`, type: 'error' });
+        }
+        api.getSandboxStatus().then(paint, () => paint(null));
+      });
+      state.appendChild(btn);
+    };
+
+    // The binding half is known synchronously; the jail half is a round trip,
+    // so say "checking" rather than claiming an outcome that is not in yet.
+    const bound = agentToolState({ unbound: sandboxBindingReport().unbound, status: null, root });
+    if (bound.tone === 'warn') {
+      paint(null);
+    } else {
+      state.textContent = 'Checking the server\'s working directory…';
+      state.style.color = 'var(--text-muted, #8a93a6)';
+    }
+    api.getSandboxStatus().then(paint, () => { /* the line above still tells the truth */ });
   }
 
   /**
@@ -307,6 +351,7 @@ export class AgentEditor {
 
     document.body.appendChild(overlay);
     this.modal = overlay;
+    this._describeToolPermissions(agent);
 
     // Close handlers
     document.getElementById('agentModalClose').addEventListener('click', () => this.close());

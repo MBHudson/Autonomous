@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=401';
-import { K } from '../storage.js?v=401';
-import { persistence } from '../persistence.js?v=401';
-import { api } from '../api.js?v=401';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=401';
-import { errText } from '../api.js?v=401';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=401';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=401';
-import { snapshot } from '../rateGovernor.js?v=401';
-import { resetBrowserEnabled } from '../toolManifest.js?v=401';
-import { perf } from '../perf.js?v=401';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=401';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=401';
+import { store } from '../store.js?v=402';
+import { K } from '../storage.js?v=402';
+import { persistence } from '../persistence.js?v=402';
+import { api } from '../api.js?v=402';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=402';
+import { errText } from '../api.js?v=402';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=402';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=402';
+import { snapshot } from '../rateGovernor.js?v=402';
+import { resetBrowserEnabled } from '../toolManifest.js?v=402';
+import { perf } from '../perf.js?v=402';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=402';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=402';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open

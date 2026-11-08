@@ -132,6 +132,66 @@ export function fileToolWarning(unbound, status) {
   return `⚠ File tools are unavailable — ${parts.join('; ')}. Anything an agent reports writing is not on disk. ${fix}`;
 }
 
+/**
+ * Whether one agent's file tools can actually reach a directory, for the agent
+ * editor.
+ *
+ * The chat warns before a turn and Config reports this page's binding, but the
+ * editor is where the tools are chosen for a particular agent -- and a
+ * per-agent root can name a folder the server will not allow. Both halves are
+ * one line here, with `tone` ('ok' | 'warn' | 'unknown') so the panel can colour
+ * it without re-reading the prose.
+ */
+export function agentToolState({ unbound, status, root } = {}) {
+  const names = Array.isArray(unbound) ? unbound.filter(n => typeof n === 'string' && n) : [];
+  const jail = status && typeof status === 'object' ? status : null;
+  const own = String(root ?? '').trim();
+  const norm = p => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const allow = [];
+  if (jail) {
+    for (const r of [...(jail.read_roots || []), ...(jail.write_roots || [])]) {
+      if (typeof r === 'string' && r) allow.push(norm(r));
+    }
+  }
+  const insideAllowed = p => {
+    const q = norm(p);
+    return !!q && allow.some(a => q === a || q.startsWith(a + '/'));
+  };
+  const jailRoot = jail && typeof (jail.read_roots || [])[0] === 'string' ? jail.read_roots[0] : '';
+
+  const problems = [];
+  if (names.length) {
+    const head = names.slice(0, 4).join(', ');
+    problems.push(`this page never bound ${head}${names.length > 4 ? ` and ${names.length - 4} more` : ''}`);
+  }
+  if (jail && jail.enabled === false) problems.push('the server has no working directory');
+  else if (jail && own && !insideAllowed(own)) {
+    problems.push(`this agent is set to ${own}, which is not one of the server's allowed directories`);
+  }
+
+  if (problems.length) {
+    return {
+      tone: 'warn',
+      text: `⚠ File tools are unavailable for this agent — ${problems.join('; ')}.`
+        + (names.length
+          ? ' Press BIND FILE TOOLS to retry in this page.'
+          : ' Set a working directory in Config.'),
+    };
+  }
+  if (!jail) {
+    return {
+      tone: 'unknown',
+      text: 'File tools are bound in this page, but the server\'s working directory could not be checked.',
+    };
+  }
+  return {
+    tone: 'ok',
+    text: own
+      ? `File tools: bound, and this agent is jailed to ${own}.`
+      : `File tools: bound. This agent follows the server's working directory${jailRoot ? ` (${jailRoot})` : ''}.`,
+  };
+}
+
 export function finishedWithoutAnswer(calls) {
   const list = Array.isArray(calls) ? calls.filter(Boolean) : [];
   if (!list.length) return 'The agent finished without writing a reply.';

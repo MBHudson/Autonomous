@@ -18,6 +18,20 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🧾 The editor says what this agent can do *(`VERSION` 402, cache-buster v401 → v402)*
+
+*2026-11-08. The agent editor is where the file tools are chosen for one agent, so it is the one panel where the state of those tools belongs -- and it had none. `_describeToolPermissions()` ran once at init, looking for `#toolHint` before any modal existed, so the explanation never appeared. When a hint did appear it was the static "None selected = plain replies."*
+
+**Painted per open.** The method is now called from `open()` with the agent in hand, and it builds the explanation plus a state line under it. Three states, coloured rather than guessed: ok, warn, unknown.
+
+**Per agent, not just per page.** `agentToolState()` in `ui/js/utils.js` takes the page's unbound list, the server's status, and the agent's root. A root outside the server's allowlist is a warning in its own right: `Sandbox::scopeRoots()` narrows the global roots to the assigned directory and throws when it is not inside one, so those calls fail before they run -- and the global Config line cannot show it, because it knows nothing about this agent's root. Paths are compared with backslashes normalised and case folded, since the editor's field accepts `C:site` as readily as `/srv/site`.
+
+**Fix where the problem is named.** When the page never bound its runners, the line carries the same `BIND FILE TOOLS` button as the warning bubble and the Config tab, through the same `bindSandboxNow()`. It re-reads the status afterwards, so the line that appears is the outcome rather than the intent.
+
+**Unknown is not fine.** An unreachable `/sandbox/status` reads as "bound in this page, but the server's working directory could not be checked", and a pending read says "checking" -- neither claims a write will land.
+
+**Tests.** `tests/js/agentToolState.test.mjs` covers the happy path, a root inside and outside the allowlist, an empty jail, unbound tools, both halves at once, a long unbound list, the unknown state, and garbage arguments.
+
 ## 🏠 A rebind confirms the jail too *(`VERSION` 401, cache-buster v400 → v401)*
 
 *2026-11-08. A successful rebind only proved the page had runners. The bubble then said "agents can read and write now" without asking whether the server had a directory -- the same false confidence the warning exists to remove, this time arriving from the fix.*

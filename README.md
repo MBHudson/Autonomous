@@ -37,16 +37,18 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v401 — a rebind confirms the jail too 🏠
+### 🆕 v402 — the editor says what this agent can do 🧾
 
-*A successful rebind only proved the page had runners. The bubble then said "agents can read and write now" without asking whether the server had a directory — the same false confidence the warning exists to remove, arriving from the other direction.*
+*The tool hint in the agent editor was written once at startup, before the modal that contains it existed, so it described nothing — and even when it appeared it spoke about the sandbox in general, never about the agent on screen.*
 
 | | |
 |---|---|
-| 🏠 **Both halves before the claim** | After binding, the chat re-reads `sandbox/status` and only then decides what the bubble says |
-| 🧾 **Three honest outcomes** | Jail live: the confirmation. Jail empty: the bubble becomes that warning again, naming Working Project Directory. Status unreachable: it claims the page half only |
-| 🔁 **The cache is refreshed** | A successful read replaces the 15-second cache with fresh data, so the next turn does not contradict the bubble |
-| ✅ **Guarded** | `rebindButton.test.mjs` covers a later verdict replacing the text, a rejected follow-up leaving it intact, and a throwing one surviving |
+| 🧾 **Painted on open** | The hint is rebuilt every time an agent is opened, so the sentence that explains the tools is actually shown beside them |
+| 🏠 **Both halves, one line** | Whether this page bound the tools, and whether the server has a directory — the same two facts the chat warns about, in the panel where the tools are chosen |
+| 🎯 **The per-agent root** | An agent jailed to a folder outside the allowlist is flagged here: the server refuses that scope, and no global line would ever say so |
+| 🔧 **Fix in place** | When the page never bound, `BIND FILE TOOLS` sits next to the sentence that names the problem |
+| 📡 **Unknown stays unknown** | A status route that does not answer reads as "could not be checked", never as a promise that writes land |
+| ✅ **Guarded** | `agentToolState.test.mjs` — 34 assertions over every combination, Windows path spellings included |
 
 ---
 
