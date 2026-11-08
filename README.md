@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v422 — a missing extension is a 503 🚦
+### 🆕 v423 — even the uncached GET says 503 🚦
 
-*A server without curl answered "400 Bad Request" about a request that was perfectly well formed.*
+*A server without curl answered the load-time check with `200 OK` and a body admitting it had failed.*
 
 | | |
 |---|---|
-| 🚦 **503 for the missing extension** | the update routes report the server's inability as 503 with `code: curl_missing`, the same shape the other network routes already use |
-| 🧾 **400 still means "you asked wrong"** | a refused host, a non-release archive or a write refusal keeps its 400 and its message |
-| 🔁 **The distinction matters** | 400 tells a client to stop; 503 says the server cannot act right now, which is what a missing extension is |
+| 🚦 **All three paths agree** | the gate, the POST routes and now the uncached GET all answer 503 with `code: curl_missing` |
+| 🧾 **The reason replaces the symptom** | the probe warnings ("undefined function curl_init") give way to the gate's sentence and the folder to fix it in |
+| 🗃️ **A cached answer is still 200** | with `check.json` on disk the server has something true to say, and says it |
 ---
 
 ## 🧭 Contents

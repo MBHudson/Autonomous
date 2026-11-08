@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🚦 Even the cached GET says 503 *(`VERSION` 423, no browser file changed)*
+
+*A server without curl answered the load-time check with `200 OK` and a body that admitted it had failed.*
+
+**The last of the three paths.** v422 made the POST routes answer `503` when the extension was missing, and the gate at the top of `api/index.php` already did. The uncached GET was the odd one out: it ran `Update::check()`, collected probes that threw `Call to undefined function curl_init`, and returned 200 with `ok: false`.
+
+**Same condition, same status.** When a GET has no cache to serve and no curl to fetch with, the route now answers `503` with `code: curl_missing`, keeping `localVersion` so the panel can still say which copy it is. The probe warnings are dropped -- "undefined function curl_init" is the cause, not the story -- and the gate's sentence takes their place.
+
+**A cached GET is untouched.** With `check.json` on disk the answer is still `200` and `cached: true`: the server had something true to say, so it says it, and a host with no network keeps working from its last check.
+
 ## 🚦 A missing extension is a 503 *(`VERSION` 422, no browser file changed)*
 
 *The update routes answered `400 Bad Request` when PHP had no curl extension: a request that was perfectly well formed, blamed for the server's inability to act.*

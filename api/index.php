@@ -1935,13 +1935,21 @@ function handleUpdate($method, $segments, $body) {
             $result = Src\Update::check($method === 'POST');
             if ($method === 'GET' && empty($result['cached']) && !function_exists('curl_init')) {
                 // No cache and no curl: this is the case the gate was written
-                // for, and its sentence is better than the raw function error.
+                // for. It answers 503 like the POST path and the gate at the top
+                // of this file -- "I cannot act" is not "your request is wrong"
+                // -- and says it with the gate's sentence rather than the raw
+                // function error.
                 try {
                     $needsCurl();
                 } catch (\RuntimeException $e) {
+                    http_response_code(503);
                     $result['ok'] = false;
                     $result['updateAvailable'] = false;
+                    $result['code'] = 'curl_missing';
                     $result['error'] = $e->getMessage();
+                    // The probes left warnings like "Call to undefined function
+                    // curl_init": true, but the cause, not the story.
+                    $result['warnings'] = array();
                 }
             }
             echo json_encode($result);
