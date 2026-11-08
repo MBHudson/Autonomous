@@ -1,5 +1,13 @@
 <!--
- ## 🔌 A proxy is for leaving the network *(`VERSION` 408, cache-buster v407 → v408)*
+ ## 🧭 One proxy setting, on the server *(`VERSION` 409, cache-buster v408 → v409)*
+
+*2026-11-08. The same install worked on the PC and failed on the phone. The endpoint and the server were identical; what differed was a proxy choice saved per device. Chat sent it with every call, and the relay let a supplied proxy win outright, so one browser could route around the server setting -- and, after v408, around the LAN bypass too, since the endpoint check ran after the spec was preferred.*
+
+**The browser no longer votes.** All four places chat built a spec -- the snippet streaming path, the raw passthrough, the one-shot relay and the template call -- carried `proxy: settings.proxyActive`. They do not any more: the Proxy tab already writes `sandbox.proxy_active` on the server, which is where the call is made.
+
+**What that fixes.** A stale per-device value can no longer outlive a clear on another device, and a phone cannot keep a dead proxy alive for its own calls. The Proxy tab still highlights the active row, so the setting is still visible; it is simply not duplicated per browser.
+
+## 🔌 A proxy is for leaving the network *(`VERSION` 408, cache-buster v407 → v408)*
 
 *2026-11-08. After activating a proxy in the Proxy tab, a local LM Studio stopped answering for every client -- and turning the proxy off changed nothing. Two faults, and only one of them was the proxy being dead.*
 

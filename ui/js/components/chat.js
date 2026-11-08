@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=408';
-import { K as STORAGE_K } from '../storage.js?v=408';
+import { store } from '../store.js?v=409';
+import { K as STORAGE_K } from '../storage.js?v=409';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,28 +20,28 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=408';
-import { persistence } from '../persistence.js?v=408';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning } from '../utils.js?v=408';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=408';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=408';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=408';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=408';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=408';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=408';
-import { usageFor } from '../rateGovernor.js?v=408';
-import { trace } from '../trace.js?v=408';
-import { offerRebind } from './rebindOffer.js?v=408';
-import { latency } from '../latency.js?v=408';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=408';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=408';
-import { SlashCommands } from '../slashCommands.js?v=408';
-import { parseRoute, routingHelp } from '../routing.js?v=408';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=408';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=408';
-import { MessageRenderer, renderToolCalls } from './message.js?v=408';
-import { createAvatar } from './avatar.js?v=408';
-import * as comms from '../commsLog.js?v=408';
+import { api, errText } from '../api.js?v=409';
+import { persistence } from '../persistence.js?v=409';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning } from '../utils.js?v=409';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=409';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=409';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=409';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=409';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=409';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=409';
+import { usageFor } from '../rateGovernor.js?v=409';
+import { trace } from '../trace.js?v=409';
+import { offerRebind } from './rebindOffer.js?v=409';
+import { latency } from '../latency.js?v=409';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=409';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=409';
+import { SlashCommands } from '../slashCommands.js?v=409';
+import { parseRoute, routingHelp } from '../routing.js?v=409';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=409';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=409';
+import { MessageRenderer, renderToolCalls } from './message.js?v=409';
+import { createAvatar } from './avatar.js?v=409';
+import * as comms from '../commsLog.js?v=409';
 
 /**
  * How long an agent may keep working on a single task.
@@ -2449,7 +2449,6 @@ _makeLiveNode(agent) {
             messages: this._messagesFor(agent.id, prompt,
               `${systemPromptFor(agent)}${memoryFor(agent)}${budgetBlockFor(agent, provider.endpoint, effectiveKey)}`,
               attachments),
-            proxy: store.get('settings.proxyActive') || null,
           }, signal);
           if (res?.success && res.content) {
             content = res.content;
@@ -2829,8 +2828,6 @@ _makeLiveNode(agent) {
         model: body.model || agent.model,
         temperature: body.temperature ?? temperature,
         max_tokens: body.max_tokens ?? maxTokens,
-        // Route through selected proxy if one is configured
-        proxy: store.get('settings.proxyActive') || null,
         // Carry any extra top-level keys the snippet set (e.g. `reasoning`,
         // `top_p`, provider switches) so custom models keep working.
         ...Object.fromEntries(
@@ -2877,7 +2874,6 @@ _makeLiveNode(agent) {
         harness: harnessOverride(agent),
         model: body.model || agent.model,
         raw_payload: body,
-        proxy: store.get('settings.proxyActive') || null,
       }, signal);
       if (!rawRes?.success || !rawRes.content) {
         throw relayError(rawRes, `Template call failed for ${agent.name}`);
@@ -2896,7 +2892,6 @@ _makeLiveNode(agent) {
       temperature: body.temperature ?? temperature,
       max_tokens: body.max_tokens ?? maxTokens,
       messages: body.messages || [],
-      proxy: store.get('settings.proxyActive') || null,
     }, signal);
     if (!res?.success || !res.content) {
       throw relayError(res, `Template call failed for ${agent.name}`);

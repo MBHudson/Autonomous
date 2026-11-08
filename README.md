@@ -37,16 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v408 — a proxy is for leaving the network 🔌
+### 🆕 v409 — one proxy setting, on the server 🧭
 
-*A proxy is how this server reaches the outside world. A runner on the LAN is not out there, and pointing a free proxy at one failed every local call while the Proxy tab reported traffic as direct.*
+*The server makes the model call, so it is the only place a proxy can matter. The browser was sending one anyway, which let a stale choice on one device override the server on every call.*
 
 | | |
 |---|---|
-| 🔌 **LAN endpoints go direct** | `activeProxy()` returns nothing for loopback, private and link-local hosts, even when the browser sent a proxy of its own |
-| 🧹 **Clear means clear** | Clear Selection and removing the active entry now write the server setting too; before, the tab said "direct" while `sandbox.proxy_active` kept routing |
-| 🗣️ **No false confirmation** | If the server does not confirm the clear, the toast says so instead of claiming success |
-| ✅ **Guarded** | `tls.test.php` covers LAN, loopback and public endpoints |
+| 🧭 **The server decides** | Chat no longer sends the browser value; the Proxy tab already writes the server setting |
+| 📵 **No per-device vote** | A phone holding a dead proxy kept routing through it while the PC, whose value was cleared, went direct |
+| 🧹 **Clear still clears both** | As in v408, and nothing can re-introduce the value one device at a time |
 
 ---
 

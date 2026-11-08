@@ -10,10 +10,10 @@
 // PROVIDEREDITOR.JS — Provider CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=408';
-import { api } from '../api.js?v=408';
-import { persistence } from '../persistence.js?v=408';
-import { esc, uuid } from '../utils.js?v=408';
+import { store } from '../store.js?v=409';
+import { api } from '../api.js?v=409';
+import { persistence } from '../persistence.js?v=409';
+import { esc, uuid } from '../utils.js?v=409';
 
 export class ProviderEditor {
   constructor() {
