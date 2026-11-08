@@ -20,6 +20,7 @@
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 ![Android](https://img.shields.io/badge/Android-coming_soon_to_Play_Store-3DDC84?logo=android&logoColor=white)
 [![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-6E56CF?logo=readthedocs&logoColor=white)](https://deepwiki.com/MBHudson/Autonomous)
+[![Tests](https://github.com/MBHudson/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/MBHudson/Autonomous/actions/workflows/tests.yml)
 
 ![Glass Desktop Theme — the glass shell: edge rail, Config drawers, a wide chat and the live network map](screenshots/new-ui-main.png)
 
@@ -38,15 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v430 — a fresh copy carries its permissions 🐧
+### 🆕 v431 — the badge that answers before you clone 📛
 
-*A clone honours the executable bit; a plain `copy()` does not, so the fresh-copy check was testing a tree nobody would ever have.*
+*It took three releases to get the Linux runner green. A badge would have said so in five seconds.*
 
 | | |
 |---|---|
-| 🐧 **`setup-token.sh` runs in the copy too** | it shipped `100644` and the fresh copy kept it that way, so `./setup-token.sh --show` exited 126 on Linux and again in the copy |
-| 🔗 **A masked URL is still a URL** | `json_encode` escapes slashes, so the secrets test parses the response instead of grepping for a spelling JSON never contains |
-| 🪟 **Platform-specific refusals say so** | the detached launch, the twin copy, the policy wording and typing's input refusals are asserted where they exist and print a skip elsewhere |
+| 📛 **`tests.yml` status, beside the other badges** | green means both suites passed on a machine that is not this one — the box the test files were written against, plus a fresh copy of the tree |
+| 🔗 **It links to the runs, not to a promise** | the badge is the workflow's own `badge.svg`, and clicking it opens the run list, so the last result is a click away instead of quoted in the text |
 ---
 
 ## 🧭 Contents

@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 📛 The badge that answers before you clone *(`VERSION` 431, no browser file changed)*
+
+*It took three releases to get the Linux runner green. A badge would have said so in five seconds.*
+
+**The workflow's own badge, beside the other badges.** It is GitHub's `badge.svg` for `tests.yml`, linked to the run list, so a reader sees the last result on a machine that is not this one instead of trusting a figure quoted in the text. The first green run is what it shows now.
+
+**What it covers.** The same three steps the job runs: both suites on Linux, both suites again in a fresh copy of the tree, and the serving refusals. Apache and IIS are not on the runner, so those files still print their skips -- a green badge is a machine-independent result, not a claim that every platform was exercised.
+
 ## 🐧 A fresh copy carries its permissions *(`VERSION` 430, no browser file changed)*
 
 *A clone honours the executable bit. `freshClone.php` builds its copy with `copy()`, which carries bytes only -- so the check that asks "would this work for someone who just cloned it?" was answering for a tree nobody would ever have.*
