@@ -37,17 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v385 — what the model thinks stays on screen 🧠
+### 🆕 v386 — a smaller tree, same app 🧹
 
-*Watching a local reasoning model work had two wrong endings: the text being typed vanished the moment the turn completed, and the answer arrived in one block after a silence. Both came from the same place — a live bubble that showed everything, and a commit that kept only the last step's text.*
+*Three files in the repo were housekeeping rather than product: a note to coding agents, a one-page hand-out for a friend, and a GitHub release body frozen at v368. They are gone, and the README no longer points at any of them.*
 
 | | |
 |---|---|
-| 🧠 **Reasoning is painted as it arrives** | The block was built for the thought trace and the streaming callback never touched it, so a model could think for a minute with nothing on screen. It paints now, live |
-| 🔁 **Across steps, not just the last one** | A turn that thinks, calls a tool and thinks again keeps both traces in order, instead of committing whichever step it happened to finish on |
-| 📝 **Narration between tool calls is kept** | A local model thinks out loud in its reply text; those sentences were painted and then dropped at commit. They now ride along as the message's reasoning, so what you watched is still there afterwards |
-| ⏳ **No more silent gap** | The trace appears as it streams, so a slow first token reads as thinking rather than a hung request, and the answer no longer materialises out of nothing |
-| 🚫 **Still no echo** | A "reasoning" block that is really the reply is hidden by the existing echo rule, so nothing is shown twice |
+| 🗑️ **Removed** | `AGENTS.md`, `FRIENDS.md` and `RELEASE-NOTES.md` leave the tree — nothing the app loads or the server serves ever read them |
+| 🔗 **Links followed** | The MCP friend section now ends with the URL-and-token pair and the file-tree listing drops its entry, so the page has no pointer to a file that is not there |
+| 📋 **`RELEASING.md` stays** | It is the version checklist — which number to bump, the three places `APP_VERSION` must move together, and the suite command — and the README links it twice |
+| 🧮 **No cache-buster bump** | Nothing under `ui/` changed, so a browser has nothing to re-download; `VERSION` alone announces this release, which is the case the release number exists for |
 
 ---
 
@@ -734,7 +733,7 @@ changes until you ask:
 ---
 ## 💭 Thinking & reasoning
 
-Some models show their work. 💭🧩 When a provider streams a reasoning trace, the **thinking panel** opens and shows it live, so you can watch the model deliberate before the answer lands — handy for debugging a stubborn prompt without cluttering the reply.
+Some models show their work. 💭🧩 When a provider streams a reasoning trace, the **thinking panel** opens and shows it live, so you can watch the model deliberate before the answer lands — handy for debugging a stubborn prompt without cluttering the reply. The trace is painted as it streams, accumulated across every step of the turn, and carried into the finished message, so what you watched does not vanish at the commit; a local model that thinks out loud in its reply text keeps those sentences in the same panel instead of losing them, and a "reasoning" block that is really the reply is still suppressed as an echo.
 
 ---
 
@@ -1287,7 +1286,7 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
    ```
 3. **The friend runs their own copy of Loop Studio** — **Config → MCP Client → + ADD SERVER** (name, transport `http`, url, and a `headers` box with `Authorization: Bearer <token>`). Their agents then reach the operator's tools through `mcp_list` / `mcp_call`.
 
-The operator hands over the **URL + that friend's token**; `FRIENDS.md` is the one-page version to send along.
+The operator hands over the **URL + that friend's token** — that pair is all their client needs.
 
 </details>
 
@@ -1374,7 +1373,6 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 ├── setup-xampp.bat/.ps1  # one-click Apache + PHP (Windows)
 ├── setup-token.sh        # create / rotate the access token (+ storage guard)
 ├── nginx.example.conf    # deny storage/ + tests/ on nginx (copy into server{})
-├── FRIENDS.md            # hand this to a friend to connect over MCP
 ├── CHANGELOG.md
 └── README.md
 ```

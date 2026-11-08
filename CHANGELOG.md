@@ -19,6 +19,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧹 Three repo docs that don't belong in a clone *(`VERSION` 386, no cache-buster bump)*
+
+*2026-11-08. `AGENTS.md`, `FRIENDS.md` and `RELEASE-NOTES.md` were repository housekeeping rather than part of the app: a note to coding agents, a hand-out for a friend, and a GitHub release body frozen at v368. They are out of the tree, and README no longer points at any of them.*
+
+**README follows.** The MCP friend section now ends with the URL-and-token pair instead of naming a file to send along, and the tree listing drops its entry. Nothing else on the page referred to them.
+
+**`RELEASING.md` stays.** It is the checklist for the two version numbers, the three places `APP_VERSION` has to move together, the CHANGELOG/README folding rule and the suite command, and the README links it twice. Its dead links to the release page are gone.
+
+**No cache-buster bump.** Nothing under `ui/` or `index.html` changed, so a browser has nothing to re-download; `VERSION` alone carries this release, which is exactly the case the release number exists for.
+
+---
+
 ## 🧠 What a local model thinks no longer vanishes when it answers *(`VERSION` 385, cache-buster v384 → v385)*
 
 *2026-11-08. A local reasoning model streamed its thoughts, then the text disappeared the instant the turn completed and the tool calls and answer appeared in one block. Two separate gaps produced that: the live reasoning block was never painted, and the commit kept only the last step's text.*

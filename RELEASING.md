@@ -3,10 +3,6 @@
 Two numbers tell the update check at **Config → Updates** that something new
 exists. Bump the right one and nothing else is needed.
 
-> Shipping a build? The GitHub release body — tag name, title, pre-release
-> checkbox and the notes themselves — lives in
-> [RELEASE-NOTES.md](RELEASE-NOTES.md).
-
 | # | Number | Lives in | Bump it when |
 | --- | --- | --- | --- |
 | 1 | **release number** | [`VERSION`](VERSION) (repo root) | **every** release — including one that changes no browser file, e.g. a PHP or docs fix |
@@ -49,14 +45,11 @@ no cached asset changed, so it cannot report one.
    neither. When the next release lands, fold the previous entry into those two
    lists: once it leaves the top of the page, the table is the only place the
    feature is described.
-5. **Update [RELEASE-NOTES.md](RELEASE-NOTES.md)** if what shipped changed:
-   tag, title and body are what the release page will say. A release whose notes
-   still describe the previous build reads as an accident.
-6. **Run both suites:** `php tests/php/run.php` and `node tests/run.mjs` (which
+5. **Run both suites:** `php tests/php/run.php` and `node tests/run.mjs` (which
    runs the PHP suite first, then the JS one).
    `tests/php/update.test.php` fails when `VERSION` is behind `APP_VERSION`,
    which is the mistake this checklist exists to prevent.
-7. **Push.** Running copies get a notification in the bell on their next page
+6. **Push.** Running copies get a notification in the bell on their next page
    load; the check is cached server-side for one hour, and nothing installs
    itself — **Config → Updates → DOWNLOAD UPDATE…** is still a manual,
    compare-first step.
