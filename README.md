@@ -37,6 +37,16 @@
 
 **Newest first.** 🚀 Everything below landed **after** the feature list further down this page was written — that list is still true, and these are the additions. The most recent release sits at the top.
 
+### 🆕 v374 — a runner's own reply shape stops arriving as JSON 🧩
+
+*Some model servers answer in their own envelope — `{"output":[{"type":"message","content":"…"}],"stats":{…}}` — instead of the OpenAI shape. Nothing recognised it, so the raw body was posted into the transcript as the agent's reply.*
+
+| | |
+|---|---|
+| 🧩 **The `output` envelope is read** | `message` / `output_text` / `text` blocks become the answer, a block whose content is itself an array of `{type:"text"}` parts is joined, `stats.input_tokens` and `stats.total_output_tokens` become the token counts, and `reasoning` / `thinking` blocks go to the thinking panel instead of the reply. Understood on the server, on the direct-call parser and on stream frames alike. |
+| 🛡️ **Thinking is not the answer** | A body carrying only a `reasoning` block reports no content rather than its private notes — the same rule every other shape already followed. |
+| 🫥 **An unknown body still shows** | The last-resort fallback that hands back a body it cannot read is deliberate, and stays: it is why this bug was visible at all, and nothing is silently swallowed. |
+
 ### 🆕 v369–v373 — calls that check the certificate, a limiter that gives its slot back, and a harness you can pin 🔒
 
 *Every model and speech call used to accept any certificate it was handed. Now it verifies, the exceptions are visible, and a pinned certificate that is about to run out says so before it does.*
@@ -191,7 +201,7 @@ Jump straight to a section — every heading on this page is also clickable.
 | | |
 |---|---|
 | 🤖 **Any model, any provider** | OpenAI, OpenRouter, NVIDIA NIM, Anthropic, Google, Groq, DeepSeek, xAI, Mistral, Cerebras, Together, Perplexity, Ollama, LM Studio, vLLM… |
-| 🧭 **Auto-fitting harness** | Detects each provider's API shape *and* tool dialect, and speaks it correctly |
+| 🧭 **Auto-fitting harness** | Detects each provider's API shape *and* tool dialect, speaks it correctly, and reads the reply back — a runner's own `output` envelope included |
 | 🧠 **Brain Lab** | Every per-agent setting, locks, memory, files and custom tools in one rail |
 | 🧪 **API Lab** | Paste a curl → get it in 10 languages → actually send it server-side |
 | 🔀 **Routing chart** | Draw workflows: agents, loops, checkpoints, delays, parallel fan-out |
@@ -665,6 +675,7 @@ Different providers aren't one API with different URLs. A single registry (`src/
 - **Which API shape** — OpenAI-compatible, Anthropic Messages, Google `generateContent`, or Ollama — from the **endpoint host**, then provider id, then a model hint.
 - **Which tool dialect** to teach — JSON, Claude XML, native tags, or plain — from the provider + model id.
 - **Per-family quirks** — auth headers (Bearer / `x-api-key` / `?key=` / Azure `api-key`), request/response/usage/reasoning shapes, streaming envelopes, and output-token caps.
+- **Reply parsing is part of the harness** — content, usage and reasoning are read from wherever that family keeps them, including the `{"output":[…],"stats":{…}}` envelope some local runners answer with, and a block list whose `reasoning` text is kept out of the reply.
 
 Adding a provider is one line in the alias table, or just a new provider in the UI. The browser copy is **generated** from the PHP (`php tools/gen-harness.php`) so the two can't drift.
 
@@ -1521,6 +1532,7 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 - **A model returns nothing / "NetworkError"** → on Windows PHP's built-in server is single-threaded; use `start.bat` (Apache) for parallel agents, or `start-php.bat` for one at a time.
 - **MCP client gets `missing bearer token` even with a token** → under Apache + PHP-FPM the `Authorization` header is stripped before PHP sees it. Redeploy `api/.htaccess` (shipped): it has `CGIPassAuth On` plus the `RewriteCond %{HTTP:Authorization}` fallback, so `$_SERVER['HTTP_AUTHORIZATION']` is populated. Without that file both are empty. If a proxy/WAF also strips the header, the host must allow it through (nginx: `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`).
 - **Local models not connecting** → make sure Ollama/LM Studio is running and reachable (Ollama `:11434`, LM Studio `:1234`).
+- **A reply arrives as raw JSON** → the server answered in a shape the app did not recognise, and the last-resort fallback printed the body rather than swallowing it. The `{"output":[{"type":"message","content":…}],"stats":{…}}` envelope is read natively as of **v374** — hard-refresh first, because the newer parsers live in `ui/js/harness.js` and an open tab keeps the old bundle. A body in some other shape still arrives verbatim on purpose: that is how a missing shape gets noticed, and teaching the extractor another one is a few lines in `src/Harness.php` plus its browser copy.
 
 ---
 
