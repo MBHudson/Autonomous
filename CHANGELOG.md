@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔐 The token name is ignored where it matters *(`VERSION` 433, no browser file changed)*
+
+*`.git/info/exclude` protects exactly one clone. A fresh clone has never heard of `.gh-workflow-token`, so its first `git add -A` would have committed a token that can write to this repository -- and pushed it.*
+
+**The name is in `.gitignore` now**, which is tracked, so every clone and every `freshClone.php` copy inherits the rule without anyone remembering it. The local exclude stays where it was: two lines of defence, and the one that travels is the tracked one.
+
+**Verified in an actual clone.** The check clones the repo, creates `.gh-workflow-token` inside it, and confirms `git status --porcelain` stays empty while `git check-ignore -v` names the rule -- the same command the ignore file's own comment recommends, rather than trusting the pattern by reading it.
+
 ## 📛 The push that only fails at the end *(`VERSION` 432, no browser file changed)*
 
 *A commit that touches `.github/workflows/` is refused by a credential without `workflow` scope -- and the refusal arrives after the objects are sent, naming the OAuth app while a working token sits unread in the repository.*

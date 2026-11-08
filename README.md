@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v432 — the push that only fails at the end 📛
+### 🆕 v433 — the token name is ignored where it matters 🔐
 
-*A commit that touches `.github/workflows/` is refused by a credential without `workflow` scope, and the error blames the OAuth app while a good token sits unread in the repo.*
+*`.git/info/exclude` protects one clone. A fresh clone has never heard of `.gh-workflow-token`, so the first `git add -A` there would have committed a token that can write to this repo.*
 
 | | |
 |---|---|
-| 📛 **`RELEASING.md` names the trap** | helpers are consulted in order and `gh`'s wins, so git never asks the token that could do it |
-| 🔐 **Where that token lives, and how to check it** | `.gh-workflow-token` at the repo root, one `ghp_` line with `repo` + `workflow`, excluded locally and never committed — verified with a command that prints no part of it |
+| 🔐 **`.gitignore` carries the name now** | it is tracked, so every clone inherits the rule; the local exclude stays as the second line of defence |
+| 🧪 **Checked in a real clone, not by eye** | clone, create the file, `git status` stays empty and `git check-ignore -v` names the rule that caught it |
 ---
 
 ## 🧭 Contents
