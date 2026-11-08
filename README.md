@@ -37,17 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v411 — the README, audited 📖
+### 🆕 v412 — Quick start on the first screen 🚀
 
-*The whole document was read against the code. It was not only typos: one section described the proxy as it worked before v408, the test figures came from a suite half this size, and Quick start had drifted 1,300 lines down the page.*
+*The audited README put the on-ramp above Security but still under the Labs walkthroughs — six screenshots deep. It now sits directly below Contents, where a stranger looks first.*
 
 | | |
 |---|---|
-| 🚀 **Quick start, back near the top** | above the Security section, so the first screen has a way in |
-| 🔐 **Security stays high** | one section down, where reviewers reach it before the feature tour |
-| 🌐 **The Proxy section is true again** | LAN endpoints bypass it, clearing writes both sides, and the tab names what it skips (v408–v410) |
-| 🧪 **Numbers re-measured** | 20 PHP files · 1,129 assertions, 24 JS files · 681 assertions, ~38s fresh-copy |
-| ✍️ **Typos and stale paths** | its / veiled / actions, `web.config`, Resource Manager, the architecture tree |
+| 🚀 **Install steps up front** | directly under Contents, before the feature table |
+| 🧪 **The Labs stay put** | Routing chart, Brain Lab, API Lab and the browser still follow *What's inside* |
+| 🔐 **Security is still high** | the very next section, not the appendix |
+| 📖 **The rest of the audit holds** | proxy section, measured figures, refusal codes, typos — see the v411 changelog entry |
 ---
 
 ## 🧭 Contents
@@ -108,6 +107,93 @@ Jump straight to a section — every heading on this page is linkable; these are
 - [🔗 API endpoints](#-api-endpoints)
 - [🧯 Troubleshooting](#-troubleshooting)
 - [📜 License](#-license)
+
+---
+
+## 🚀 Quick start
+
+### 🪟 Windows — one click
+- **`start.bat`** — the one-click launcher. First run installs XAMPP (Apache + PHP only, no MySQL), links this folder into `htdocs\router`, configures Apache, creates the access token, starts it and opens the app. Later runs just start Apache. Use this when several agents run at once: Apache is multi-threaded.
+- **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
+- **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
+
+ 🧵**Autonomous' implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
+ Apache serves many requests at once (a pool of worker processes and threads), so a
+ whole team of agents really does run in parallel. 
+ **Autonomous ships the workaround:** one click installs XAMPP
+ (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
+ app's `.htaccess` needs, links the folder and starts a genuinely concurrent
+ server — **zero configuration, no database, nothing to hand-tune**. That is the
+ mold this project breaks: a multithreaded local server, deployed in one click.
+ (`start-php.bat` remains for the rare machine where Apache cannot run; it is the
+ slow single-threaded fallback.)
+> *PHP's own built-in server is the opposite: `php -S` is a single process,
+> so one streamed model reply holds the only slot for its entire duration while
+> every other agent — and the browser's own state polling — queues behind it until
+> the fetch dies with `NetworkError`. Windows PHP cannot fork, and the usual
+> local Windows PHP setups
+> either accept that limit or expect you to install and hand-edit Apache/FPM
+> yourself. *
+
+### 🐧 Linux / macOS
+```bash
+./start.sh          # or ./start.sh 8090 for another port
+```
+
+### 🌍 Deploying on a real web host (Apache / nginx / IIS)
+
+The one-folder design means `storage/` (the token, provider keys, every session
+and the exec allow/deny lists) lives **inside the app folder**. That folder must
+**never** be reachable over HTTP. Everything here is about keeping it that way. 🔒
+
+The same rules also cover `tests/`: dev tooling that never runs at runtime, but
+that nobody else needs to read either. The full grid — every path against every
+serving mode, dotfiles and case variants included — is in
+**Security & guardrails → §16**, and the rules are **tested by making the real
+request** (§17). 🧪
+
+- 🟡 **Apache** — `storage/.htaccess` and `tests/.htaccess` ship with the app and
+  deny their whole folder (`Require all denied`, with a 2.2 fallback).
+  `./setup-token.sh` **re-creates the storage one if a deploy lost it**. Just make
+  sure `AllowOverride` lets `.htaccess` apply (the XAMPP installer sets this for
+  you). The app root `.htaccess` also refuses `storage`, `logs`, `tmp`, `sessions`
+  and `tests` as a path segment **at any depth** — a backup or archived copy of the
+  app kept inside the web root brings its own `storage/` and `tests/`, and a copy
+  made before `tests/.htaccess` existed would otherwise serve its test files in
+  full. That guard is `RedirectMatch 403` (mod_alias), not a `RewriteRule`: a child
+  `.htaccess` replaces its parent's per-directory rewrites, so a rewrite never sees
+  the nested path, while mod_alias config merges normally.
+- 🔴 **nginx** — **ignores `.htaccess` entirely**, so you *must* add the rules
+  yourself. Ship the included **`nginx.example.conf`** into your `server{}` block
+  (it denies `storage`, `logs`, `tmp`, `sessions` and `tests` as a path segment **at
+  any depth** — so a backup or an archived copy of the app kept inside the web root
+  cannot expose its own `config.json` — plus dotfiles and loose
+  `.json/.log/.ini/.bak/.key/.pem` files), then `nginx -t && systemctl reload nginx`.
+  A file whose *name* merely contains one of those words (`ui/js/storage.js`, `ui/js/tests.js`)
+  is still served.
+- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage` and
+  `tests` segments, e.g.:
+  ```xml
+  <configuration><system.webServer><security><requestFiltering>
+    <hiddenSegments>
+      <add segment="storage" /><add segment="logs" /><add segment="tmp" />
+      <add segment="sessions" /><add segment="tests" />
+    </hiddenSegments>
+  </requestFiltering></security></system.webServer></configuration>
+  ```
+- 🧪 **The PHP built-in server** (`start-php.bat` / `php serve.php`) already
+  refuses `/storage`, `/logs`, `/tmp`, `/sessions`, `/tests` and dotfiles with a
+  `403` — no config needed.
+- ✅ **Verify it, don't assume it.** After any deploy, fetch
+  `https://your-host/router/storage/config.json` **and**
+  `https://your-host/router/tests/js/run.mjs` in a private window. You must get
+  **403 / 404** for both — never JSON or source. If you do, stop and fix the rule
+  above before doing anything else. 🚨
+
+### 🔑 First run
+The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
+
+On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/macOS it opens at `http://127.0.0.1:8080/`. If you miss the token, run `start.bat -Token` to print it again. Nothing ships with keys — add your own providers in the **Providers** tab.
 
 ---
 
@@ -251,93 +337,6 @@ A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 n
 - ⚡ **No multi-second stalls** — DevTools HTTP is read by exact `Content-Length` over a raw socket, navigation returns the moment the page is interactive, and every action is single-flight so a slow page can't stampede the connection pool.
 
 </details>
-
----
-
-## 🚀 Quick start
-
-### 🪟 Windows — one click
-- **`start.bat`** — the one-click launcher. First run installs XAMPP (Apache + PHP only, no MySQL), links this folder into `htdocs\router`, configures Apache, creates the access token, starts it and opens the app. Later runs just start Apache. Use this when several agents run at once: Apache is multi-threaded.
-- **`start-php.bat`** — legacy built-in server (single-threaded). Fine for one agent at a time, or on machines where Apache cannot run.
-- **`setup-xampp.bat`** — repair / advanced installer, used by `start.bat` automatically. Run it directly to reinstall XAMPP or pick another port (`setup-xampp.bat -Port 8090`).
-
- 🧵**Autonomous' implementation of Apache / PHP is not single-threaded — and that is exactly the point.**
- Apache serves many requests at once (a pool of worker processes and threads), so a
- whole team of agents really does run in parallel. 
- **Autonomous ships the workaround:** one click installs XAMPP
- (Apache + PHP only), points it at a free port, loads the `mod_*` modules the
- app's `.htaccess` needs, links the folder and starts a genuinely concurrent
- server — **zero configuration, no database, nothing to hand-tune**. That is the
- mold this project breaks: a multithreaded local server, deployed in one click.
- (`start-php.bat` remains for the rare machine where Apache cannot run; it is the
- slow single-threaded fallback.)
-> *PHP's own built-in server is the opposite: `php -S` is a single process,
-> so one streamed model reply holds the only slot for its entire duration while
-> every other agent — and the browser's own state polling — queues behind it until
-> the fetch dies with `NetworkError`. Windows PHP cannot fork, and the usual
-> local Windows PHP setups
-> either accept that limit or expect you to install and hand-edit Apache/FPM
-> yourself. *
-
-### 🐧 Linux / macOS
-```bash
-./start.sh          # or ./start.sh 8090 for another port
-```
-
-### 🌍 Deploying on a real web host (Apache / nginx / IIS)
-
-The one-folder design means `storage/` (the token, provider keys, every session
-and the exec allow/deny lists) lives **inside the app folder**. That folder must
-**never** be reachable over HTTP. Everything here is about keeping it that way. 🔒
-
-The same rules also cover `tests/`: dev tooling that never runs at runtime, but
-that nobody else needs to read either. The full grid — every path against every
-serving mode, dotfiles and case variants included — is in
-**Security & guardrails → §16**, and the rules are **tested by making the real
-request** (§17). 🧪
-
-- 🟡 **Apache** — `storage/.htaccess` and `tests/.htaccess` ship with the app and
-  deny their whole folder (`Require all denied`, with a 2.2 fallback).
-  `./setup-token.sh` **re-creates the storage one if a deploy lost it**. Just make
-  sure `AllowOverride` lets `.htaccess` apply (the XAMPP installer sets this for
-  you). The app root `.htaccess` also refuses `storage`, `logs`, `tmp`, `sessions`
-  and `tests` as a path segment **at any depth** — a backup or archived copy of the
-  app kept inside the web root brings its own `storage/` and `tests/`, and a copy
-  made before `tests/.htaccess` existed would otherwise serve its test files in
-  full. That guard is `RedirectMatch 403` (mod_alias), not a `RewriteRule`: a child
-  `.htaccess` replaces its parent's per-directory rewrites, so a rewrite never sees
-  the nested path, while mod_alias config merges normally.
-- 🔴 **nginx** — **ignores `.htaccess` entirely**, so you *must* add the rules
-  yourself. Ship the included **`nginx.example.conf`** into your `server{}` block
-  (it denies `storage`, `logs`, `tmp`, `sessions` and `tests` as a path segment **at
-  any depth** — so a backup or an archived copy of the app kept inside the web root
-  cannot expose its own `config.json` — plus dotfiles and loose
-  `.json/.log/.ini/.bak/.key/.pem` files), then `nginx -t && systemctl reload nginx`.
-  A file whose *name* merely contains one of those words (`ui/js/storage.js`, `ui/js/tests.js`)
-  is still served.
-- 🔵 **IIS** — add a `web.config` at the app root that blocks the `storage` and
-  `tests` segments, e.g.:
-  ```xml
-  <configuration><system.webServer><security><requestFiltering>
-    <hiddenSegments>
-      <add segment="storage" /><add segment="logs" /><add segment="tmp" />
-      <add segment="sessions" /><add segment="tests" />
-    </hiddenSegments>
-  </requestFiltering></security></system.webServer></configuration>
-  ```
-- 🧪 **The PHP built-in server** (`start-php.bat` / `php serve.php`) already
-  refuses `/storage`, `/logs`, `/tmp`, `/sessions`, `/tests` and dotfiles with a
-  `403` — no config needed.
-- ✅ **Verify it, don't assume it.** After any deploy, fetch
-  `https://your-host/router/storage/config.json` **and**
-  `https://your-host/router/tests/js/run.mjs` in a private window. You must get
-  **403 / 404** for both — never JSON or source. If you do, stop and fix the rule
-  above before doing anything else. 🚨
-
-### 🔑 First run
-The launchers install PHP + the extensions it needs (curl, openssl, mbstring, fileinfo, zip) without touching your own `php.ini`, bundle CA certs so HTTPS verifies, and print an **access token** once. Paste it into **Config → Access token** in the app — it saves on paste (there's no SAVE for that field, on purpose).
-
-On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/macOS it opens at `http://127.0.0.1:8080/`. If you miss the token, run `start.bat -Token` to print it again. Nothing ships with keys — add your own providers in the **Providers** tab.
 
 ---
 

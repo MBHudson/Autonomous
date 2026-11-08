@@ -84,6 +84,12 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🚀 Quick start on the first screen *(`VERSION` 412, no browser file changed)*
+
+*`VERSION` 411 put the on-ramp above the Security section, which fixed the ordering but not the distance: Contents, the feature table and the four Labs walkthroughs -- with six screenshots between them -- still stood in front of the first instruction. Measured on the rendered page that was several screens of images before anyone learned how to start the app, which is the one thing a README cannot afford to hide.*
+
+Quick start now sits directly under Contents, before *What's inside*. The Labs stay exactly where they were, immediately after the feature table; Security remains the section right after Quick start rather than being demoted to the end.
+
 ## 📖 The README, audited *(`VERSION` 411, no browser file changed)*
 
 *2026-11-08. The document was read line by line against the code. The typos were the least of it: one section described the proxy as it worked before v408, the test figures came from a suite half this size, and Quick start had ended up 1,300 lines down the page, behind the whole feature tour.*
