@@ -19,6 +19,22 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧠 A model's musings are not a to-do list *(`VERSION` 388, cache-buster v387 → v388)*
+
+*2026-11-08. A local agent asked to list the agents ran `list_agents` three times and then an `echo` nobody asked for. The roster was fine: the model was explaining tool-call syntax in its own thinking, and every example it wrote -- `{"tool":"list_agents","arg":{}}`, `{"tool":"echo",...}` -- was parsed as a real call and executed.*
+
+**The reasoning channel is a rescue, not a source.** `parseToolCalls(text, fallback)` mined the fallback whenever the reply itself parsed to no call, prose or not. The rescue exists for the model that thinks the call instead of sending it, and that model's reply is empty; a model that writes "to call `list_agents` I send ..." was writing an illustration, and it ran.
+
+**Prose closes the door.** The parser now checks `stripToolCall(text).trim()` before touching the fallback: if anything is left after the tool-call markup is cut out, the reply said something of its own and its thinking is not a call. Whitespace, an empty string, or a reply that is nothing but markup still gets the rescue, which is exactly the shape that needs it. Because the rule lives in the parser, native calls, the prompt dialects, the near-miss repair and the narration retry all obey it.
+
+**What it costs.** A turn that used to repeat a tool now answers; each phantom call had also spent one of the step budget and posted a result the operator did not ask for, which is what made a simple roster request read as a malfunction.
+
+**Tests and docs.** `tests/js/toolCalls.test.mjs` replaces the old "prose text + fallback parses" case with six: prose stops the fallback, a stray `\boxed{think}` answer stops it, a mused-about call inside prose does not revive it, an empty reply still gets it, no text still gets it, and a real call in the reply is used without consulting the channel. README: the **What's new** entry for v388 (replacing v387, whose panel fix stays in this file) and a bullet in *Dynamic tools & the learned dialect*.
+
+**Still true.** `think` remains a real tool with a private scratchpad result, and the narration rescue still nudges a model that describes a call instead of sending one.
+
+---
+
 ## 🧠 A thought that ends in the answer is still a thought *(`VERSION` 387, cache-buster v385 → v387)*
 
 *2026-11-08. The reasoning box filled while the model thought and then emptied itself the moment the answer landed. The text was not lost -- the copy button still produced it -- but the renderer refused to draw it, and a turn that ran for several rounds kept only the last round's thinking.*

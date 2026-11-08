@@ -37,17 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v387 — the thought you watched is still there 🧠
+### 🆕 v388 — a model's musings aren't a to-do list 🧠
 
-*The reasoning box filled while the model thought and then emptied itself the moment the answer landed. The text was not lost — the copy button still produced it — but the renderer refused to draw it, and a turn that kept working for several rounds kept only the last round's thinking.*
+*Asking a local agent to list the agents ran `list_agents` three times, then an `echo` nobody asked for. Nothing was wrong with the roster: the model was explaining tool-call syntax inside its own thinking, and every example it wrote — `{"tool":"list_agents","arg":{}}` — was parsed as a real call and executed.*
 
 | | |
 |---|---|
-| 🔍 **The echo rule was too eager** | It hid the panel whenever either string contained the other, so a short answer that appears anywhere inside a long trace — a local model's `\boxed{think}`, a phrase the model reused — counted as "the reasoning is just the reply" and deleted the whole panel at commit |
-| ↔️ **One direction, with a size** | `isReasoningEcho()` hides only an identical trace, the reply plus up to 120 characters of wrapper, or reasoning that is most of a longer reply. A short answer inside a long trace is thinking, and the panel stays |
-| 🔁 **Every round keeps its share** | The trace is seeded from the live bubble between rounds, the way the prose already was, so a tool-heavy turn shows all of its thinking instead of the last round's |
-| 💭 **Thoughts-only replies keep the box** | An empty reply used to suppress the panel too — the one case where the panel is all there is |
-| ✅ **Guarded** | `tests/js/reasoningPanel.test.mjs` covers all of it, including the case that broke: a long trace whose answer is `\boxed{think}` |
+| 🔇 **Prose means no mining** | The reasoning channel is read for a call only when the reply itself says nothing. A model that thinks the call instead of sending it is still rescued; a model that explains the syntax no longer has its own examples run |
+| 🧾 **Examples stay examples** | The decision lives in `parseToolCalls`, so native calls, every prompt dialect, the near-miss repair and the rescue retry all obey it |
+| 💸 **The budget stops leaking** | Each phantom call spent a step and posted a result the operator never asked for; a turn that repeated itself now answers instead |
+| ✅ **Guarded** | `tests/js/toolCalls.test.mjs` covers prose stopping the fallback, the stray `\boxed{think}` answer, the empty reply that still gets the rescue, and a real call that ignores the channel |
 
 ---
 
@@ -614,6 +613,7 @@ No two models are alike — and the **free** ones are the fussiest of all. 🔧 
 - 🌍 **Speaks the model's language** — OpenAI-style JSON, Claude XML, native tags or plain JSON, detected from the provider + model id (or forced per agent).
 - 🛟 **One rescue retry** — if a reply *looks* like a tool call but parses to nothing, the loop re-teaches **once** with a different dialect instead of letting the near-miss become the answer.
 - 🩹 **Near misses are read, not dropped** — a guessed name (`list_agent` for `list_agents`, `Read-File`, `read_fil`, `functions.read_file`) is repaired to the tool it meant, and a guessed wrapper (`<|begin|> … <|end|>`, `<begin> … </begin>`, `<|tool|> … <|/tool|>`) parses exactly like `<|tool_call|>`. An invented name and a fence full of prose are still refused.
+- 🔇 **Thinking is not a to-do list** — a call is only read out of the model's reasoning channel when the reply itself says nothing. A model that thinks the call instead of sending it is still rescued; a model that explains the syntax (`{"tool":"list_agents"}`) no longer has its own examples executed, which used to run the same tool repeatedly.
 - 🧠 **Learns the winner** — once a call parses, the dialect that worked is remembered per `provider + model` and tried first next time.
 - 🛑 **Off in one click** — Config → Labs → *Dynamic tools* restores the classic behaviour exactly, if you ever want it.
 

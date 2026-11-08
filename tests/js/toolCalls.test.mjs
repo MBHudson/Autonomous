@@ -52,12 +52,22 @@ console.log('-'.repeat(60));
   eq(calls[0].tool, 'list_agents', 'prose-wrapped call names the tool');
 }
 {
-  // The reasoning-channel fallback still works when the text holds nothing.
-  const calls = parseToolCalls(
-    'I will call the tool now.',
-    '{"tool":"recall"}'
-  );
-  eq(calls.length, 1, 'fallback reasoning parses');
+  // The reasoning-channel fallback is for a reply that said NOTHING of its own.
+  // Prose means the channel is being mined for musings, and a model's musings
+  // contain example JSON -- running those calls the same tool repeatedly.
+  eq(parseToolCalls('I will call the tool now.', '{"tool":"recall"}').length, 0,
+    'prose in the reply stops the reasoning fallback');
+  eq(parseToolCalls('Final Answer: \\boxed{think}', '{"tool":"list_agents","arg":{}}').length, 0,
+    'a stray answer stops the reasoning fallback');
+  eq(parseToolCalls('I will explain the syntax first.',
+    '{"tool":"list_agents"}\n{"tool":"echo","arg":"hi"}').length, 0,
+    'examples in the reasoning do not run beside a prose reply');
+  eq(parseToolCalls('   \n', '{"tool":"recall"}').length, 1,
+    'an empty reply still gets the reasoning fallback');
+  eq(parseToolCalls('', '{"tool":"recall"}').length, 1,
+    'no text at all still gets the reasoning fallback');
+  eq(parseToolCalls('{"tool":"read_file","arg":{"path":"x"}}', '{"tool":"recall"}').length, 1,
+    'a real call is used and the reasoning fallback is not consulted');
 }
 
 // --- argv leniency ---------------------------------------------------------------

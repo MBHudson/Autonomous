@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=387';
-import { asText, compactText } from './utils.js?v=387';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=387';
-import { settingFor } from './agentConfig.js?v=387';
-import { trace } from './trace.js?v=387';
+import { store } from './store.js?v=388';
+import { asText, compactText } from './utils.js?v=388';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=388';
+import { settingFor } from './agentConfig.js?v=388';
+import { trace } from './trace.js?v=388';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1987,9 +1987,23 @@ export function parseToolCalls(text, fallback) {
     if (!span) break;
     rest = rest.slice(0, span[0]) + ' ' + rest.slice(span[1]);
   }
+  // The fallback is the reasoning channel, and reaching into it is a rescue for
+  // a reply that said NOTHING of its own -- a model that thinks the call
+  // instead of sending it. It must not run when the reply has prose.
+  //
+  // A thinking model narrates its own syntax: "to call list_agents I send
+  // {\"tool\":\"list_agents\",\"arg\":{}}". Mining those musings executed the
+  // examples, so a turn ran the same tool over and over -- and repeated calls
+  // are not free: each one spends a step of the budget and answers the operator
+  // with a result they did not ask for. Only an empty reply (whitespace, or
+  // tool-call markup with no prose around it) still gets the rescue, which is
+  // exactly the shape that needs it.
   if (!out.length && fallback && fallback !== text) {
-    const call = _parseToolCall(fallback);
-    if (call) out.push(call);
+    const saidSomething = stripToolCall(text).trim().length > 0;
+    if (!saidSomething) {
+      const call = _parseToolCall(fallback);
+      if (call) out.push(call);
+    }
   }
   return out;
 }
