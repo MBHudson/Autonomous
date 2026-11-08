@@ -37,16 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v412 — Quick start on the first screen 🚀
+### 🆕 v413 — “Is it safe?”, answered up front 🔒
 
-*The audited README put the on-ramp above Security but still under the Labs walkthroughs — six screenshots deep. It now sits directly below Contents, where a stranger looks first.*
+*Reviewers kept reaching the end without finding the security section, and filling the gap with the worst assumption. This puts the answer two screens above it, in the eight lines people actually ask about.*
 
 | | |
 |---|---|
-| 🚀 **Install steps up front** | directly under Contents, before the feature table |
-| 🧪 **The Labs stay put** | Routing chart, Brain Lab, API Lab and the browser still follow *What's inside* |
-| 🔐 **Security is still high** | the very next section, not the appendix |
-| 📖 **The rest of the audit holds** | proxy section, measured figures, refusal codes, typos — see the v411 changelog entry |
+| 🔒 **Eight assumptions, answered** | no accounts or analytics, nothing ships with a key, no CORS wildcard, argv not a shell, secrets refused even inside a root, private hosts blocked, dangerous tools off by default, guards tested by real requests |
+| ⚖️ **The caveat stays honest** | it is not a fence around the operator — the table says what it does not cover |
+| 🧭 **Now in Contents** | under *Start here*, with Quick start first, in the order the page actually reads |
 ---
 
 ## 🧭 Contents
@@ -55,11 +54,12 @@ Jump straight to a section — every heading on this page is linkable; these are
 
 **🚀 Start here**
 
+- [🚀 Quick start](#-quick-start)
+- [🔒 Is it safe?](#-is-it-safe)
 - [🆕 What's new](#-whats-new)
 - [✨ What's inside](#-whats-inside)
 - [🖥️ Two interfaces, one switch](#️-two-interfaces-one-switch)
 - [🎛️ Config → Desktop](#️-config--desktop--the-machine-room-card)
-- [🚀 Quick start](#-quick-start)
 
 **🧠 Using the studio**
 
@@ -197,6 +197,24 @@ On Windows the app opens at `http://localhost:8080/router/` (Apache); on Linux/m
 
 ---
 
+## 🔒 Is it safe?
+
+Short answer: it runs on your machine, against your keys, and every dangerous capability is off until you switch it on. The full argument is [Security & guardrails](#-security--guardrails--safe-by-construction-️) below — this is the answer to what people assume before they read it.
+
+| If you assumed | What is actually true |
+| --- | --- |
+| 💸 “It phones home, or needs an account” | No accounts, no cloud service, no analytics. Plain PHP and static files on your own host; the only outbound calls are the provider endpoints **you** configure. |
+| 🔑 “It ships with someone's keys” | Nothing ships with a token or a key, and a fresh copy **refuses to serve** (`503`) until `./setup-token.sh` creates one. |
+| 🌍 “Any website can drive it” | Every API route is token-gated, CORS has **no wildcard**, and a copy with no token answers `403` to anything not on this machine. |
+| 🐚 “The model gets a shell” | `exec` takes an **argv array** — no `sh -c`, no pipes, no redirects — matched against your allowlist *and* denylist, and it **asks first**. |
+| 🗝️ “It can read my secrets” | Every path resolves through the jail, and `storage/`, `.env*`, `*.pem`, `*.key` and dotfiles are refused **even inside** an allowed root. |
+| 🌐 “It can reach my network” | `fetch_url` and `http_request` refuse private and cloud-metadata hosts; the built-in browser enforces a block list on **every** navigation. |
+| 🟢 “It ships switched on” | `exec`, `run_code`, the browser and the MCP server are **off by default**, auto-approve is off, and a global deny button sits in front of every write. |
+| 🧪 “Those guards are just prose” | Each is tested by making the real request — `guards`, `apacheGuards`, `nginxGuards`, `secrets`, `programs`, `tls` — in the suite you can run yourself. |
+
+> ⚖️ **What it is not:** a fence around the operator. Turn everything on, auto-approve writes and point the root at `/`, and you have built a very capable foot-gun. The design makes the safe choice the **default**, not mandatory — and it cannot read your mind. 💙
+
+---
 ## ✨ What's inside
 
 | | |

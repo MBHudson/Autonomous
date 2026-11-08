@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔒 "Is it safe?", answered up front *(`VERSION` 413, no browser file changed)*
+
+*The security section is long, deliberate and, by the account of the people leaving reviews, unread. The assumptions arrived first and filled the space: that it phones home, ships with keys, hands the model a shell, or can read the token. Each of those is answered in one line inside the section nobody got to, which is the wrong place for the answer to a question asked before reading.*
+
+The README now carries a short table under the on-ramp: eight assumptions beside what is actually true, each pointing at the mechanism (`503` before a token, argv instead of a shell, protected paths inside an allowed root, the block list on every navigation, the suites that make the real request). It ends with the caveat the section already made -- it is not a fence around the operator -- so the summary cannot be quoted as a claim the app does not support.
+
+Contents gained the entry, and *Start here* now lists sections in the order the page reads them, with Quick start first.
+
 ## 🚀 Quick start on the first screen *(`VERSION` 412, no browser file changed)*
 
 *`VERSION` 411 put the on-ramp above the Security section, which fixed the ordering but not the distance: Contents, the feature table and the four Labs walkthroughs -- with six screenshots between them -- still stood in front of the first instruction. Measured on the rendered page that was several screens of images before anyone learned how to start the app, which is the one thing a README cannot afford to hide.*
