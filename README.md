@@ -37,16 +37,16 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v390 — every extra model call has a reason beside it 🧾
+### 🆕 v391 — “`[called exec]`” was never an answer 🧾
 
-*When a turn made four model calls for one question, the Runs tab showed four identical `model` rows. The narration nudge, the dialect retry after a near-miss and the empty-reply retry each spend a whole request, and each left nothing behind to say why.*
+*Ask for a file and the reply was `[called exec]`. That string was the app's own note-to-itself — the stand-in text it handed the model for a tool call made without words — and the model learned to send it back as the answer. The turn ended with a caption where the result should be.*
 
 | | |
 |---|---|
-| 🧾 **Nudges are rows now** | `note` events named `nudge — narration`, `nudge — dialect` and `nudge — empty reply`, each stamped with the agent, the model and the step |
-| 💬 **With what caused it** | The narration row carries the sentence the model wrote instead of a call; the dialect row names the format it was retried in; the empty row keeps the upstream finish reason |
-| 🔗 **In sequence** | The note lands between the two `model` rows it explains, so a turn's cost reads end to end instead of being summed |
-| ✅ **No new machinery** | Same in-memory ring buffer, same Runs tab — the note is a label and a detail line on a row that already existed |
+| 🚫 **No more fabricated turns** | A call with no prose now enters the conversation as the call itself, `{"tool":"exec","arg":{…}}`, instead of `[called exec]` — nothing plausible for a model to parrot back |
+| 📄 **The result is the reply** | A turn that ends on tool calls answers with the last tool's output, whitespace collapsed and cut at 600 characters, instead of “finished after running N tool calls” |
+| 🧹 **A stored echo heals** | Content that is nothing but `[called x]` is treated as no answer, so a message already saved that way re-renders as the tool-result notice |
+| ✅ **Guarded** | `tests/js/finalMessage.test.mjs` pins the placeholder rule, the last-result excerpt, the cutting and the whitespace collapsing |
 
 ---
 

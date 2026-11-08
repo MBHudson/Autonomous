@@ -19,6 +19,22 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🧾 "[called exec]" was never an answer *(`VERSION` 391, cache-buster v390 → v391)*
+
+*2026-11-08. Ask a local agent to make a file and the reply was `[called exec]`. That string is the app's own stand-in -- the text it gave the model for a tool call made without words -- and the model learned to send it back as the answer, so the turn ended with a caption where the result belonged.*
+
+**Why the app wrote it.** When a step returns tool calls and no prose, the loop still needs an assistant turn for the following `TOOL_RESULT` to attach to, so it invented `[called ${tool}]`. Fabricated text in a transcript is text a model can imitate, and this one did.
+
+**The call, not a caption.** That assistant turn now carries the call itself -- `{"tool":"exec","arg":{...}}` -- which is the shape the prompt dialect already teaches and not something a model would mistake for its answer.
+
+**The result becomes the reply.** A turn that ends on tool calls used to commit "Finished after running 2 tool calls without writing an answer", which said nothing about whether the file existed. `finishedWithoutAnswer()` in `ui/js/utils.js` appends the last call's output, whitespace collapsed and cut at `TOOL_RESULT_NOTICE_CHARS` (600), so `exec -> <stdout or the refusal>` reaches the transcript.
+
+**A stored placeholder heals.** `isPlaceholderReply()` refuses content that is nothing but `[called x]`, in `_finalMsg` and in the streamed fallback, so a message already saved that way renders as the tool-result notice instead.
+
+**Tests and docs.** New `tests/js/finalMessage.test.mjs` covers the placeholder rule (including `I called exec and it failed`, which is a real reply), the singular/plural notice, that only the LAST result is shown, the empty and whitespace-only cases, the 600-character cut, and whitespace collapsing. README: the **What's new** entry for v391 (replacing v390, which stays in this file).
+
+---
+
 ## 🧾 Every extra model call has a reason beside it *(`VERSION` 390, cache-buster v389 → v390)*
 
 *2026-11-08. A turn that made four model calls for one question looked identical in the run trace to one that made two: the narration nudge, the dialect retry after a near-miss and the empty-reply retry each spend a full request and left nothing behind to say why.*

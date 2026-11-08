@@ -65,6 +65,45 @@ export function isReasoningEcho(reasoning, content) {
   return c.includes(r) && r.length >= c.length * 0.6;
 }
 
+/** Characters of a tool result that ride along in a no-answer notice. */
+export const TOOL_RESULT_NOTICE_CHARS = 600;
+
+/**
+ * Is this reply nothing but the harness's own call placeholder?
+ *
+ * A tool call with no prose used to enter the conversation as `[called exec]`
+ * so the following TOOL_RESULT had an assistant turn to attach to. Fake text in
+ * a transcript is text a model can imitate, and one did: it answered with the
+ * placeholder. Such a reply is not an answer, and a message already stored that
+ * way should render as the tool-result notice instead.
+ */
+export function isPlaceholderReply(text) {
+  return /^\[called[ \t]+[A-Za-z0-9_.:-]+\]$/.test(String(text ?? '').trim());
+}
+
+/**
+ * The reply for a turn that ran tools and never wrote an answer.
+ *
+ * "Finished after running 2 tool calls" told the operator nothing about whether
+ * the work happened, while the answer was sitting in the last tool's result.
+ * That result is included -- whitespace collapsed, cut at
+ * TOOL_RESULT_NOTICE_CHARS -- so `exec -> <stdout or refusal>` reaches the
+ * transcript instead of a shrug.
+ */
+export function finishedWithoutAnswer(calls) {
+  const list = Array.isArray(calls) ? calls.filter(Boolean) : [];
+  if (!list.length) return 'The agent finished without writing a reply.';
+  const n = list.length;
+  const head = `Finished after running ${n} tool call${n === 1 ? '' : 's'} without writing an answer.`;
+  const last = list[n - 1];
+  const detail = String(last && last.result != null ? last.result : '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!detail) return head;
+  const name = String((last && last.tool) || 'tool');
+  return `${head}\n\n${name} → ${detail.slice(0, TOOL_RESULT_NOTICE_CHARS)}`;
+}
+
 /**
  * Rough token estimate for budgeting. Deliberately conservative: prose is
  * usually ~4 chars/token, but code and JSON tokenize denser, and non-ASCII

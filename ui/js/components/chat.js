@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=390';
-import { K as STORAGE_K } from '../storage.js?v=390';
+import { store } from '../store.js?v=391';
+import { K as STORAGE_K } from '../storage.js?v=391';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,27 +20,27 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=390';
-import { persistence } from '../persistence.js?v=390';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault } from '../utils.js?v=390';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=390';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=390';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=390';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=390';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=390';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=390';
-import { usageFor } from '../rateGovernor.js?v=390';
-import { trace } from '../trace.js?v=390';
-import { latency } from '../latency.js?v=390';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=390';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=390';
-import { SlashCommands } from '../slashCommands.js?v=390';
-import { parseRoute, routingHelp } from '../routing.js?v=390';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=390';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=390';
-import { MessageRenderer, renderToolCalls } from './message.js?v=390';
-import { createAvatar } from './avatar.js?v=390';
-import * as comms from '../commsLog.js?v=390';
+import { api, errText } from '../api.js?v=391';
+import { persistence } from '../persistence.js?v=391';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer } from '../utils.js?v=391';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=391';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=391';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY } from '../tools.js?v=391';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=391';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=391';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=391';
+import { usageFor } from '../rateGovernor.js?v=391';
+import { trace } from '../trace.js?v=391';
+import { latency } from '../latency.js?v=391';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=391';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=391';
+import { SlashCommands } from '../slashCommands.js?v=391';
+import { parseRoute, routingHelp } from '../routing.js?v=391';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=391';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=391';
+import { MessageRenderer, renderToolCalls } from './message.js?v=391';
+import { createAvatar } from './avatar.js?v=391';
+import * as comms from '../commsLog.js?v=391';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1262,17 +1262,18 @@ _makeLiveNode(agent) {
   _finalMsg(node, msg) {
     const m = msg || { role: 'agent', timestamp: Date.now() };
     if (m.role !== 'agent') return m;
-    if (asText(m.content).trim()) return m;
+    // A reply that is only `[called exec]` is the harness's own placeholder
+    // echoed back, not an answer: it says nothing about what the tool returned
+    // and reads as the turn having gone nowhere. Treated as no content, below.
+    if (asText(m.content).trim() && !isPlaceholderReply(m.content)) return m;
     const streamed = asText(node && node.turnProse).trim();
-    if (streamed) return { ...m, content: streamed };
+    if (streamed && !isPlaceholderReply(streamed)) return { ...m, content: streamed };
     const calls = (Array.isArray(m.toolCalls) && m.toolCalls.length)
       ? m.toolCalls
       : ((node && Array.isArray(node.toolCalls)) ? node.toolCalls : []);
-    if (calls.length) {
-      const n = calls.length;
-      return { ...m, content: `Finished after running ${n} tool call${n === 1 ? '' : 's'} without writing an answer.` };
-    }
-    return { ...m, content: 'The agent finished without writing a reply.' };
+    // The tool's own output, not a count of calls: whether the file was created
+    // is in the result, and that is the thing the operator asked for.
+    return { ...m, content: finishedWithoutAnswer(calls) };
   }
 
   /**
@@ -2151,7 +2152,13 @@ _makeLiveNode(agent) {
         // Native calls often have no prose alongside them. Give the model a
         // short assistant turn so the following TOOL_RESULT has something to
         // attach to; otherwise the message list starts with a user result.
-        const assistantText = (ci === 0 && chunk) ? chunk : `[called ${call.tool}]`;
+        // The call itself, never a caption: `[called exec]` was fabricated text
+        // the model could imitate, and a local model duly answered with it. The
+        // JSON is the shape the prompt dialect already teaches, so it reads as a
+        // call rather than as something worth repeating.
+        const assistantText = (ci === 0 && chunk)
+          ? chunk
+          : JSON.stringify({ tool: call.tool, arg: call.arg ?? {} });
         exchanges.push({ role: 'assistant', content: assistantText });
         exchanges.push({
           role: 'user',
