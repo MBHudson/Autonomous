@@ -37,15 +37,15 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v377 — a Reasoning switch in Config, so the default need not be taught by clicking 🎛️
+### 🆕 v378 — the Config switch follows a hand-toggled panel 🎛️
 
-*The panel remembered clicks, but the only way to set it was to open or close a message and hope the next reply followed. It is a switch in Config → Interface now, with Auto kept as a choice of its own.*
+*The switch could set the preference, but not read it back: opening a panel by hand while Config was on screen left the dropdown describing the old choice until the section was reopened.*
 
 | | |
 |---|---|
-| 🎛️ **Auto · Always open · Collapsed** | Config → Interface sets how every Reasoning panel starts — **Auto** keeps the length rule (400 characters or more opens), **Always open** shows every trace in full, **Collapsed** keeps the transcript flat. Written at once, no SAVE, and it survives a reload |
-| 🖱️ **A click still wins** | Opening or closing one panel teaches the app the way it always did — that click is saved as your choice — so the switch and the panels never disagree |
-| 📖 **Auto stays reachable** | Choosing **Auto** puts the length rule back, so pinning a preference once does not cost you the behaviour that opens long thinking by itself — and a panel opened mid-stream is still not flipped back by the next token |
+| 🔄 **One setting, followed live** | The dropdown subscribes to `settings.reasoningOpen`, so a panel opened or closed by hand updates the switch and its state label on the spot — both write the same key, and neither can now describe the other wrongly |
+| 🧹 **No pile-up** | Config → Interface rebuilds its markup every time it opens, so the previous subscription is dropped before a new one is made: reopening the tab fifty times leaves one listener, not fifty |
+| 🎛️ **Auto · Always open · Collapsed** | The three choices are unchanged: **Auto** opens a trace of 400 characters or more, **Always open** shows every one, **Collapsed** keeps the transcript flat — written at once, no SAVE, and a hand toggle is still saved as your choice |
 
 ---
 

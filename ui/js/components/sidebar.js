@@ -10,19 +10,19 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=377';
-import { K } from '../storage.js?v=377';
-import { persistence } from '../persistence.js?v=377';
-import { api } from '../api.js?v=377';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=377';
-import { errText } from '../api.js?v=377';
-import { TOOL_REGISTRY } from '../tools.js?v=377';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=377';
-import { snapshot } from '../rateGovernor.js?v=377';
-import { resetBrowserEnabled } from '../toolManifest.js?v=377';
-import { perf } from '../perf.js?v=377';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=377';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=377';
+import { store } from '../store.js?v=378';
+import { K } from '../storage.js?v=378';
+import { persistence } from '../persistence.js?v=378';
+import { api } from '../api.js?v=378';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=378';
+import { errText } from '../api.js?v=378';
+import { TOOL_REGISTRY } from '../tools.js?v=378';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=378';
+import { snapshot } from '../rateGovernor.js?v=378';
+import { resetBrowserEnabled } from '../toolManifest.js?v=378';
+import { perf } from '../perf.js?v=378';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=378';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=378';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1420,7 +1420,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Reasoning panels <span class="form-hint-inline">${reasoningMode === 'auto' ? 'automatic' : (reasoningMode === 'open' ? 'always open' : 'collapsed')}</span></label>
+          <label class="form-label">Reasoning panels <span class="form-hint-inline" id="sbReasoningPanelHint">${reasoningMode === 'auto' ? 'automatic' : (reasoningMode === 'open' ? 'always open' : 'collapsed')}</span></label>
           <select class="form-select" id="sbReasoningPanel">
             <option value="auto" ${reasoningMode === 'auto' ? 'selected' : ''}>Auto — open when the thinking is long (400+ characters)</option>
             <option value="open" ${reasoningMode === 'open' ? 'selected' : ''}>Always open — every trace in full</option>
@@ -2065,6 +2065,22 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         type: 'info',
       });
     });
+
+    // A panel toggled by hand writes the same setting, so follow the store
+    // rather than the click: this section is rebuilt on every open, and the
+    // previous listener is dropped first so they cannot pile up.
+    const paintReasoningMode = (val) => {
+      const select = document.getElementById('sbReasoningPanel');
+      if (!select) return;
+      const mode = val === true ? 'open' : (val === false ? 'closed' : 'auto');
+      if (select.value !== mode) select.value = mode;
+      const hint = document.getElementById('sbReasoningPanelHint');
+      if (hint) {
+        hint.textContent = mode === 'auto' ? 'automatic' : (mode === 'open' ? 'always open' : 'collapsed');
+      }
+    };
+    if (this._reasoningSub) this._reasoningSub();
+    this._reasoningSub = store.subscribe('settings.reasoningOpen', paintReasoningMode);
 
     this._initToggle('sbAutoScroll', (val) => store.set('settings.autoScroll', val));
     this._initToggle('sbEnterToSend', (val) => store.set('settings.enterToSend', val));

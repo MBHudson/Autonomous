@@ -17,6 +17,18 @@ reads and compares alongside that cache-buster — see the first entry below.
 
 ---
 
+## 🎛️ The Reasoning switch follows a hand-toggled panel *(`VERSION` 378, cache-buster v377 → v378)*
+
+*2026-11-08. The switch could set the Reasoning preference but not read it back: opening or closing a message panel while Config was on screen left the dropdown describing the old choice until the section was reopened.*
+
+**Followed, not polled.** The dropdown subscribes to `settings.reasoningOpen` and repaints both the select and its state label from the value, whichever side wrote it -- the Config control or a click on a panel. `renderConfig()` rewrites its own markup on every open, so `_reasoningSub` unwinds the previous listener before subscribing again; adding one per render would have fired dozens of times against detached nodes.
+
+**Unchanged.** Auto still opens at 400+ characters of reasoning, always open and always collapsed still pin every message, a hand toggle is still saved as the preference, and nothing re-renders an already-painted message when the switch changes.
+
+**Tests.** `tests/js/reasoningPanel.test.mjs` covers `reasoningOpenByDefault` for all three states; the subscription is DOM wiring, checked by `node --check` and a read of the render path rather than by a browser run.
+
+---
+
 ## 🎛️ A Reasoning switch in Config → Interface *(`VERSION` 377, cache-buster v376 → v377)*
 
 *2026-11-08. The panel remembered clicks, so the only way to set it was to open or close a message and hope the next reply followed -- no way to say "always open" on purpose, and no way back to the length rule once a click had been made.*
