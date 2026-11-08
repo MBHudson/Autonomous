@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=406';
-import { acquire, note429 } from './rateGovernor.js?v=406';
-import { latency } from './latency.js?v=406';
-import { detectFamily, outputText, outputUsage } from './harness.js?v=406';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=406';
+import { store } from './store.js?v=407';
+import { acquire, note429 } from './rateGovernor.js?v=407';
+import { latency } from './latency.js?v=407';
+import { detectFamily, outputText, outputUsage } from './harness.js?v=407';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=407';
 
 latency.bindStore(store);
 
@@ -133,12 +133,31 @@ class ApiClient {
       // A non-JSON body (data.raw set) is almost always an HTML error page from
       // the web server, not our API. Never dump that wall of markup into the UI.
       const nonJson = data && data.raw !== undefined;
-      const err = new Error(res.status === 401
+      // The token gate refuses in two shapes. A wrong or missing token is a 401;
+      // with the gate switched off, a request arriving from any address but this
+      // machine gets 403 "local requests only". On a phone that is every call,
+      // and the bare phrase sent the operator hunting for a broken model server
+      // while the server's own `detail` already named the fix.
+      const localOnly = res.status === 403 && !nonJson
+        && /local requests only/i.test(String((data && data.error) || ''));
+      if (localOnly) {
+        // Same recovery UI a 401 raises: the banner taps through to Config,
+        // where the token field is.
+        try { store.emit('token:required'); } catch { /* no store */ }
+      }
+      let message = res.status === 401
         ? 'Access token required or wrong — set it in Config'
         : (errText(data.error)
             || (nonJson
               ? `API ${res.status}: the server sent a web page instead of JSON — check the app URL and API path`
-              : `API ${res.status}`)));
+              : `API ${res.status}`));
+      // A refusal that comes with an explanation is the server telling the
+      // operator how to fix it. Dropping the detail left two words and no way to
+      // learn that setting a token was what unblocked it.
+      const detail = !nonJson && data && typeof data.detail === 'string'
+        ? data.detail.trim() : '';
+      if (detail && !message.includes(detail)) message += ` — ${detail}`;
+      const err = new Error(message);
       // Carry the status so callers can tell "slow down" (429) from "the key
       // is wrong, retrying is pointless" (401/403) instead of regex-matching
       // the message.
@@ -703,6 +722,19 @@ class ApiClient {
       // setup problem, not a hiccup: show its message as-is and don't retry.
       let parsed = null;
       try { parsed = JSON.parse(detail); } catch { /* not JSON */ }
+      // The same gate, in the path chat tries FIRST for every agent. With the
+      // token gate off, any address but this machine gets 403 "local requests
+      // only": on a phone that is the whole app, and "Stream request failed
+      // (HTTP 403)" reads as a dead model server rather than a door held shut.
+      // Raise the token UI and carry the server's own sentence, which names it.
+      if (res.status === 403 && parsed
+          && /local requests only/i.test(String(parsed.error || ''))) {
+        try { store.emit('token:required'); } catch { /* no store */ }
+        const e = new Error(String(parsed.detail || parsed.error || 'local requests only'));
+        e.status = 403;
+        e.retryable = false;
+        throw e;
+      }
       if (parsed && parsed.code === 'curl_missing') {
         const e = new Error(String(parsed.error));
         e.status = res.status;

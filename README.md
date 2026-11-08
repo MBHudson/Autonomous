@@ -37,17 +37,17 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v406 — the first call fixes the binding itself ⚡
+### 🆕 v407 — a refusal that says what to do 📵
 
-*The boot bind is one shot in `app.js`. When it threw partway, every tool after the failure kept its placeholder, and the first call to one of them spent a whole model step learning "reload the page".*
+*With the token gate off, the server answers only this machine; anything else gets `403 local requests only`. A phone is anything else, so every call fails — and the UI showed a status code, which reads as a dead model server.*
 
 | | |
 |---|---|
-| ⚡ **The first call repairs it** | `runTool()` spots a tool still on its placeholder and binds before the policy check, so the call you approved is the call that runs |
-| 🧠 **The client is remembered** | The binder keeps the API client it was handed, so a boot attempt that threw partway still leaves one in hand |
-| 🚫 **Once, never on a loop** | One automatic attempt per page; with no client, or after a failure, the call fails loudly with the same marker as before |
-| 🧹 **Warnings follow the repair** | A successful auto-bind emits `sandbox:bound`, so the transcript re-checks the jail and drops warnings that are no longer true |
-| ✅ **Guarded** | `sandboxBinding.test.mjs` covers no client, one repair, and the refusal to try twice |
+| 📵 **Two refusals, one door** | A wrong token is a 401; the gate being off is a 403 that names no fix in the UI |
+| 🔑 **The recovery UI, not a code** | That 403 raises the same token banner and toast a 401 does, and both tap through to Config's token field |
+| 💬 **The server's own sentence** | Its `detail` is carried into the error, so the phone says to set an access token |
+| 🚏 **Both request paths** | The streaming call chat tries first, and the plain JSON call behind it |
+| 🔍 **Why it looked like LM Studio** | The server makes the model call; the model was fine, the phone never got past the API |
 
 ---
 

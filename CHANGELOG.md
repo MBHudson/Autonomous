@@ -1,5 +1,17 @@
 <!--
- ## ⚡ The first real call repairs the binding *(`VERSION` 406, cache-buster v405 → v406)*
+ ## 📵 The door says why it is shut *(`VERSION` 407, cache-buster v406 → v407)*
+
+*2026-11-08. A phone stopped reaching the local LM Studio after an update; the desktop kept working. The cause was not the model. With `require_token` off, `/api/*` answers only loopback peers, and a phone is a LAN peer, so every call got `403 local requests only`. Proven by serving the app on `0.0.0.0`: `/api/state` is 200 over loopback and 403 over the LAN address.*
+
+**A refusal is a 403, not a 401.** The UI treated only 401 as "you need a token", so this one surfaced as `Stream request failed (HTTP 403)` -- an HTTP code where the app was holding a sentence naming the fix.
+
+**The sentence was already there.** The server sends `detail` with the refusal ("run ./setup-token.sh ... paste it into Config -> Access token"), and `request()` dropped it. It is carried into the message now, and the refusal raises the same banner and toast a 401 raises, so the phone can tap through to Config and paste a token.
+
+**Both paths, because chat tries streaming first.** `_relayStreamCore()` had its own 401 branch and its own generic message, so fixing only `request()` would have left the symptom the phone actually sees.
+
+**What this does not change.** The gate itself: a copy with no token still refuses other machines, which is the point of it. Setting a token is what reopens the LAN, and the error now says so.
+
+## ⚡ The first real call repairs the binding *(`VERSION` 406, cache-buster v405 → v406)*
 
 *2026-11-08. Binding happens once, at boot, inside a try/catch. When it throws partway every tool after the failure keeps the placeholder that throws "not bound", and the first agent to call one burned a model step to learn it should reload a page the operator was still using.*
 
