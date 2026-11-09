@@ -286,7 +286,6 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | ♾️ **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
 | 🏋️ **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
 | 📖 **Harness & training guide** | Auto-fit, manual pins and the 12-step drill in one place — [Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode) |
-
 | ❝ **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
 | 🧠 **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
 | 🧭 **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |
