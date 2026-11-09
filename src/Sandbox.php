@@ -3446,8 +3446,34 @@ class Sandbox {
                 throw new \RuntimeException('remove: refusing to delete the sandbox root itself');
             }
         }
+        // A delete is not reversible: refuse before the first file goes, so a
+        // half-deleted tree never happens.
+        if (self::containsProtected($full)) {
+            throw new \RuntimeException('remove: ' . $full
+                . ' contains a path on the protected list (secrets); clear that entry in the protect list first');
+        }
         $count = self::removeTree($full);
         return ['path' => $full, 'removed' => $count];
+    }
+
+    /**
+     * Does this path, or anything beneath it, hit the protect list?
+     *
+     * The walkers that build an archive or a copy skip protected entries as
+     * they meet them. Move and delete cannot be undone halfway, so they ask
+     * this first and refuse, rather than relocating a secret or shredding it.
+     */
+    private static function containsProtected($path, $depth = 0, $protect = null) {
+        if ($protect === null) { $protect = self::config()['protect'] ?? []; }
+        if (self::isProtectedPath($path, $protect)) { return true; }
+        if ($depth > 16 || !is_dir($path) || is_link($path)) { return false; }
+        $items = @scandir($path);
+        if ($items === false) { return false; }
+        foreach ($items as $name) {
+            if ($name === '.' || $name === '..') { continue; }
+            if (self::containsProtected($path . '/' . $name, $depth + 1, $protect)) { return true; }
+        }
+        return false;
     }
 
     private static function removeTree($path) {
@@ -3477,6 +3503,13 @@ class Sandbox {
         // allowlist entry could be emptied with move.
         $source = self::jail($from, $move ? $writeRoots : $readRoots, $label);
         $dest = self::jail($to, $writeRoots, $label);
+        // rename() would move a secret out from under the deny list in one
+        // step, and the delete half of a copy+delete move cannot be undone, so
+        // a move refuses instead of skipping. A copy skips (see copyTree).
+        if ($move && self::containsProtected($source)) {
+            throw new \RuntimeException($label . ': ' . $source
+                . ' contains a path on the protected list (secrets); clear that entry in the protect list first');
+        }
         if (is_dir($dest)) { $dest = rtrim($dest, '/') . '/' . basename($source); }
         if ($source === $dest) { throw new \RuntimeException("$label: source and destination are the same"); }
         if (is_dir($source) && strpos($dest, $source . '/') === 0) {
@@ -3501,7 +3534,11 @@ class Sandbox {
         ];
     }
 
-    private static function copyTree($source, $dest) {
+    private static function copyTree($source, $dest, $protect = null) {
+        if ($protect === null) { $protect = self::config()['protect'] ?? []; }
+        // The deny list holds inside a tree operation too: copying the app
+        // folder must not smuggle storage/ out under a readable name.
+        if (self::isProtectedPath($source, $protect)) { return 0; }
         if (is_link($source)) {
             throw new \RuntimeException('copy: symbolic links cannot be copied');
         }
@@ -3519,7 +3556,7 @@ class Sandbox {
         $count = 0;
         foreach ($items as $name) {
             if ($name === '.' || $name === '..') { continue; }
-            $count += self::copyTree($source . '/' . $name, $dest . '/' . $name);
+            $count += self::copyTree($source . '/' . $name, $dest . '/' . $name, $protect);
         }
         return $count;
     }
@@ -3731,6 +3768,9 @@ class Sandbox {
     private static function zipAddPath($zip, $full, $local, $dest) {
         $local = trim(str_replace('\\', '/', $local), '/');
         if ($local === '' || $full === $dest) { return; }
+        // An archive is a copy you can carry out, so the deny list applies to
+        // it exactly as it does to read_file: no storage/, no .env, no keys.
+        if (self::isProtectedPath($full)) { return; }
         if (is_link($full)) {
             throw new \RuntimeException('zip: symbolic links cannot be archived');
         }
@@ -3806,6 +3846,7 @@ class Sandbox {
                         foreach ($it as $file) {
                             if ($file->isLink()) { continue; }
                             $name = str_replace('\\', '/', $file->getPathname());
+                            if (self::isProtectedPath($name)) { continue; }
                             // Never add the archive to itself when the archive
                             // lives inside the directory being zipped.
                             if ($name === $dest) { continue; }
@@ -3852,6 +3893,11 @@ class Sandbox {
         $resolved = self::resolveExisting($target);
         if ($resolved === null || ($resolved !== $dest && strpos($resolved, $dest . '/') !== 0)) {
             throw new \RuntimeException("unzip: entry escapes the destination: $name");
+        }
+        // Extraction overwrites what is there, so an archive entry named
+        // storage/config.json must not be able to replace the live token.
+        if (self::isProtectedPath($resolved)) {
+            throw new \RuntimeException("unzip: entry \"$name\" would write into a protected path (secrets)");
         }
         return $resolved;
     }
