@@ -18,6 +18,12 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🔇 Failed saves say why; nested paths stop looping the drill *(`VERSION` 440, cache-buster v424 → v425)*
+
+*Flipping the Programs switch when `storage/` is not writable used to snap back with a success toast and no explanation: the server answers 200 with `success: false`, and nothing checked it. The config saver now throws the server's reason, so the dialog says "storage/config.json could not be written" and the switch returns to the server's value instead of sitting ON while the server holds OFF. The same saver covers the shell toggles.*
+
+*A model sending a nested `{"path":{"path":"…"}}` used to become a file literally named `[object Object]` — `String()` on an object — and the server's "not a file" error told the model nothing it could correct, so training mode's retry rule looped on it. A new `pathText()` unwraps one nesting level and every file tool (`read_file`, `write_file`, `edit_file`, `list_dir`, `glob_files`, `grep_code`, `str_replace_editor`) answers anything still unusable with the shape to retry with; `write_file` also refuses object `content` instead of writing the literal into the file. Covered by `tests/js/toolPath.test.mjs`.*
+
 ## ▶️ Training Start dispatches the drill; failed restores report what landed *(`VERSION` 439, cache-buster v423 → v424)*
 
 *Start used to only arm the mode — with no run in flight the fleet sat silent: no text, no map, no metrics. It now posts the drill into chat as a turn (fresh) or steers it into a running one, so everything behaves exactly as it does for a typed message. With no active agents it says so instead of arming.*

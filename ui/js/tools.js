@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=424';
-import { asText, compactText } from './utils.js?v=424';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=424';
-import { settingFor } from './agentConfig.js?v=424';
-import { trace } from './trace.js?v=424';
+import { store } from './store.js?v=425';
+import { asText, compactText } from './utils.js?v=425';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=425';
+import { settingFor } from './agentConfig.js?v=425';
+import { trace } from './trace.js?v=425';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -943,6 +943,23 @@ export function bindSandboxNow(api) {
   return { unbound, error, threw };
 }
 
+/**
+ * A tool path argument as text, or null when it is not one. Some models send
+ * a nested {"path":{"path":"..."}}; String() on that gives the literal
+ * "[object Object]", which the server then jails and reports as a missing
+ * file — an error the model cannot correct, so a retry rule loops on it
+ * forever. Null lets each tool answer with the shape to retry with instead.
+ */
+export function pathText(v) {
+  if (typeof v === 'string' || typeof v === 'number') return String(v);
+  let cur = v;
+  for (let i = 0; i < 2 && cur && typeof cur === 'object' && !Array.isArray(cur); i++) {
+    cur = cur.path ?? cur.arg;
+    if (typeof cur === 'string' || typeof cur === 'number') return String(cur);
+  }
+  return null;
+}
+
 export function bindSandboxTools(api) {
   setSandboxClient(api);
   const lines = rows => rows.map(r => (typeof r === 'string' ? r : r.join(' '))).join('\n');
@@ -964,8 +981,9 @@ export function bindSandboxTools(api) {
 
   TOOL_REGISTRY.read_file.run = async (arg, _note, ctx) => {
     // Accept "path" or "path 20-80" so large files can be read in slices.
-    const raw = String(arg ?? '').trim();
-    const m = /^(.*?)\s+(\d+)\s*-\s*(\d+)$/.exec(raw);
+    const raw = pathText(arg);
+    if (raw == null) return 'error: read_file needs "path" as a plain string, e.g. {"path":"training/training.txt"} — retry the step with that shape';
+    const m = /^(.*?)\s+(\d+)\s*-\s*(\d+)$/.exec(raw.trim());
     const path = m ? m[1].trim() : raw;
     const range = m ? `${m[2]}-${m[3]}` : undefined;
     const res = await api.sandbox('read', { path, range, root: scopeOf(ctx) });
@@ -974,7 +992,9 @@ export function bindSandboxTools(api) {
   };
 
   TOOL_REGISTRY.list_dir.run = async (arg, _note, ctx) => {
-    const a = String(arg ?? '').trim();
+    const raw = pathText(arg);
+    if (raw == null) return 'error: list_dir needs "path" as a plain string, e.g. {"path":"training"} — retry the step with that shape';
+    const a = raw.trim();
     const res = await api.sandbox('list', a ? { path: a, limit: 200, root: scopeOf(ctx) } : { root: scopeOf(ctx) });
     if (!res.entries) return `allowed directories:\n${(res.dirs || []).join('\n')}`;
     return lines(res.entries.map(e =>
@@ -982,13 +1002,17 @@ export function bindSandboxTools(api) {
   };
 
   TOOL_REGISTRY.glob_files.run = async (arg, _note, ctx) => {
-    const res = await api.sandbox('glob', { pattern: String(arg ?? ''), scope: scopeOf(ctx) });
+    const pattern = pathText(arg);
+    if (pattern == null) return 'error: glob_files needs "pattern" as a plain string, e.g. {"pattern":"training/*"} — retry the step with that shape';
+    const res = await api.sandbox('glob', { pattern, scope: scopeOf(ctx) });
     if (!res.count) return `no files match "${arg}"`;
     return `${res.count} matches:\n${res.matches.join('\n')}`;
   };
 
   TOOL_REGISTRY.grep_code.run = async (arg, _note, ctx) => {
-    const res = await api.sandbox('grep', { pattern: String(arg ?? ''), max_matches: 60, scope: scopeOf(ctx) });
+    const pattern = pathText(arg);
+    if (pattern == null) return 'error: grep_code needs "pattern" as a plain string, e.g. {"pattern":"training"} — retry the step with that shape';
+    const res = await api.sandbox('grep', { pattern, max_matches: 60, scope: scopeOf(ctx) });
     if (!res.count) return `no matches for /${res.pattern}/ in ${res.files_scanned} files`;
     return `${res.count} matches:\n` + lines(res.matches.map(m =>
       `${m.rel}:${m.line}: ${m.text}`));
@@ -1000,16 +1024,17 @@ export function bindSandboxTools(api) {
     let content = null;
     let mode = 'write';
     if (arg && typeof arg === 'object') {
-      path = arg.path;
+      path = pathText(arg.path);
       content = arg.content;
       mode = arg.mode || 'write';
     } else {
-      path = String(arg ?? '');
+      path = pathText(arg);
       content = name != null ? String(name) : '';
     }
-    if (!path) return 'error: write_file needs a "path" and a "content"';
+    if (!path) return 'error: write_file needs "path" as a plain string, e.g. {"path":"training/training.txt","content":"..."} — retry the step with that shape';
     if (content == null || content === '') return 'error: write_file needs non-empty "content"';
-    const res = await api.sandbox('write', { path: String(path), content, mode, root: scopeOf(ctx) });
+    if (typeof content === 'object') return 'error: write_file needs "content" as plain text, not an object — retry the step with that shape';
+    const res = await api.sandbox('write', { path, content, mode, root: scopeOf(ctx) });
     return `wrote ${res.bytes_written} bytes${res.appended ? ' (appended)' : ''} to ${res.path}`;
   };
 
@@ -1019,8 +1044,8 @@ export function bindSandboxTools(api) {
   TOOL_REGISTRY.str_replace_editor.run = async (arg, _note, ctx) => {
     const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : { command: 'view', path: String(arg ?? '') };
     const command = String(a.command || 'view').toLowerCase();
-    const path = String(a.path || '');
-    if (!path) return 'error: str_replace_editor needs a "path"';
+    const path = pathText(a.path);
+    if (!path) return 'error: str_replace_editor needs "path" as a plain string — retry the step with that shape';
     const root = scopeOf(ctx);
     if (command === 'view') {
       const range = Array.isArray(a.view_range) && a.view_range.length === 2
@@ -1050,9 +1075,9 @@ export function bindSandboxTools(api) {
   // Cursor/Aider edit dialect: path + old_string + new_string.
   TOOL_REGISTRY.edit_file.run = async (arg, _note, ctx) => {
     const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
-    const path = String(a.path || '');
+    const path = pathText(a.path);
     const old = String(a.old_string ?? a.old_str ?? '');
-    if (!path) return 'error: edit_file needs a "path"';
+    if (!path) return 'error: edit_file needs "path" as a plain string, e.g. {"path":"training/training.txt","old_string":"...","new_string":"..."} — retry the step with that shape';
     if (!old) return 'error: edit_file needs "old_string"';
     const res = await api.sandbox('str_replace', {
       path, old, new: String(a.new_string ?? a.new_str ?? ''), replace_all: !!a.replace_all, root: scopeOf(ctx),

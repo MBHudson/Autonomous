@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v439 — Start actually starts the drill, and restores tell the truth 🏋️
+### 🆕 v440 — Failed saves say why, and nested paths stop looping the drill 🔇
 
-*Pressing Start in training mode now sends the drill into chat itself — every active agent works it at once, so messages, the map, metrics and trace all move exactly as usual. And a restore that fails part-way now says what landed before it stopped instead of a bare "failed".*
+*A config toggle flipped while `storage/` is not writable used to snap back with a success toast and no explanation — it now reports `storage/config.json could not be written` and the switch returns to the server's value. And a nested `{"path":{"path":"…"}}` no longer becomes a file literally named `[object Object]`: the path is unwrapped, and anything still unusable comes back with the shape to retry with, so training mode's retry rule fixes itself instead of looping.*
 
 | | |
 |---|---|
-| ▶️ **Start dispatches the drill** | arming still throttles to ~50% and locks the prompt, but Start also posts the drill as a turn (or steers it into a running one) — an idle fleet no longer sits silent; with no active agents it says so |
-| 🧾 **Honest restore report** | sections land in order, so a late write failure now names the sections already on disk plus the one that choked, instead of reading as "nothing worked" |
+| 🔇 **Failed saves say why** | the saver believes the server's `success: false` and throws its reason — Programs and shell toggles alike; the switch is put back to what the server holds |
+| 🧭 **Nested paths unwrapped** | one level of `{"path":{"path":…}}` resolves itself across every file tool, and the error for the rest shows the plain-string shape to retry with |
 ---
 
 ## 🧭 Contents

@@ -10,21 +10,21 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=424';
-import { K } from '../storage.js?v=424';
-import { persistence } from '../persistence.js?v=424';
-import { api } from '../api.js?v=424';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=424';
-import { errText } from '../api.js?v=424';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=424';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=424';
-import { snapshot } from '../rateGovernor.js?v=424';
-import { trainingStepList, trainingKickoffFor } from '../training.js?v=424';
-import { resetBrowserEnabled } from '../toolManifest.js?v=424';
-import { perf } from '../perf.js?v=424';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=424';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=424';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=424';
+import { store } from '../store.js?v=425';
+import { K } from '../storage.js?v=425';
+import { persistence } from '../persistence.js?v=425';
+import { api } from '../api.js?v=425';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=425';
+import { errText } from '../api.js?v=425';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=425';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=425';
+import { snapshot } from '../rateGovernor.js?v=425';
+import { trainingStepList, trainingKickoffFor } from '../training.js?v=425';
+import { resetBrowserEnabled } from '../toolManifest.js?v=425';
+import { perf } from '../perf.js?v=425';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=425';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=425';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=425';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -3595,7 +3595,14 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._cfgChain = (this._cfgChain || Promise.resolve()).then(async () => {
       const cfg = await api.getConfig();
       mutator(cfg);
-      await api.saveConfig(cfg);
+      const res = await api.saveConfig(cfg);
+      // POST /config answers 200 with success:false when the file could not
+      // be written (unlike an HTTP error, nothing throws) — believe it, or a
+      // failed save reads back as the old value and the toggle just snaps off
+      // with no explanation.
+      if (res && res.success === false) {
+        throw new Error((res && res.error) || 'storage/config.json could not be written.');
+      }
       return cfg;
     });
     return this._cfgChain;
@@ -3762,6 +3769,13 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     } catch (err) {
       if (st) st.textContent = `Not saved: ${err.message}`;
       store.emit('toast', { message: `Programs not saved: ${err.message}`, type: 'error' });
+      // The switch was flipped optimistically: put it back to what the server
+      // actually holds, so it never sits ON while the server has it off. Rows
+      // are left alone — only the switch is re-read.
+      try {
+        const res = await api.sandbox('program', { action: 'list' });
+        document.getElementById('sbProgOn')?.classList.toggle('active', !!res.enabled);
+      } catch { /* the save error above is the one that matters */ }
     }
   }
 
