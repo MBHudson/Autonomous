@@ -160,7 +160,13 @@ export class ConfigPanel {
           const bits = [s.enabled
             ? `Filesystem tools are live. Web search: ${engine}.`
             : 'No directories are allowed yet, so the filesystem tools report themselves as disabled. Web search works regardless.'];
-          if (s.require_token) {
+          if (s.require_token && !s.token_set) {
+            // Armed with nothing to check against: every route answers 503, so
+            // "send a matching token" would send you looking for one that does
+            // not exist.
+            bits.push('A token is required but none is set, so every route answers 503 — '
+              + 'run ./setup-token.sh, then paste the token into Config → Access token.');
+          } else if (s.require_token) {
             bits.push('A token is required — your browser must send a matching one or every sandbox call is refused.');
           } else if (s.local_only_strict === false) {
             // Say this plainly: it is the state that lets a reverse proxy on

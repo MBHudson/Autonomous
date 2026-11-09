@@ -2101,7 +2101,7 @@ _makeLiveNode(agent) {
 
           const msg = (truncated || thoughtOnly)
             ? `${agent.name} thought through this but used its whole token budget before `
-              + 'writing an answer. Raise Max Tokens in Settings, or ask for a shorter reply.'
+              + 'writing an answer. Raise Max Tokens under Config → Limits & Budgets, or ask for a shorter reply.'
             : 'The model returned an empty response. Sending the same prompt again '
               + 'usually gets an answer — if it keeps happening, the model may be '
               + 'unreachable; check the provider status.';
@@ -2508,7 +2508,7 @@ _makeLiveNode(agent) {
     if (finishReason === 'length') {
       throw new Error(`${provider?.name || 'The provider'} stopped at the token ceiling before `
         + `writing an answer (finishReason=length, model "${agent.model}"). `
-        + 'Raise Max Tokens in Settings, or ask for a shorter reply.');
+        + 'Raise Max Tokens under Config → Limits & Budgets, or ask for a shorter reply.');
     }
     throw new Error(`No reply content from ${provider?.name || 'provider'} `
       + `for model "${agent.model}" — the provider returned an empty response `

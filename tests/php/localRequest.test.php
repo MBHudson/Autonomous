@@ -181,6 +181,7 @@ $st = Sandbox::status();
 ok(($st['local_only_strict'] ?? null) === true, 'status: the proxy check reports on by default');
 ok(is_array($st['trusted_proxies'] ?? null), 'status: the trusted proxy list is reported');
 ok(($st['trusted_proxies'] ?? null) === array(), 'status: no proxy is trusted on a fresh config');
+ok(($st['token_set'] ?? null) === false, 'status: a fresh config has no token set');
 
 file_put_contents($base . '/config.json', json_encode(array('sandbox' => array(
     'trusted_proxies' => array('127.0.0.1', '10.0.0.0/8'),
@@ -191,6 +192,15 @@ file_put_contents($base . '/config.json', json_encode(array('sandbox' => array(
 $st2 = Sandbox::status();
 ok($st2['local_only_strict'] === false, 'status: the switch reports off when turned off');
 ok(count($st2['trusted_proxies']) === 2, 'status: the trusted proxies are listed');
+
+file_put_contents($base . '/config.json', json_encode(array('sandbox' => array(
+    'token' => 'temp-token',
+    'read_roots' => array(),
+    'write_roots' => array(),
+))));
+$st3 = Sandbox::status();
+ok($st3['token_set'] === true, 'status: a configured token is reported as set');
+ok(!array_key_exists('token', $st3), 'status: the token itself is never returned');
 
 // --- cleanup ---------------------------------------------------------------
 @unlink($base . '/config.json');
