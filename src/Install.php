@@ -226,6 +226,10 @@ class Install
         // and only met the refusal halfway through the release; this asks each
         // folder the plan actually writes into, so the button can say which one
         // is shut BEFORE a single app file is replaced.
+        // The folder a release ADDS and this copy lacks, when a refusal names it:
+        // the panel can then print the two lines that create it instead of
+        // leaving the operator to work out the account and the flags.
+        $missing = null;
         if ($writable && $plan) {
             foreach (self::writeTargets($plan) as $dir) {
                 if ($dir === '') {
@@ -246,6 +250,7 @@ class Install
                 // A plain file where a folder has to go is not a permission
                 // problem, and finding it here costs one probe instead of a
                 // half-finished install.
+                if ($probeDir !== $full) { $missing = $dir; }
                 $clash = '';
                 for ($up = $full; $up !== $probeDir; $up = dirname($up)) {
                     if (file_exists($up)) { $clash = $up; break; }
@@ -289,6 +294,12 @@ class Install
             // with the account that owns the files. The UI prints it as given.
             'blocked' => $blocked,
             'command' => $blocked === null ? null : self::TERMINAL_COMMAND,
+            // Only when the refusal is about a folder the release ADDS: there is
+            // nothing to create otherwise, and the installer line above is the
+            // whole answer.
+            'folderCommand' => ($blocked === null || $missing === null)
+                ? null
+                : self::folderFixCommand(self::appDir() . '/' . $missing, self::appDir()),
             'currentVersion' => self::version(),
             'targetVersion' => $target,
             'staged' => (bool) ($staged && is_dir($staged)),
@@ -298,6 +309,27 @@ class Install
             // defer them. Not a problem — a state the UI has to be able to name.
             'pending' => self::pendingSwaps(),
         );
+    }
+
+    /**
+     * The two shell lines that make a folder a release adds exist.
+     *
+     * A refusal that says "cannot write there" still leaves the operator to
+     * work out which account, which flags and what to hand it to. `--reference`
+     * copies the app folder's own owner and group, so the web user never has to
+     * be guessed (www-data, apache, nginx, a custom pool). POSIX only: Windows
+     * has no sudo, mkdir -p or chown, and the account that owns the tree can
+     * create a folder already.
+     */
+    public static function folderFixCommand($abs, $appDir = null)
+    {
+        $abs = str_replace('\\', '/', (string) $abs);
+        if ($abs === '' || DIRECTORY_SEPARATOR === '\\') {
+            return null;
+        }
+        $ref = str_replace('\\', '/', (string) ($appDir === null ? self::appDir() : $appDir));
+        return 'sudo mkdir -p ' . escapeshellarg($abs)
+            . ' && sudo chown --reference=' . escapeshellarg($ref) . ' ' . escapeshellarg($abs);
     }
 
     // ---------------------------------------------------------------- locking

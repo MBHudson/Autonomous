@@ -448,6 +448,29 @@ $res = Install::apply();
 ok($res['ok'] === true && is_file($app . '/.github/workflows/tests.yml'),
     'apply creates the missing folder and writes the file into it');
 
+// --- 7. the folder recipe the panel prints ----------------------------
+// A refusal about a folder the release ADDS is the one the operator can finish
+// by hand, so the server hands the panel the exact lines rather than a
+// paraphrase that leaves the account and the flags to be guessed.
+$folderCmd = Install::folderFixCommand('/var/www/app/.github/workflows', '/var/www/app');
+if (DIRECTORY_SEPARATOR === '\\') {
+    ok($folderCmd === null, 'Windows gets no sudo/mkdir/chown recipe -- it has none of the three');
+} else {
+    ok(is_string($folderCmd) && strpos($folderCmd, 'mkdir -p') !== false,
+        'the recipe creates the missing folder');
+    ok(strpos($folderCmd, "'/var/www/app/.github/workflows'") !== false,
+        'the path is quoted, so one with a space still works');
+    ok(strpos($folderCmd, "chown --reference='/var/www/app'") !== false,
+        'and it copies the app folder\'s owner, so the web user is never guessed');
+}
+ok(Install::folderFixCommand('', '/var/www/app') === null, 'no path, no recipe');
+
+// Nothing to create when the refusal is about a folder that already exists.
+build($app, '361');
+$pre = Install::preflight();
+ok(array_key_exists('folderCommand', $pre) && $pre['folderCommand'] === null,
+    'a writable tree offers no folder recipe (the key exists and is null)');
+
 // --- report -----------------------------------------------------------
 rmTree($tmp);
 Install::useRoot(null);

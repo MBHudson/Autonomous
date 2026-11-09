@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v435 — the update that refused to create a folder 🐧
+### 🆕 v436 — the panel says which folder, and how to make it 🐧
 
-*The preflight writes a probe file into every folder a release touches. A release that **adds** a folder has nothing to write it into, so the probe failed — and that was reported as a permission refusal, even under `sudo`.*
+*A refusal that says "cannot write there" still leaves the operator to work out the account, the ownership and the flags.*
 
 | | |
 |---|---|
-| 🐧 **A missing folder is not a locked one** | the probe asks the deepest folder that exists, which is where `mkdir` would create the rest, so `.github/workflows/` no longer blocks an install that would have worked |
-| 🔐 **A file in the way is named honestly** | when something that is not a folder occupies the path, the message says so instead of blaming permissions, and says it before a single file is replaced |
+| 🐧 **The exact two lines, from the server** | when a release adds a folder this copy lacks, the Updates panel prints `sudo mkdir -p …` and `sudo chown --reference=<app folder> …` — the reference copies the app's own owner and group, so `www-data`, `apache` or a custom pool never has to be guessed |
+| 🪟 **Only where those exist** | the recipe appears on POSIX and not on Windows, which has no `sudo`, `mkdir -p` or `chown`, and where the account that owns the tree can create the folder already |
 ---
 
 ## 🧭 Contents

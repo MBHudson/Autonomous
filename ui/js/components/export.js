@@ -10,9 +10,9 @@
 // EXPORT.JS — Export functionality
 // ============================================
 
-import { store } from '../store.js?v=421';
-import { api } from '../api.js?v=421';
-import { esc, formatTime, downloadFile, agentCode } from '../utils.js?v=421';
+import { store } from '../store.js?v=422';
+import { api } from '../api.js?v=422';
+import { esc, formatTime, downloadFile, agentCode } from '../utils.js?v=422';
 
 export class ExportPanel {
   constructor() {

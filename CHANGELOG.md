@@ -84,6 +84,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🐧 The panel says which folder, and how to make it *(`VERSION` 436, cache-buster v421 → v422)*
+
+*`v435` stopped refusing an install over a folder it could create itself. This is the other half: when a refusal is real, the operator should not have to work out the account, the ownership and the flags.*
+
+**The server sends the two lines.** If a release adds a folder the copy does not have and the install is still blocked, `preflight()` now returns `folderCommand`: `sudo mkdir -p <folder>` and `sudo chown --reference=<app folder> <folder>`. The `--reference` is the point -- it copies the owner, group and mode of the app folder itself, so nobody has to guess whether this host's web user is `www-data`, `apache`, `nginx` or a custom PHP-FPM pool.
+
+**The panel prints it before the installer line**, because the installer cannot run until the folder exists. On Windows the field is null and the panel shows what it always showed: there is no `sudo`, `mkdir -p` or `chown` there, and the account that owns the tree can already create a folder.
+
 ## 🐧 The update that refused to create a folder *(`VERSION` 435, no browser file changed)*
 
 *`v427` added `.github/workflows/tests.yml`, and from then on some copies could not install anything at all: "The web server cannot write to .github/workflows/". Running the installer as `root` said the same thing, which was the clue -- a permission error that survives `sudo` is not a permission error.*

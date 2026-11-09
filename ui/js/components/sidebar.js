@@ -10,20 +10,20 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=421';
-import { K } from '../storage.js?v=421';
-import { persistence } from '../persistence.js?v=421';
-import { api } from '../api.js?v=421';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=421';
-import { errText } from '../api.js?v=421';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=421';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=421';
-import { snapshot } from '../rateGovernor.js?v=421';
-import { resetBrowserEnabled } from '../toolManifest.js?v=421';
-import { perf } from '../perf.js?v=421';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=421';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=421';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=421';
+import { store } from '../store.js?v=422';
+import { K } from '../storage.js?v=422';
+import { persistence } from '../persistence.js?v=422';
+import { api } from '../api.js?v=422';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=422';
+import { errText } from '../api.js?v=422';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=422';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=422';
+import { snapshot } from '../rateGovernor.js?v=422';
+import { resetBrowserEnabled } from '../toolManifest.js?v=422';
+import { perf } from '../perf.js?v=422';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=422';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=422';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=422';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -4241,7 +4241,14 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         // how an update sits unfinished.
         const problems = (pre.problems || []).join(' ');
         if (pre.blocked !== null && pre.blocked !== undefined && pre.command) {
-          hint.innerHTML = `${esc(problems)} Run this in the app folder: <code>${esc(pre.command)}</code>`;
+          // A release can add a folder this copy does not have. "Cannot write
+          // there" leaves the operator to work out the account and the flags, so
+          // the server sends the two lines that make it, and they are printed
+          // before the installer line that needs it.
+          const fix = pre.folderCommand
+            ? ` Create it first: <code>${esc(pre.folderCommand)}</code> — then run this in the app folder: <code>${esc(pre.command)}</code>`
+            : ` Run this in the app folder: <code>${esc(pre.command)}</code>`;
+          hint.innerHTML = `${esc(problems)}${fix}`;
         } else {
           hint.textContent = problems;
         }
