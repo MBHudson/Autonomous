@@ -15,6 +15,7 @@ import { acquire, note429 } from './rateGovernor.js?v=428';
 import { latency } from './latency.js?v=428';
 import { detectFamily, outputText, outputUsage } from './harness.js?v=428';
 import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=428';
+import { mergeUsage, googleFinishReason } from './streamShape.js?v=428';
 
 latency.bindStore(store);
 
@@ -867,26 +868,21 @@ class ApiClient {
       // still null at this point on the first frame, hence the guards.
       // Anthropic sends input tokens early, on the message_start event.
       if (obj.type === 'message_start' && obj.message && obj.message.usage) {
-        const u = obj.message.usage;
-        const p = Number(u.input_tokens) || 0;
-        const prev = usage || {};
-        usage = {
-          prompt: Math.max(prev.prompt || 0, p),
-          completion: Math.max(prev.completion || 0, 0),
-          total: Math.max(prev.total || 0, p + (prev.completion || 0)),
-        };
+        usage = mergeUsage(usage, Number(obj.message.usage.input_tokens) || 0, 0, 0);
         return;
       }
       if (obj && obj.usage && typeof obj.usage === 'object') {
         const u = obj.usage;
-        const p = Number(u.prompt_tokens ?? u.input_tokens) || 0;
-        const c = Number(u.completion_tokens ?? u.output_tokens) || 0;
-        const prev = usage || {};
-        usage = {
-          prompt: Math.max(prev.prompt || 0, p),
-          completion: Math.max(prev.completion || 0, c),
-          total: Math.max(prev.total || 0, Number(u.total_tokens) || 0 || p + c),
-        };
+        // A frame carries part of the picture: Anthropic puts input tokens on
+        // message_start and output tokens on message_delta. Merge the halves
+        // and take the SUM for the total, rather than reading the second frame
+        // as 0 + output and reporting max(input, output).
+        usage = mergeUsage(
+          usage,
+          Number(u.prompt_tokens ?? u.input_tokens) || 0,
+          Number(u.completion_tokens ?? u.output_tokens) || 0,
+          Number(u.total_tokens ?? u.total) || 0
+        );
         return;
       }
 
@@ -932,15 +928,20 @@ class ApiClient {
           reasoning += gthink;
           onReasoning?.(gthink, reasoning);
         }
+        // Gemini's own spelling of why it stopped. Without this a reply cut at
+        // the token ceiling, or emptied by a safety block, arrived as an
+        // ordinary short answer and the caller's truncation path never fired.
+        const gFinish = obj.candidates[0] && obj.candidates[0].finishReason;
+        if (typeof gFinish === 'string' && gFinish) {
+          finishReason = googleFinishReason(gFinish);
+        }
         if (obj.usageMetadata) {
-          const p = Number(obj.usageMetadata.promptTokenCount) || 0;
-          const c = Number(obj.usageMetadata.candidatesTokenCount) || 0;
-          const prev = usage || {};
-          usage = {
-            prompt: Math.max(prev.prompt || 0, p),
-            completion: Math.max(prev.completion || 0, c),
-            total: Math.max(prev.total || 0, Number(obj.usageMetadata.totalTokenCount) || (p + c)),
-          };
+          usage = mergeUsage(
+            usage,
+            Number(obj.usageMetadata.promptTokenCount) || 0,
+            Number(obj.usageMetadata.candidatesTokenCount) || 0,
+            Number(obj.usageMetadata.totalTokenCount) || 0
+          );
         }
       }
       // Envelope frames ({output:[…]}): a runner that keeps its own shape on a
@@ -964,14 +965,12 @@ class ApiClient {
       }
       // Same for a Google frame that only carries usage.
       if (!piece && !thought && !Array.isArray(obj.candidates) && obj.usageMetadata) {
-        const p = Number(obj.usageMetadata.promptTokenCount) || 0;
-        const c = Number(obj.usageMetadata.candidatesTokenCount) || 0;
-        const prev = usage || {};
-        usage = {
-          prompt: Math.max(prev.prompt || 0, p),
-          completion: Math.max(prev.completion || 0, c),
-          total: Math.max(prev.total || 0, Number(obj.usageMetadata.totalTokenCount) || (p + c)),
-        };
+        usage = mergeUsage(
+          usage,
+          Number(obj.usageMetadata.promptTokenCount) || 0,
+          Number(obj.usageMetadata.candidatesTokenCount) || 0,
+          Number(obj.usageMetadata.totalTokenCount) || 0
+        );
       }
     };
 
