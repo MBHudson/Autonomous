@@ -756,7 +756,6 @@ export class Sidebar {
   }
 
   /**
-  /**
    * Training mode dialog: what the mode does, the drill steps, and Start /
    * Cancel (or Stop + a recap while armed). Same overlay pattern as the
    * pre-prompt editor, so it inherits every skin for free.
@@ -823,6 +822,7 @@ export class Sidebar {
     this.renderAgents();
   }
 
+  /**
    * Proxy tab: fetch elite/anonymous proxies, ping them, save favorites,
    * and route the app's outbound relay traffic through the selected one.
    */
