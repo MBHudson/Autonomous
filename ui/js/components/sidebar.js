@@ -1819,7 +1819,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
             <div class="toggle" id="sbExecOn"><div class="toggle-knob"></div></div>
           </div>
           <div class="form-hint">Runs on this server as the web user, jailed to the directories above. Off by default; on your copy only. Its timeout is under Limits &amp; Budgets.</div>
-          <div class="form-hint">The guard checks the arguments a command is handed, so a folder is allowed or refused as a whole: something like <code>grep -r token .</code> still reads what it finds inside it. With shell access on, keep <code>storage/</code> unreadable to the web user — the filesystem is the boundary the argument check cannot be.</div>
+          <div class="form-hint">The guard checks the arguments a command is handed, so a folder is allowed or refused as a whole: something like <code>grep -r token .</code> still reads what it finds inside it. So a known walker handed a folder that contains a protected entry is refused (checked up to 2,000 entries). Past that scan the filesystem is the boundary: keep <code>storage/</code> unreadable to the web user.</div>
           <div class="toggle-row" id="sbExecApprovalRow" style="margin-top:6px">
             <span class="toggle-label">Ask before running a new command</span>
             <div class="toggle" id="sbExecApproval"><div class="toggle-knob"></div></div>

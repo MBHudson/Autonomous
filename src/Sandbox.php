@@ -908,10 +908,11 @@ class Sandbox {
         // the web server runs as.
         $escape = self::checkArgPaths($argv, $program, self::readRoots(), self::writeRoots(), $cwd);
         if ($escape !== null) {
+            // checkArgPaths builds the whole sentence: each refusal carries the
+            // note that fits it, and the jail note would contradict a
+            // recursive-read refusal rather than explain it.
             return ['ok' => false, 'exit' => -1, 'stdout' => '',
-                'stderr' => 'Refused: ' . $escape
-                    . ' Arguments that are paths must stay inside the allowed directories ('
-                    . implode(', ', self::readRoots()) . ').',
+                'stderr' => 'Refused: ' . $escape,
                 'truncated' => false, 'timed_out' => false, 'ms' => 0];
         }
         if (!is_dir($cwd)) { $cwd = $defaultCwd; }
@@ -1237,6 +1238,12 @@ class Sandbox {
         $from = self::pathArgSpec($program);
         if ($from === null) { return null; }
         $allowed = array_merge($readRoots, $writeRoots, ['/dev/null', '/proc', '/sys']);
+        // The sentence every path refusal used to gain from exec(). Built here
+        // so a recursive-read refusal -- which is not about the jail edge and
+        // has its own advice -- can leave it off.
+        $jailNote = sprintf(' Arguments that are paths must stay inside the allowed directories (%s).',
+            implode(', ', $readRoots));
+        $recursive = self::isRecursiveReader($program);
 
         for ($i = $from; $i < count($argv); $i++) {
             $a = $argv[$i];
@@ -1272,8 +1279,8 @@ class Sandbox {
                 if ($resolved === $root || strpos($resolved, $root . '/') === 0) { $inside = true; break; }
             }
             if (!$inside) {
-                return sprintf('%s was given the path "%s", which resolves outside the sandbox (%s).',
-                    $program, $a, $resolved);
+                return sprintf('%s was given the path "%s", which resolves outside the sandbox (%s).%s',
+                    $program, $a, $resolved, $jailNote);
             }
             // Inside a root is not the same as allowed to read it: the protect
             // list is what keeps storage/, .git, .env* and the key files out of
@@ -1282,8 +1289,22 @@ class Sandbox {
             // `cat storage/config.json` answered with the access token and
             // every provider key. Same rule, same place in the path.
             if (self::isProtectedPath($resolved)) {
-                return sprintf('%s was given the path "%s", which is on the protected list (secrets).',
-                    $program, $a);
+                return sprintf('%s was given the path "%s", which is on the protected list (secrets).%s',
+                    $program, $a, $jailNote);
+            }
+            // A recursive command reads whatever it finds under a directory it
+            // is handed, and this guard only ever sees the directory name:
+            // `grep -rn token .` passed a filename check and then read storage/.
+            // Refusing the scope is the one check available at this layer. A
+            // tree the bounded scan does not reach is still covered by the
+            // filesystem permissions the README describes.
+            if ($recursive && is_dir($resolved)) {
+                $hit = self::firstProtectedUnder($resolved);
+                if ($hit !== null) {
+                    return sprintf('%s walks directories: "%s" contains %s, which is on the protected list (secrets). '
+                        . 'Point it at a narrower directory, or clear that entry in the protect list.',
+                        $program, $a, $hit);
+                }
             }
         }
         return null;
@@ -3611,6 +3632,40 @@ class Sandbox {
             if (self::containsProtected($path . '/' . $name, $depth + 1, $protect)) { return true; }
         }
         return false;
+    }
+
+    /** Commands that walk a directory themselves: the argument is a scope, not a file. */
+    private static function isRecursiveReader($program) {
+        static $names = ['grep', 'egrep', 'fgrep', 'rg', 'ag', 'ack', 'ack-grep',
+            'find', 'tree', 'du', 'tar', 'zip', 'unzip', 'rsync'];
+        return in_array(self::policyName($program), $names, true);
+    }
+
+    /**
+     * The first protected path at or beneath $path, or null.
+     *
+     * Bounded on purpose: this runs while checking an exec argument, so a tree
+     * with a hundred thousand files must not stall the request. $limit counts
+     * entries inspected; a scan that runs out returns null rather than a
+     * guess, and the filesystem boundary remains the backstop there.
+     */
+    private static function firstProtectedUnder($path, $limit = 2000) {
+        $protect = self::config()['protect'] ?? [];
+        $queue = array($path);
+        $seen = 0;
+        while ($queue && $seen < $limit) {
+            $current = array_shift($queue);
+            $seen++;
+            if (self::isProtectedPath($current, $protect)) { return $current; }
+            if (is_link($current) || !is_dir($current)) { continue; }
+            $items = @scandir($current);
+            if ($items === false) { continue; }
+            foreach ($items as $name) {
+                if ($name === '.' || $name === '..') { continue; }
+                $queue[] = $current . '/' . $name;
+            }
+        }
+        return null;
     }
 
     private static function removeTree($path) {
