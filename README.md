@@ -39,13 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v444 — Training mode gains the brute-force note ⚡
+### 🆕 v445 — glob stops searching the directory twice, and says what it searched 🩹
 
-*The drill brief now opens with the two-pass trick: run an agent through once (2–4 minutes, mixed results), run it again, and 100% (12 calls / 0 retries) is the common outcome on models above ~1.5b parameters — the system keeps only the winning syntax from there on.*
+*`{"pattern":"training/*"}` matched nothing because the server jailed the `training/` prefix and then matched the whole pattern under it — searching `training/training/*`. The "no files match" message then printed the raw arguments object instead of the pattern, hence `[object Object]`. Both fixed; the drill's glob step passes now.*
 
 | | |
 |---|---|
-| ⚡ **Brute-force training note** | first bullet of the Training mode brief: two passes, winning syntax kept |
+| 🩹 **Prefix matched once** | path-relative patterns run whole from the root; escapes still filtered |
+| 🪞 **Errors echo the pattern** | zero-match message prints the pattern string, never the raw object |
 ---
 
 ## 🧭 Contents

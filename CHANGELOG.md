@@ -18,6 +18,10 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🩹 glob matched `training/*` against `training/training/*` *(`VERSION` 445, cache-buster v427 → v428)*
+
+*Two halves of the loop training mode hit live with `{"pattern":"training/*"}`. Server-side, `globFiles()` jailed the `training/` prefix and then matched the whole pattern beneath it, so the directory was searched twice and nothing ever matched. Client-side, the zero-match message printed the raw arguments object instead of the pattern string, hence `no files match "[object Object]"`. The search now runs the whole pattern from the root (escapes still dropped by the realpath filter), and the message echoes the pattern. Covered by `tests/php/sandbox.test.php` 22a/22b.*
+
 ## ⚡ Training mode brief opens with the brute-force note *(`VERSION` 444, docs-only — no cache-buster bump)*
 
 *The "Training mode — the full brief" list gains a first bullet at the user's words: brute-force the drill to speed up custom forming harnesses and dialect learning; best above the 1.5b-parameter mark, ~2–4 minutes the first pass, commonly 12 calls / 0 retries the second, with only the winning syntax kept. README-only, so `APP_VERSION` stays at v427.*

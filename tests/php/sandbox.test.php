@@ -222,6 +222,21 @@ foreach ($g['matches'] as $m) {
 $g2 = Sandbox::globFiles('../secret-outside/*', null, $writeDir);
 ok(count($g2['matches']) === 0, 'glob ../ outside yields zero matches');
 
+// 22a. globFiles with a path-relative pattern matches under the prefix once:
+// "sub/*" finds sub/deep.txt. It used to jail the "sub" prefix and then
+// match the whole pattern beneath it, i.e. sub/sub/* -- zero matches, which
+// is the loop training mode hit live with {"pattern":"training/*"}.
+$g3 = Sandbox::globFiles('sub/*', null, $writeDir);
+$foundDeep = false;
+foreach ($g3['matches'] as $m) {
+    if (substr(str_replace('\\', '/', $m), -strlen('/sub/deep.txt')) === '/sub/deep.txt') { $foundDeep = true; }
+}
+ok($foundDeep, 'glob path-relative pattern matches under the prefix');
+
+// 22b. globFiles with a path-relative literal finds the file itself.
+$g4 = Sandbox::globFiles('sub/deep.txt', null, $writeDir);
+ok(count($g4['matches']) === 1, 'glob path-relative literal matches the file');
+
 // 23. grep (skip symlinks: create a symlink to outside secret; if fails skip)
 $linkInR = $readOnly . '/evillink';
 $linkOk = @symlink($secretFile, $linkInR);

@@ -3585,15 +3585,13 @@ class Sandbox {
         if ($root !== null && trim((string)$root) !== '') {
             $base = self::jail($root, $roots, 'glob');
         } else {
-            // A pattern like "ui/js/*.js" is itself relative to a root.
-            $base = null;
-            $prefix = trim(dirname($pattern), '.');
-            $probe = $prefix === '' ? '' : $prefix;
-            if ($probe !== '' && strpos($probe, '*') === false) {
-                try { $base = self::jail($probe, $roots, 'glob'); }
-                catch (\RuntimeException $e) { $base = null; }
-            }
-            if ($base === null) { $base = $roots[0]; }
+            // A pattern like "ui/js/*.js" is itself relative to a root, so
+            // the whole pattern is matched from the root. Matching it under
+            // the jailed prefix instead prepends the directory twice, and
+            // "training/*" searches training/training/* -- zero matches,
+            // which is the loop training mode hit live. The realpath +
+            // within() filter below stays the guard against escapes.
+            $base = $roots[0];
         }
 
         $matches = glob($base . '/' . ltrim($pattern, '/'), GLOB_BRACE);
