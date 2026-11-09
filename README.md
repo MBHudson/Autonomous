@@ -39,13 +39,13 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v443 — glob_files and grep_code stop rejecting the `pattern` they ask for 🩹
+### 🆕 v444 — Training mode gains the brute-force note ⚡
 
-*A model sending the documented `{"pattern":"training/*"}` was told to "retry the step with that shape" — so it resent the identical call, forever. The unwrapper only knew fields named `path` or `arg`; it now knows `pattern` too, and the loop is gone.*
+*The drill brief now opens with the two-pass trick: run an agent through once (2–4 minutes, mixed results), run it again, and 100% (12 calls / 0 retries) is the common outcome on models above ~1.5b parameters — the system keeps only the winning syntax from there on.*
 
 | | |
 |---|---|
-| 🩹 **Correct args accepted** | `{"pattern":"…"}` unwraps like `{"path":"…"}` already did — no more identical-call loop |
+| ⚡ **Brute-force training note** | first bullet of the Training mode brief: two passes, winning syntax kept |
 ---
 
 ## 🧭 Contents
@@ -1176,6 +1176,7 @@ And when a reply still misses: 🔍
 
 The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains the mode with **Start** and **Cancel** (Stop + recap once running). While armed: 🚦
 
+- ⚡ **Speed up custom forming harnesses and learning dialect via a brute force training method.** This method is especially successful on models above the 1.5b parameters mark (1.4-1.9gb) but not typically any lower. Run the agent through the 1st time, takes around 2-4 minutes with varying degrees of success. Run that same agent a 2nd time, and it's more common to see a 100% success rate (12 calls/0 retries) than anything lower. The system remembers only successful calls and makes sure to use the winning syntax from that point forward. 🏆
 - 🐢 **~50% request rate** — every active agent is throttled to half pace (`TRAINING_THROTTLE = 0.5` in `ui/js/training.js`), so the drill exercises patience as well as tools. ⏳
 - 🔒 **One drill, nothing else** — the system prompt locks to 12 steps in `training/`, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → `edit_file` 🩹, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `exec` ⌨️, and a final `todo_write` to mark everything done. Approval-gated steps (write/edit/exec) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
 - 🔁 **Retry until it passes** — a failed step is never skipped; the error comes back with the shape to retry with, so a miss becomes practice instead of a skip. Each pass is logged with `todo_write`. ✅

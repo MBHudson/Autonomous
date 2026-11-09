@@ -18,6 +18,10 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## ⚡ Training mode brief opens with the brute-force note *(`VERSION` 444, docs-only — no cache-buster bump)*
+
+*The "Training mode — the full brief" list gains a first bullet at the user's words: brute-force the drill to speed up custom forming harnesses and dialect learning; best above the 1.5b-parameter mark, ~2–4 minutes the first pass, commonly 12 calls / 0 retries the second, with only the winning syntax kept. README-only, so `APP_VERSION` stays at v427.*
+
 ## 🩹 glob_files and grep_code accept the `pattern` they ask for *(`VERSION` 443, cache-buster v426 → v427)*
 
 *A model sending the documented `{"pattern":"training/*"}` got back "needs pattern as a plain string — retry the step with that shape", resent the identical call, and looped forever: `pathText()` only unwrapped fields named `path` or `arg`, never `pattern`, so correct args read as missing and the retry hint re-prescribed the same shape. It now unwraps `pattern` too. Covered by `tests/js/toolPath.test.mjs`.*
