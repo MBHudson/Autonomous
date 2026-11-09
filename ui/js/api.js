@@ -831,6 +831,28 @@ class ApiClient {
 
       ingestNativeDelta(nativeState, obj, family);
 
+      // Anthropic types its stream, and two things live only in those typed
+      // frames: thinking arrives as its own delta type, and the stop reason on
+      // message_delta. Neither was read, so a thinking Claude rendered nothing
+      // in the thinking panel while it thought, and a max_tokens cut-off came
+      // back as an ordinary empty reply instead of "it ran out of budget".
+      // Read here, ahead of the usage branch below, because message_delta
+      // carries usage too and that branch returns early.
+      if (obj.type === 'content_block_delta' && obj.delta
+          && obj.delta.type === 'thinking_delta'
+          && typeof obj.delta.thinking === 'string' && obj.delta.thinking) {
+        reasoning += obj.delta.thinking;
+        onReasoning?.(obj.delta.thinking, reasoning);
+      }
+      if (obj.type === 'message_delta' && obj.delta
+          && typeof obj.delta.stop_reason === 'string') {
+        // Map Anthropic's spelling onto the OpenAI one the loop already reads,
+        // which is what turns a truncated reply into an actionable message.
+        finishReason = obj.delta.stop_reason === 'max_tokens'
+          ? 'length'
+          : obj.delta.stop_reason;
+      }
+
       // finish_reason is the difference between "the model had nothing to say"
       // and "the model ran out of tokens mid-thought". Without it both look
       // like an empty reply. Read it BEFORE the usage branch below, because

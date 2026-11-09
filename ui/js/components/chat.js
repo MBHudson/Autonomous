@@ -25,7 +25,7 @@ import { persistence } from '../persistence.js?v=428';
 import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning } from '../utils.js?v=428';
 import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=428';
 import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=428';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=428';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=428';
 import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=428';
 import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=428';
 import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=428';
@@ -1676,6 +1676,16 @@ _makeLiveNode(agent) {
       enabled = Array.from(new Set(enabled.concat(BROWSER_TOOLS)));
     }
 
+    // The operator's deny list is a policy, not a UI hint: a tool struck out
+    // in Config is neither advertised to the model nor runnable, even by an
+    // agent saved before the deny and even when a model names it anyway.
+    // runTool enforces the same list at the choke point every call passes.
+    const deniedTools = deniedToolNames();
+    if (deniedTools.length) {
+      const blocked = new Set(deniedTools);
+      enabled = enabled.filter(t => !blocked.has(t));
+    }
+
     if (!enabled.length) {
       // No tools means a single request, so there is no step boundary at which
       // a steering message could land. Without this loop, anything typed while
@@ -2153,6 +2163,11 @@ _makeLiveNode(agent) {
           result = await runTool(call.tool, call.arg, call.note, {
             agentId: agent.id, sessionId: this.currentSessionId,
             sandboxRoot,
+            // The exact set advertised to the model this turn. runTool refuses
+            // anything outside it: the registry is not a permission list, so a
+            // model that names read_file / exec on an agent whose panel never
+            // offered them must not get it run.
+            toolScope: enabled,
             // Carries who has already spoken in this reply, so ask_agent can
             // refuse to close a loop.
             chain: (commsCtx && commsCtx.chain) || [agent.id],
@@ -2333,11 +2348,19 @@ _makeLiveNode(agent) {
   /**
    * Where an agent's call actually goes: its own Endpoint when it has one,
    * otherwise the provider row's.
+   *
+   * A `{model}` in the URL is filled in from the agent's model id. The shipped
+   * Google preset is .../v1beta/models/{model}:generateContent, and nothing
+   * ever substituted it, so every Gemini call asked for a model literally
+   * named "models/{model}" and 404'd.
    */
   _endpointFor(agent, provider) {
-    return (agent && agent.endpoint && String(agent.endpoint).trim())
+    const raw = (agent && agent.endpoint && String(agent.endpoint).trim())
       || (provider && provider.endpoint)
       || '';
+    const model = String((agent && agent.model) || '').trim();
+    if (!raw || !model || !String(raw).includes('{model}')) return raw;
+    return String(raw).split('{model}').join(encodeURIComponent(model));
   }
 
   async _callAgent(prompt, agent, signal, liveNode, attachments, commsCtx) {

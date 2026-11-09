@@ -333,9 +333,27 @@ function handleCatalog($method, $segments, $body) {
         if (preg_match('~/chat/completions$~', $ep)) {
             $catalog = preg_replace('~/chat/completions$~', '', $ep) . '/models';
         } else {
-            $catalog = preg_replace('~/[^/]+$~', '', $ep) . '/models';
+            // Derive the catalog URL without eating a path that IS the root:
+            // .../v1, .../v1beta and .../v1beta/models are all roots, and the
+            // old "replace the last segment" turned them into .../models,
+            // .../models and .../v1beta/models/models -- 404s for Gemini and
+            // for anyone who typed a bare /v1 endpoint.
+            if (preg_match('~/models/?$~', $ep)) {
+                $catalog = rtrim($ep, '/');
+            } elseif (preg_match('~/models/[^/]+$~', $ep)) {
+                $catalog = preg_replace('~/[^/]+$~', '', $ep);
+            } elseif (preg_match('~/v\d+[a-z0-9.-]*$~i', $ep)) {
+                $catalog = rtrim($ep, '/') . '/models';
+            } else {
+                $catalog = preg_replace('~/[^/]+$~', '', $ep) . '/models';
+            }
         }
         $authHeader = ['Authorization: Bearer ' . $apiKey, 'x-api-key: ' . $apiKey];
+        // Gemini ignores Bearer and wants its own header (or ?key=) on the
+        // catalog fetch too, so "list models" worked everywhere but here.
+        if (stripos($catalog, 'googleapis.com') !== false) {
+            $authHeader[] = 'x-goog-api-key: ' . $apiKey;
+        }
     }
     if (!$catalog) {
         echo json_encode(['error' => 'Could not derive catalog URL']);

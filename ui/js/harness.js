@@ -304,10 +304,30 @@ export function contextLimitFor(model) {
  */
 export function defaultRpmFor(endpoint) {
   const host = hostOf(endpoint);
+  // A runner on this machine or the LAN has no quota to respect. Only
+  // localhost/127.0.0.1 used to match, so an LM Studio box at 192.168.x.x was
+  // paced at the generic 20/min and a local model that answers in 300ms
+  // behaved like a throttled free tier.
+  if (isLocalHost(host)) return 0;
   for (const [needle, rpm] of DEFAULT_RPM) {
     if (needle && host.includes(String(needle).toLowerCase())) return Number(rpm) || 0;
   }
   return 20;
+}
+
+/** Loopback, private, link-local or single-label: this box or the LAN. */
+export function isLocalHost(host) {
+  const h = String(host || '').toLowerCase().trim().replace(/^\[|\]$/g, '');
+  if (!h) return false;
+  if (h === 'localhost' || h === '::1' || h === '0.0.0.0') return true;
+  if (h.endsWith('.local')) return true;
+  if (/^127\./.test(h)) return true;
+  if (/^10\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (/^169\.254\./.test(h)) return true;
+  // A single-label name ("workstation", "nas") can only be a LAN box.
+  return !h.includes('.') && !/^[0-9.]+$/.test(h);
 }
 
 /** A one-line "what did we detect" string for hints and diagnostics. */

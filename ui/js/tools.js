@@ -1997,6 +1997,37 @@ function execCallOpts(arg) {
 }
 
 /**
+ * Tool names the operator struck out in Config -> Permissions -> Tools.
+ *
+ * The list used to only hide a tool in the picker: it was written to
+ * settings.deniedTools and to sandbox.denied_tools, and nothing at runtime
+ * ever read it. An agent saved before the deny -- or a model that simply named
+ * the tool -- still ran it. This is the read side; runTool is the enforcement.
+ */
+export function deniedToolNames() {
+  const saved = store.get('settings.deniedTools');
+  return Array.isArray(saved) ? saved.map(String).filter(Boolean) : [];
+}
+
+/**
+ * The tools one agent may actually use, derived the way the tool loop derives
+ * them: its own ticks (or the default set when it has none), the memory tools
+ * unless memory is off, and the always-on stop tool when it has a standing
+ * goal. Browser tools are added by the loop instead, because that flag is
+ * fetched asynchronously; they are allowed here regardless, and the server
+ * refuses them when the feature is off.
+ */
+export function toolsForAgent(agent) {
+  if (!agent) return [];
+  const ticked = Array.isArray(agent.tools) ? agent.tools.filter(Boolean) : defaultTools();
+  const out = agent.memory === false
+    ? ticked.slice()
+    : Array.from(new Set(ticked.concat(MEMORY_TOOL_NAMES)));
+  if (agent.alwaysOn) out.push(...ALWAYS_ON_TOOLS);
+  return Array.from(new Set(out)).filter(t => TOOL_REGISTRY[t]);
+}
+
+/**
  * Effective approval mode for one tool: 'allow', 'ask' or 'deny'.
  *
  * Precedence: Auto Deny wins over everything (the panic button: anything
@@ -2051,14 +2082,25 @@ export async function runTool(name, arg, noteName, ctx) {
   // check, so an approved call is the call that actually runs -- instead of
   // paying a model step to learn "reload the page".
   if (isUnboundTool(name)) autoBindSandboxOnce();
-  if (def.custom) {
-    const agent = agentFromCtx(ctx);
-    const enabled = agent
-      ? (Array.isArray(agent.tools) ? agent.tools : defaultTools())
-      : [];
-    if (!agent || !enabled.includes(name)) {
+  // The operator's deny list wins over everything, including an agent that
+  // still has the tool ticked from before the deny was saved.
+  if (deniedToolNames().includes(name)) {
+    return `denied: ${name} is switched off in Config \u2192 Permissions \u2192 Tools`;
+  }
+  // Which tools this turn may run. The loop hands over the exact set it
+  // advertised (memory, browser and always-on included); anything that did
+  // not come from the loop falls back to the agent's own panel. Checking only
+  // CUSTOM tools here let a model that named read_file / web_search / exec run
+  // it on an agent whose panel never offered it -- the registry is not a
+  // permission list.
+  const agent = agentFromCtx(ctx);
+  if (agent) {
+    const scope = Array.isArray(ctx?.toolScope) ? ctx.toolScope : toolsForAgent(agent);
+    if (!scope.includes(name)) {
       return `denied: ${name} is not enabled for this agent`;
     }
+  } else if (def.custom) {
+    return `denied: ${name} is not enabled for this agent`;
   }
   // Per-tool policy first: deny refuses outright (auto-deny says why),
   // allow skips the prompt, ask falls through to the Auto Approve check

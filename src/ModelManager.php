@@ -30,7 +30,10 @@ class ModelManager {
      *         max_tokens, messages (OpenAI-style array).
      */
     public function relay($spec) {
-        $endpoint = $spec['endpoint'] ?? '';
+        // A `{model}` in the URL is filled in before anything parses the host:
+        // the shipped Google preset carries it, and nothing substituted it, so
+        // every Gemini call asked for a model literally named "models/{model}".
+        $endpoint = self::expandEndpointModel($spec['endpoint'] ?? '', $spec['model'] ?? '');
         if (!preg_match('#^https?://#i', $endpoint)) {
             return ['error' => 'Invalid endpoint URL'];
         }
@@ -158,7 +161,7 @@ class ModelManager {
         // setting is invisible to the server that actually makes the call, so
         // selecting a proxy previously changed nothing at all.
         $spec['proxy'] = self::activeProxy($spec);
-        $endpoint = (string)($spec['endpoint'] ?? '');
+        $endpoint = self::expandEndpointModel($spec['endpoint'] ?? '', $spec['model'] ?? '');
         $apiKey = (string)($spec['api_key'] ?? '');
         $family = Harness::detect($spec);
 
@@ -349,6 +352,24 @@ class ModelManager {
     }
 
     /**
+     * Expand a `{model}` placeholder in an endpoint URL.
+     *
+     * The Google preset ships as
+     * https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+     * and no code path ever replaced the placeholder, so the request asked for
+     * a model literally named "models/{model}" and Google answered 404. Doing
+     * it here covers the relay, the streaming path and /query, which all take
+     * their endpoint from a provider or model row.
+     */
+    private static function expandEndpointModel($endpoint, $model) {
+        $url = (string)$endpoint;
+        if (strpos($url, '{model}') === false) { return $url; }
+        $id = trim((string)$model);
+        if ($id === '') { return $url; }
+        return str_replace('{model}', rawurlencode($id), $url);
+    }
+
+    /**
      * Restore empty JSON-Schema objects lost to PHP decoding.
      *
      * json_decode(..., true) turns BOTH [] and {} into PHP [], so a template
@@ -529,6 +550,11 @@ class ModelManager {
         // Bearer auth on this path while the relay detected the family
         // correctly -- the "works in the relay, breaks in /query" split.
         $family = Harness::detect($model);
+
+        // Same substitution the relay paths make, so an agent pinned to a
+        // provider URL with a `{model}` placeholder reaches /query too.
+        $model['endpoint'] = self::expandEndpointModel(
+            (string)($model['endpoint'] ?? ''), (string)($model['model'] ?? ''));
 
         // Build context-aware prompt
         $fullPrompt = $this->buildPromptWithContext($prompt, $sessionData, $model['role']);

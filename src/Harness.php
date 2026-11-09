@@ -161,8 +161,10 @@ class Harness {
             }
             if (strpos($host, 'openai.azure.com') !== false) return 'openrouter';
             if (strpos($host, 'api.openai.com') !== false) return 'openrouter';
-            if (strpos($host, 'localhost') !== false && self::pathIsOllama($path)) return 'ollama';
-            if (strpos($host, 'localhost') === false && self::pathIsOllama($path)) return 'ollama';
+            // One check, not two: the pair that used to sit here said
+            // "localhost AND ollama path" or "NOT localhost AND ollama path",
+            // which is just "the path is Ollama's".
+            if (self::pathIsOllama($path)) return 'ollama';
         }
         // Ollama addressed by IP:port, e.g. http://192.168.1.5:11434/api/chat.
         // Its OpenAI-compatible shim lives under /v1, which is the openrouter
@@ -363,15 +365,25 @@ class Harness {
         }
         switch ($id) {
             case 'anthropic':
-                if (isset($data['content'][0]['text'])) return $data['content'][0]['text'];
-                // Concatenate multi-block replies (text blocks only).
+                // EVERY text block, in order. The old early return on
+                // content[0].text handed back only the first of several, so a
+                // reply split across blocks arrived truncated -- and looked
+                // like the model had simply stopped.
                 if (isset($data['content']) && is_array($data['content'])) {
                     $out = '';
+                    $first = null;
                     foreach ($data['content'] as $b) {
-                        if (is_array($b) && ($b['type'] ?? '') === 'text') $out .= $b['text'] ?? '';
+                        if (is_string($b)) { $out .= $b; continue; }
+                        if (!is_array($b)) { continue; }
+                        if (($b['type'] ?? '') === 'text' && isset($b['text'])) {
+                            $out .= (string)$b['text'];
+                            if ($first === null) { $first = (string)$b['text']; }
+                        }
                     }
                     if ($out !== '') return $out;
+                    if ($first !== null) return $first;
                 }
+                if (isset($data['content']) && is_string($data['content'])) return $data['content'];
                 return null;
 
             case 'google':
@@ -577,6 +589,20 @@ class Harness {
         $model = strtolower((string)$model);
         $caps = [
             // model substring => hard output ceiling
+            //
+            // Anthropic has no default here, and the global maxTokens (16384)
+            // is above what the older Claude models allow, so every call to
+            // one of those 400s -- and a 400 is not retryable, so the turn
+            // dies instead of the ceiling being discovered. Order matters:
+            // the first substring that matches wins.
+            'claude-3-5-sonnet' => 8192,
+            'claude-3-5-haiku'  => 8192,
+            'claude-3-7-sonnet' => 64000,
+            'claude-sonnet-4'   => 64000,
+            'claude-opus-4'     => 32000,
+            'claude-3-opus'     => 4096,
+            'claude-3-sonnet'   => 4096,
+            'claude-3-haiku'    => 4096,
             'gemini-2.0-flash' => 8192,
             'gemini-1.5-flash' => 8192,
             'gemini-1.5-pro'   => 8192,
@@ -742,9 +768,31 @@ class Harness {
         ];
     }
 
+    /**
+     * Loopback, private, link-local or single-label: this machine or the LAN.
+     * Mirrors isLocalHost() in ui/js/harness.js.
+     */
+    public static function isLocalHost($host) {
+        $h = strtolower(trim((string)$host, "[] \t"));
+        if ($h === '') return false;
+        if ($h === 'localhost' || $h === '::1' || $h === '0.0.0.0') return true;
+        if (substr($h, -6) === '.local') return true;
+        if (preg_match('#^127\.#', $h)) return true;
+        if (preg_match('#^10\.#', $h)) return true;
+        if (preg_match('#^192\.168\.#', $h)) return true;
+        if (preg_match('#^172\.(1[6-9]|2\d|3[01])\.#', $h)) return true;
+        if (preg_match('#^169\.254\.#', $h)) return true;
+        // A single-label name ("workstation", "nas") can only be a LAN box.
+        return strpos($h, '.') === false && !preg_match('#^[0-9.]+$#', $h);
+    }
+
     /** The host's default RPM, or 20 when the host is unknown. */
     public static function defaultRpmFor($endpoint) {
         $host = strtolower((string)(parse_url((string)$endpoint, PHP_URL_HOST) ?: ''));
+        // A runner on this machine or a LAN box has no quota to respect. Only
+        // localhost/127.0.0.1 matched before, so an LM Studio server at
+        // 192.168.x.x was paced at the generic 20/min.
+        if (self::isLocalHost($host)) return 0;
         foreach (self::defaultRpm() as $needle => $rpm) {
             if ($needle !== '' && strpos($host, strtolower($needle)) !== false) return (int)$rpm;
         }

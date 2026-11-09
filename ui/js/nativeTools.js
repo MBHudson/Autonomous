@@ -145,6 +145,32 @@ export const NATIVE_FAMILIES = new Set(['openai', 'anthropic', 'google']);
 const CUSTOM_SCHEMA = { type: 'object', properties: {}, additionalProperties: true };
 
 /**
+ * Schema keys Gemini's `parameters` proto has no field for.
+ *
+ * `functionDeclarations[].parameters` is a bare OpenAPI 3.0 subset, not JSON
+ * Schema: an unknown key is a parse error, and the error fails the whole
+ * request rather than the one declaration. `additionalProperties` is the one
+ * that matters, because every schema above is built with it; the rest are the
+ * same class of problem.
+ */
+const GOOGLE_UNSUPPORTED = new Set([
+  'additionalProperties', '$schema', '$ref', '$defs', 'definitions',
+  'patternProperties', 'propertyNames', 'title', 'default', 'examples',
+]);
+
+/** Recursively drop the keywords Gemini rejects, keeping the schema's shape. */
+function googleSchema(schema) {
+  if (Array.isArray(schema)) return schema.map(googleSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (GOOGLE_UNSUPPORTED.has(key)) continue;
+    out[key] = googleSchema(value);
+  }
+  return out;
+}
+
+/**
  * Build the provider-specific tool definitions for an enabled tool list.
  * @param {Array<{name:string,description?:string}>} defs
  * @param {'openai'|'anthropic'|'google'} family
@@ -164,9 +190,15 @@ export function nativeToolDefs(defs, family) {
     }));
   }
   if (family === 'google') {
-    return [{ functionDeclarations: list.map(d => ({
-      name: d.name, description: d.description, parameters: d.parameters,
-    })) }];
+    return [{ functionDeclarations: list.map(d => {
+      const parameters = googleSchema(d.parameters);
+      const props = parameters && parameters.properties ? Object.keys(parameters.properties) : [];
+      // Gemini's docs say to leave `parameters` unset when a function takes
+      // none; an empty properties object is the shape it is least happy with.
+      return props.length
+        ? { name: d.name, description: d.description, parameters }
+        : { name: d.name, description: d.description };
+    }) }];
   }
   return list.map(d => ({
     type: 'function',

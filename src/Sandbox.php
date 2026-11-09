@@ -2491,6 +2491,10 @@ class Sandbox {
         if (!is_file($full)) { throw new \RuntimeException("insert: not a file: $full"); }
         $raw = @file_get_contents($full);
         if ($raw === false) { throw new \RuntimeException("insert: cannot read $full"); }
+        // Keep the file's OWN line endings. Splitting on \r\n and writing back
+        // with \n rewrote every line of a CRLF file, so one insert turned into
+        // a whole-file diff on any Windows checkout.
+        $eol = strpos($raw, "\r\n") !== false ? "\r\n" : "\n";
         $lines = preg_split('/\r\n|\r|\n/', $raw);
         $line = (int)$line;
         if ($line < 0 || $line > count($lines)) {
@@ -2499,7 +2503,7 @@ class Sandbox {
         }
         $block = explode("\n", str_replace(["\r\n", "\r"], "\n", (string)$text));
         array_splice($lines, $line, 0, $block);
-        $bytes = @file_put_contents($full, implode("\n", $lines));
+        $bytes = @file_put_contents($full, implode($eol, $lines));
         if ($bytes === false) { throw new \RuntimeException("insert: cannot write $full"); }
         return ['path' => $full, 'inserted_after' => $line, 'lines' => count($lines), 'bytes' => $bytes];
     }
@@ -2602,8 +2606,13 @@ class Sandbox {
                 if (!is_file($full)) { throw new \RuntimeException("apply_patch: update failed, not a file: $rel"); }
                 $rawFile = @file_get_contents($full);
                 if ($rawFile === false) { throw new \RuntimeException("apply_patch: cannot read $rel"); }
+                // Matching happens on LF, but the file is written back in its
+                // own ending: converting a CRLF file whole-file is how one
+                // patch used to rewrite every line of the target.
+                $eol = strpos($rawFile, "\r\n") !== false ? "\r\n" : "\n";
                 $rawFile = str_replace(["\r\n", "\r"], "\n", $rawFile);
                 $updated = self::applyHunks($rawFile, $hunkLines, $rel);
+                if ($eol === "\r\n") { $updated = str_replace("\n", "\r\n", $updated); }
 
                 $dest = $full;
                 if ($moveTo !== null && $moveTo !== '') {
