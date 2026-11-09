@@ -1103,8 +1103,22 @@ class Sandbox {
 
         for ($i = $from; $i < count($argv); $i++) {
             $a = $argv[$i];
-            // Skip flags and option values that are obviously not paths.
-            if ($a === '' || $a[0] === '-' || strpos($a, '=') !== false) { continue; }
+            if ($a === '') { continue; }
+            // A long option can CARRY its path: `--output=/etc/x` is the same
+            // target as `-o /etc/x`, and skipping every argument that merely
+            // contained an `=` meant only the space-separated spelling was
+            // ever checked. `curl --output=...`, `wget --output-document=...`
+            // and `tar --directory=...` all wrote outside the jail that way.
+            // Check the value; the option name itself is still a flag.
+            if ($a[0] === '-') {
+                $eq = strpos($a, '=');
+                if ($eq === false) { continue; }
+                $a = substr($a, $eq + 1);
+                if ($a === '') { continue; }
+            } elseif (strpos($a, '=') !== false) {
+                // Not an option at all: a bare key=value argument is not a path.
+                continue;
+            }
             // URLs and glob metacharacters are not resolved as paths here.
             if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $a)) { continue; }
             if (strpbrk($a, '*?[') !== false) { continue; }
