@@ -298,7 +298,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🖥️ | **Agent-opened programs** | An agent may **name** a program on your list and it opens **detached**, so the window outlives the reply — closed gracefully, always by the binary and never by name, and audited as *started* |
 | ⌨️ | **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
 | 🕵️ | **Masked reads** | The config routes answer `********` instead of your access token, keys and friend tokens — and the write path restores the real value |
-| 🏠 | **Local-only mode** | Until a token is set, only requests from this machine are answered — anything else gets **403** |
+| 🏠 | **Local-only mode** | Until a token is set, only requests from this machine are answered — anything else gets **403** — and a reverse proxy is judged by the client it forwards, not by its own loopback address |
 | 📱 | **Mobile-first** | Built for the phone in your pocket: the composer rides above the open keyboard, URL-bar wiggles are ignored, and an **Allow** choice finally sticks |
 
 ---
@@ -741,22 +741,33 @@ which *were* protected.** 🚪🔓
   address is **not loopback** gets **`403 {"error":"local requests only"}`**, plus the one-liner that fixes it:
   `./setup-token.sh` (or `start.bat -Token` on Windows), then paste the token into **Config → Access token**
   on each device — after which the copy is reachable from anywhere again, which is what a token is for. 🔑
-- 🔁 **Three spellings of "this machine"** count as local: `127.0.0.1`, `::1`, and the IPv4-mapped
-  `::ffff:127.0.0.1` that some Windows stacks report. All three are asserted in the suite, along with a LAN
-  address, another private address and a public one — none of which are local. 🧪
-- 🕳️ **No peer address at all passes** (the CLI, and PHP's built-in server before it has bound). There is no
-  network path there to refuse — and refusing it would only break the tooling that runs on the same machine. 🖥️
+- 🔁 **Loopback means all of `127.0.0.0/8`**, plus `::1` and the IPv4-mapped `::ffff:127.0.0.1` that some
+  Windows stacks report. Every spelling is asserted in the suite, along with a LAN address, another private
+  address and a public one — none of which are local. 🧪
+- 🧱 **A reverse proxy no longer defeats it.** The rule used to trust the socket peer alone, so nginx or
+  Apache on the same host connected from `127.0.0.1` and **every internet visitor looked local**. A forwarding
+  header (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`, `CF-Connecting-IP`) now marks a request as proxied, and
+  the client is read from it **only when the peer is a proxy you listed** in `sandbox.trusted_proxies`
+  (`storage/config.json`; addresses or CIDR — `["127.0.0.1", "10.0.0.0/8"]`). An **undeclared** proxy is
+  refused outright, because the header is then just something the caller typed. `X-Forwarded-For` is read from
+  the **right**, so a spoofed left-most `127.0.0.1` cannot win. 🔍
+- 🔧 **The proxy has to forward the client.** The check needs the header to exist: nginx wants
+  `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`, and a bare Apache `ProxyPass` sends nothing.
+  A proxy that forwards no address is indistinguishable from a local request at the HTTP layer — which is
+  what the switch below is for.
+- 🎚️ **Config → Permissions → Remote access → "Judge proxied requests by the client"** turns the whole
+  rule off (default **on**). Off restores the socket-peer test, and is only right when your proxy forwards no
+  client address at all — with the gate off and no token, it reopens exactly the hole described above.
+  Saved as `sandbox.local_only_strict`; a config written before the key existed keeps it **on**. 🛡️
+- 🕳️ **No peer address passes only in the CLI.** A web request without one is a broken SAPI, not a local
+  visitor, so it is refused instead of inheriting the CLI exemption. 🖥️
 - 🎭 **The `Host` header is deliberately not consulted.** It is client-supplied, so a rule like "the Host
   matched the peer address" would let anyone in by naming **their own** address in the request. The decision
-  is made on the **socket**, not on anything the caller wrote. 🚫
+  is made on the **socket** — or, behind a declared proxy, on the address that proxy forwards. 🚫
 - 🤝 **The MCP RPC route is exempt, on purpose.** `POST /api/mcp-server` exists for other machines and keeps
   its own **per-friend Bearer token** with a **read / write / exec** scope ceiling, an optional IP allowlist
   and one-click revoke (§12). It is the one door this rule must leave open — and it is a *door*, not a hole:
   the caller is authenticated before anything runs. 🔐
-- ⚖️ **The honest edge:** a request arriving through a **reverse proxy on the same host** has the proxy as
-  its peer, so it looks local and passes. That is the operator's own configuration rather than a stranger's
-  path (§4, *the jail*), and the answer is the same as everywhere else in this app: **set a token** and the
-  question stops mattering. 🧱
 
 ### 🧾 22. The trace is written by this app alone
 
@@ -1566,7 +1577,7 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 ## 🧯 Troubleshooting
 
 - **"PHP's curl extension is not enabled"** → the server was started without the launcher (e.g. a bare `php -S`). Use `start.bat` / `start.sh`, or run `php serve.php --setup`.
-- **Every request returns 401** → the **Access token** isn't pasted on this device. The token is per-device; paste it in **Config → Access token**. A **403 `local requests only`** is a different thing: this copy has no token set and is answering this machine only (§21) — run `./setup-token.sh` (Windows: `start.bat -Token`), then paste that token on the phone as well as the PC.
+- **Every request returns 401** → the **Access token** isn't pasted on this device. The token is per-device; paste it in **Config → Access token**. A **403 `local requests only`** is a different thing: this copy has no token set and is answering this machine only (§21) — run `./setup-token.sh` (Windows: `start.bat -Token`), then paste that token on the phone as well as the PC. If a reverse proxy sits in front, list it in `sandbox.trusted_proxies` (§21), or the 403 will not clear.
 - **Phone shows an empty UI or immortal 401s** → a **split-brain** load. Deploy the **whole `ui/` folder** (never single files) and hard-refresh — mixing module versions gives each its own store.
 - **Agents "won't use tools"** → check for a **global pre-prompt** that says "reply with ONLY text / N words" — it fights the tool protocol. The tool instructions now override it and the loop re-prompts once, but turning it off is cleanest. A fleet-wide house rule is fine — just remember it **prepends** to each agent's prompt by default (or **replaces** it if you flip the toggle in the editor).
 - **An agent's badge says HELD and nothing happens** → it's parked. A **cap** (Config → Limits & Budgets → *Max iterations* / *Max minutes*) held it, or you stopped it by hand. Click **Config → Permissions → RELEASE HELD AGENTS** (or toggle the master switch off and on). To loop forever, set both caps to **`0`** and give the agent a real standing goal — a goal of `idle` gives it nothing to aim at, so it will wander.
