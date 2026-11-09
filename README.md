@@ -596,6 +596,9 @@ that **makes the real request** and fails loudly when a path comes back:
 
 Run them with the rest of the suite (*Tests*, below). 🌱
 
+- 🚫 `tests/php/recursiveRead.test.php` — runs the real exec path guard against a temporary tree that holds `storage/`: `grep -r` and `du` over the root are refused and the entry is named, the same command narrowed to a clean subdirectory runs, and `cat` on an ordinary file is untouched.
+- ✂️ `tests/js/directCall.test.mjs` — drives the real `Chat._callAgentCore` with streaming off and only `api.callProvider` stubbed, so a body cut off at the token ceiling produces the truncation sentence (model name and the **Config → Limits & Budgets** pointer included) instead of "the provider returned an empty response".
+
 ### 🌐 18. Closed by default in the browser, too
 
 - 🚫 **No CORS wildcard — deliberately.** The API used to answer with
@@ -1493,7 +1496,7 @@ The UI is **mobile-first** — touch controls, a responsive layout, an icon rail
 │   ├── php/              # 20 files: sandbox · programs · secrets · setupToken ·
 │                         #   tls · update · mcp · mcpServer · mcpStdio · guards ·
 │                         #   apacheGuards · nginxGuards · layers · docs  (run.php)
-│   └── js/               # 24 files: context · curl · harness · ifaceMode ·
+│   └── js/               # 30 files: context · curl · harness · ifaceMode ·
 │                         #   latency · nativeTools · toolCalls · sandboxBinding ·
 │                         #   rebindButton · localEndpoints   (run.mjs)
 ├── screenshots/
@@ -1529,7 +1532,7 @@ Either half runs on its own, which is what you want while working on one of them
 | --- | --- |
 | 🧪 `node tests/run.mjs` | Both suites, PHP then JS |
 | 🐘 `php tests/php/run.php` | PHP only — sandbox, **desktop programs** (`programs.test.php`: the operator's list as the whole allowlist, the detached launch, binary-path matching, real kill verdicts and the un-forgeable trace), **masked secrets** (`secrets.test.php`: masks going out, restores coming back, and who may ask when there is no token), the **token recovery script** (`setupToken.test.php`), harness, MCP client/server, HTTP guards (`serve.php`, Apache `.htaccess`, and the nginx rules via PCRE), and the CSS/JS **layer audit** |
-| 🟨 `node tests/js/run.mjs` | JS only — 24 files: context, curl, harness, interface mode, latency, native tools, tool calls and markup stripping, sandbox binding, the rebind button, backup sections, comms, rate governor, `localEndpoints` |
+| 🟨 `node tests/js/run.mjs` | JS only — 30 files: context, curl, harness, interface mode, latency, native tools, tool calls and markup stripping, sandbox binding, the rebind button, backup sections, comms, rate governor, `localEndpoints`, direct-call truncation |
 | 🌱 `php tests/freshClone.php` | **Both suites, in a fresh copy** of the tree in the temp dir — the same check a clone gets, run every time (needs `git`, which supplies the file list). `--head` clones the last commit instead of the working tree; `--keep` keeps the copy. Deleted on success, kept when something fails. Ends every run — pass or fail — with its measured total, split by phase: `took: 37.6s  (copy 6.9s, PHP 28.3s, JS 2.4s)` |
 | 🛡️ `./tools/check-guards.sh` | The serving refusals against a live copy — `--serve` boots `serve.php` on a free port and checks this tree, or pass a URL; `--token` requires an authenticated `200` |
 
