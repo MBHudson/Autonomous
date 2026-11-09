@@ -231,15 +231,41 @@ class Install
                 if ($dir === '') {
                     continue;   // the root probe above is this folder
                 }
-                $p = self::appDir() . '/' . $dir . '/.router-write-probe';
+                $full = self::appDir() . '/' . $dir;
+                // A release can ADD a folder that does not exist yet -- this one
+                // adds .github/workflows. Writing a probe into a missing
+                // directory fails with "No such file or directory", for root and
+                // for www-data alike, and this reported that as a permission
+                // refusal: an install was stopped with nothing wrong with it.
+                // Ask the deepest folder that DOES exist instead, because put()
+                // creates every level under a writable parent with mkdir(..., true).
+                $probeDir = $full;
+                while (!is_dir($probeDir) && dirname($probeDir) !== $probeDir) {
+                    $probeDir = dirname($probeDir);
+                }
+                // A plain file where a folder has to go is not a permission
+                // problem, and finding it here costs one probe instead of a
+                // half-finished install.
+                $clash = '';
+                for ($up = $full; $up !== $probeDir; $up = dirname($up)) {
+                    if (file_exists($up)) { $clash = $up; break; }
+                }
+                if ($clash !== '') {
+                    $blocked = $dir;
+                    $problems[] = 'The update has to create ' . $dir . '/, but ' . $clash
+                        . ' is a file, not a folder. Nothing has been changed.';
+                    break;
+                }
+                $p = $probeDir . '/.router-write-probe';
                 $can = @file_put_contents($p, 'probe') !== false;
                 if ($can) {
                     @unlink($p);
                     continue;
                 }
                 $blocked = $dir;
-                $problems[] = 'The web server cannot write to ' . $dir . '/, which this release updates. '
-                    . 'Nothing has been changed. Give the web server write access to that folder, or run '
+                $problems[] = 'Cannot write to ' . ($probeDir === $full ? $dir . '/' : $probeDir . '/,')
+                    . ' which this release updates. Nothing has been changed. Give the account running'
+                    . ' the install write access there, or run '
                     . self::TERMINAL_COMMAND . ' from a terminal with your own account.';
                 break;
             }

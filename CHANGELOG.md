@@ -84,6 +84,16 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🐧 The update that refused to create a folder *(`VERSION` 435, no browser file changed)*
+
+*`v427` added `.github/workflows/tests.yml`, and from then on some copies could not install anything at all: "The web server cannot write to .github/workflows/". Running the installer as `root` said the same thing, which was the clue -- a permission error that survives `sudo` is not a permission error.*
+
+**The folder did not exist.** `preflight()` writes a probe file into every folder the plan will write into, and `file_put_contents` into a directory that is not there fails with "No such file or directory" -- for root as much as for `www-data`. `apply()` was never the problem: `put()` calls `mkdir(..., true)` and would have created the folder on the way past. The probe asks the deepest folder that DOES exist now, so a release that adds a folder passes the question it was failing.
+
+**A file where a folder has to go is reported as such.** If a plain file occupies one of those levels, the message says that instead of pointing at permissions, and it still says it before anything is replaced.
+
+**Already stuck on an older copy?** The fixed preflight only arrives with this release, so unblock the current one by hand: `sudo mkdir -p .github/workflows && sudo chown --reference=. .github/workflows`, then install again from the app or from the terminal. `--reference=.` copies the owner and group of the app folder itself, so no account has to be guessed.
+
 ## 🔐 The push section works on someone else's machine *(`VERSION` 434, no browser file changed)*
 
 *`RELEASING.md` gained the workflow-scope section in v432, and two details in it were true only on the machine that wrote it.*

@@ -430,6 +430,24 @@ ok(count($ages) === Install::BACKUP_KEEP
     && abs($ages[0] - 600) < 60 && abs($ages[1] - 1200) < 60,
     'old rollback copies are pruned -- the two NEWEST survive, the two oldest go');
 
+// --- 6. a release that ADDS a folder -----------------------------------
+// .github/workflows did not exist on the host that first met one. The probe was
+// written into it anyway, failed with "No such file or directory", and the
+// preflight reported that as a permission refusal -- stopping an install that
+// put() would have completed, because put() creates the folder itself.
+build($app, '360', null, [
+    ['path' => '.github/workflows/tests.yml', 'status' => 'new', 'from' => null, 'to' => 24],
+]);
+put($app . '/storage/updates/staging/Autonomous-master/.github/workflows/tests.yml', "name: tests\n");
+ok(!is_dir($app . '/.github'), 'the folder this release adds does not exist yet');
+$pre = Install::preflight();
+ok($pre['ok'] === true, 'a MISSING folder the release adds is not a locked one');
+ok($pre['blocked'] === null, 'and no folder is named as blocked');
+ok(!is_dir($app . '/.github'), 'asking the question did not create the folder');
+$res = Install::apply();
+ok($res['ok'] === true && is_file($app . '/.github/workflows/tests.yml'),
+    'apply creates the missing folder and writes the file into it');
+
 // --- report -----------------------------------------------------------
 rmTree($tmp);
 Install::useRoot(null);

@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v434 — the push section works on someone else's machine 🔐
+### 🆕 v435 — the update that refused to create a folder 🐧
 
-*The workflow-scope section shipped with this machine's absolute path in it, and with advice that v433 had already made stale.*
+*The preflight writes a probe file into every folder a release touches. A release that **adds** a folder has nothing to write it into, so the probe failed — and that was reported as a permission refusal, even under `sudo`.*
 
 | | |
 |---|---|
-| 🔐 **A path the helper can find anywhere** | it reads `$(git rev-parse --show-toplevel)/.gh-workflow-token`, so the snippet works from any clone instead of publishing one directory layout |
-| ✅ **The ignore advice matches the repo** | it says the tracked `.gitignore` already covers the name, and keeps `.git/info/exclude` named as the per-clone second line |
+| 🐧 **A missing folder is not a locked one** | the probe asks the deepest folder that exists, which is where `mkdir` would create the rest, so `.github/workflows/` no longer blocks an install that would have worked |
+| 🔐 **A file in the way is named honestly** | when something that is not a folder occupies the path, the message says so instead of blaming permissions, and says it before a single file is replaced |
 ---
 
 ## 🧭 Contents
