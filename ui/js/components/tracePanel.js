@@ -26,11 +26,11 @@
 // The two renderers are exported so the per-agent drawer on the map can show
 // the same rows filtered to one agent instead of re-implementing them.
 
-import { store } from '../store.js?v=425';
-import { esc } from '../utils.js?v=425';
-import { recent, clear, stats } from '../trace.js?v=425';
-import { api } from '../api.js?v=425';
-import * as comms from '../commsLog.js?v=425';
+import { store } from '../store.js?v=426';
+import { esc } from '../utils.js?v=426';
+import { recent, clear, stats } from '../trace.js?v=426';
+import { api } from '../api.js?v=426';
+import * as comms from '../commsLog.js?v=426';
 
 function fmtTime(t) {
   try { return new Date(t).toLocaleTimeString([], { hour12: false }); } catch { return ''; }

@@ -464,7 +464,7 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: flex-end;
-  gap: 4px;
+  gap: 8px;
   max-height: 45%;
   overflow: hidden;
   pointer-events: none;

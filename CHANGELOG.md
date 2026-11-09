@@ -18,6 +18,12 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 📖 The harness guide folds away; prompt ticks breathe *(`VERSION` 442, cache-buster v425 → v426)*
+
+*The v441 "Auto Forming Harnesses, Dialects & Training Mode" section now matches most other sections: title, screenshot and brief on show, the four subsections inside a collapsed drawer. The What's-new slot swaps to this release; the guide's What's-inside row stays, since it still describes where the feature lives.*
+
+*The only behaviour change is spacing: the prompt rail's per-prompt jump ticks (`.prompt-rail` in `ui/css/chat.css`) go from a 4px to an 8px gap, so neighbouring ticks are easier to tell apart and tap. `APP_VERSION` 425 → 426 in `ui/js/store.js`, every `?v=` under `ui/js/**`, and both `index.html` files.*
+
 ## 📖 Harnesses, dialects & training get their own guide *(`VERSION` 441, no cache-buster bump — no browser file changed)*
 
 *The auto-fit, the manual pins and the drill lived in three different sections — the new README section "Auto Forming Harnesses, Dialects & Training Mode" covers them end to end, with the training-mode screenshot above its intro and a link in Contents, so pinning a harness, forcing a dialect and running the fleet drill are all one page away.*

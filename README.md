@@ -39,13 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v441 — Harnesses, dialects & training get their own guide 📖
+### 🆕 v442 — The harness guide folds away, and prompt ticks breathe ↔️
 
-*The auto-fit, the manual pins and the drill lived in three different sections — now [one guide](#-auto-forming-harnesses-dialects--training-mode) covers them end to end with the training-mode screenshot, so pinning a harness, forcing a dialect and running the fleet drill are all one page away.*
+*The harness/dialect/training section now opens as its title plus the two-sentence brief, with the full manual one click away like most other sections — and the prompt rail's jump ticks down the transcript's right edge sit twice as far apart, so neighbouring prompts are easier to tell apart and hit.*
 
 | | |
 |---|---|
-| 📖 **One guide for harness, dialect & drill** | detection order, both Brain Lab pins and the 12-step training drill, screenshotted and in a single section |
+| 📖 **Guide folds into a drawer** | title, screenshot and brief stay visible; detection order, pins and the 12-step drill expand on click |
+| ↔️ **Roomier prompt ticks** | rail gap doubled, so each jump tick is easier to read and tap |
 ---
 
 ## 🧭 Contents
@@ -1141,6 +1142,9 @@ Free, quantised models that used to burn **6–8 calls** guessing now get it rig
 
 Every agent meets every provider through the same door 🚪: the **harness** decides *how* to call it and *which tool dialect* to teach it — automatically, on every request. When you'd rather choose yourself, two dropdowns in 🧠 Brain Lab pin either one per agent. And 🏋️ **Training mode** is where the fleet proves it can use the tools at all: one paced drill, every active agent, all at once. This section is the full manual for all three — the auto-fit, the manual pins, and the drill. 📖
 
+<details>
+<summary>Detection order, manual pins and the 12-step drill</summary>
+
 ### 🤖🔌 How the auto-fit works
 
 One registry decides per request — `src/Harness.php` in PHP, generated into `ui/js/harness.data.js` by `php tools/gen-harness.php`, so the browser copy can never drift from the server: 🧬
@@ -1181,6 +1185,8 @@ The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains th
 - 🧱 **The jail still applies** — the drill resolves under the agent's writable root, never outside it. 🔒
 
 Happy drilling! 💪🚀
+
+</details>
 
 ---
 ## ⏱️ Throttle / limiter / pacer
