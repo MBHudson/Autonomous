@@ -1,70 +1,4 @@
 <!--
- ## 💡 The Proxy tab says what it skips *(`VERSION` 410, cache-buster v409 → v410)*
-
-*The Proxy tab could only say "active: 1.2.3.4:8080". Since v408 the relay calls local endpoints directly, so that line was true for the internet and false for the runner the operator was actually watching -- the one case where "is it proxied?" decides whether a model answers.
-
-**A note under the proxy list.** When a proxy is selected and any configured provider lives on this network, the tab names those hosts and says they are called directly. It reads the provider list the app already has, so it needs no new request.
-
-**The rules live in one place.** `ui/js/localEndpoints.js` mirrors `Tls::isLocalUrl` -- loopback, RFC1918, CGNAT, link-local, `.local`/`.lan`/`.internal` names, docker host aliases and bare hostnames. It is display only: the decision stays in the server, per call, and the file says so at the top so it is never mistaken for a gate.
-
-**What it prevents.** A proxied-looking tab invites exactly the wrong fix -- changing an endpoint that was never being proxied, or clearing a proxy that was never in the path. The note makes the real route visible, and stays silent when every provider is remote.
-
-## 🧭 One proxy setting, on the server *(`VERSION` 409, cache-buster v408 → v409)*
-
-*2026-11-08. The same install worked on the PC and failed on the phone. The endpoint and the server were identical; what differed was a proxy choice saved per device. Chat sent it with every call, and the relay let a supplied proxy win outright, so one browser could route around the server setting -- and, after v408, around the LAN bypass too, since the endpoint check ran after the spec was preferred.*
-
-**The browser no longer votes.** All four places chat built a spec -- the snippet streaming path, the raw passthrough, the one-shot relay and the template call -- carried `proxy: settings.proxyActive`. They do not any more: the Proxy tab already writes `sandbox.proxy_active` on the server, which is where the call is made.
-
-**What that fixes.** A stale per-device value can no longer outlive a clear on another device, and a phone cannot keep a dead proxy alive for its own calls. The Proxy tab still highlights the active row, so the setting is still visible; it is simply not duplicated per browser.
-
-## 🔌 A proxy is for leaving the network *(`VERSION` 408, cache-buster v407 → v408)*
-
-*2026-11-08. After activating a proxy in the Proxy tab, a local LM Studio stopped answering for every client -- and turning the proxy off changed nothing. Two faults, and only one of them was the proxy being dead.*
-
-**Clearing wrote half the setting.** `_setActiveProxy()` saved the choice in the browser and on the server. `_clearActiveProxy()` -- the Clear Selection button -- wrote only the browser one, then toasted "Proxy cleared -- using direct connection", while `sandbox.proxy_active` in `storage/config.json` kept sending every relay, stream and audio call through it. Removing the active entry had the same hole. Both now clear the server too, and say so only when it confirms.
-
-**A proxy cannot reach the LAN.** `ModelManager::activeProxy()` returned the selected proxy for any endpoint, and a per-request `proxy` from the browser won outright -- so a runner at `http://10.0.0.128:1235/...` was asked for through a public proxy that has no route to it. Loopback, private, link-local and `.local` endpoints now always go direct, whichever side supplied the proxy; a public endpoint still uses it.
-
-**Why the model list looked alive while chat did not.** Reading a provider catalog and talking to a model are different requests, and the failure text for a proxied call is a curl error, which reads as a dead server. The endpoint also decides the catalog URL: `.../api/v1/chat` derives `.../api/v1/models`.
-
-## 📵 The door says why it is shut *(`VERSION` 407, cache-buster v406 → v407)*
-
-*2026-11-08. A phone stopped reaching the local LM Studio after an update; the desktop kept working. The cause was not the model. With `require_token` off, `/api/*` answers only loopback peers, and a phone is a LAN peer, so every call got `403 local requests only`. Proven by serving the app on `0.0.0.0`: `/api/state` is 200 over loopback and 403 over the LAN address.*
-
-**A refusal is a 403, not a 401.** The UI treated only 401 as "you need a token", so this one surfaced as `Stream request failed (HTTP 403)` -- an HTTP code where the app was holding a sentence naming the fix.
-
-**The sentence was already there.** The server sends `detail` with the refusal ("run ./setup-token.sh ... paste it into Config -> Access token"), and `request()` dropped it. It is carried into the message now, and the refusal raises the same banner and toast a 401 raises, so the phone can tap through to Config and paste a token.
-
-**Both paths, because chat tries streaming first.** `_relayStreamCore()` had its own 401 branch and its own generic message, so fixing only `request()` would have left the symptom the phone actually sees.
-
-**What this does not change.** The gate itself: a copy with no token still refuses other machines, which is the point of it. Setting a token is what reopens the LAN, and the error now says so.
-
-## ⚡ The first real call repairs the binding *(`VERSION` 406, cache-buster v405 → v406)*
-
-*2026-11-08. Binding happens once, at boot, inside a try/catch. When it throws partway every tool after the failure keeps the placeholder that throws "not bound", and the first agent to call one burned a model step to learn it should reload a page the operator was still using.*
-
-**Once, before the policy check.** `runTool()` compares the requested tool's runner against the placeholder captured at load; when they match it makes one `autoBindSandboxOnce()` attempt, before approval, so an approved call is the call that runs rather than a prompt followed by an error.
-
-**The client is remembered.** `setSandboxClient()` is called by the binder itself, so an attempt that threw partway still leaves the API client in hand for the repair that follows.
-
-**Once per page, never retried.** A silent repair on every call would hide an install that cannot bind at all -- that is what the warning bubble and its button are for. With no client, or after the automatic attempt fails, the call fails loudly with the same marker as before.
-
-**A successful repair emits `sandbox:bound`**, the signal Config and the editor already send, so the transcript re-reads the jail and drops warnings that are no longer true.
-
-**Tests.** `sandboxBinding.test.mjs` now 28: with no client the call fails loudly and no attempt is invented; with one, the first `read_file` call binds, runs and reports bound to Config; a second automatic attempt declines.
-
-## ⏳ The button says which half is running *(`VERSION` 405, cache-buster v404 → v405)*
-
-*2026-11-08. The rebind button disabled itself on click and left its label alone. Binding is a synchronous walk over the registry, but the follow-up -- a `/sandbox/status` read that decides what the bubble may claim -- is a round trip, and for its duration the control looked broken rather than busy.*
-
-**Two labels, one click.** `offerRebind()` writes `BINDING…` before the attempt and `CHECKING…` once the page half is done, then keeps the button as the progress indicator instead of deleting it. A failed bind re-arms as `TRY AGAIN`; a second click during the check is ignored because the button stays disabled.
-
-**The bubble waits for the answer.** It used to print `doneText` immediately and correct itself, repeating in miniature the false confidence the warning exists to remove. It is now written once: the verdict when there is one, `doneText` when not, and `doneText` if the follow-up throws or rejects -- so a broken status route leaves neither a spinner nor a blank bubble.
-
-**The agent editor's button follows the same labels**, then shows `TRY AGAIN` if anything is still unbound.
-
-**Tests.** `rebindButton.test.mjs` holds a follow-up promise open: the label reads `CHECKING…`, the warning is still readable, a second click changes nothing, and the released verdict settles the bubble.
-
  Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
 
   Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
@@ -84,6 +18,14 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 📚 The changelog was hiding five releases *(`VERSION` 437, no browser file changed)*
+
+*`v405` through `v410` were committed inside the copyright comment at the top of this file. They rendered nowhere -- GitHub shows a comment as nothing -- and nothing failed, because the release check reads the top entry rather than the archives.*
+
+**Moved out, in order.** They sit between `v411` and `v404` now, where a reader scrolling the file finds them, and the comment holds only the copyright it was written for.
+
+**The Updates section in the README says what the installer asks first** -- which folder each file lands in, why a folder a release *adds* is not a locked one, and the exact `mkdir`/`chown` lines the panel prints when a refusal is real.
+
 ## 🐧 The panel says which folder, and how to make it *(`VERSION` 436, cache-buster v421 → v422)*
 
 *`v435` stopped refusing an install over a folder it could create itself. This is the other half: when a refusal is real, the operator should not have to work out the account, the ownership and the flags.*
@@ -315,6 +257,72 @@ Quick start now sits directly under Contents, before *What's inside*. The Labs s
 **Figures re-measured.** The fresh-copy claim said `14 files, 840 assertions`; it is `20 files, 1,129` for PHP and `24 files, 681` for JS, about 38s end to end on this machine, and the tree is 306 files rather than 281. The JS test list and the architecture tree name the files that exist.
 
 **Smaller corrections.** The three refusal codes are stated once each (`401` with a token set, `503` before one exists, `403` for a LAN caller when the gate is off), Troubleshooting gained the 403 case, the IIS footnote no longer implies a `web.config` ships, `Resource Monitor` became `Resource Manager`, and its / veiled / actions lost their typos.
+
+## 💡 The Proxy tab says what it skips *(`VERSION` 410, cache-buster v409 → v410)*
+
+*The Proxy tab could only say "active: 1.2.3.4:8080". Since v408 the relay calls local endpoints directly, so that line was true for the internet and false for the runner the operator was actually watching -- the one case where "is it proxied?" decides whether a model answers.
+
+**A note under the proxy list.** When a proxy is selected and any configured provider lives on this network, the tab names those hosts and says they are called directly. It reads the provider list the app already has, so it needs no new request.
+
+**The rules live in one place.** `ui/js/localEndpoints.js` mirrors `Tls::isLocalUrl` -- loopback, RFC1918, CGNAT, link-local, `.local`/`.lan`/`.internal` names, docker host aliases and bare hostnames. It is display only: the decision stays in the server, per call, and the file says so at the top so it is never mistaken for a gate.
+
+**What it prevents.** A proxied-looking tab invites exactly the wrong fix -- changing an endpoint that was never being proxied, or clearing a proxy that was never in the path. The note makes the real route visible, and stays silent when every provider is remote.
+
+## 🧭 One proxy setting, on the server *(`VERSION` 409, cache-buster v408 → v409)*
+
+*2026-11-08. The same install worked on the PC and failed on the phone. The endpoint and the server were identical; what differed was a proxy choice saved per device. Chat sent it with every call, and the relay let a supplied proxy win outright, so one browser could route around the server setting -- and, after v408, around the LAN bypass too, since the endpoint check ran after the spec was preferred.*
+
+**The browser no longer votes.** All four places chat built a spec -- the snippet streaming path, the raw passthrough, the one-shot relay and the template call -- carried `proxy: settings.proxyActive`. They do not any more: the Proxy tab already writes `sandbox.proxy_active` on the server, which is where the call is made.
+
+**What that fixes.** A stale per-device value can no longer outlive a clear on another device, and a phone cannot keep a dead proxy alive for its own calls. The Proxy tab still highlights the active row, so the setting is still visible; it is simply not duplicated per browser.
+
+## 🔌 A proxy is for leaving the network *(`VERSION` 408, cache-buster v407 → v408)*
+
+*2026-11-08. After activating a proxy in the Proxy tab, a local LM Studio stopped answering for every client -- and turning the proxy off changed nothing. Two faults, and only one of them was the proxy being dead.*
+
+**Clearing wrote half the setting.** `_setActiveProxy()` saved the choice in the browser and on the server. `_clearActiveProxy()` -- the Clear Selection button -- wrote only the browser one, then toasted "Proxy cleared -- using direct connection", while `sandbox.proxy_active` in `storage/config.json` kept sending every relay, stream and audio call through it. Removing the active entry had the same hole. Both now clear the server too, and say so only when it confirms.
+
+**A proxy cannot reach the LAN.** `ModelManager::activeProxy()` returned the selected proxy for any endpoint, and a per-request `proxy` from the browser won outright -- so a runner at `http://10.0.0.128:1235/...` was asked for through a public proxy that has no route to it. Loopback, private, link-local and `.local` endpoints now always go direct, whichever side supplied the proxy; a public endpoint still uses it.
+
+**Why the model list looked alive while chat did not.** Reading a provider catalog and talking to a model are different requests, and the failure text for a proxied call is a curl error, which reads as a dead server. The endpoint also decides the catalog URL: `.../api/v1/chat` derives `.../api/v1/models`.
+
+## 📵 The door says why it is shut *(`VERSION` 407, cache-buster v406 → v407)*
+
+*2026-11-08. A phone stopped reaching the local LM Studio after an update; the desktop kept working. The cause was not the model. With `require_token` off, `/api/*` answers only loopback peers, and a phone is a LAN peer, so every call got `403 local requests only`. Proven by serving the app on `0.0.0.0`: `/api/state` is 200 over loopback and 403 over the LAN address.*
+
+**A refusal is a 403, not a 401.** The UI treated only 401 as "you need a token", so this one surfaced as `Stream request failed (HTTP 403)` -- an HTTP code where the app was holding a sentence naming the fix.
+
+**The sentence was already there.** The server sends `detail` with the refusal ("run ./setup-token.sh ... paste it into Config -> Access token"), and `request()` dropped it. It is carried into the message now, and the refusal raises the same banner and toast a 401 raises, so the phone can tap through to Config and paste a token.
+
+**Both paths, because chat tries streaming first.** `_relayStreamCore()` had its own 401 branch and its own generic message, so fixing only `request()` would have left the symptom the phone actually sees.
+
+**What this does not change.** The gate itself: a copy with no token still refuses other machines, which is the point of it. Setting a token is what reopens the LAN, and the error now says so.
+
+## ⚡ The first real call repairs the binding *(`VERSION` 406, cache-buster v405 → v406)*
+
+*2026-11-08. Binding happens once, at boot, inside a try/catch. When it throws partway every tool after the failure keeps the placeholder that throws "not bound", and the first agent to call one burned a model step to learn it should reload a page the operator was still using.*
+
+**Once, before the policy check.** `runTool()` compares the requested tool's runner against the placeholder captured at load; when they match it makes one `autoBindSandboxOnce()` attempt, before approval, so an approved call is the call that runs rather than a prompt followed by an error.
+
+**The client is remembered.** `setSandboxClient()` is called by the binder itself, so an attempt that threw partway still leaves the API client in hand for the repair that follows.
+
+**Once per page, never retried.** A silent repair on every call would hide an install that cannot bind at all -- that is what the warning bubble and its button are for. With no client, or after the automatic attempt fails, the call fails loudly with the same marker as before.
+
+**A successful repair emits `sandbox:bound`**, the signal Config and the editor already send, so the transcript re-reads the jail and drops warnings that are no longer true.
+
+**Tests.** `sandboxBinding.test.mjs` now 28: with no client the call fails loudly and no attempt is invented; with one, the first `read_file` call binds, runs and reports bound to Config; a second automatic attempt declines.
+
+## ⏳ The button says which half is running *(`VERSION` 405, cache-buster v404 → v405)*
+
+*2026-11-08. The rebind button disabled itself on click and left its label alone. Binding is a synchronous walk over the registry, but the follow-up -- a `/sandbox/status` read that decides what the bubble may claim -- is a round trip, and for its duration the control looked broken rather than busy.*
+
+**Two labels, one click.** `offerRebind()` writes `BINDING…` before the attempt and `CHECKING…` once the page half is done, then keeps the button as the progress indicator instead of deleting it. A failed bind re-arms as `TRY AGAIN`; a second click during the check is ignored because the button stays disabled.
+
+**The bubble waits for the answer.** It used to print `doneText` immediately and correct itself, repeating in miniature the false confidence the warning exists to remove. It is now written once: the verdict when there is one, `doneText` when not, and `doneText` if the follow-up throws or rejects -- so a broken status route leaves neither a spinner nor a blank bubble.
+
+**The agent editor's button follows the same labels**, then shows `TRY AGAIN` if anything is still unbound.
+
+**Tests.** `rebindButton.test.mjs` holds a follow-up promise open: the label reads `CHECKING…`, the warning is still readable, a second click changes nothing, and the released verdict settles the bubble.
 
 ## 🔁 The button comes back with the warning *(`VERSION` 404, cache-buster v403 → v404)*
 

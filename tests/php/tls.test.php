@@ -310,7 +310,11 @@ $row = null;
 foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
 ok($row !== null && $row['expiring'] === false, 'a certificate four months out is not flagged');
 
-$just_out = time() + (Tls::EXPIRY_WARN_DAYS + 1) * 86400;
+// An hour of slack, not an exact boundary. days_left is floor(), so 31 days
+// minus the one second that can tick between this line and pins() reads as 30
+// and the certificate is flagged -- a failure of the clock, not of the code.
+// It sat exactly on that boundary and passed for weeks by being fast enough.
+$just_out = time() + (Tls::EXPIRY_WARN_DAYS + 1) * 86400 + 3600;
 Tls::setPinMeta([$fp => ['to' => gmdate('Y-m-d', $just_out), 'expires_ts' => $just_out]]);
 $row = null;
 foreach (Tls::pins() as $p) { if ($p['fingerprint'] === $fp) { $row = $p; } }
