@@ -34,6 +34,8 @@ eq(pathText(20), '20', 'number stringifies');
 eq(pathText({ path: 'training/training.txt' }), 'training/training.txt', 'object with path unwraps');
 eq(pathText({ path: { path: 'training/training.txt' } }), 'training/training.txt', 'nested path unwraps one level');
 eq(pathText({ arg: 'training/training.txt' }), 'training/training.txt', 'object with arg unwraps');
+eq(pathText({ pattern: 'training/*' }), 'training/*', 'object with pattern unwraps (glob_files/grep_code)');
+eq(pathText({ pattern: { pattern: 'training/*' } }), 'training/*', 'nested pattern unwraps one level');
 eq(pathText({}), null, 'empty object is null, never "[object Object]"');
 eq(pathText({ path: { deep: 1 } }), null, 'unresolvable nesting is null');
 eq(pathText({ path: ['a'] }), null, 'array path is null');

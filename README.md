@@ -39,14 +39,13 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v442 — The harness guide folds away, and prompt ticks breathe ↔️
+### 🆕 v443 — glob_files and grep_code stop rejecting the `pattern` they ask for 🩹
 
-*The harness/dialect/training section now opens as its title plus the two-sentence brief, with the full manual one click away like most other sections — and the prompt rail's jump ticks down the transcript's right edge sit twice as far apart, so neighbouring prompts are easier to tell apart and hit.*
+*A model sending the documented `{"pattern":"training/*"}` was told to "retry the step with that shape" — so it resent the identical call, forever. The unwrapper only knew fields named `path` or `arg`; it now knows `pattern` too, and the loop is gone.*
 
 | | |
 |---|---|
-| 📖 **Guide folds into a drawer** | title, screenshot and brief stay visible; detection order, pins and the 12-step drill expand on click |
-| ↔️ **Roomier prompt ticks** | rail gap doubled, so each jump tick is easier to read and tap |
+| 🩹 **Correct args accepted** | `{"pattern":"…"}` unwraps like `{"path":"…"}` already did — no more identical-call loop |
 ---
 
 ## 🧭 Contents

@@ -34,11 +34,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=426';
-import { asText, compactText } from './utils.js?v=426';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=426';
-import { settingFor } from './agentConfig.js?v=426';
-import { trace } from './trace.js?v=426';
+import { store } from './store.js?v=427';
+import { asText, compactText } from './utils.js?v=427';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=427';
+import { settingFor } from './agentConfig.js?v=427';
+import { trace } from './trace.js?v=427';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -954,7 +954,7 @@ export function pathText(v) {
   if (typeof v === 'string' || typeof v === 'number') return String(v);
   let cur = v;
   for (let i = 0; i < 2 && cur && typeof cur === 'object' && !Array.isArray(cur); i++) {
-    cur = cur.path ?? cur.arg;
+    cur = cur.path ?? cur.arg ?? cur.pattern;
     if (typeof cur === 'string' || typeof cur === 'number') return String(cur);
   }
   return null;

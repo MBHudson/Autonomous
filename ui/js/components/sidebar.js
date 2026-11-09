@@ -10,21 +10,21 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=426';
-import { K } from '../storage.js?v=426';
-import { persistence } from '../persistence.js?v=426';
-import { api } from '../api.js?v=426';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=426';
-import { errText } from '../api.js?v=426';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=426';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=426';
-import { snapshot } from '../rateGovernor.js?v=426';
-import { trainingStepList, trainingKickoffFor } from '../training.js?v=426';
-import { resetBrowserEnabled } from '../toolManifest.js?v=426';
-import { perf } from '../perf.js?v=426';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=426';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=426';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=426';
+import { store } from '../store.js?v=427';
+import { K } from '../storage.js?v=427';
+import { persistence } from '../persistence.js?v=427';
+import { api } from '../api.js?v=427';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=427';
+import { errText } from '../api.js?v=427';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=427';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=427';
+import { snapshot } from '../rateGovernor.js?v=427';
+import { trainingStepList, trainingKickoffFor } from '../training.js?v=427';
+import { resetBrowserEnabled } from '../toolManifest.js?v=427';
+import { perf } from '../perf.js?v=427';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=427';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=427';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=427';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open

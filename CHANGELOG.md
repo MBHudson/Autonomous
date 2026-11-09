@@ -18,6 +18,10 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🩹 glob_files and grep_code accept the `pattern` they ask for *(`VERSION` 443, cache-buster v426 → v427)*
+
+*A model sending the documented `{"pattern":"training/*"}` got back "needs pattern as a plain string — retry the step with that shape", resent the identical call, and looped forever: `pathText()` only unwrapped fields named `path` or `arg`, never `pattern`, so correct args read as missing and the retry hint re-prescribed the same shape. It now unwraps `pattern` too. Covered by `tests/js/toolPath.test.mjs`.*
+
 ## 📖 The harness guide folds away; prompt ticks breathe *(`VERSION` 442, cache-buster v425 → v426)*
 
 *The v441 "Auto Forming Harnesses, Dialects & Training Mode" section now matches most other sections: title, screenshot and brief on show, the four subsections inside a collapsed drawer. The What's-new slot swaps to this release; the guide's What's-inside row stays, since it still describes where the feature lives.*
