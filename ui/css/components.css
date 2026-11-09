@@ -1813,6 +1813,59 @@ body.agent-reordering .agent-editor:hover {
   overflow-y: auto;
 }
 
+/* A diff needs room: the 520px prompt box wraps every line and hides the
+   change it exists to show. */
+.approve-box.has-diff {
+  width: min(94vw, 660px);
+}
+
+.approve-diff-head {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+
+.approve-diff {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 0;
+  margin: 0 0 10px;
+  max-height: 34vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 4;
+}
+
+.approve-diff-row {
+  display: block;
+  padding: 0 10px;
+  color: var(--text-secondary, var(--text-primary));
+}
+
+.approve-diff-row.add {
+  color: var(--accent-green);
+  background: rgba(0, 255, 136, 0.08);
+}
+
+.approve-diff-row.del {
+  color: var(--accent-red);
+  background: rgba(255, 71, 87, 0.08);
+}
+
+.approve-diff-row.meta {
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.approve-diff-row.ctx {
+  color: var(--text-dim);
+}
+
 .approve-note {
   font-size: 11px;
   color: var(--text-dim);
