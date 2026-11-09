@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v437 — the changelog shows the five releases it was hiding 📚
+### 🆕 v438 — training mode: drill the whole fleet on every tool 🏋️
 
-*`v405`–`v410` were committed inside this file's own copyright comment, so the published changelog skipped them and nothing failed, because the release check reads the top entry, not the archives.*
+*A dumbbell in the Agents-tab header arms a paced drill: all active agents drop to ~50% request rate and work simple tool tasks in `training/` — write it, read it back, list it — retrying each miss until it passes and logging what worked.*
 
 | | |
 |---|---|
-| 📚 **Five entries moved out of the comment** | they sit in order between `v411` and `v404` now, and the copyright block holds only the copyright it was written for |
-| 🧭 **The Updates section documents the preflight** | what is probed before a single file is replaced, why a folder a release *adds* is not a locked one, and the exact `mkdir`/`chown` lines the panel prints when a refusal is real |
+| 🏋️ **Training mode button** | next to the global pre-prompt § in the Agents header; armed it glows the same cyan, and its popup explains the drill with Start/Cancel |
+| 📉 **~50% throttle + retry-until-pass lock-in** | the governor halves every agent's ceiling while armed, and a system-prompt block heads every call: drill order only, never skip a failed step, log each pass to the todo list |
 ---
 
 ## 🧭 Contents
@@ -283,6 +283,8 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
 | 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
 | ♾️ **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
+| 🏋️ **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header |
+
 | ❝ **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
 | 🧠 **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
 | 🧭 **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |

@@ -10,8 +10,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=422';
-import { K as STORAGE_K } from '../storage.js?v=422';
+import { store } from '../store.js?v=423';
+import { K as STORAGE_K } from '../storage.js?v=423';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -20,28 +20,29 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=422';
-import { persistence } from '../persistence.js?v=422';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning } from '../utils.js?v=422';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=422';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=422';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=422';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=422';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=422';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=422';
-import { usageFor } from '../rateGovernor.js?v=422';
-import { trace } from '../trace.js?v=422';
-import { offerRebind } from './rebindOffer.js?v=422';
-import { latency } from '../latency.js?v=422';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=422';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=422';
-import { SlashCommands } from '../slashCommands.js?v=422';
-import { parseRoute, routingHelp } from '../routing.js?v=422';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=422';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=422';
-import { MessageRenderer, renderToolCalls } from './message.js?v=422';
-import { createAvatar } from './avatar.js?v=422';
-import * as comms from '../commsLog.js?v=422';
+import { api, errText } from '../api.js?v=423';
+import { persistence } from '../persistence.js?v=423';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning } from '../utils.js?v=423';
+import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=423';
+import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=423';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=423';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=423';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=423';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=423';
+import { usageFor } from '../rateGovernor.js?v=423';
+import { trace } from '../trace.js?v=423';
+import { offerRebind } from './rebindOffer.js?v=423';
+import { latency } from '../latency.js?v=423';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=423';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=423';
+import { trainingBlockFor } from '../training.js?v=423';
+import { SlashCommands } from '../slashCommands.js?v=423';
+import { parseRoute, routingHelp } from '../routing.js?v=423';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=423';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=423';
+import { MessageRenderer, renderToolCalls } from './message.js?v=423';
+import { createAvatar } from './avatar.js?v=423';
+import * as comms from '../commsLog.js?v=423';
 
 /**
  * How long an agent may keep working on a single task.
@@ -3642,6 +3643,7 @@ const refreshTodoBlock = messages => {
 };
 
 const systemPromptFor = agent => {
+  const training = trainingBlockFor();
   const pre = globalPrePromptFor();
   const own = agent.systemPrompt || '';
   // Prepend (default) keeps the agent's own prompt and puts the override in
@@ -3649,8 +3651,11 @@ const systemPromptFor = agent => {
   const base = pre
     ? (globalPrePromptReplaces() ? pre : (own ? `${pre}\n\n${own}` : pre))
     : own;
+  // Training mode heads the prompt: confine + retry rules must dominate the
+  // agent instructions and any global pre-prompt while the drill runs.
+  const headed = training ? (base ? `${training}\n\n${base}` : training) : base;
   const append = [alwaysAppendFor(agent), filesBlockFor(agent), todosBlockFor()].filter(Boolean).join('\n\n');
-  return append ? `${base}${base ? '\n\n' : ''}${append}` : base;
+  return append ? `${headed}${headed ? '\n\n' : ''}${append}` : headed;
 };
 
 /**

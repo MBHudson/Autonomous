@@ -430,7 +430,8 @@
     animation: d26-float 4.5s ease-in-out infinite;
   }
 
-  html.d26 .sidebar-body .preprompt-btn {
+  html.d26 .sidebar-body .preprompt-btn,
+  html.d26 .sidebar-body .training-btn {
     border-radius: 10px;
     background: rgba(8, 12, 19, 0.62);
     backdrop-filter: blur(calc(var(--d26-blur, 10px) * 0.8));

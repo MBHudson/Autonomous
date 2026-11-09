@@ -18,6 +18,15 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🏋️ Training mode: a paced tool drill for the whole fleet *(`VERSION` 438, cache-buster v422 → v423)*
+
+*A dumbbell button in the Agents-tab header arms it: every active agent drops to ~50% request rate and works one simple drill — think, todo_write, echo, now, write/read/edit `training/training.txt`, list/glob/grep it, exec echo — retrying each failed step until it passes and logging what worked to the todo list.*
+
+**The button glows like the global pre-prompt** when armed, and its popup explains the mode with Start/Cancel (Stop + recap while armed). Model weights never change — “remember” means the todo record plus the run transcript.
+
+**Covered by `tests/js/training.test.mjs`** (30 assertions: drill shape, armed/disarmed prompt block, governor halving), which reads `APP_VERSION` out of `store.js` instead of hardcoding the `?v=` — the commsLog lesson, applied before it could bite twice.
+
+
 ## 📚 The changelog was hiding five releases *(`VERSION` 437, no browser file changed)*
 
 *`v405` through `v410` were committed inside the copyright comment at the top of this file. They rendered nowhere -- GitHub shows a comment as nothing -- and nothing failed, because the release check reads the top entry rather than the archives.*

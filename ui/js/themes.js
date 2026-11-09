@@ -10,8 +10,8 @@
 // THEMES.JS — Theme manager
 // ============================================
 
-import { store } from './store.js?v=422';
-import { K } from './storage.js?v=422';
+import { store } from './store.js?v=423';
+import { K } from './storage.js?v=423';
 
 const THEMES = ['dark', 'matrix', 'cyberpunk'];
 

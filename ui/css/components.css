@@ -2113,3 +2113,43 @@ body.agent-reordering .agent-editor:hover {
   outline: none;
 }
 .bs-blocklist:focus { border-color: var(--accent-cyan); }
+
+/* Training mode button (Agents tab header, next to the pre-prompt button).
+   Same treatment as the pre-prompt button: quiet until armed, then the same
+   cyan glow/pulse. The dumbbell is an inline SVG stroked with currentColor,
+   so it follows every skin without its own palette. */
+.agent-menu-btn.training-btn svg { display: block; }
+
+.agent-menu-btn.training-btn.armed {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  animation: preprompt-pulse 1.6s ease-in-out infinite;
+}
+
+/* Training mode dialog: the drill recap and the while-armed rules. */
+.training-points {
+  margin: 0 0 10px 18px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.training-points li { margin-bottom: 4px; }
+
+.training-points code {
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
+}
+
+.training-steps {
+  margin: 0 0 10px 18px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.training-steps li { margin-bottom: 2px; }

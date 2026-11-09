@@ -10,20 +10,21 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=422';
-import { K } from '../storage.js?v=422';
-import { persistence } from '../persistence.js?v=422';
-import { api } from '../api.js?v=422';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=422';
-import { errText } from '../api.js?v=422';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=422';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=422';
-import { snapshot } from '../rateGovernor.js?v=422';
-import { resetBrowserEnabled } from '../toolManifest.js?v=422';
-import { perf } from '../perf.js?v=422';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=422';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=422';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=422';
+import { store } from '../store.js?v=423';
+import { K } from '../storage.js?v=423';
+import { persistence } from '../persistence.js?v=423';
+import { api } from '../api.js?v=423';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=423';
+import { errText } from '../api.js?v=423';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=423';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=423';
+import { snapshot } from '../rateGovernor.js?v=423';
+import { trainingStepList } from '../training.js?v=423';
+import { resetBrowserEnabled } from '../toolManifest.js?v=423';
+import { perf } from '../perf.js?v=423';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=423';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=423';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=423';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -479,6 +480,8 @@ export class Sidebar {
     // An active flag with empty text injects nothing, so it shows as off.
     const pre = store.get('settings.globalPrePrompt') || { text: '', active: false };
     const preActive = !!(pre.active && (pre.text || '').trim());
+    const tm = store.get('settings.trainingMode') || { active: false };
+    const trainingActive = !!tm.active;
 
     let html = `<div class="sidebar-section-header">
       <span class="sidebar-section-title">${activeCount} active</span>
@@ -488,6 +491,9 @@ export class Sidebar {
           <button class="agent-menu-item" data-pre-action="edit">Edit</button>
           <button class="agent-menu-item ${preActive ? 'danger' : 'go'}" data-pre-action="toggle">${preActive ? 'Deactivate' : 'Activate'}</button>
         </div>
+      </span>
+      <span class="preprompt-wrap">
+        <button class="agent-menu-btn training-btn${trainingActive ? ' armed' : ''}" id="trainingBtn" title="Training mode${trainingActive ? ' (ON — drill only, agents at ~50% rate)' : ' (off)'}"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 3.5v9M10 3.5v9M2.5 6v4M13.5 6v4M4.5 4.8v6.4M11.5 4.8v6.4M6 8h4"/></svg></button>
       </span>
       <button class="btn btn-primary btn-sm" id="addAgentBtn">+ ADD</button>
     </div>`;
@@ -619,6 +625,11 @@ export class Sidebar {
       e.stopPropagation();
       this._showMenu(e.currentTarget, document.getElementById('prePromptMenu'));
     });
+    // Training mode button: popup explains the drill, Start/Stop arms it.
+    document.getElementById('trainingBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._openTrainingDialog();
+    });
     // API Lab and Brain Lab now live in the apps notch under the header, so the
     // sidebar no longer carries their buttons.
     document.querySelectorAll('#prePromptMenu [data-pre-action]').forEach(item => {
@@ -745,6 +756,73 @@ export class Sidebar {
   }
 
   /**
+  /**
+   * Training mode dialog: what the mode does, the drill steps, and Start /
+   * Cancel (or Stop + a recap while armed). Same overlay pattern as the
+   * pre-prompt editor, so it inherits every skin for free.
+   */
+  _openTrainingDialog() {
+    const tm = store.get('settings.trainingMode') || { active: false, startedAt: 0 };
+    const armed = !!tm.active;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const steps = trainingStepList().map(s => `<li>${esc(s)}</li>`).join('');
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Training mode${armed ? ' (ON)' : ''}</span>
+          <button class="modal-close" id="trainingClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-hint" style="margin-bottom:8px">A paced tool drill for every active agent. While armed:</div>
+          <ul class="training-points">
+            <li>All active agents are throttled to ~50% of their normal request rate.</li>
+            <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else until it is done.</li>
+            <li>A failed step must be retried until it passes, never skipped; each pass is logged to the todo list.</li>
+          </ul>
+          <ol class="training-steps">${steps}</ol>
+          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. End the drill with Stop.</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="trainingCancel">Cancel</button>
+          <button class="btn btn-${armed ? 'secondary' : 'primary'}" id="trainingGo">${armed ? 'Stop training' : 'Start training'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('#trainingClose').addEventListener('click', close);
+    overlay.querySelector('#trainingCancel').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#trainingGo').addEventListener('click', () => {
+      if (armed) this._stopTraining(close);
+      else this._startTraining(close);
+    });
+  }
+
+  /** Arm training mode: throttle note, re-render, and tell the fleet. */
+  _startTraining(close) {
+    store.set('settings.trainingMode', { active: true, startedAt: Date.now() });
+    persistence.set('settings', store.get('settings'));
+    store.emit('toast', {
+      message: 'Training mode ON — agents at ~50% rate, drill only (training/ folder)',
+      type: 'success',
+    });
+    store.emit('training:changed', { active: true });
+    close();
+    this.renderAgents();
+  }
+
+  /** Stand the fleet back down. The todo record keeps what the drill taught. */
+  _stopTraining(close) {
+    const tm = store.get('settings.trainingMode') || {};
+    store.set('settings.trainingMode', { active: false, startedAt: tm.startedAt || 0 });
+    persistence.set('settings', store.get('settings'));
+    store.emit('toast', { message: 'Training mode off — full rate restored', type: 'info' });
+    store.emit('training:changed', { active: false });
+    close();
+    this.renderAgents();
+  }
+
    * Proxy tab: fetch elite/anonymous proxies, ping them, save favorites,
    * and route the app's outbound relay traffic through the selected one.
    */

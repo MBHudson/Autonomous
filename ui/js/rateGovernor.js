@@ -35,9 +35,10 @@
 // a stale bucket throttles calls that would succeed, a fresh one merely risks
 // a 429 the retry path already handles.
 
-import { store } from './store.js?v=422';
-import { settingFor, hasRateLock, overridesOf } from './agentConfig.js?v=422';
-import { defaultRpmFor } from './harness.js?v=422';
+import { store } from './store.js?v=423';
+import { TRAINING_THROTTLE } from './training.js?v=423';
+import { settingFor, hasRateLock, overridesOf } from './agentConfig.js?v=423';
+import { defaultRpmFor } from './harness.js?v=423';
 
 /** Sliding window length. Per-minute limits are the common shape. */
 const WINDOW_MS = 60000;
@@ -130,9 +131,15 @@ function rateConf(spec) {
 
   const agent = agentFor(spec);
   if (!agent) {
+    let rpm0 = globalRpm;
+    try {
+      if (settings().trainingMode && settings().trainingMode.active && rpm0) {
+        rpm0 = Math.max(1, Math.floor(rpm0 * TRAINING_THROTTLE));
+      }
+    } catch { /* the training flag is decorative to pacing */ }
     return {
       enabled: globalEnabled && hostRpm !== 0,
-      rpm: globalRpm,
+      rpm: rpm0,
       maxWait: governorMaxWaitMs(),
       stealth: governorStealth(),
       own: false,
@@ -141,7 +148,15 @@ function rateConf(spec) {
   const o = overridesOf(agent);
   const provider = providerFor(agent);
   const providerRpm = provider ? asRpm(provider.rateRpm) : null;
-  const rpm = has(o, 'rateRpm') ? asRpm(o.rateRpm) ?? globalRpm : (providerRpm ?? globalRpm);
+  let rpm = has(o, 'rateRpm') ? asRpm(o.rateRpm) ?? globalRpm : (providerRpm ?? globalRpm);
+  // Training mode throttles every agent to ~50% of its normal ceiling. All
+  // pacing flows through here, so this one spot covers every call path and
+  // the Config status line reports the halved ceiling automatically.
+  try {
+    if (settings().trainingMode && settings().trainingMode.active && rpm) {
+      rpm = Math.max(1, Math.floor(rpm * TRAINING_THROTTLE));
+    }
+  } catch { /* the training flag is decorative to pacing */ }
   return {
     enabled: settingFor(agent, 'rateEnabled') !== false && rpm !== 0,
     rpm,
