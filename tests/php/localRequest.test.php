@@ -149,6 +149,33 @@ ok(!Sandbox::isLocalRequest(array(
     'HTTP_X_FORWARDED_FOR' => '203.0.113.9',
 )), 'a comma-separated proxy list is honoured');
 
+// --- the operator's switch (Permissions -> Remote access) -------------------
+// Default ON. Turned off, the socket peer decides again -- which is only safe
+// when the proxy forwards no client address at all.
+file_put_contents($base . '/config.json', json_encode(array('sandbox' => array(
+    'trusted_proxies' => array(),
+    'local_only_strict' => false,
+    'read_roots' => array(),
+    'write_roots' => array(),
+))));
+ok(Sandbox::isLocalRequest(array(
+    'REMOTE_ADDR' => '127.0.0.1',
+    'HTTP_X_FORWARDED_FOR' => '203.0.113.9',
+)), 'strict off: the socket peer decides again');
+ok(!Sandbox::isLocalRequest(array('REMOTE_ADDR' => '203.0.113.9')), 'strict off: a public peer is still not local');
+ok(Sandbox::isLocalRequest(array('REMOTE_ADDR' => '127.0.0.1')), 'strict off: a direct loopback request is local');
+
+// A config written before the key existed keeps the protection.
+file_put_contents($base . '/config.json', json_encode(array('sandbox' => array(
+    'trusted_proxies' => array(),
+    'read_roots' => array(),
+    'write_roots' => array(),
+))));
+ok(!Sandbox::isLocalRequest(array(
+    'REMOTE_ADDR' => '127.0.0.1',
+    'HTTP_X_FORWARDED_FOR' => '203.0.113.9',
+)), 'the switch defaults to on when the key is absent');
+
 // --- cleanup ---------------------------------------------------------------
 @unlink($base . '/config.json');
 @rmdir($base);

@@ -1750,6 +1750,15 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           </div>
         </div>
 
+        <div class="cfg-sublabel">Remote access <span class="form-hint-inline">while no token is set</span></div>
+        <div class="toggle-row">
+          <span class="toggle-label">Judge proxied requests by the client <span class="form-hint-inline">default on</span></span>
+          <div class="toggle active" id="sbLocalOnlyStrict">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
+        <div class="form-hint">Until an access token is set, the API answers only this machine. On, a request that arrived through a reverse proxy is judged by the address the proxy reports &mdash; otherwise nginx on this host makes every internet visitor look local. Off trusts the socket peer alone, which is only right when the proxy forwards no client address at all. Saved as <code>sandbox.local_only_strict</code>.</div>
+
         <div class="cfg-sublabel">Always-On Agents <span class="form-hint-inline">work on their own</span></div>
         <div class="toggle-row">
           <span class="toggle-label">Enable always-on</span>
@@ -3523,6 +3532,15 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       });
     }
 
+    const strictToggle = document.getElementById('sbLocalOnlyStrict');
+    if (strictToggle && !strictToggle.dataset.bound) {
+      strictToggle.dataset.bound = '1';
+      strictToggle.addEventListener('click', () => {
+        strictToggle.classList.toggle('active');
+        this._saveLocalOnlyStrict();
+      });
+    }
+
     // --- Programs (real windows on this machine) ---------------------------
     // Bound the same way as the shell toggle above: the switch saves itself and
     // the load only ever reports what the server kept.
@@ -3560,6 +3578,9 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       set('sbExecOn', on);
       set('sbExecApproval', ask);
       set('sbCodeOn', !!sb.code_enabled);
+      // Absent means on: the switch is protection, so a config written before
+      // it existed must not silently disable it.
+      set('sbLocalOnlyStrict', sb.local_only_strict !== false);
       const row = document.getElementById('sbExecApprovalRow');
       if (row) row.style.display = on ? '' : 'none';
       const t = document.getElementById('sbExecTimeout');
@@ -3606,6 +3627,32 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       return cfg;
     });
     return this._cfgChain;
+  }
+
+  /**
+   * Permissions -> Remote access. Default ON: while no token is set, a request
+   * that came through a proxy is judged by the address the proxy reports.
+   * Turning it off goes back to trusting the socket peer alone, which is only
+   * safe when the proxy forwards no client address.
+   */
+  async _saveLocalOnlyStrict() {
+    const el = document.getElementById('sbLocalOnlyStrict');
+    const on = !!el?.classList.contains('active');
+    try {
+      await this._patchServerConfig((cfg) => {
+        cfg.sandbox = cfg.sandbox || {};
+        cfg.sandbox.local_only_strict = on;
+      });
+      store.emit('toast', {
+        message: on
+          ? 'Proxy-aware local-only mode on'
+          : 'Proxy-aware local-only mode off \u2014 the socket address decides again',
+        type: on ? 'success' : 'info',
+      });
+    } catch (err) {
+      el?.classList.toggle('active', !on);
+      store.emit('toast', { message: `Not saved: ${err.message}`, type: 'error' });
+    }
   }
 
   async _saveExecSettings(opts = {}) {

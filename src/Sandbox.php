@@ -132,6 +132,13 @@ class Sandbox {
             // not local, because the proxy's own loopback address would
             // otherwise make every internet visitor look like this machine.
             'trusted_proxies' => self::proxyList($sb['trusted_proxies'] ?? []),
+            // Permissions -> Remote access, ON unless an operator turns it off.
+            // On, a forwarded request is judged by the client the proxy names;
+            // off, the socket peer decides again (the old rule), for a proxy
+            // that forwards no client address at all.
+            'local_only_strict' => !array_key_exists('local_only_strict', $sb)
+                ? true
+                : !empty($sb['local_only_strict']),
             // --- shell access -------------------------------------------
             // Off unless the operator turns it on. `exec_enabled` gates the
             // whole feature; `exec_allow` is the per-command allowlist.
@@ -505,6 +512,14 @@ class Sandbox {
         // broken SAPI rather than a local visitor -- refuse it there instead of
         // inheriting the CLI's exemption.
         if ($remote === '') { return PHP_SAPI === 'cli'; }
+
+        // Permissions -> Remote access. ON by default; turned off, the old
+        // rule applies and the socket peer alone decides. That is only correct
+        // for a proxy that forwards no client address, where nothing else can
+        // distinguish its loopback connection from a real local visitor.
+        if (!(self::config()['local_only_strict'] ?? true)) {
+            return self::isLoopbackIp($remote);
+        }
 
         // A forwarding header means this request came through a proxy, so the
         // peer address is the PROXY's and the loopback test below would call
