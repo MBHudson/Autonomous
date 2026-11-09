@@ -251,55 +251,55 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 ---
 ## ✨ What's inside
 
-| | |
-|---|---|
-| 🤖 **Any model, any provider** | OpenAI, OpenRouter, NVIDIA NIM, Anthropic, Google, Groq, DeepSeek, xAI, Mistral, Cerebras, Together, Perplexity, Ollama, LM Studio, vLLM… |
-| 🧭 **Auto-fitting harness** | Detects each provider's API shape *and* tool dialect, speaks it correctly, and reads the reply back — a runner's own `output` envelope included |
-| 🧠 **Brain Lab** | Every per-agent setting, locks, memory, files and custom tools in one rail |
-| 🧪 **API Lab** | Paste a curl → get it in 10 languages → actually send it server-side |
-| 🔀 **Routing chart** | Draw workflows: agents, loops, checkpoints, delays, parallel fan-out |
-| 🛠️ **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP — with timeouts that end the process instead of the turn, argv shapes models actually write, and approvals that resume the agent where it left off |
-| 🚀 **Background commands** | `exec_start` runs a server, watcher or anything that never exits and hands back a handle at once; `exec_poll` reads its output and says whether it is alive, `exec_kill` stops it |
-| ⏱️ **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
-| 📊 **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
-| 🗣️ **Conversations, in words** | Every hop keeps its **text** — your prompt, the task a coordinator hands down, an agent-to-agent ask with its answer, the reply, and a question typed in the map's ASK box: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer (All / agent-to-agent) opened from either map, a failed ask that stays visible, and a beam you can hover to read *“A → B: …”*. |
-| 📣 **One name, the whole roster** | `ask_agent` / `tell_agent` take `"ALL"` (or `everyone` / `everybody`, any case): ask each agent in turn with replies labelled by agent, or post one instruction to every mailbox — and an agent really called "All" keeps its name |
-| 🧠 **Memory** | Private + collective long-term memory the agents actually use |
-| 🔐 **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
-| 🔒 **Verified calls** | Model and speech calls check the peer certificate *and* the hostname — **Auto** exempts LAN and loopback so local runners keep working, **Always** / **Never** are explicit choices saved as `tls.verify`, and `tls.ca_bundle` can point at a PEM you manage yourself |
-| 📌 **Pinned certificates** | Read the chain a host actually presents, see its SHA-256, and store it in `storage/tls/trusted.pem` — every pin is listed in Config → TLS / Certificates with fingerprint, expiry and pin date, and FORGET drops one |
-| ⚠️ **Expiry warnings** | A pin inside 30 days reads *EXPIRES IN n DAYS* in the list and raises a bell notification naming the host, so a renewed server certificate is re-pinned before it becomes an outage |
-| 🧭 **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
-| 🧠 **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, and **Config → Interface** pins it Auto, always open or always collapsed |
-| 🧰 **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
-| 🔌 **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
-| 🎨 **Themes** | Dark, Matrix, Cyberpunk |
-| 🖼️ **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
-| 🎙️ **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
-| ⌨️ **Slash commands** | `/CODE`, `/ROLE`, `/NAME`, `/ALL`, `/?` — address agents from the composer |
-| ⬇️ **Scroll to latest** | With Auto Scroll off, scrolling up reveals a `∨` button parked above the composer; clicking it jumps to the newest message and follows new output until you scroll up again, and scrolling up with Auto Scroll on pauses the follow instead of yanking the transcript |
-| 💬 **Prompt rail** | One short tick per prompt down the right edge of the chat box, newest at the bottom — hovering names it, clicking jumps straight there and flashes the landing |
-| 💾 **Export / import** | Take a session out, or back up the whole state under a name you choose with one checkbox per section — agents, providers & keys, models, settings, memory, pipelines, conversations, metrics, sessions, shell config, approvals — and restore any of it onto any copy. A section the file lacks is left alone rather than blanked, and a restore keeps this copy's own token |
-| 🧠 **Dynamic tools** | Teaches each model the environment it's really in — and learns the tool dialect that works |
-| 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
-| 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
-| ♾️ **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
-| 🏋️ **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
-| 📖 **Harness & training guide** | Auto-fit, manual pins and the 12-step drill in one place — [Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode) |
-| ❝ **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
-| 🧠 **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
-| 🧭 **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |
-| 🧮 **Resource Manager** | Optional pause / idle throttles + CPU/GPU gauges so the 3D graph can rest |
-| 🕸️ **MCP on the graph** | Outgoing calls and incoming friends drawn as live nodes with editable access |
-| 🖥️ **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
-| 🎛️ **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
-| 🌐 **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes outbound traffic through it — every endpoint on your own network goes direct |
-| 🔄 **Self-updates, one click** | A load-time check that names what shipped, asked again within the hour and offered on every load until installed, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
-| 🖥️ **Agent-opened programs** | An agent may **name** a program on your list and it opens **detached**, so the window outlives the reply — closed gracefully, always by the binary and never by name, and audited as *started* |
-| ⌨️ **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
-| 🕵️ **Masked reads** | The config routes answer `********` instead of your access token, keys and friend tokens — and the write path restores the real value |
-| 🏠 **Local-only mode** | Until a token is set, only requests from this machine are answered — anything else gets **403** |
-| 📱 **Mobile-first** | Built for the phone in your pocket: the composer rides above the open keyboard, URL-bar wiggles are ignored, and an **Allow** choice finally sticks |
+| | Feature | What it does |
+|---|---|---|
+| 🤖 | **Any model, any provider** | OpenAI, OpenRouter, NVIDIA NIM, Anthropic, Google, Groq, DeepSeek, xAI, Mistral, Cerebras, Together, Perplexity, Ollama, LM Studio, vLLM… |
+| 🧭 | **Auto-fitting harness** | Detects each provider's API shape *and* tool dialect, speaks it correctly, and reads the reply back — a runner's own `output` envelope included |
+| 🧠 | **Brain Lab** | Every per-agent setting, locks, memory, files and custom tools in one rail |
+| 🧪 | **API Lab** | Paste a curl → get it in 10 languages → actually send it server-side |
+| 🔀 | **Routing chart** | Draw workflows: agents, loops, checkpoints, delays, parallel fan-out |
+| 🛠️ | **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP — with timeouts that end the process instead of the turn, argv shapes models actually write, and approvals that resume the agent where it left off |
+| 🚀 | **Background commands** | `exec_start` runs a server, watcher or anything that never exits and hands back a handle at once; `exec_poll` reads its output and says whether it is alive, `exec_kill` stops it |
+| ⏱️ | **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
+| 📊 | **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
+| 🗣️ | **Conversations, in words** | Every hop keeps its **text** — your prompt, the task a coordinator hands down, an agent-to-agent ask with its answer, the reply, and a question typed in the map's ASK box: a **Comms** tab beside the run trace, a per-agent **Talk / Runs** drawer (All / agent-to-agent) opened from either map, a failed ask that stays visible, and a beam you can hover to read *“A → B: …”*. |
+| 📣 | **One name, the whole roster** | `ask_agent` / `tell_agent` take `"ALL"` (or `everyone` / `everybody`, any case): ask each agent in turn with replies labelled by agent, or post one instruction to every mailbox — and an agent really called "All" keeps its name |
+| 🧠 | **Memory** | Private + collective long-term memory the agents actually use |
+| 🔐 | **Locked down** | Access token, approvals, allow/deny lists, jailed filesystem |
+| 🔒 | **Verified calls** | Model and speech calls check the peer certificate *and* the hostname — **Auto** exempts LAN and loopback so local runners keep working, **Always** / **Never** are explicit choices saved as `tls.verify`, and `tls.ca_bundle` can point at a PEM you manage yourself |
+| 📌 | **Pinned certificates** | Read the chain a host actually presents, see its SHA-256, and store it in `storage/tls/trusted.pem` — every pin is listed in Config → TLS / Certificates with fingerprint, expiry and pin date, and FORGET drops one |
+| ⚠️ | **Expiry warnings** | A pin inside 30 days reads *EXPIRES IN n DAYS* in the list and raises a bell notification naming the host, so a renewed server certificate is re-pinned before it becomes an outage |
+| 🧭 | **Per-agent API shape** | Pin one agent's harness — OpenAI-compatible, Anthropic, Google, Ollama — instead of relying on detection |
+| 🧠 | **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, and **Config → Interface** pins it Auto, always open or always collapsed |
+| 🧰 | **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
+| 🔌 | **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
+| 🎨 | **Themes** | Dark, Matrix, Cyberpunk |
+| 🖼️ | **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
+| 🎙️ | **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
+| ⌨️ | **Slash commands** | `/CODE`, `/ROLE`, `/NAME`, `/ALL`, `/?` — address agents from the composer |
+| ⬇️ | **Scroll to latest** | With Auto Scroll off, scrolling up reveals a `∨` button parked above the composer; clicking it jumps to the newest message and follows new output until you scroll up again, and scrolling up with Auto Scroll on pauses the follow instead of yanking the transcript |
+| 💬 | **Prompt rail** | One short tick per prompt down the right edge of the chat box, newest at the bottom — hovering names it, clicking jumps straight there and flashes the landing |
+| 💾 | **Export / import** | Take a session out, or back up the whole state under a name you choose with one checkbox per section — agents, providers & keys, models, settings, memory, pipelines, conversations, metrics, sessions, shell config, approvals — and restore any of it onto any copy. A section the file lacks is left alone rather than blanked, and a restore keeps this copy's own token |
+| 🧠 | **Dynamic tools** | Teaches each model the environment it's really in — and learns the tool dialect that works |
+| 🔑 | **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
+| 🌐 | **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
+| ♾️ | **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
+| 🏋️ | **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
+| 📖 | **Harness & training guide** | Auto-fit, manual pins and the 12-step drill in one place — [Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode) |
+| ❝ | **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
+| 🧠 | **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
+| 🧭 | **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |
+| 🧮 | **Resource Manager** | Optional pause / idle throttles + CPU/GPU gauges so the 3D graph can rest |
+| 🕸️ | **MCP on the graph** | Outgoing calls and incoming friends drawn as live nodes with editable access |
+| 🖥️ | **Two interfaces** | **Classic** (default) and **Desktop 2026** — one switch, same features, same store |
+| 🎛️ | **Desktop card** | Fog · bloom · floating floor · floor pin · map detail · frame cap · glass — tuned defaults, every knob exposed |
+| 🌐 | **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes outbound traffic through it — every endpoint on your own network goes direct |
+| 🔄 | **Self-updates, one click** | A load-time check that names what shipped, asked again within the hour and offered on every load until installed, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
+| 🖥️ | **Agent-opened programs** | An agent may **name** a program on your list and it opens **detached**, so the window outlives the reply — closed gracefully, always by the binary and never by name, and audited as *started* |
+| ⌨️ | **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
+| 🕵️ | **Masked reads** | The config routes answer `********` instead of your access token, keys and friend tokens — and the write path restores the real value |
+| 🏠 | **Local-only mode** | Until a token is set, only requests from this machine are answered — anything else gets **403** |
+| 📱 | **Mobile-first** | Built for the phone in your pocket: the composer rides above the open keyboard, URL-bar wiggles are ignored, and an **Allow** choice finally sticks |
 
 ---
 ## 🔀 Routing chart
