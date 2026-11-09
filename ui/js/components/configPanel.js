@@ -160,13 +160,7 @@ export class ConfigPanel {
           const bits = [s.enabled
             ? `Filesystem tools are live. Web search: ${engine}.`
             : 'No directories are allowed yet, so the filesystem tools report themselves as disabled. Web search works regardless.'];
-          if (s.require_token && !s.token_set) {
-            // Armed with nothing to check against: every route answers 503, so
-            // "send a matching token" would send you looking for one that does
-            // not exist.
-            bits.push('A token is required but none is set, so every route answers 503 — '
-              + 'run ./setup-token.sh, then paste the token into Config → Access token.');
-          } else if (s.require_token) {
+          if (s.require_token) {
             bits.push('A token is required — your browser must send a matching one or every sandbox call is refused.');
           } else if (s.local_only_strict === false) {
             // Say this plainly: it is the state that lets a reverse proxy on
@@ -186,7 +180,18 @@ export class ConfigPanel {
       })
       .catch(err => {
         const status = document.getElementById('cfgSandboxStatus');
-        if (status) status.textContent = `Could not load sandbox settings: ${err.message}`;
+        // The gate armed with no token answers 503 on every route, this one
+        // included, so the state above can never load. Name that state here --
+        // the same sentence the Permissions panel shows -- instead of reporting
+        // a bare failure that reads like a broken backend.
+        const noToken = !!err && err.status === 503
+          && String((err.data && err.data.error) || '').toLowerCase() === 'no token configured';
+        if (status) {
+          status.textContent = noToken
+            ? 'A token is required but none is set, so every route answers 503 — '
+              + 'run ./setup-token.sh, then paste the token into Config → Access token.'
+            : `Could not load sandbox settings: ${err.message}`;
+        }
         if (read) read.value = '';
       });
 

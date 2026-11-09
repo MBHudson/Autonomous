@@ -449,10 +449,6 @@ class Sandbox {
             'search_configured' => !empty($c['read_roots']) || !empty($c['write_roots'])
                 || $c['search_engine'] === 'ddg',
             'require_token' => $c['require_token'],
-            // A boolean, never the token: the status line has to tell "armed
-            // with a token" apart from "armed with nothing", which answers 503
-            // on every route rather than 401.
-            'token_set' => trim((string)($c['token'] ?? '')) !== '',
             // Shown on the Config status line. With no token set the posture is
             // "this machine only", and this says whether a reverse proxy is
             // judged by the client it forwards or by its own address.

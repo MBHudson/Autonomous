@@ -1758,6 +1758,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           </div>
         </div>
         <div class="form-hint">Until an access token is set, the API answers only this machine. On, a request that arrived through a reverse proxy is judged by the address the proxy reports &mdash; otherwise nginx on this host makes every internet visitor look local. Off trusts the socket peer alone, which is only right when the proxy forwards no client address at all. Saved as <code>sandbox.local_only_strict</code>.</div>
+        <div class="form-hint" id="sbTokenPosture"></div>
 
         <div class="cfg-sublabel">Always-On Agents <span class="form-hint-inline">work on their own</span></div>
         <div class="toggle-row">
@@ -3573,6 +3574,8 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       const info = await api.execAllowlist();
       const cfg = await api.getConfig();
       const sb = cfg.sandbox || {};
+      const posture = document.getElementById('sbTokenPosture');
+      if (posture) posture.textContent = '';
       const on = !!info.enabled;
       const ask = !!sb.exec_approval;
       const set = (id, v) => document.getElementById(id)?.classList.toggle('active', v);
@@ -3597,6 +3600,18 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       // Say what happened. The toggles still work -- their listeners are
       // already attached -- but the displayed state is unverified, so make that
       // obvious rather than leaving stale switches looking authoritative.
+      // The no-token 503 blocks the config read itself, so the Remote access
+      // hint has to come from the failure rather than from a status call, and
+      // it says the same sentence the Config status line does.
+      const posture = document.getElementById('sbTokenPosture');
+      const noToken = !!err && err.status === 503
+        && String((err.data && err.data.error) || '').toLowerCase() === 'no token configured';
+      if (posture) {
+        posture.textContent = noToken
+          ? 'A token is required but none is set, so every route answers 503 — '
+            + 'run ./setup-token.sh, then paste the token into Config → Access token.'
+          : '';
+      }
       const st = document.getElementById('sbExecStatus');
       if (st) st.textContent = `Could not read the current setting: ${err.message}. `
         + 'Toggles still work; the shown state may be out of date.';
