@@ -5,7 +5,7 @@
 //   - Google's finishReason was never read, so a MAX_TOKENS or SAFETY stop
 //     arrived as an ordinary short reply.
 
-import { mergeUsage, googleFinishReason } from '../../ui/js/streamShape.js?v=428';
+import { mergeUsage, googleFinishReason, finishReasonFrom } from '../../ui/js/streamShape.js?v=428';
 
 let pass = 0;
 let fail = 0;
@@ -71,6 +71,27 @@ ok(googleFinishReason('BLOCKLIST') === 'content_filter', 'BLOCKLIST reads as con
 ok(googleFinishReason('OTHER') === 'other', 'an unknown reason passes through lowercased');
 ok(googleFinishReason(null) === null, 'a missing reason stays null');
 ok(googleFinishReason('') === null, 'an empty reason stays null');
+
+// --- finishReasonFrom (the direct, non-streamed call) -----------------------
+
+same(finishReasonFrom({ choices: [{ finish_reason: 'length' }] }, 'openrouter'), 'length',
+  'direct openai: a token ceiling is read');
+same(finishReasonFrom({ choices: [{ finish_reason: 'stop' }] }, 'openrouter'), 'stop',
+  'direct openai: a normal stop is read');
+same(finishReasonFrom({ stop_reason: 'max_tokens' }, 'anthropic'), 'length',
+  'direct anthropic: max_tokens maps to length');
+same(finishReasonFrom({ stop_reason: 'end_turn' }, 'anthropic'), 'end_turn',
+  'direct anthropic: other stop reasons pass through');
+same(finishReasonFrom({ candidates: [{ finishReason: 'MAX_TOKENS' }] }, 'google'), 'length',
+  'direct google: MAX_TOKENS maps to length');
+same(finishReasonFrom({ candidates: [{ finishReason: 'SAFETY' }] }, 'google'), 'content_filter',
+  'direct google: a safety stop reads as content_filter');
+same(finishReasonFrom({ done: true, done_reason: 'length' }, 'ollama'), 'length',
+  'direct ollama: done_reason is read');
+same(finishReasonFrom({ done: true }, 'ollama'), 'stop',
+  'direct ollama: a finished body with no reason reads as stop');
+same(finishReasonFrom({}, 'openrouter'), null, 'direct: a body with no stop reason is null');
+same(finishReasonFrom(null, 'openrouter'), null, 'direct: a null body is null');
 
 console.log('-'.repeat(60));
 console.log(`streamShape: ${pass} passed, ${fail} failed`);

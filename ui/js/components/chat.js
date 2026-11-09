@@ -2420,6 +2420,10 @@ _makeLiveNode(agent) {
     };
 
     let content = null;
+    // Kept out here so the "no reply" path can say WHY: a body that stopped at
+    // the token ceiling is a different fix from a refused or empty one, and the
+    // direct call used to drop the provider's stop reason on the floor.
+    let finishReason = null;
     let usage = null;
     let reasoning = null;
 
@@ -2455,6 +2459,7 @@ _makeLiveNode(agent) {
       content = res?.content ?? null;
       usage = res?.usage ?? null;
       reasoning = res?.reasoning ?? null;
+      finishReason = res?.finishReason ?? null;
     } catch (e) {
       if (e?.name === 'AbortError') throw e;
       // Network-level failure (e.g. CORS block) → retry via server-side relay
@@ -2492,11 +2497,19 @@ _makeLiveNode(agent) {
     if (content) {
       this._recordUsage(agent.id, usage || null, content);
       const parsed = this._parseSections(content);
-      return { content, text: parsed.text, sections: parsed.sections, reasoning };
+      return { content, text: parsed.text, sections: parsed.sections, reasoning, finishReason };
     }
     // Say WHY there is no reply. A bare null here used to surface as
     // "Error: Unknown error", which reads like a crash and hides the real
     // cause (an empty or refused provider response).
+    // A token ceiling is a reason, and a different fix from a bad key. Say so
+    // instead of "the provider returned an empty response", which sends the
+    // hunt to the wrong place.
+    if (finishReason === 'length') {
+      throw new Error(`${provider?.name || 'The provider'} stopped at the token ceiling before `
+        + `writing an answer (finishReason=length, model "${agent.model}"). `
+        + 'Raise Max Tokens in Settings, or ask for a shorter reply.');
+    }
     throw new Error(`No reply content from ${provider?.name || 'provider'} `
       + `for model "${agent.model}" — the provider returned an empty response `
       + `(check the key, the model id, and that the endpoint matches the API).`);

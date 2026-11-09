@@ -65,3 +65,46 @@ export function googleFinishReason(reason) {
   }
   return r;
 }
+
+/**
+ * The stop reason out of a COMPLETE (non-streamed) provider body.
+ *
+ * The relayed path reads it frame by frame; a direct call got the whole body
+ * at once and threw the field away, returning content/usage/reasoning only. A
+ * reply cut off at the token ceiling therefore looked like an ordinary short
+ * answer on that route, and the caller's truncation message could not fire.
+ *
+ * Returned in the same vocabulary the streamed path produces: 'length' for a
+ * token ceiling, Google's safety stops as 'content_filter', and everything
+ * else as the provider spelled it.
+ *
+ * @param {object} data   decoded body
+ * @param {string} family 'anthropic' | 'google' | 'ollama' | anything else (OpenAI-compatible)
+ * @returns {string|null}
+ */
+export function finishReasonFrom(data, family) {
+  if (!data || typeof data !== 'object') return null;
+
+  if (family === 'anthropic') {
+    const r = data.stop_reason;
+    if (typeof r !== 'string' || !r) return null;
+    return r === 'max_tokens' ? 'length' : r;
+  }
+
+  if (family === 'google') {
+    const r = data.candidates && data.candidates[0] && data.candidates[0].finishReason;
+    return typeof r === 'string' && r ? googleFinishReason(r) : null;
+  }
+
+  if (family === 'ollama') {
+    const r = data.done_reason ?? data.finish_reason;
+    if (typeof r === 'string' && r) return r;
+    // A finished Ollama body without a reason: it stopped on its own.
+    return data.done === true ? 'stop' : null;
+  }
+
+  const r = data.choices && data.choices[0] && data.choices[0].finish_reason;
+  if (typeof r === 'string' && r) return r;
+  const alt = data.finish_reason;
+  return (typeof alt === 'string' && alt) ? alt : null;
+}

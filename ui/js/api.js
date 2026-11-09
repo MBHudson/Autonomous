@@ -15,7 +15,7 @@ import { acquire, note429 } from './rateGovernor.js?v=428';
 import { latency } from './latency.js?v=428';
 import { detectFamily, outputText, outputUsage } from './harness.js?v=428';
 import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=428';
-import { mergeUsage, googleFinishReason } from './streamShape.js?v=428';
+import { mergeUsage, googleFinishReason, finishReasonFrom } from './streamShape.js?v=428';
 
 latency.bindStore(store);
 
@@ -1072,10 +1072,15 @@ class ApiClient {
     }
 
     const data = await res.json();
+    // The body carries the stop reason too. Reading it here is what makes a
+    // direct call report a token-ceiling cut-off the same way a relayed stream
+    // does, instead of presenting a truncated reply as a short answer.
+    const family = detectFamily({ endpoint: provider?.endpoint, model: options.model || '' });
     return {
       content: this._parseProviderResponse(data, provider),
       usage: this._parseUsage(data, provider),
       reasoning: this._parseReasoning(data),
+      finishReason: finishReasonFrom(data, family),
     };
   }
 
