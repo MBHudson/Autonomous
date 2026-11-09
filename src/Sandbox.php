@@ -127,6 +127,11 @@ class Sandbox {
             'max_read_bytes' => (int)($sb['max_read_bytes'] ?? self::DEFAULT_MAX_READ_BYTES),
             'require_token' => !empty($sb['require_token']),
             'token'         => (string)($sb['token'] ?? ''),
+            // Reverse proxies allowed to report the real client. Empty by
+            // default: a request that arrives through an UNdeclared proxy is
+            // not local, because the proxy's own loopback address would
+            // otherwise make every internet visitor look like this machine.
+            'trusted_proxies' => self::proxyList($sb['trusted_proxies'] ?? []),
             // --- shell access -------------------------------------------
             // Off unless the operator turns it on. `exec_enabled` gates the
             // whole feature; `exec_allow` is the per-command allowlist.
@@ -496,10 +501,122 @@ class Sandbox {
     public static function isLocalRequest($server = null) {
         $server = is_array($server) ? $server : (array)$_SERVER;
         $remote = trim((string)($server['REMOTE_ADDR'] ?? ''));
-        // No peer address at all (the CLI, or PHP's built-in server before it
-        // has bound): nothing to refuse, and no network path to refuse it on.
-        if ($remote === '') { return true; }
-        return in_array(strtolower($remote), ['127.0.0.1', '::1', '::ffff:127.0.0.1'], true);
+        // No peer address: the CLI has none, and a web request without one is a
+        // broken SAPI rather than a local visitor -- refuse it there instead of
+        // inheriting the CLI's exemption.
+        if ($remote === '') { return PHP_SAPI === 'cli'; }
+
+        // A forwarding header means this request came through a proxy, so the
+        // peer address is the PROXY's and the loopback test below would call
+        // every internet visitor local -- the whole hole this function exists
+        // to close. The client is read from the header only when the peer is a
+        // proxy the operator declared; an undeclared one is refused outright.
+        $forwarded = self::forwardedClientIp($server);
+        if ($forwarded === false) { return false; }
+        if ($forwarded !== null) { return self::isLoopbackIp($forwarded); }
+
+        return self::isLoopbackIp($remote);
+    }
+
+    /** Normalise a proxy list given as an array or a comma/newline string. */
+    private static function proxyList($value) {
+        $v = is_array($value) ? $value : preg_split('/[\r\n,]+/', (string)$value);
+        $out = [];
+        foreach ((array)$v as $item) {
+            $item = trim((string)$item);
+            if ($item !== '') { $out[] = $item; }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /** 127.0.0.0/8 or ::1. */
+    private static function isLoopbackIp($ip) {
+        $ip = strtolower(trim((string)$ip));
+        if ($ip === '::1' || $ip === '::ffff:127.0.0.1') { return true; }
+        $bin = @inet_pton($ip);
+        return $bin !== false && strlen($bin) === 4 && $bin[0] === "\x7f";
+    }
+
+    /** Is $ip one of these addresses, or inside one of these CIDR ranges? */
+    private static function ipInList($ip, $list) {
+        $bin = @inet_pton(trim((string)$ip));
+        if ($bin === false) { return false; }
+        foreach ((array)$list as $entry) {
+            $entry = trim((string)$entry);
+            if ($entry === '') { continue; }
+            if (strpos($entry, '/') === false) {
+                $one = @inet_pton($entry);
+                if ($one !== false && $one === $bin) { return true; }
+                continue;
+            }
+            list($net, $bits) = array_pad(explode('/', $entry, 2), 2, '0');
+            $n = @inet_pton(trim($net));
+            $bits = (int)$bits;
+            if ($n === false || strlen($n) !== strlen($bin)) { continue; }
+            if ($bits < 0 || $bits > strlen($n) * 8) { continue; }
+            $whole = intdiv($bits, 8);
+            if ($whole > 0 && substr($bin, 0, $whole) !== substr($n, 0, $whole)) { continue; }
+            $rem = $bits % 8;
+            if ($rem === 0) { return true; }
+            $mask = (0xFF << (8 - $rem)) & 0xFF;
+            if ((ord($bin[$whole]) & $mask) === (ord($n[$whole]) & $mask)) { return true; }
+        }
+        return false;
+    }
+
+    /**
+     * The client address a proxy reported.
+     *
+     * Returns null when nothing was forwarded (a direct request), and false
+     * when a forwarding header is present but the peer is not a declared
+     * proxy -- in that case the header is just something the caller typed,
+     * and there is no trustworthy answer to give.
+     *
+     * X-Forwarded-For is read from the RIGHT: a proxy appends the address it
+     * saw, so a caller can only add to the left of it, and taking the leftmost
+     * entry is how a spoofed "127.0.0.1" gets believed. Hops that are
+     * themselves declared proxies are skipped, which is what makes a chain of
+     * them resolve to the client rather than to the last proxy.
+     */
+    private static function forwardedClientIp($server) {
+        $xff = trim((string)($server['HTTP_X_FORWARDED_FOR'] ?? ''));
+        $real = trim((string)($server['HTTP_X_REAL_IP'] ?? ''));
+        $cf = trim((string)($server['HTTP_CF_CONNECTING_IP'] ?? ''));
+        $fwd = trim((string)($server['HTTP_FORWARDED'] ?? ''));
+        if ($xff === '' && $real === '' && $cf === '' && $fwd === '') { return null; }
+
+        $peer = (string)($server['REMOTE_ADDR'] ?? '');
+        $trusted = self::config()['trusted_proxies'] ?? [];
+        if (!self::ipInList($peer, $trusted)) { return false; }
+
+        if ($xff !== '') {
+            $hops = array();
+            foreach (explode(',', $xff) as $hop) {
+                // Proxies sometimes write "unknown" for a hop they could not
+                // resolve; drop it rather than refusing the whole request.
+                $hop = trim(trim($hop), '"');
+                if ($hop !== '' && filter_var($hop, FILTER_VALIDATE_IP) !== false) { $hops[] = $hop; }
+            }
+            if (!$hops) { return false; }
+            // Walk from the right, dropping hops that are themselves declared
+            // proxies -- a chain of them still ends at the client. The last one
+            // standing is the client even when it is a trusted address: a
+            // browser on this machine talking through a proxy on this machine
+            // is still a local visitor.
+            $i = count($hops) - 1;
+            while ($i > 0 && self::ipInList($hops[$i], $trusted)) { $i--; }
+            return $hops[$i];
+        }
+        foreach (array($real, $cf) as $ip) {
+            if ($ip !== '') {
+                return filter_var($ip, FILTER_VALIDATE_IP) !== false ? $ip : false;
+            }
+        }
+        if (preg_match('/for\s*=\s*"?\[?([0-9A-Fa-f:.]+)\]?"?/', $fwd, $m)
+            && filter_var($m[1], FILTER_VALIDATE_IP) !== false) {
+            return $m[1];
+        }
+        return false;
     }
 
     /**

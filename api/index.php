@@ -164,7 +164,7 @@ if (!empty($routerSandbox['require_token']) && !$isMcpRpc) {
         'detail' => 'This copy has no access token set, so it only answers requests from the '
             . 'machine it runs on. Run ./setup-token.sh (or start.bat -Token on Windows) to set '
             . 'one, paste it into Config -> Access token on each device, and this address will '
-            . 'work from anywhere again.',
+            . 'work from anywhere again. Behind a reverse proxy, list it in sandbox.trusted_proxies too, or forwarded visitors are judged by the proxy\'s address.',
     ]);
     exit(0);
 }
