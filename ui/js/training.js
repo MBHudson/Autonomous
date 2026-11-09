@@ -20,7 +20,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=423';
+import { store } from './store.js?v=424';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -63,6 +63,21 @@ export function isTrainingActive() {
 /** Short numbered recap for the popup dialog. */
 export function trainingStepList() {
   return TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool} — ${t.label}`);
+}
+
+/**
+ * The chat turn Start dispatches, so arming the mode IS starting the drill.
+ * Self-contained on purpose: a fresh turn also carries the drill in its
+ * system prompt, but a turn already in flight when Start is pressed was built
+ * before arming — this text reaches those agents through the steer queue at
+ * their next tool-loop boundary. Either way the drill runs through the normal
+ * turn path, so messages, topology, metrics and trace all behave as usual.
+ */
+export function trainingKickoffFor() {
+  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${t.label}`).join('\n');
+  return `Training mode is ON — work this drill now, step by step, inside the "training" sandbox folder. Nothing else until it is done.\n`
+    + `Steps:\n${steps}\n`
+    + `Rules: one step at a time; a failed step is retried until it passes, never skipped; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; when every step is completed, give a two-line summary (which tools passed, how many retries each took) and stop.`;
 }
 
 /**

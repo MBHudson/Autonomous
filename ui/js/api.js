@@ -10,11 +10,11 @@
 // API.JS — PHP backend client
 // ============================================
 
-import { store } from './store.js?v=423';
-import { acquire, note429 } from './rateGovernor.js?v=423';
-import { latency } from './latency.js?v=423';
-import { detectFamily, outputText, outputUsage } from './harness.js?v=423';
-import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=423';
+import { store } from './store.js?v=424';
+import { acquire, note429 } from './rateGovernor.js?v=424';
+import { latency } from './latency.js?v=424';
+import { detectFamily, outputText, outputUsage } from './harness.js?v=424';
+import { createNativeCallState, ingestNativeDelta, nativeCalls } from './nativeTools.js?v=424';
 
 latency.bindStore(store);
 
@@ -163,6 +163,11 @@ class ApiClient {
       // the message.
       err.status = res.status;
       err.retryable = res.status === 429 || (res.status >= 500 && res.status < 600);
+      // Carry a structured error body for callers that report partial
+      // progress: a restore can land earlier sections and still fail on a
+      // later one, and the bare message alone hides what is already on disk.
+      // (A raw HTML page is never useful to a caller — only real JSON.)
+      if (data && typeof data === 'object' && data.raw === undefined) err.data = data;
       throw err;
     }
 

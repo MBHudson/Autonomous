@@ -10,21 +10,21 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=423';
-import { K } from '../storage.js?v=423';
-import { persistence } from '../persistence.js?v=423';
-import { api } from '../api.js?v=423';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=423';
-import { errText } from '../api.js?v=423';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=423';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=423';
-import { snapshot } from '../rateGovernor.js?v=423';
-import { trainingStepList } from '../training.js?v=423';
-import { resetBrowserEnabled } from '../toolManifest.js?v=423';
-import { perf } from '../perf.js?v=423';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=423';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=423';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=423';
+import { store } from '../store.js?v=424';
+import { K } from '../storage.js?v=424';
+import { persistence } from '../persistence.js?v=424';
+import { api } from '../api.js?v=424';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=424';
+import { errText } from '../api.js?v=424';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=424';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=424';
+import { snapshot } from '../rateGovernor.js?v=424';
+import { trainingStepList, trainingKickoffFor } from '../training.js?v=424';
+import { resetBrowserEnabled } from '../toolManifest.js?v=424';
+import { perf } from '../perf.js?v=424';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=424';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=424';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=424';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -780,7 +780,7 @@ export class Sidebar {
             <li>A failed step must be retried until it passes, never skipped; each pass is logged to the todo list.</li>
           </ul>
           <ol class="training-steps">${steps}</ol>
-          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. End the drill with Stop.</div>
+          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. Start sends the drill into chat straight away, so every attempt, the map and the metrics show exactly as usual. End the drill with Stop.</div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="trainingCancel">Cancel</button>
@@ -798,8 +798,22 @@ export class Sidebar {
     });
   }
 
-  /** Arm training mode: throttle note, re-render, and tell the fleet. */
+  /**
+   * Arm training mode AND start the drill: the flag alone only affects turns
+   * dispatched after arming, so with no run in flight Start used to appear to
+   * do nothing (no text, no topology, no metrics). The kickoff goes through
+   * the normal turn path, so everything behaves exactly as it does for a
+   * typed message — a fresh turn when idle, a steer when already working.
+   */
   _startTraining(close) {
+    const actives = (store.get('agents') || []).filter(a => a && a.active);
+    if (!actives.length) {
+      store.emit('toast', {
+        message: 'No active agents — activate at least one agent, then Start training',
+        type: 'error',
+      });
+      return;
+    }
     store.set('settings.trainingMode', { active: true, startedAt: Date.now() });
     persistence.set('settings', store.get('settings'));
     store.emit('toast', {
@@ -809,6 +823,23 @@ export class Sidebar {
     store.emit('training:changed', { active: true });
     close();
     this.renderAgents();
+    // Dispatch after arming so the fresh turn's system prompt already carries
+    // the drill block; the kickoff text itself is self-contained for a turn
+    // that is already in flight (steer path).
+    try {
+      const kickoff = trainingKickoffFor();
+      if (this.chat && typeof this.chat.steer === 'function' && this.chat.aborter) {
+        this.chat.steer(kickoff);
+      } else if (this.chat && typeof this.chat.sendMessage === 'function') {
+        const input = document.getElementById('inputField');
+        if (input) {
+          input.value = kickoff;
+          this.chat.sendMessage();
+        }
+      }
+    } catch (err) {
+      console.warn('[training] drill dispatch failed; mode is armed for the next turn:', err);
+    }
   }
 
   /** Stand the fleet back down. The todo record keeps what the drill taught. */
@@ -2949,6 +2980,16 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       e.preventDefault();
       overlay.querySelectorAll('[data-section]').forEach(c => { c.checked = false; });
     });
+    // A restore writes section by section, so a late failure leaves the
+    // earlier sections on disk. Say both halves: what landed anyway and what
+    // never ran, instead of a bare failure that reads as "nothing worked".
+    const failSay = (why, payload) => {
+      const landed = payload && Array.isArray(payload.restored) ? payload.restored : [];
+      const missed = payload && Array.isArray(payload.skipped) ? payload.skipped : [];
+      say('Restore failed: ' + why
+        + (landed.length ? ' — but these sections DID land on disk: ' + landed.map(labelOf).join(', ') : '')
+        + (missed.length ? ' — skipped: ' + missed.map(sk => `${labelOf(sk.section)} (${sk.reason})`).join('; ') : ''));
+    };
     overlay.querySelector('[data-restore]').addEventListener('click', async () => {
       const only = [...overlay.querySelectorAll('[data-section]:checked')].map(c => c.dataset.section);
       if (!only.length) { say('Pick at least one section — or Cancel.'); return; }
@@ -2959,12 +3000,12 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       try {
         res = await api.importBackup(backup, only);
       } catch (err) {
-        say('Restore failed: ' + (err?.message || err));
+        failSay(err?.message || err, err && err.data);
         btn.disabled = false;
         return;
       }
       if (!res || !res.success) {
-        say('Restore failed: ' + ((res && res.error) || 'unknown error'));
+        failSay((res && res.error) || 'unknown error', res);
         btn.disabled = false;
         return;
       }

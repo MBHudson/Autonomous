@@ -30,7 +30,7 @@ if (!version) {
 }
 const {
   TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_TASKS,
-  isTrainingActive, trainingStepList, trainingBlockFor,
+  isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const { store } = await import(`../../ui/js/store.js?v=${version}`);
 const { limitsFor } = await import(`../../ui/js/rateGovernor.js?v=${version}`);
@@ -70,6 +70,16 @@ ok(block.includes('TRY AGAIN'), 'block orders retries on failure');
 ok(block.includes('never skip'), 'block forbids skipping failed steps');
 ok(block.includes(TRAINING_FILE), 'block names the drill file');
 for (const t of TRAINING_TASKS) ok(block.includes(t.tool), `block lists ${t.tool}`);
+
+// The Start dispatch: self-contained, so a fresh turn AND a steered in-flight
+// turn both get the drill even though only the fresh turn carries the block.
+const kickoff = trainingKickoffFor();
+ok(typeof kickoff === 'string' && kickoff.length > 200, 'kickoff is a full instruction');
+ok(kickoff.includes('Training mode is ON'), 'kickoff announces the mode');
+ok(kickoff.includes(TRAINING_DIR), 'kickoff names the drill folder');
+ok(kickoff.includes('retried until it passes'), 'kickoff carries the retry rule');
+ok(kickoff.includes('approval'), 'kickoff warns about approval pauses');
+for (const t of TRAINING_TASKS) ok(kickoff.includes(t.tool), `kickoff lists ${t.tool}`);
 
 // Armed: the governor halves the ceiling on the no-agent path.
 const ENDPOINT = 'https://unknown.example/v1/chat/completions';

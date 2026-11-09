@@ -18,6 +18,12 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## ▶️ Training Start dispatches the drill; failed restores report what landed *(`VERSION` 439, cache-buster v423 → v424)*
+
+*Start used to only arm the mode — with no run in flight the fleet sat silent: no text, no map, no metrics. It now posts the drill into chat as a turn (fresh) or steers it into a running one, so everything behaves exactly as it does for a typed message. With no active agents it says so instead of arming.*
+
+*A restore writes section by section, and a late write failure used to return a bare error while the earlier sections sat on disk — "failed" and "restored" at once. The error now carries the sections that landed, the dialog prints both halves, and the config section no longer claims "restored" when its save fails. Covered by a backup test that breaks the models write on purpose.*
+
 ## 🏋️ Training mode: a paced tool drill for the whole fleet *(`VERSION` 438, cache-buster v422 → v423)*
 
 *A dumbbell button in the Agents-tab header arms it: every active agent drops to ~50% request rate and works one simple drill — think, todo_write, echo, now, write/read/edit `training/training.txt`, list/glob/grep it, exec echo — retrying each failed step until it passes and logging what worked to the todo list.*

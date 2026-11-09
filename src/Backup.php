@@ -271,6 +271,20 @@ class Backup
     }
 
     /**
+     * An import that fails part-way still says what already landed.
+     * Sections restore in order (state, sessions, models, config,
+     * approvals), so a late failure means the earlier ones are on disk
+     * while a bare error reads as "nothing worked". The dialog reports
+     * both halves from this shape.
+     */
+    private static function importError($message, $restored, $skipped)
+    {
+        return ['error' => $message,
+            'restored' => array_values(array_unique($restored)),
+            'skipped' => $skipped];
+    }
+
+    /**
      * Restore the planned sections of $backup into $storageDir.
      *
      * Only planned sections are touched: state slots merge per-slot, sessions
@@ -343,7 +357,7 @@ class Backup
             } elseif (Config::saveModels($backup['models'])) {
                 $restored[] = 'models';
             } else {
-                return ['error' => 'Could not write the models catalog'];
+                return self::importError('Could not write the models catalog', $restored, $skipped);
             }
         }
 
@@ -360,7 +374,11 @@ class Backup
             }
             list($importConfig, $keptLocal) = Config::sanitizeImportedConfig($backup['config'], $stored);
             $configSaved = Config::saveConfig($importConfig);
-            $restored[] = 'config';
+            if ($configSaved) {
+                $restored[] = 'config';
+            } else {
+                return self::importError('Could not write storage/config.json', $restored, $skipped);
+            }
         }
 
         // Approval grants.
@@ -368,7 +386,8 @@ class Backup
             $ok = @file_put_contents($storageDir . '/exec-approvals.json',
                 json_encode($backup['approvals'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             if ($ok === false) {
-                return ['error' => 'Could not write storage/exec-approvals.json'];
+                return self::importError(
+                    'Could not write storage/exec-approvals.json', $restored, $skipped);
             }
             $restored[] = 'approvals';
         }

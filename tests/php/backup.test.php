@@ -28,6 +28,8 @@
  *     only when the sessions section is restored, and a restore onto a copy
  *     with a different token keeps this copy's own gate, token and roots
  *     while saying the backup's token differed;
+ *   * a restore that fails on a late section still reports the sections that
+ *     landed first, instead of a bare error that reads as "nothing worked";
  *   * nothing here touches the operator's install: a throwaway directory plus
  *     the ROUTER_CONFIG / ROUTER_MODELS overrides, both unset afterwards. No
  *     server is started and no log is written, so parallel runs cannot collide.
@@ -248,6 +250,19 @@ $res3 = Backup::importBundle($tmp, array_merge($foreign, ['sessions' => []]), ['
 same($res3['sessions'], 0, 'an empty sessions list restores empty');
 ok(!is_file($tmp . DIRECTORY_SEPARATOR . 'sessions' . DIRECTORY_SEPARATOR . 'keep.json'),
     'and the current files go with it');
+
+// --- a late failure still reports what landed ----------------------------------
+// Point the models catalog at a directory: the write fails, while the state
+// and sessions sections restore first. The error must carry those sections so
+// the dialog can say what landed instead of reporting a total failure.
+putenv('ROUTER_MODELS=' . $tmp . DIRECTORY_SEPARATOR . 'sessions');
+$oldRep = error_reporting(E_ALL & ~E_WARNING);
+$resFail = Backup::importBundle($tmp, $foreign);
+error_reporting($oldRep);
+putenv('ROUTER_MODELS=' . $models);
+ok(isset($resFail['error']), 'an unwritable models catalog fails the import');
+same($resFail['restored'], ['agents', 'sessions'],
+    '...but the error still names the sections that landed first');
 
 // --- cleanup -----------------------------------------------------------------------
 putenv('ROUTER_CONFIG');

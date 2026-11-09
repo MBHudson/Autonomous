@@ -39,14 +39,14 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v438 — training mode: drill the whole fleet on every tool 🏋️
+### 🆕 v439 — Start actually starts the drill, and restores tell the truth 🏋️
 
-*A dumbbell in the Agents-tab header arms a paced drill: all active agents drop to ~50% request rate and work simple tool tasks in `training/` — write it, read it back, list it — retrying each miss until it passes and logging what worked.*
+*Pressing Start in training mode now sends the drill into chat itself — every active agent works it at once, so messages, the map, metrics and trace all move exactly as usual. And a restore that fails part-way now says what landed before it stopped instead of a bare "failed".*
 
 | | |
 |---|---|
-| 🏋️ **Training mode button** | next to the global pre-prompt § in the Agents header; armed it glows the same cyan, and its popup explains the drill with Start/Cancel |
-| 📉 **~50% throttle + retry-until-pass lock-in** | the governor halves every agent's ceiling while armed, and a system-prompt block heads every call: drill order only, never skip a failed step, log each pass to the todo list |
+| ▶️ **Start dispatches the drill** | arming still throttles to ~50% and locks the prompt, but Start also posts the drill as a turn (or steers it into a running one) — an idle fleet no longer sits silent; with no active agents it says so |
+| 🧾 **Honest restore report** | sections land in order, so a late write failure now names the sections already on disk plus the one that choked, instead of reading as "nothing worked" |
 ---
 
 ## 🧭 Contents
@@ -283,7 +283,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🔑 **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
 | 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
 | ♾️ **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
-| 🏋️ **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header |
+| 🏋️ **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
 
 | ❝ **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
 | 🧠 **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
