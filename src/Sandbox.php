@@ -1243,7 +1243,10 @@ class Sandbox {
         // has its own advice -- can leave it off.
         $jailNote = sprintf(' Arguments that are paths must stay inside the allowed directories (%s).',
             implode(', ', $readRoots));
-        $recursive = self::isRecursiveReader($program);
+        $recursive = self::isRecursiveReader($program, $argv);
+        // Whether any argument was itself a directory: `git grep` with none
+        // searches the cwd, which then has to be checked like a named scope.
+        $sawDir = false;
 
         for ($i = $from; $i < count($argv); $i++) {
             $a = $argv[$i];
@@ -1295,17 +1298,19 @@ class Sandbox {
             // A recursive command reads whatever it finds under a directory it
             // is handed, and this guard only ever sees the directory name:
             // `grep -rn token .` passed a filename check and then read storage/.
-            // Refusing the scope is the one check available at this layer. A
-            // tree the bounded scan does not reach is still covered by the
-            // filesystem permissions the README describes.
+            // Refusing the scope is the one check available at this layer.
             if ($recursive && is_dir($resolved)) {
-                $hit = self::firstProtectedUnder($resolved);
-                if ($hit !== null) {
-                    return sprintf('%s walks directories: "%s" contains %s, which is on the protected list (secrets). '
-                        . 'Point it at a narrower directory, or clear that entry in the protect list.',
-                        $program, $a, $hit);
-                }
+                $sawDir = true;
+                $bad = self::walkerRefusal($program, $a, $resolved);
+                if ($bad !== null) { return $bad; }
             }
+        }
+        // `git grep` takes no path when you mean the whole checkout, so the cwd
+        // is the scope even though no argument named it. Only when no directory
+        // was given, so `git grep token src` stays narrowed.
+        if ($recursive && !$sawDir && self::isGitGrep($program, $argv)) {
+            $bad = self::walkerRefusal($program, '.', $cwd);
+            if ($bad !== null) { return $bad; }
         }
         return null;
     }
@@ -3634,29 +3639,62 @@ class Sandbox {
         return false;
     }
 
-    /** Commands that walk a directory themselves: the argument is a scope, not a file. */
-    private static function isRecursiveReader($program) {
+    /**
+     * Commands that walk a directory themselves: the argument is a scope, not a file.
+     *
+     * `git grep` is included by subcommand: the program name alone says nothing,
+     * and it walks the checkout when no path is given.
+     */
+    private static function isRecursiveReader($program, $argv = []) {
+        if (self::policyName($program) === 'git') {
+            return self::isGitGrep($program, $argv);
+        }
         static $names = ['grep', 'egrep', 'fgrep', 'rg', 'ag', 'ack', 'ack-grep',
             'find', 'tree', 'du', 'tar', 'zip', 'unzip', 'rsync'];
         return in_array(self::policyName($program), $names, true);
     }
 
+    /** True for `git grep` (and `git -C dir grep`), the git subcommand that walks. */
+    private static function isGitGrep($program, $argv = []) {
+        if (self::policyName($program) !== 'git') { return false; }
+        $args = array_slice($argv, 1);
+        for ($i = 0; $i < count($args); $i++) {
+            $a = (string)$args[$i];
+            if ($a === '') { continue; }
+            if ($a[0] === '-') {
+                // -c NAME=VALUE and -C DIR take a value; skip it so the
+                // subcommand after them is still the one being judged.
+                if (($a === '-c' || $a === '-C') && isset($args[$i + 1])) { $i++; }
+                continue;
+            }
+            return $a === 'grep';
+        }
+        return false;
+    }
+
     /**
-     * The first protected path at or beneath $path, or null.
+     * What the bounded scan found beneath $path.
      *
-     * Bounded on purpose: this runs while checking an exec argument, so a tree
-     * with a hundred thousand files must not stall the request. $limit counts
-     * entries inspected; a scan that runs out returns null rather than a
-     * guess, and the filesystem boundary remains the backstop there.
+     * 'hit' names the protected entry; 'clean' means everything within the
+     * limit was checked; 'cut' means the tree was too large to finish. 'cut'
+     * is refused by the caller: a check that stopped early is not a clean
+     * result, and reporting it as one is how a secret at entry 2,001 escapes.
+     *
+     * @return array{state:string,path:?string,limit:int}
      */
     private static function firstProtectedUnder($path, $limit = 2000) {
         $protect = self::config()['protect'] ?? [];
         $queue = array($path);
         $seen = 0;
-        while ($queue && $seen < $limit) {
+        while ($queue) {
+            if ($seen >= $limit) {
+                return ['state' => 'cut', 'path' => null, 'limit' => $limit];
+            }
             $current = array_shift($queue);
             $seen++;
-            if (self::isProtectedPath($current, $protect)) { return $current; }
+            if (self::isProtectedPath($current, $protect)) {
+                return ['state' => 'hit', 'path' => $current, 'limit' => $limit];
+            }
             if (is_link($current) || !is_dir($current)) { continue; }
             $items = @scandir($current);
             if ($items === false) { continue; }
@@ -3664,6 +3702,22 @@ class Sandbox {
                 if ($name === '.' || $name === '..') { continue; }
                 $queue[] = $current . '/' . $name;
             }
+        }
+        return ['state' => 'clean', 'path' => null, 'limit' => $limit];
+    }
+
+    /** The refusal for a walker whose directory argument cannot be cleared, or null. */
+    private static function walkerRefusal($program, $shown, $dir, $limit = 2000) {
+        $r = self::firstProtectedUnder($dir, $limit);
+        if ($r['state'] === 'hit') {
+            return sprintf('%s walks directories: "%s" contains %s, which is on the protected list (secrets). '
+                . 'Point it at a narrower directory, or clear that entry in the protect list.',
+                $program, $shown, $r['path']);
+        }
+        if ($r['state'] === 'cut') {
+            return sprintf('%s walks directories: "%s" is too large to check for protected entries '
+                . '(limit %d). Point it at a narrower directory.',
+                $program, $shown, $limit);
         }
         return null;
     }

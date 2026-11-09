@@ -70,7 +70,7 @@ file_put_contents($configFile, json_encode(array('sandbox' => array(
     'require_token' => false,
     'token' => '',
     'exec_enabled' => true,
-    'exec_allow' => array('grep', 'du', 'cat', 'ls'),
+    'exec_allow' => array('grep', 'du', 'cat', 'ls', 'git'),
     'exec_approval' => false,
     'code_enabled' => false,
 ))));
@@ -115,6 +115,23 @@ ok(stripos((string)$cat['stderr'], 'protected') === false,
 $direct = Sandbox::execCommand(array('grep', 'MARKER', 'storage/config.json'), array('cwd' => $app));
 ok(empty($direct['ok']) && stripos((string)$direct['stderr'], 'protected') !== false,
     'a protected file named outright is still refused');
+
+// --- git grep names no path and still walks the checkout --------------------
+$git = Sandbox::execCommand(array('git', 'grep', 'MARKER'), array('cwd' => $app));
+ok(empty($git['ok']) && stripos((string)$git['stderr'], 'walks directories') !== false,
+    'git grep with no path is refused over the app root');
+
+$gitNarrow = Sandbox::execCommand(array('git', 'grep', 'MARKER', 'src'), array('cwd' => $app));
+ok(stripos((string)$gitNarrow['stderr'], 'walks directories') === false,
+    'git grep narrowed to a clean subdirectory is not refused');
+
+// --- a tree too large to finish checking is refused, not waved through -------
+$big = $app . '/big';
+@mkdir($big, 0775, true);
+for ($i = 0; $i < 2100; $i++) { file_put_contents($big . '/f' . $i . '.txt', 'x'); }
+$large = Sandbox::execCommand(array('du', '-a', 'big'), array('cwd' => $app));
+ok(empty($large['ok']) && stripos((string)$large['stderr'], 'too large') !== false,
+    'a walker over a tree past the scan limit is refused rather than passed');
 
 // --- cleanup ----------------------------------------------------------------
 rmTree($base);

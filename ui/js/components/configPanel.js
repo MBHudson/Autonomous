@@ -15,6 +15,7 @@ import { persistence } from '../persistence.js?v=428';
 import { themeManager } from '../themes.js?v=428';
 import { DEFAULT_HISTORY_TURNS } from '../utils.js?v=428';
 import { api } from '../api.js?v=428';
+import { isNoTokenError } from '../apiError.js?v=428';
 import { audio } from '../audio.js?v=428';
 
 export class ConfigPanel {
@@ -184,8 +185,7 @@ export class ConfigPanel {
         // included, so the state above can never load. Name that state here --
         // the same sentence the Permissions panel shows -- instead of reporting
         // a bare failure that reads like a broken backend.
-        const noToken = !!err && err.status === 503
-          && String((err.data && err.data.error) || '').toLowerCase() === 'no token configured';
+        const noToken = isNoTokenError(err);
         if (status) {
           status.textContent = noToken
             ? 'A token is required but none is set, so every route answers 503 — '

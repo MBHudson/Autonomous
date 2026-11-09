@@ -14,6 +14,7 @@ import { store } from '../store.js?v=428';
 import { K } from '../storage.js?v=428';
 import { persistence } from '../persistence.js?v=428';
 import { api } from '../api.js?v=428';
+import { isNoTokenError } from '../apiError.js?v=428';
 import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=428';
 import { errText } from '../api.js?v=428';
 import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=428';
@@ -1820,7 +1821,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
             <div class="toggle" id="sbExecOn"><div class="toggle-knob"></div></div>
           </div>
           <div class="form-hint">Runs on this server as the web user, jailed to the directories above. Off by default; on your copy only. Its timeout is under Limits &amp; Budgets.</div>
-          <div class="form-hint">The guard checks the arguments a command is handed, so a folder is allowed or refused as a whole: something like <code>grep -r token .</code> still reads what it finds inside it. So a known walker handed a folder that contains a protected entry is refused (checked up to 2,000 entries). Past that scan the filesystem is the boundary: keep <code>storage/</code> unreadable to the web user.</div>
+          <div class="form-hint">The guard checks the arguments a command is handed, so a folder is allowed or refused as a whole: something like <code>grep -r token .</code> still reads what it finds inside it. So a known walker handed a folder that contains a protected entry is refused, and so is one too large to check within 2,000 entries — including <code>git grep</code> with no path. Keep <code>storage/</code> unreadable to the web user as the backstop.</div>
           <div class="toggle-row" id="sbExecApprovalRow" style="margin-top:6px">
             <span class="toggle-label">Ask before running a new command</span>
             <div class="toggle" id="sbExecApproval"><div class="toggle-knob"></div></div>
@@ -3604,8 +3605,7 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       // hint has to come from the failure rather than from a status call, and
       // it says the same sentence the Config status line does.
       const posture = document.getElementById('sbTokenPosture');
-      const noToken = !!err && err.status === 503
-        && String((err.data && err.data.error) || '').toLowerCase() === 'no token configured';
+      const noToken = isNoTokenError(err);
       if (posture) {
         posture.textContent = noToken
           ? 'A token is required but none is set, so every route answers 503 — '
