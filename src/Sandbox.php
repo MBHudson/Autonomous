@@ -252,9 +252,16 @@ class Sandbox {
         return $default;
     }
 
-    /** True when a resolved path hits the protect list. */
-    private static function isProtectedPath($path) {
-        $protect = self::config()['protect'] ?? [];
+    /**
+     * True when a resolved path hits the protect list.
+     *
+     * $protect may be passed in when the caller already resolved it: a walk
+     * over a large tree would otherwise reload and re-decode the config file
+     * once per file, which is a lot of disk reads for a list that cannot
+     * change mid-walk.
+     */
+    private static function isProtectedPath($path, $protect = null) {
+        if ($protect === null) { $protect = self::config()['protect'] ?? []; }
         if (!$protect) { return false; }
         $p = str_replace('\\', '/', (string)$path);
         $segments = array_values(array_filter(explode('/', $p), fn($s) => $s !== ''));
@@ -1116,6 +1123,16 @@ class Sandbox {
             if (!$inside) {
                 return sprintf('%s was given the path "%s", which resolves outside the sandbox (%s).',
                     $program, $a, $resolved);
+            }
+            // Inside a root is not the same as allowed to read it: the protect
+            // list is what keeps storage/, .git, .env* and the key files out of
+            // reach even when the root is the whole app folder. jail() has
+            // always applied it to the file tools; this guard did not, so
+            // `cat storage/config.json` answered with the access token and
+            // every provider key. Same rule, same place in the path.
+            if (self::isProtectedPath($resolved)) {
+                return sprintf('%s was given the path "%s", which is on the protected list (secrets).',
+                    $program, $a);
             }
         }
         return null;
@@ -3613,7 +3630,10 @@ class Sandbox {
             $real = realpath($m);
             if ($real === false) { continue; }
             $real = rtrim(str_replace('\\', '/', $real), '/');
-            if (self::within($real, $roots) && !in_array($real, $keep, true)) { $keep[] = $real; }
+            if (self::within($real, $roots) && !self::isProtectedPath($real)
+                && !in_array($real, $keep, true)) {
+                $keep[] = $real;
+            }
             if (count($keep) >= 500) { break; }
         }
         sort($keep);
@@ -3637,6 +3657,7 @@ class Sandbox {
         $maxMatches = max(1, min(500, (int)$maxMatches));
         $skipDirs = ['.git', 'node_modules', 'vendor', '.svn', '__pycache__', '.idea', 'dist', 'build'];
 
+        $protect = self::config()['protect'] ?? [];
         $results = [];
         $filesScanned = 0;
         foreach ($roots as $root) {
@@ -3652,6 +3673,10 @@ class Sandbox {
                 // link target directly.
                 if ($file->isLink()) { continue; }
                 $path = str_replace('\\', '/', $file->getPathname());
+                // jail() refuses a protected path by name, but this walk never
+                // goes through it -- it opened every file under the root
+                // directly, so `grep storage/config.json` read the token.
+                if (self::isProtectedPath($path, $protect)) { continue; }
                 $rel = ltrim(substr($path, strlen($root)), '/');
                 if (self::anySegment($rel, $skipDirs)) { continue; }
                 if ($glob && !self::matchesAny($glob, $file->getFilename())) { continue; }
