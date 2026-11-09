@@ -18,6 +18,12 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 📖 Harnesses, dialects & training get their own guide *(`VERSION` 441, no cache-buster bump — no browser file changed)*
+
+*The auto-fit, the manual pins and the drill lived in three different sections — the new README section "Auto Forming Harnesses, Dialects & Training Mode" covers them end to end, with the training-mode screenshot above its intro and a link in Contents, so pinning a harness, forcing a dialect and running the fleet drill are all one page away.*
+
+*Nothing behaves differently: this release is docs only. The What's-new slot swaps to the guide (the v440 save/dialog fixes stay in this file), What's-inside gains a pointer row, and the docs guard keeps proving every Contents anchor lands.*
+
 ## 🔇 Failed saves say why; nested paths stop looping the drill *(`VERSION` 440, cache-buster v424 → v425)*
 
 *Flipping the Programs switch when `storage/` is not writable used to snap back with a success toast and no explanation: the server answers 200 with `success: false`, and nothing checked it. The config saver now throws the server's reason, so the dialog says "storage/config.json could not be written" and the switch returns to the server's value instead of sitting ON while the server holds OFF. The same saver covers the shell toggles.*

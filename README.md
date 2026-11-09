@@ -39,14 +39,13 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v440 — Failed saves say why, and nested paths stop looping the drill 🔇
+### 🆕 v441 — Harnesses, dialects & training get their own guide 📖
 
-*A config toggle flipped while `storage/` is not writable used to snap back with a success toast and no explanation — it now reports `storage/config.json could not be written` and the switch returns to the server's value. And a nested `{"path":{"path":"…"}}` no longer becomes a file literally named `[object Object]`: the path is unwrapped, and anything still unusable comes back with the shape to retry with, so training mode's retry rule fixes itself instead of looping.*
+*The auto-fit, the manual pins and the drill lived in three different sections — now [one guide](#-auto-forming-harnesses-dialects--training-mode) covers them end to end with the training-mode screenshot, so pinning a harness, forcing a dialect and running the fleet drill are all one page away.*
 
 | | |
 |---|---|
-| 🔇 **Failed saves say why** | the saver believes the server's `success: false` and throws its reason — Programs and shell toggles alike; the switch is put back to what the server holds |
-| 🧭 **Nested paths unwrapped** | one level of `{"path":{"path":…}}` resolves itself across every file tool, and the error for the rest shows the plain-string shape to retry with |
+| 📖 **One guide for harness, dialect & drill** | detection order, both Brain Lab pins and the 12-step training drill, screenshotted and in a single section |
 ---
 
 ## 🧭 Contents
@@ -85,6 +84,7 @@ Jump straight to a section — every heading on this page is linkable; these are
 - [🛠️ Tools agents can use](#️-tools-agents-can-use)
 - [🧭 The provider harness](#-the-provider-harness)
 - [🧠 Dynamic tools & the learned dialect](#-dynamic-tools--the-learned-dialect)
+- [🏋 Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode)
 - [⏱️ Throttle / limiter / pacer](#️-throttle--limiter--pacer)
 - [🔑 API pool](#-api-pool--rotate-your-keys)
 - [🌐 Proxy](#-proxy--route-every-agents-outbound-traffic)
@@ -284,6 +284,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🌐 **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
 | ♾️ **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
 | 🏋️ **Training mode** | A paced tool drill for every active agent — ~50% request rate, simple tasks in `training/`, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
+| 📖 **Harness & training guide** | Auto-fit, manual pins and the 12-step drill in one place — [Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode) |
 
 | ❝ **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
 | 🧠 **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
@@ -1132,6 +1133,54 @@ No two models are alike — and the **free** ones are the fussiest of all. 🔧 
 Free, quantised models that used to burn **6–8 calls** guessing now get it right the first time. 🚀
 
 </details>
+
+---
+## 🏋 Auto Forming Harnesses, Dialects & Training Mode
+
+![Training mode armed — the dumbbell button, the drill popup and the fleet working it](screenshots/training-mode.png)
+
+Every agent meets every provider through the same door 🚪: the **harness** decides *how* to call it and *which tool dialect* to teach it — automatically, on every request. When you'd rather choose yourself, two dropdowns in 🧠 Brain Lab pin either one per agent. And 🏋️ **Training mode** is where the fleet proves it can use the tools at all: one paced drill, every active agent, all at once. This section is the full manual for all three — the auto-fit, the manual pins, and the drill. 📖
+
+### 🤖🔌 How the auto-fit works
+
+One registry decides per request — `src/Harness.php` in PHP, generated into `ui/js/harness.data.js` by `php tools/gen-harness.php`, so the browser copy can never drift from the server: 🧬
+
+- 🧭 **Shape first** — OpenAI-compatible, Anthropic Messages, Google `generateContent`, or Ollama native — picked from the **endpoint host**, then the provider id, then a model hint. An explicit OpenAI path (`/chat/completions`, `/responses`) or Ollama path (`/api/chat` without `/v1`) wins on sight; OpenRouter stays OpenAI-shaped even for Claude models. 🌐
+- 🗣️ **Dialect second** — the API family already implies Claude XML for Anthropic; otherwise a model-name table (Qwen/GLM/Hermes → native tags, …) decides, and anything unrecognised gets plain OpenAI-style JSON. A model id never chooses the *shape* — only the dialect. 🎯
+- 🧩 **Quirks ride along** — auth headers (Bearer / `x-api-key` / `?key=`), usage and reasoning shapes, streaming envelopes — and replies are read from wherever that family keeps them, including the `{"output":[…],"stats":{…}}` envelope some local runners answer with. 📦
+- ⏱️ **Even pacing is harness-aware** — the rate governor's default ceiling comes from the endpoint host (NVIDIA 40/min, Groq 30, OpenRouter 20, …), so auto-fit models arrive pre-paced; `0 = AUTO` uses each provider's real ceiling. 🐢
+- ➕ **Adding a provider is one line** in the alias table — or just add it in the UI and let detection do the rest. 🆕
+
+### 🗣️ Dialects: taught, rescued, remembered
+
+🔧 **Dynamic tools** (Config → Labs, on by default) hands each model the environment it is *actually* running in — the server's 🪟/🐧 OS, working directory, and which shell commands **really exist** — then shows **one correct example per tool in that model's own dialect**: JSON `{"tool":…}`, Claude XML `<function_calls><invoke>`, native `<|tool_call|>` tags, or strict plain JSON. The free, fussy models stop burning calls guessing the syntax. 🎯
+
+And when a reply still misses: 🔍
+
+- 🛟 **One rescue retry** — a reply that *looks* like a call but parses to nothing is re-taught **once** in a different dialect instead of becoming the answer. 🔄
+- 🩹 **Near misses are read, not dropped** — `list_agent` for `list_agents`, a guessed wrapper like `<|begin|>…<|end|>` — repaired to what was meant. Invented names and prose fences are still refused. 🙅
+- 🧠 **The winner is remembered** — once a dialect parses, it is stored per `provider + model` and tried first next time. Config → Labs → *Remember the working dialect* turns the memo off; detection then re-derives every turn. 🏆
+- 🛑 **Off in one click** — Config → Labs → *Dynamic tools* restores the classic fixed instructions exactly, if you ever want them. 🔙
+
+### 🎛️ Choosing by hand — harness & dialect pins
+
+🧠 Brain Lab → per-agent **Approvals & Tools** carries both overrides, and the hint under each always names what auto-detection *would* have picked, so a wrong pin is visible before it 400s: 👀
+
+- 🗣️ **Tool protocol** — `Auto (provider default)`, JSON object, Claude XML, Native tags, or Plain JSON only. On Auto the hint reads `Auto -> <label> for <provider> / <model>`; a stale or unknown saved value is treated as Auto, so a pin can never break a call. 🛡️
+- 🧭 **API harness** — `Auto — detect it`, OpenAI-compatible, Anthropic Messages, Google generateContent, or Ollama native. Pinning the shape never changes the dialect and vice versa. ⚠️ OpenRouter serves Claude models over the OpenAI-compatible API — pinning Anthropic there fails, and the hint says so. 💡
+
+### 🏋️ Training mode — the full brief
+
+The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains the mode with **Start** and **Cancel** (Stop + recap once running). While armed: 🚦
+
+- 🐢 **~50% request rate** — every active agent is throttled to half pace (`TRAINING_THROTTLE = 0.5` in `ui/js/training.js`), so the drill exercises patience as well as tools. ⏳
+- 🔒 **One drill, nothing else** — the system prompt locks to 12 steps in `training/`, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → `edit_file` 🩹, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `exec` ⌨️, and a final `todo_write` to mark everything done. Approval-gated steps (write/edit/exec) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
+- 🔁 **Retry until it passes** — a failed step is never skipped; the error comes back with the shape to retry with, so a miss becomes practice instead of a skip. Each pass is logged with `todo_write`. ✅
+- ▶️ **Start dispatches the drill** — Start posts it into chat as a turn (or steers it into a running one), so messages 🗨️, map 🗺️, metrics 📊 and trace 🔎 all move exactly as usual. With no active agents it says so instead of arming. 🤫
+- 🧠 **Nothing mystical is stored** — model weights never change; *"remember what worked"* means the todo record plus the run transcript. Stop on the same button ends it with a recap: which tools passed, how many retries each took. 📋
+- 🧱 **The jail still applies** — the drill resolves under the agent's writable root, never outside it. 🔒
+
+Happy drilling! 💪🚀
 
 ---
 ## ⏱️ Throttle / limiter / pacer
