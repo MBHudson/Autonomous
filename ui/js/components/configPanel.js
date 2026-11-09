@@ -162,6 +162,18 @@ export class ConfigPanel {
             : 'No directories are allowed yet, so the filesystem tools report themselves as disabled. Web search works regardless.'];
           if (s.require_token) {
             bits.push('A token is required — your browser must send a matching one or every sandbox call is refused.');
+          } else if (s.local_only_strict === false) {
+            // Say this plainly: it is the state that lets a reverse proxy on
+            // this host make internet visitors look local again.
+            bits.push('No token is set, so only this machine is answered — and the proxy check is OFF, '
+              + 'so anything a reverse proxy forwards is treated as local.');
+          } else {
+            const trusted = (s.trusted_proxies || []).length;
+            bits.push('No token is set, so only this machine is answered; a reverse proxy is judged by '
+              + 'the address it forwards'
+              + (trusted
+                ? ` (${trusted} trusted prox${trusted === 1 ? 'y' : 'ies'}).`
+                : ' — none is trusted yet, so set a token or list the proxy in Permissions → Remote access.'));
           }
           status.textContent = bits.join(' ');
         }

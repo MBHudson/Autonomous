@@ -449,6 +449,11 @@ class Sandbox {
             'search_configured' => !empty($c['read_roots']) || !empty($c['write_roots'])
                 || $c['search_engine'] === 'ddg',
             'require_token' => $c['require_token'],
+            // Shown on the Config status line. With no token set the posture is
+            // "this machine only", and this says whether a reverse proxy is
+            // judged by the client it forwards or by its own address.
+            'local_only_strict' => $c['local_only_strict'],
+            'trusted_proxies' => $c['trusted_proxies'],
             // --- environment facts (read-only) --------------------------
             // Consumed by the dynamic tool manifest so a model is told which
             // shell it is on and which allowlisted programs actually exist,

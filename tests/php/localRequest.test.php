@@ -176,6 +176,22 @@ ok(!Sandbox::isLocalRequest(array(
     'HTTP_X_FORWARDED_FOR' => '203.0.113.9',
 )), 'the switch defaults to on when the key is absent');
 
+// --- what the Config status line reads --------------------------------------
+$st = Sandbox::status();
+ok(($st['local_only_strict'] ?? null) === true, 'status: the proxy check reports on by default');
+ok(is_array($st['trusted_proxies'] ?? null), 'status: the trusted proxy list is reported');
+ok(($st['trusted_proxies'] ?? null) === array(), 'status: no proxy is trusted on a fresh config');
+
+file_put_contents($base . '/config.json', json_encode(array('sandbox' => array(
+    'trusted_proxies' => array('127.0.0.1', '10.0.0.0/8'),
+    'local_only_strict' => false,
+    'read_roots' => array(),
+    'write_roots' => array(),
+))));
+$st2 = Sandbox::status();
+ok($st2['local_only_strict'] === false, 'status: the switch reports off when turned off');
+ok(count($st2['trusted_proxies']) === 2, 'status: the trusted proxies are listed');
+
 // --- cleanup ---------------------------------------------------------------
 @unlink($base . '/config.json');
 @rmdir($base);
