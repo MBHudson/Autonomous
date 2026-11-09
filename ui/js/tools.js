@@ -996,7 +996,12 @@ export function bindSandboxTools(api) {
     if (raw == null) return 'error: list_dir needs "path" as a plain string, e.g. {"path":"training"} — retry the step with that shape';
     const a = raw.trim();
     const res = await api.sandbox('list', a ? { path: a, limit: 200, root: scopeOf(ctx) } : { root: scopeOf(ctx) });
-    if (!res.entries) return `allowed directories:\n${(res.dirs || []).join('\n')}`;
+    if (!res.entries) {
+      // The server can answer the orientation call even when the agent's own
+      // root was refused; lead with that refusal so the model stops guessing.
+      const head = res.warning ? `warning: ${res.warning}\n\n` : '';
+      return `${head}allowed directories:\n${(res.dirs || []).join('\n')}`;
+    }
     return lines(res.entries.map(e =>
       e.type === 'dir' ? `${e.name}/` : `${e.name}  (${e.size} bytes)`));
   };

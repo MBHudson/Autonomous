@@ -2514,7 +2514,8 @@ class Sandbox {
                 return [$real];
             }
         }
-        throw new \RuntimeException("$label: sandbox directory is outside the allowed roots: $scope");
+        throw new \RuntimeException("$label: sandbox directory is outside the allowed roots: $scope. "
+            . 'Allowed: ' . implode(', ', $roots));
     }
 
     /** A per-file entry the Brain Lab file manager can render. */
@@ -3834,8 +3835,33 @@ class Sandbox {
      * model can orient itself without guessing absolute paths.
      */
     public static function listDir($path = null, $limit = 200, $scope = null) {
-        $roots = array_unique(array_merge(self::readRoots(), self::writeRoots()));
-        $roots = self::scopeRoots($scope, $roots, 'list_dir');
+        $allRoots = array_unique(array_merge(self::readRoots(), self::writeRoots()));
+        $wantsRoots = ($path === null || trim((string)$path) === '');
+        if ($wantsRoots && !$allRoots) {
+            throw new \RuntimeException(
+                'list_dir: the sandbox has no allowed directories (it defaults to this '
+                . 'app\'s own folder). Set one in the Config tab ("Working Project '
+                . 'Directory"), or in storage/config.json under "sandbox".'
+            );
+        }
+        try {
+            $roots = self::scopeRoots($scope, $allRoots, 'list_dir');
+        } catch (\RuntimeException $e) {
+            // A misconfigured per-agent root used to break the orientation call
+            // before it could return the list that explains the problem: the
+            // model asked "where may I work?" and got only "that directory is
+            // not allowed". Return the configured roots with the refusal
+            // attached, so the next step can be a real path under one of them.
+            if ($wantsRoots) {
+                return [
+                    'dirs' => $allRoots,
+                    'warning' => $e->getMessage(),
+                    'hint' => 'The agent\'s sandbox root was refused. Fix it in the agent '
+                        . 'editor or clear it; a path under one of these directories still works.',
+                ];
+            }
+            throw $e;
+        }
         if (!$roots) {
             throw new \RuntimeException(
                 'list_dir: the sandbox has no allowed directories (it defaults to this '
@@ -3843,7 +3869,7 @@ class Sandbox {
                 . 'Directory"), or in storage/config.json under "sandbox".'
             );
         }
-        if ($path === null || trim((string)$path) === '') {
+        if ($wantsRoots) {
             return [
                 'dirs' => $roots,
                 'hint' => 'Pass a path relative to one of these, or an absolute path inside them.',
