@@ -49,6 +49,8 @@ class McpServer {
         if (!is_array($m)) { $m = []; }
         return [
             'enabled' => !empty($m['enabled']),
+            'discovery' => !empty($m['discovery']),
+            'studio' => trim((string)($m['studio'] ?? '')),
             'root' => trim((string)($m['root'] ?? '')),
             'protect' => array_key_exists('protect', $m) && is_array($m['protect'])
                 ? array_values(array_filter(array_map('strval', $m['protect']), fn($p) => trim($p) !== ''))
@@ -79,6 +81,7 @@ class McpServer {
                 'label' => trim((string)($t['label'] ?? 'friend')) ?: 'friend',
                 'token' => $token,
                 'scope' => $scope,
+                'forward' => !empty($t['forward']),
                 'ips' => array_values(array_filter(array_map('strval', (array)($t['ips'] ?? [])), fn($i) => trim($i) !== '')),
             ];
         }
@@ -105,6 +108,8 @@ class McpServer {
         }
         return [
             'enabled' => $c['enabled'],
+            'discovery' => $c['discovery'],
+            'studio' => $c['studio'],
             'root' => $c['root'],
             'protect' => $c['protect'] === null ? self::defaultProtect() : $c['protect'],
             'tokens' => $tokens,
@@ -158,6 +163,7 @@ class McpServer {
                 'label' => $label,
                 'token' => $token,
                 'scope' => $scope,
+                'forward' => !empty($t['forward']),
                 'ips' => array_values(array_filter(array_map(
                     fn($i2) => trim((string)$i2), (array)($t['ips'] ?? [])
                 ), fn($i2) => $i2 !== '')),
@@ -172,8 +178,12 @@ class McpServer {
             ? array_values(array_filter(array_map('strval', $incoming['protect']), fn($p) => trim($p) !== ''))
             : self::defaultProtect();
 
+        $studio = trim((string)($stored['studio'] ?? ''));
+        if ($studio === '') { $studio = 'st_' . bin2hex(random_bytes(8)); }
         $cfg['mcp_server'] = [
             'enabled' => !empty($incoming['enabled']),
+            'discovery' => !empty($incoming['discovery']),
+            'studio' => $studio,
             'root' => $root,
             'protect' => $protect,
             'tokens' => $tokens,
@@ -399,6 +409,12 @@ class McpServer {
                 'description' => 'Install a shared agent def onto this copy. Mints a fresh id; installs inactive.',
                 'schema' => ['type' => 'object', 'properties' => [
                     'agent' => ['type' => 'object', 'description' => 'agent def from get_agent']], 'required' => ['agent']]],
+            ['name' => 'mesh_peers', 'scope' => 'read',
+                'description' => 'Which other studios this copy can reach (its advertised outbound servers, plus their peers up to `hops` away). Discovery only — no forwarded execution yet.',
+                'schema' => ['type' => 'object', 'properties' => [
+                    'hops' => ['type' => 'integer', 'description' => 'how many levels to enumerate (1-3, default 2)'],
+                    'visited' => ['type' => 'array', 'description' => 'studio ids already seen, for loop safety',
+                        'items' => ['type' => 'string']]]]],
             ['name' => 'remote_chat', 'scope' => 'write',
                 'description' => 'Ask one of this copy\'s agents a question and get its reply. Runs here, on this copy\'s meter: one inference turn, no tools, no memory.',
                 'schema' => ['type' => 'object', 'properties' => [
@@ -544,6 +560,10 @@ class McpServer {
             case 'remote_chat': {
                 @set_time_limit(240);
                 return self::remoteChat($a);
+            }
+            case 'mesh_peers': {
+                @set_time_limit(120);
+                return self::meshPeers($token, $a);
             }
             case 'run_code': {
                 $res = Sandbox::runCode($s('language') ?: 'python', $s('code'), ['cwd' => $scope, 'root' => $scope]);
@@ -917,6 +937,155 @@ class McpServer {
         $usage = is_array($data) ? Harness::usage($data, $built['family']) : null;
         return json_encode(
             ['reply' => $text, 'model' => $built['model'], 'usage' => $usage],
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    // ---------------------------------------------------------------
+    // Mesh phase 1: peer discovery (no forwarded execution yet).
+    // ---------------------------------------------------------------
+    //
+    // mesh_peers answers "who can you reach?" with this copy's advertised
+    // outbound servers, then asks each of those (recursively, hop-bounded
+    // and loop-guarded by `visited`) for THEIR peers and merges the answers.
+    // Every studio on the path opts in independently: this copy answers at
+    // all only when its operator enables mesh discovery, each outbound hop
+    // is listed only when the operator ticked "advertise" on that server,
+    // and each downstream copy applies the same rules with its own config.
+    // The `forward` flag on every entry is this copy's promise about the
+    // NEXT phase: whether the asking friend may use this copy as a
+    // forwarder. Phase 1 advertises it; nothing executes through it yet.
+
+    /** This copy's stable studio id, minted once and kept in config. */
+    public static function studioId() {
+        $cfg = Config::loadConfig();
+        if (!is_array($cfg)) { $cfg = []; }
+        $studio = trim((string)($cfg['mcp_server']['studio'] ?? ''));
+        if ($studio === '') {
+            $studio = 'st_' . bin2hex(random_bytes(8));
+            $cfg['mcp_server'] = is_array($cfg['mcp_server'] ?? null) ? $cfg['mcp_server'] : [];
+            $cfg['mcp_server']['studio'] = $studio;
+            Config::saveConfig($cfg);
+        }
+        return $studio;
+    }
+
+    /**
+     * Answer mesh_peers for a friend's token.
+     *
+     * $dialer defaults to a live downstream query; tests inject a fake.
+     * $servers defaults to this copy's outbound servers; tests inject rows.
+     * $selfId defaults to studioId(); tests inject a fixed id so no config
+     * file is touched.
+     */
+    public static function meshPeers(array $token, array $args, $dialer = null, $servers = null, $selfId = null) {
+        if (!self::config()['discovery']) {
+            throw new \RuntimeException('mesh discovery is off on this copy');
+        }
+        $self = $selfId !== null ? substr(trim((string)$selfId), 0, 64) : self::studioId();
+        $hops = (int)($args['hops'] ?? 2);
+        $hops = max(1, min(3, $hops));
+        $visited = [];
+        foreach ((array)($args['visited'] ?? []) as $v) {
+            $v = substr(trim((string)$v), 0, 64);
+            if ($v !== '' && count($visited) < 32 && !in_array($v, $visited, true)) { $visited[] = $v; }
+        }
+        if ($self !== '' && !in_array($self, $visited, true)) { $visited[] = $self; }
+        $canForward = !empty($token['forward']);
+
+        if ($servers === null) {
+            try { $servers = Mcp::servers(); }
+            catch (\Throwable $e) { $servers = []; }
+        }
+        $direct = [];
+        foreach ((array)$servers as $s) {
+            if (!is_array($s)) { continue; }
+            if (strtolower(trim((string)($s['transport'] ?? ''))) !== 'http') { continue; }
+            if (empty($s['advertise'])) { continue; }
+            $sid = trim((string)($s['id'] ?? ''));
+            if ($sid === '') { continue; }
+            $direct[$sid] = [
+                'studio' => null,
+                'url' => substr(trim((string)($s['url'] ?? '')), 0, 500),
+                'hops' => 1,
+                'via' => $sid,
+                'forward' => $canForward,
+            ];
+        }
+
+        $byKey = [];
+        $put = function ($entry) use (&$byKey) {
+            $studio = isset($entry['studio']) ? trim((string)$entry['studio']) : '';
+            $url = isset($entry['url']) ? trim((string)$entry['url']) : '';
+            if ($studio === '' && $url === '') { return; }
+            $key = $studio !== '' ? ('studio:' . $studio) : ('url:' . $url);
+            if (!isset($byKey[$key]) || (int)($entry['hops'] ?? 99) < (int)($byKey[$key]['hops'] ?? 99)) {
+                $byKey[$key] = $entry;
+            }
+        };
+        // Recurse while levels remain, into a bounded number of live hops.
+        // Direct entries are filed as they finalise (a resolved studio id
+        // replaces the url-keyed placeholder) so one hop never lists twice.
+        if ($hops > 1 && count($direct) > 0) {
+            if ($dialer === null) {
+                $dialer = function ($serverId, $a) {
+                    return Mcp::callTool($serverId, 'mesh_peers', $a);
+                };
+            }
+            $dialed = 0;
+            foreach (array_keys($direct) as $sid) {
+                if ($dialed >= 10) { break; }
+                $dialed++;
+                try {
+                    $res = $dialer($sid, ['hops' => $hops - 1, 'visited' => $visited]);
+                } catch (\Throwable $e) {
+                    $entry = $direct[$sid];
+                    $entry['note'] = 'no answer: ' . substr(trim($e->getMessage()), 0, 120);
+                    $put($entry);
+                    continue;
+                }
+                if (!is_array($res) || !empty($res['is_error'])) {
+                    $entry = $direct[$sid];
+                    $entry['note'] = 'no answer: ' . substr(trim((string)(is_array($res) ? ($res['text'] ?? '') : '')), 0, 120);
+                    $put($entry);
+                    continue;
+                }
+                $child = json_decode((string)($res['text'] ?? ''), true);
+                if (!is_array($child)) {
+                    $entry = $direct[$sid];
+                    $entry['note'] = 'unreadable answer';
+                    $put($entry);
+                    continue;
+                }
+                $childId = substr(trim((string)($child['studio'] ?? '')), 0, 64);
+                $entry = $direct[$sid];
+                if ($childId !== '') { $entry['studio'] = $childId; }
+                $put($entry);
+                foreach ((array)($child['peers'] ?? []) as $cp) {
+                    if (!is_array($cp)) { continue; }
+                    $put([
+                        'studio' => (substr(trim((string)($cp['studio'] ?? '')), 0, 64)) ?: null,
+                        'url' => substr(trim((string)($cp['url'] ?? '')), 0, 500),
+                        'hops' => min(9, (int)($cp['hops'] ?? 1) + 1),
+                        'via' => $sid,
+                        'forward' => $canForward,
+                    ]);
+                }
+            }
+        } else {
+            foreach ($direct as $entry) { $put($entry); }
+        }
+
+        $out = [];
+        foreach ($byKey as $entry) {
+            $st = isset($entry['studio']) ? trim((string)$entry['studio']) : '';
+            if ($st !== '' && in_array($st, $visited, true)) { continue; }
+            $out[] = $entry;
+            if (count($out) >= 50) { break; }
+        }
+        usort($out, function ($x, $y) {
+            return ((int)($x['hops'] ?? 99)) <=> ((int)($y['hops'] ?? 99));
+        });
+        return json_encode(['studio' => $self, 'peers' => $out],
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 

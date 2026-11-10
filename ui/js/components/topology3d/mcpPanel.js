@@ -111,6 +111,7 @@ export class McpPanel {
         <textarea class="form-textarea" data-f="allow_tools" rows="3" placeholder="one tool per line">${esc(allow)}</textarea>
         <label class="form-label">Tools denied <span class="form-hint-inline">always refused</span></label>
         <textarea class="form-textarea" data-f="deny_tools" rows="3" placeholder="one tool per line">${esc(deny)}</textarea>
+        ${isHttp ? `<label class="tool-option" style="margin-top:6px" title="Tell your inbound friends you can reach this server (mesh discovery)"><input type="checkbox" data-f="advertise" ${srv.advertise ? 'checked' : ''}><span class="tool-name">Advertise to my peers</span><span class="tool-desc">mesh: listed by mesh_peers</span></label>` : ''}
         <div class="mcp-edit-actions">
           <button class="btn btn-ghost" data-act="probe">Check now</button>
           <button class="btn btn-primary" data-act="save">Save</button>
@@ -123,6 +124,14 @@ export class McpPanel {
           </div>
           <div data-agents-list style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
         </div>
+        <div class="mcp-shared" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+          <label class="form-label">Mesh <span class="form-hint-inline">who can they reach?</span></label>
+          <div class="form-hint">Asks this server for <code>mesh_peers</code> — studios it can reach, and theirs in turn. Needs this update on their side and <code>read</code> scope.</div>
+          <div class="mcp-edit-actions">
+            <button class="btn btn-ghost" data-act="mesh">Discover mesh</button>
+          </div>
+          <div data-mesh-list style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+        </div>
       </div>`;
 
     const val = f => host.querySelector(`[data-f="${f}"]`)?.value ?? '';
@@ -132,6 +141,9 @@ export class McpPanel {
         const list = ((await api.mcpServers()).servers || []).map(s => {
           if (s.id !== id) return s;
           const out = { ...s };
+          if (host.querySelector('[data-f="advertise"]')) {
+            out.advertise = !!host.querySelector('[data-f="advertise"]')?.checked;
+          }
           if (out.transport === 'http') {
             out.url = val('url').trim();
             out.headers = this._pairs(val('headers'), ':');
@@ -242,6 +254,37 @@ export class McpPanel {
         btn.textContent = 'List shared agents';
       }
     });
+    host.querySelector('[data-act="mesh"]')?.addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      const box = host.querySelector('[data-mesh-list]');
+      btn.disabled = true;
+      btn.textContent = 'Discovering…';
+      try {
+        let visited = [];
+        try {
+          const mine = await api.mcpServerConfig();
+          if (mine && mine.studio) visited = [mine.studio];
+        } catch { /* our own id is loop protection, not a requirement */ }
+        const res = await api.mcpCall(id, 'mesh_peers', { hops: 2, visited });
+        if (res.is_error) throw new Error(res.text || 'mesh_peers failed');
+        const data = JSON.parse(res.text || '{}');
+        const peers = Array.isArray(data.peers) ? data.peers : [];
+        if (!peers.length) {
+          box.innerHTML = '<div class="form-hint">No reachable studios advertised. Ask them to tick Advertise on their outbound servers.</div>';
+          return;
+        }
+        box.innerHTML = peers.map(p => `
+          <div class="tool-option" style="align-items:center">
+            <span class="tool-name">${esc((p.studio || 'unknown').slice(0, 18))}</span>
+            <span class="tool-desc">${esc([p.hops === 1 ? 'direct' : `${p.hops} hops`, p.via ? `via ${p.via}` : '', p.forward ? 'forward ok' : 'no forward'].filter(Boolean).join(' · '))}</span>
+          </div>`).join('');
+      } catch (err) {
+        box.innerHTML = `<div class="form-hint" style="color:var(--danger)">Discovery failed: ${esc(err.message || err)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Discover mesh';
+      }
+    });
   }
 
   /** "a: b" / "a=b" lines into an object. */
@@ -275,7 +318,8 @@ export class McpPanel {
           <label class="tool-option"><input type="checkbox" data-scope="write" ${has('write')}><span class="tool-name">write</span><span class="tool-desc">edits and patches</span></label>
           <label class="tool-option"><input type="checkbox" data-scope="exec" ${has('exec')}><span class="tool-name">exec</span><span class="tool-desc">commands and code</span></label>
         </div>
-        <div class="form-hint"><code>read</code> covers browsing + fetching your shared agents; <code>write</code> covers installing onto you. Keys never leave either way.</div>
+        <div class="form-hint"><code>read</code> covers browsing + fetching your shared agents and mesh discovery; <code>write</code> covers installing onto you and running your agents remotely. Keys never leave either way.</div>
+        <label class="tool-option" style="margin-top:6px" title="Phase 2 will let this friend route mesh requests through you; phase 1 only advertises the permission"><input type="checkbox" data-forward="1" ${token.forward ? 'checked' : ''}><span class="tool-name">Allow mesh forwarding</span><span class="tool-desc">advertised by mesh_peers</span></label>
         </div>
         <label class="form-label">IP allowlist <span class="form-hint-inline">optional, comma-separated</span></label>
         <input class="form-input" data-f="ips" value="${escAttr((token.ips || []).join(', '))}">
@@ -291,7 +335,7 @@ export class McpPanel {
         const ips = lines(host.querySelector('[data-f="ips"]')?.value);
         const tokens = (cfg.tokens || []).map(t => {
           if ((t.label || 'friend') !== label) return t;
-          return { ...t, scope, ips };
+          return { ...t, scope, ips, forward: !!host.querySelector('[data-forward]')?.checked };
         });
         await api.mcpServerSave({ ...cfg, tokens });
         this._done(`Saved ${label}`);

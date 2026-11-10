@@ -1952,6 +1952,10 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <span class="toggle-label">Enable the MCP server</span>
           <div class="toggle ${this._mcpSrv?.enabled ? 'active' : ''}" id="sbMcpSrvOn"><div class="toggle-knob"></div></div>
         </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Mesh discovery <span class="form-hint-inline">answer mesh_peers for friends</span></span>
+          <div class="toggle ${this._mcpSrv?.discovery ? 'active' : ''}" id="sbMcpSrvMesh"><div class="toggle-knob"></div></div>
+        </div>
         <div class="form-group">
           <label class="form-label">Scratch folder friends work in</label>
           <input class="form-input" id="sbMcpSrvRoot" value="${escAttr(this._mcpSrv?.root || '')}" placeholder="e.g. /var/www/site/friends">
@@ -3050,9 +3054,12 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     document.getElementById('sbMcpSrvOn')?.addEventListener('click', (e) => {
       e.currentTarget.classList.toggle('active');
     });
+    document.getElementById('sbMcpSrvMesh')?.addEventListener('click', (e) => {
+      e.currentTarget.classList.toggle('active');
+    });
     document.getElementById('sbMcpSrvAdd')?.addEventListener('click', () => {
       if (!this._mcpSrv) this._mcpSrv = { enabled: false, root: '', protect: [], tokens: [] };
-      this._mcpSrv.tokens = [...(this._mcpSrv.tokens || []), { label: '', token: '', scope: ['read'], ips: [] }];
+      this._mcpSrv.tokens = [...(this._mcpSrv.tokens || []), { label: '', token: '', scope: ['read'], forward: false, ips: [] }];
       this._renderMcpSrvTokens();
     });
     document.getElementById('sbMcpSrvSave')?.addEventListener('click', () => this._saveMcpServer());
@@ -3061,18 +3068,20 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
       api.mcpServerConfig().then(res => {
         if (!document.getElementById('sbMcpSrvTokens')) return; // tab changed
         this._mcpSrv = {
-          enabled: !!res.enabled, root: res.root || '',
+          enabled: !!res.enabled, discovery: !!res.discovery, root: res.root || '',
           protect: res.protect || res.defaultProtect || [], tokens: res.tokens || [],
         };
         const on = document.getElementById('sbMcpSrvOn');
         if (on) on.classList.toggle('active', this._mcpSrv.enabled);
+        const mesh = document.getElementById('sbMcpSrvMesh');
+        if (mesh) mesh.classList.toggle('active', this._mcpSrv.discovery);
         const rootEl = document.getElementById('sbMcpSrvRoot');
         if (rootEl && !rootEl.value) rootEl.value = this._mcpSrv.root;
         const pEl = document.getElementById('sbMcpSrvProtect');
         if (pEl && !pEl.value.trim()) pEl.value = (this._mcpSrv.protect || []).join('\n');
         this._renderMcpSrvTokens();
       }).catch(() => {
-        this._mcpSrv = { enabled: false, root: '', protect: [], tokens: [] };
+        this._mcpSrv = { enabled: false, discovery: false, root: '', protect: [], tokens: [] };
         this._renderMcpSrvTokens();
       });
     } else {
@@ -3103,6 +3112,9 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
           <label class="form-hint-inline"><input type="checkbox" data-mcpsrv-scope="read" data-i="${i}"${sc(t, 'read')}> read</label>
           <label class="form-hint-inline"><input type="checkbox" data-mcpsrv-scope="write" data-i="${i}"${sc(t, 'write')}> write</label>
           <label class="form-hint-inline"><input type="checkbox" data-mcpsrv-scope="exec" data-i="${i}"${sc(t, 'exec')}> exec</label>
+        </div>
+        <div style="margin-top:6px">
+          <label class="form-hint-inline" title="Advertise to this friend that they may route mesh requests through you (forwarding itself arrives in phase 2)"><input type="checkbox" data-mcpsrv-fwd="${i}"${t.forward ? ' checked' : ''}> allow mesh forwarding</label>
         </div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <input class="form-input" data-mcpsrv="token" value="${escAttr(shown)}" readonly style="flex:1;font-family:var(--font-mono);font-size:11px" title="${fresh ? 'Just issued — copy it to your friend now' : 'Stored on the server. Only a token issued in this session can be shown.'}">
@@ -3140,6 +3152,12 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         if (cb.checked && (set.has('write') || set.has('exec'))) set.add('read');
         t.scope = ['read', 'write', 'exec'].filter(x => set.has(x));
         this._renderMcpSrvTokens();
+      });
+    });
+    el.querySelectorAll('[data-mcpsrv-fwd]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const t = this._mcpSrv?.tokens?.[Number(cb.dataset.mcpsrvFwd)];
+        if (t) t.forward = cb.checked;
       });
     });
     el.querySelectorAll('[data-mcpsrv-del]').forEach(btn => {
@@ -3190,15 +3208,16 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         .split('\n').map(s => s.trim()).filter(Boolean);
       const payload = {
         enabled: !!document.getElementById('sbMcpSrvOn')?.classList.contains('active'),
+        discovery: !!document.getElementById('sbMcpSrvMesh')?.classList.contains('active'),
         root: (document.getElementById('sbMcpSrvRoot')?.value || '').trim(),
         protect,
         tokens: (this._mcpSrv?.tokens || []).map(t => ({
-          id: t.id, label: t.label, token: t.token, scope: t.scope || [], ips: t.ips || [],
+          id: t.id, label: t.label, token: t.token, scope: t.scope || [], forward: !!t.forward, ips: t.ips || [],
         })),
       };
       const res = await api.mcpServerSave(payload);
       this._mcpSrv = {
-        enabled: !!res.enabled, root: res.root || '',
+        enabled: !!res.enabled, discovery: !!res.discovery, root: res.root || '',
         protect: res.protect || [], tokens: res.tokens || [],
       };
       // `issued` carries the plaintext of every token THIS save generated, and

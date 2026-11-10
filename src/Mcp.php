@@ -63,6 +63,7 @@ class Mcp {
                 'id' => $id,
                 'transport' => 'http',
                 'url' => $url,
+                'advertise' => !empty($s['advertise']),
                 'headers' => is_array($s['headers'] ?? null) ? $s['headers'] : [],
                 'allow_tools' => self::toolList($s['allow_tools'] ?? []),
                 'deny_tools' => self::toolList($s['deny_tools'] ?? []),
@@ -70,11 +71,11 @@ class Mcp {
         }
         $command = trim((string)($s['command'] ?? ''));
         if ($command === '') { return null; }
-        $args = array_values(array_filter(array_map('strval', (array)($s['args'] ?? [])), fn($a) => $a !== ''));
-        return [
-            'id' => $id,
-            'transport' => 'stdio',
-            'command' => $command,
+        $args = array_values(array_filter(array_map('strval', (array)($s['args'] ?? [])), fn($a) => $a !== ''));            return [
+                'id' => $id,
+                'transport' => 'stdio',
+                'advertise' => !empty($s['advertise']),
+                'command' => $command,
             'args' => $args,
             'env' => self::envPairs($s['env'] ?? null),
             'allow_tools' => self::toolList($s['allow_tools'] ?? []),

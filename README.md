@@ -1469,16 +1469,18 @@ The operator hands over the **URL + that friend's token** — that pair is all t
    remote replies stream into THEIR chat box, on YOUR meter ✅
 ```
 
-Four tools on the MCP server you already have: `list_agents` and `get_agent` ride the **read** scope, `install_agent` and `remote_chat` need **write**. Everything else about the server — sandbox, approvals, audit log — applies unchanged.
+Five tools on the MCP server you already have: `list_agents`, `get_agent` and `mesh_peers` ride the **read** scope, `install_agent` and `remote_chat` need **write**. Everything else about the server — sandbox, approvals, audit log — applies unchanged. Three switches govern the mesh, each opt-in: **share my agents** (a `read` token), **offer remote execution** (a `write` token), **forward mesh connections** (per-friend toggle, advertised but not yet executable — phase 2).
 
 ### 🫵 Side A — sharing (yours)
 
 1. **Config → MCP Server** — switched on, as usual.
 2. **Add a token** for your friend:
-   - 🔍 **read** — they may browse cards and copy agents onto *their* copy.
+   - 🔍 **read** — they may browse cards and copy agents onto *their* copy, and ask `mesh_peers` who you can reach.
    - ✍️ **write** — *also* lets their side place agents onto *yours* via `install_agent`, and run your agents remotely via `remote_chat` (your meter runs). Only tick this for people you'd hand your keyboard to.
+   - 🌐 **Allow mesh forwarding** — advertises that this friend may one day route through you (phase 2 executes it; phase 1 only publishes the permission).
    - Optional IP allowlist, one-click revoke / ROTATE any time.
-3. **Send them two things privately** (chat, QR, USB stick — never a screenshot): the server URL `https://YOUR-HOST/router/api/mcp-server` and that friend's token (shown **once**).
+3. **Mesh discovery** (Config → MCP Server, below the enable toggle) answers `mesh_peers` at all — off by default, like everything powerful here. And on each of YOUR outbound servers (their graph card → Advertise to my peers) choose which routes you tell your friends about.
+4. **Send them two things privately** (chat, QR, USB stick — never a screenshot): the server URL `https://YOUR-HOST/router/api/mcp-server` and that friend's token (shown **once**).
 
 ### 🙋 Side B — receiving (theirs)
 
@@ -1513,6 +1515,19 @@ mcp_call(server="you", tool="get_agent", args={id: "cmdr"})  # read the full def
 ```
 
 With a **write** token the far side's agents can also place agents onto you — where they land inactive, awaiting your switch-on — and ask your agents questions through `remote_chat`, answered on your meter. Switch an agent OFF on your side and its remote use stops too: deactivation is the kill switch. Revoking the token cuts all of this instantly. 🎫✂️
+
+### 🛰️ Seeing the wider mesh (phase 1 — discovery, no forwarded execution yet)
+
+Tim connects to Bryce, Bryce connects to you, Tim and you never meet. Tim opens Bryce's card → **Discover mesh** → Bryce's copy lists its advertised outbound servers, asks each of them for *their* peers (up to 3 hops, loop-guarded by a visited list), and merges the answers:
+
+```
+Tim ──read token──▶ Bryce ──read token──▶ You ──▶ Dana
+     mesh_peers{hops:2}  mesh_peers{hops:1, visited:[Tim, Bryce]}
+     ◀── {studio: Bryce, peers: [{studio: You, hops: 1, via, forward…},
+     ◀── {studio: Dana, hops: 2, via, forward…}]}
+```
+
+Every studio opts in independently: yours answers only with discovery on, lists only servers you ticked Advertise on, and your friends' copies apply the same rules with their own config. A dead hop degrades to a noted entry, never a failure; answers cap at 50 peers, 10 downstream dials, 3 hops. The `forward` flag on each entry is Bryce's promise about phase 2 — Tim can SEE Dana through Bryce, but cannot RUN anything there until forwarding executes and Dana issues Tim a grant.
 
 ### 🧯 If it sulks
 
