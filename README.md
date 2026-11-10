@@ -39,16 +39,9 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v445 — glob stops searching the directory twice, and says what it searched 🩹
+### 🆕 v446 — the Mesh section opens with both ends pictured 🤝
 
-*`{"pattern":"training/*"}` matched nothing because the server jailed the `training/` prefix and then matched the whole pattern under it — searching `training/training/*`. The "no files match" message then printed the raw arguments object instead of the pattern, hence `[object Object]`. Both fixed; the drill's glob step passes now.*
-
-| | |
-|---|---|
-| 🩹 **Prefix matched once** | path-relative patterns run whole from the root; escapes still filtered |
-| 🪞 **Errors echo the pattern** | zero-match message prints the pattern string, never the raw object |
-
-**🌱 Also on this branch: 🤝 Mesh — share agents between copies.** Lend agents to another copy of the studio straight from the MCP graph card — keys never travel, installs land inactive. Full both-sides walk-through in [🤝 Mesh](#-mesh--share-agents-between-copies).
+*The [🤝 Mesh](#-mesh--share-agents-between-copies) section now opens with the two ends of a mesh connection side by side: the **sharing side** (Config → MCP Server — enable toggle, Mesh discovery, friend tokens with scope and mesh-forwarding flag) and the **receiving side** (the server's graph card — advertise toggle, Shared agents with Install / Use remotely, Discover mesh). Docs and screenshots only; nothing behaves differently.*
 ---
 
 ## 🧭 Contents
@@ -276,6 +269,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🧠 | **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, and **Config → Interface** pins it Auto, always open or always collapsed |
 | 🧰 | **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 | **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
+| 🤝 | **Mesh — share agents** | Lend agents to another copy over the MCP server — friend tokens with read/write scope, installs land inactive and keyless, or run remotely on the sharer's meter — [Mesh](#-mesh--share-agents-between-copies) |
 | 🎨 | **Themes** | Dark, Matrix, Cyberpunk |
 | 🖼️ | **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
 | 🎙️ | **Voice** | 🎤 speech-to-text in, 🔊 spoken replies out, with per-agent pitch |
@@ -1444,6 +1438,14 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 The operator hands over the **URL + that friend's token** — that pair is all their client needs.
 
 </details>
+
+---
+<p>
+  <img src="screenshots/MCP-Server-Mesh.png" width="49%" alt="Sharing side: Config MCP Server with enable toggle, Mesh discovery, and friend tokens" />
+  <img src="screenshots/MCP-Client-Mesh.png" width="49%" alt="Receiving side: server graph card with advertise toggle, shared agents, and Discover mesh" />
+</p>
+
+*Left: sharing — Config → MCP Server (enable, Mesh discovery, friend tokens with read/write scope and mesh-forwarding flag). Right: receiving — the server's graph card (advertise to peers, Shared agents → Install ⬇ or Use remotely 🌐, Discover mesh). Keys never travel; installs land inactive with a fresh id.*
 
 ---
 ## 🤝 Mesh — share agents between copies

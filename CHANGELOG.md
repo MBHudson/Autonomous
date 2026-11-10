@@ -18,6 +18,10 @@ usual file deploy.
 reads and compares alongside that cache-buster — see the first entry below.
 
 ---
+## 🤝 Mesh section opens with both ends pictured *(`VERSION` 446, docs-only — no cache-buster bump)*
+
+*README's Mesh section now opens with the two new screenshots side by side: `screenshots/MCP-Server-Mesh.png` (Config → MCP Server — enable toggle, Mesh discovery, friend tokens with scope and mesh-forwarding flag) on the left and `screenshots/MCP-Client-Mesh.png` (the server's graph card — advertise toggle, Shared agents with Install / Use remotely, Discover mesh) on the right, with a caption naming each side. What's new swaps to this release; What's inside gains a Mesh row so the capability stays listed after this entry scrolls off. No browser file changed, so `APP_VERSION` stays at v428.*
+
 ## 🩹 glob matched `training/*` against `training/training/*` *(`VERSION` 445, cache-buster v427 → v428)*
 
 *Two halves of the loop training mode hit live with `{"pattern":"training/*"}`. Server-side, `globFiles()` jailed the `training/` prefix and then matched the whole pattern beneath it, so the directory was searched twice and nothing ever matched. Client-side, the zero-match message printed the raw arguments object instead of the pattern string, hence `no files match "[object Object]"`. The search now runs the whole pattern from the root (escapes still dropped by the realpath filter), and the message echoes the pattern. Covered by `tests/php/sandbox.test.php` 22a/22b.*
