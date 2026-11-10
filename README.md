@@ -41,7 +41,7 @@
 
 ### 🆕 v447 — tunnels leave the terminal: Config → Tunnels 🌐
 
-*Off-LAN friends without touching a terminal: the new **Tunnels** card starts and stops ngrok and Cloudflare quick tunnels from inside the app, detects the served port, and shows each public URL with its friend-ready RPC path to copy. The binaries install from the setup scripts only when asked (`setup-xampp.bat -Tunnels`, `INSTALL_TUNNELS=1 ./start.sh` into `tools/bin/`); `tunnel.bat` / `./tunnel.sh` remain for the command line, with a bare number meaning a port. Operator-only — there is no agent tool for this, the switch defaults off, and every start and stop is audited.*
+*Off-LAN friends without touching a terminal: the new **Tunnels** card starts and stops ngrok and Cloudflare quick tunnels from inside the app, detects the served port, and shows each public URL with its friend-ready RPC path to copy. The binaries install from the setup scripts only when asked (`setup-xampp.bat -Tunnels`, `INSTALL_TUNNELS=1 ./start.sh` into `tools/bin/`); `tunnel.bat` / `./tunnel.sh` remain for the command line, with a bare number meaning a port. Operator-only — there is no agent tool for this, the switch defaults off, and every start and stop is audited. Pictured and fully detailed in the new [🌐 Tunnels](#-tunnels--take-the-mcp-server-off-lan) section below.*
 ---
 
 ## 🧭 Contents
@@ -97,6 +97,7 @@ Jump straight to a section — every heading on this page is linkable; these are
 
 - [🔌 MCP client](#-mcp--connect-out-to-other-servers-client)
 - [🖥️ MCP server](#️-mcp--let-others-connect-in-server)
+- [🌐 Tunnels](#-tunnels--take-the-mcp-server-off-lan)
 - [🤝 Mesh — share agents between copies](#-mesh--share-agents-between-copies)
 - [📱 Android & mobile](#-android--mobile)
 - [🧩 Architecture](#-architecture)
@@ -269,7 +270,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🧠 | **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, and **Config → Interface** pins it Auto, always open or always collapsed |
 | 🧰 | **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 | **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
-| 🌐 | **Tunnels** | Expose the MCP server off-LAN over ngrok / Cloudflare from Config → Tunnels — installable from the setup scripts, port-aware, URLs copied from the card — [MCP server](#️-mcp--let-others-connect-in-server) |
+| 🌐 | **Tunnels** | Expose the MCP server off-LAN over ngrok / Cloudflare from Config → Tunnels — installable from the setup scripts, port-aware, URLs copied from the card — [Tunnels](#-tunnels--take-the-mcp-server-off-lan) |
 | 🤝 | **Mesh — share agents** | Lend agents to another copy over the MCP server — friend tokens with read/write scope, installs land inactive and keyless, or run remotely on the sharer's meter — [Mesh](#-mesh--share-agents-between-copies) |
 | 🎨 | **Themes** | Dark, Matrix, Cyberpunk |
 | 🖼️ | **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
@@ -1439,15 +1440,44 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 The operator hands over the **URL + that friend's token** — that pair is all their client needs.
 
 ### 🌐 Reach it from outside (tunnels)
-Off-LAN friends reach the same endpoint through a reverse-proxy tunnel — no router configuration, and both tunnels can run at once against the same copy. Two ways to drive them:
+Off-LAN friends reach the same endpoint through a reverse-proxy tunnel — no router configuration, and both tunnels can run at once against the same copy. The full story — the in-app card, both providers, install steps, and the friend URL — lives in [🌐 Tunnels](#-tunnels--take-the-mcp-server-off-lan).
 
-- **Inside the app (recommended): Config → Tunnels.** Switch tunnels on, pick the provider, and press START — the public URL appears on the card with a Copy button and the friend-ready RPC path. STOP ends them. No terminal, and the app refuses to start what is not installed, telling you how to install it instead.
-- **From a terminal:** `tunnel.bat [ngrok|cloudflare|both] [port]` on Windows (double-click for both on the auto-detected port), `./tunnel.sh` with the same arguments on Linux/macOS.
-- **Port:** omit it and the port is auto-detected (the served port in the app, Apache's `Listen` line for the scripts, else `8080`); pass it when the app runs elsewhere, e.g. `tunnel.bat both 8090`. A bare number is a port: `tunnel.bat 8090`.
-- **Installing the binaries:** `setup-xampp.bat -Tunnels` on Windows (winget, only with that flag — the app never installs network-facing software unasked); `INSTALL_TUNNELS=1 ./start.sh` on Linux/macOS (into `tools/bin/`, no sudo). The installers are opt-in on purpose: a tunnel is a public door into this machine.
+</details>
+
+---
+---
+## 🌐 Tunnels — take the MCP server off-LAN
+
+![Tunnels — the Config card that starts ngrok and Cloudflare tunnels from inside the app](screenshots/Reverse-Proxy.png)
+
+*The Tunnels card: enable switch, provider picker, auto-detected port, reserved ngrok domain, binary-path overrides, SAVE / START / STOP — and the public URL with its friend-ready RPC path to copy.*
+
+Off-LAN friends reach the MCP server through a reverse-proxy tunnel — no router configuration, no new dependencies, and both tunnels can run at once against the same copy. The **Config → Tunnels** card starts and stops them from inside the app; `tunnel.bat` / `./tunnel.sh` remain for the terminal.
+
+<details>
+<summary>Providers, ports, install steps, the friend URL, and how the app runs them</summary>
+
+### 🖱️ From the card (recommended)
+**Config → Tunnels.** Switch tunnels on, pick the provider, and press START — each public URL appears on the card with a Copy button and the friend-ready RPC path beside it. STOP ends them; the refresh button re-checks what is actually running. Nothing here starts on its own, and the app refuses to start what is not installed — telling you how to install it instead of failing quietly.
+
+### 💻 From a terminal
+`tunnel.bat [ngrok|cloudflare|both] [port]` on Windows (double-click for both on the auto-detected port); `./tunnel.sh` with the same arguments on Linux/macOS.
+
+### 🔌 Port
+Omit it and the port is auto-detected (the card reads the served port; the scripts read Apache's `Listen` line, else `8080`); pass it when the app runs elsewhere, e.g. `tunnel.bat both 8090`. A bare number is a port: `tunnel.bat 8090`.
+
+### 📦 Installing the binaries — only when asked
+`setup-xampp.bat -Tunnels` on Windows (winget, skipped when already present); `INSTALL_TUNNELS=1 ./start.sh` on Linux/macOS (into `tools/bin/`, no sudo, no package manager). The installers are opt-in on purpose: a tunnel is a public door into this machine, and the app never installs network-facing software unasked.
+
+### 🌐 The two providers
 - **ngrok** needs an authtoken once (`ngrok config add-authtoken <token>`, ~1 GB/month on the free tier). A reserved domain keeps the friend's saved URL stable across restarts: the card's domain field, `-NgrokDomain` on PowerShell, `NGROK_DOMAIN` in the environment on bash.
-- **Cloudflare quick tunnel** needs no account and prints a random `*.trycloudflare.com` URL on every launch — perfect as a disposable second route next to ngrok's stable one.
-- The friend URL keeps the same shape over either tunnel: `https://<tunnel-host>[/router]/api/mcp-server` (`/router` when Apache serves the app, bare path for `php -S`/`start.sh`) plus their `Authorization: Bearer <token>` header. Nothing listening locally? The start refuses and says so — start the app first.
+- **Cloudflare quick tunnel** needs no account and prints a random `*.trycloudflare.com` URL on every launch — the disposable second route next to ngrok's stable one.
+
+### 👋 The friend URL
+The same shape over either tunnel: `https://<tunnel-host>[/router]/api/mcp-server` (`/router` when Apache serves the app, bare path for `php -S`/`start.sh`) plus their `Authorization: Bearer <token>` header. That URL-plus-token pair is all their client needs. Nothing listening locally? The start refuses and says so — start the app first.
+
+### 🔧 How the app runs them
+`POST /sandbox/tunnels` (`start` / `stop` / `status` / `save`) spawns each tunnel's binary detached with its output captured to a log, waits up to ~25s for the daemon's own public-URL line, and kills a tunnel that never prints one — no orphan daemons with unknown addresses. Pids and URLs live in `storage/tunnels.json`, never in `config.json`, so backups and restores can't resurrect a dead tunnel. Every status re-checks the pid is alive, so a dead daemon reads as down and a stale URL is never shown. Operator-only: there is no agent tool for this, the switch defaults off, and every start and stop is written to the audit trail.
 
 </details>
 
