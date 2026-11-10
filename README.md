@@ -1196,7 +1196,7 @@ The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains th
 - 🔒 **One drill, nothing else** — the system prompt locks to 12 steps in `training/`, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → `edit_file` 🩹, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `exec` ⌨️, and a final `todo_write` to mark everything done. Approval-gated steps (write/edit/exec) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
 - 🔁 **Retry until it passes** — a failed step is never skipped; the error comes back with the shape to retry with, so a miss becomes practice instead of a skip. Each pass is logged with `todo_write`. ✅
 - ▶️ **Start dispatches the drill** — Start posts it into chat as a turn (or steers it into a running one), so messages 🗨️, map 🗺️, metrics 📊 and trace 🔎 all move exactly as usual. With no active agents it says so instead of arming. 🤫
-- 🧠 **Nothing mystical is stored** — model weights never change; *"remember what worked"* means the todo record plus the run transcript. Stop on the same button ends it with a recap: which tools passed, how many retries each took. 📋
+- 🧠 **Nothing mystical is stored** — model weights never change; *"remember what worked"* means the todo record (kept per agent), the run transcript, and the dialect memo: a tool-call dialect is only remembered after its calls execute ok, and native-API turns never write it. Stop on the same button ends it with a recap: which tools passed, how many retries each took. 📋
 - 🧱 **The jail still applies** — the drill resolves under the agent's writable root, never outside it. 🔒
 
 Happy drilling! 💪🚀

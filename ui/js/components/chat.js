@@ -1767,7 +1767,7 @@ _makeLiveNode(agent) {
     // `dialect` is kept in a variable so the parse-failure escalation below can
     // move it without rebuilding everything. Env facts (OS, cwd, which commands
     // exist) come from the SERVER, cached — see toolManifest.js.
-    let dialect = toolProtocolFor(agent);
+    let dialect = toolProtocolFor(agent, undefined, baseSpec.endpoint);
     const envFacts = await getEnvFacts().catch(() => null);
     let instructions = buildToolInstructions(enabled, sandboxRoot,
       nativeMode ? 'native-api' : dialect, envFacts);
@@ -1891,7 +1891,7 @@ _makeLiveNode(agent) {
         if (nativeMode && step === 0 && err?.name !== 'AbortError'
             && (Number(err?.status) === 400 || Number(err?.status) === 422)) {
           nativeMode = false;
-          dialect = toolProtocolFor(agent);
+          dialect = toolProtocolFor(agent, undefined, baseSpec.endpoint);
           const promptInstructions = buildToolInstructions(enabled, sandboxRoot, dialect, envFacts);
           const sysIdx = working.findIndex(m => m && m.role === 'system');
           if (sysIdx !== -1) {
@@ -1970,20 +1970,18 @@ _makeLiveNode(agent) {
           calls.push({ tool: call.tool, arg: call.arg });
         }
       }
-      if (calls.length) {
-        // It parsed. Remember this dialect for this provider::model so the next
-        // turn starts here instead of re-guessing.
-        rememberDialect(agent.provider, agent.model, dialect);
-      }
       if (!calls.length) {
         // Parse-failure escalation. The model TRIED to call a tool — the reply
         // carries JSON/XML/tag shapes — but nothing parsed, usually because the
-        // dialect taught was the wrong one for this model. Re-teach ONCE with a
-        // different dialect rather than letting the near-miss become the final
-        // answer, which reads as "the tool did not work".
+        // dialect taught was the wrong one for this model. Re-teach with each
+        // untried dialect in turn rather than letting the near-miss become the
+        // final answer, which reads as "the tool did not work".
         const looksLikeTool = enabled.length > 0
           && /(\{\s*"tool"\s*:|<\|tool_call\||<function_calls|<invoke\s|\{"tool")/i.test(String(chunk || ''));
-        if (looksLikeTool && parseRetries < 1 && !outOfTime() && !(signal && signal.aborted)) {
+        // Brute-force every untried dialect before giving up: plain, json,
+        // native, anthropic. The first guess is already in triedDialects, so
+        // up to three reteaches cover the whole set.
+        if (looksLikeTool && parseRetries < 3 && !outOfTime() && !(signal && signal.aborted)) {
           const alt = nextDialect(dialect, triedDialects);
           if (alt) {
             parseRetries++;
@@ -2186,7 +2184,7 @@ _makeLiveNode(agent) {
 
         this._recordToolCall(agent.id, call.tool);
         store.emit('toast', { message: `${agent.name}: ${call.tool} → ${asText(result).slice(0, 40)}`, type: 'info' });
-        if (call.tool === 'todo_write') refreshTodoBlock(working);
+        if (call.tool === 'todo_write') refreshTodoBlock(working, agent.id);
 
         // An autonomous agent declares its goal met with a tool, not a phrase.
         // Ending the turn here turns the summary into that agent's reply, which
@@ -2218,6 +2216,16 @@ _makeLiveNode(agent) {
           role: 'user',
           content: `TOOL_RESULT: ${asText(result)}\nContinue with the next tool call if the task needs it, or answer the user in plain prose when done.`,
         });
+      }
+
+      // It PARSED and every call EXECUTED ok. Remember this dialect for this
+      // provider::model so the next turn starts here instead of re-guessing.
+      // Native-API turns skip this: the prompt dialect was never tested, and
+      // writing it would memoize a guess. Anything less than all-ok (an
+      // error, a denial, a pending approval) is not "what worked".
+      if (calls.length && calls.every(c => !c.native) && !nativeMode
+        && records.every(r => r && r.status === 'ok')) {
+        rememberDialect(agent.provider, agent.model, dialect);
       }
 
       if (completedSummary !== null) {
@@ -3657,8 +3665,11 @@ const filesBlockFor = agent => {
  * context assembler compacts first; without this the plan survives in
  * localStorage but disappears from the model's view halfway through a task.
  */
-const todosBlockFor = () => {
-  const todos = store.get('ui.todos');
+const todosBlockFor = (agentId) => {
+  const byAgent = (store.get('ui.todosByAgent')) || {};
+  const todos = (agentId && Array.isArray(byAgent[agentId]))
+    ? byAgent[agentId]
+    : store.get('ui.todos');
   if (!Array.isArray(todos) || !todos.length) return '';
   const mark = { pending: '[ ]', in_progress: '[~]', completed: '[x]' };
   const lines = todos.slice(0, 50).map((t, i) => {
@@ -3670,12 +3681,12 @@ const todosBlockFor = () => {
 };
 
 /** Re-inject the plan after todo_write, so it survives the same long turn. */
-const refreshTodoBlock = messages => {
+const refreshTodoBlock = (messages, agentId) => {
   const idx = messages.findIndex(m => m && m.role === 'system');
   if (idx === -1) return;
   const base = String(messages[idx].content || '')
     .replace(/\n\n<current-plan>[\s\S]*?<\/current-plan>/, '');
-  messages[idx] = { ...messages[idx], content: `${base}${todosBlockFor()}` };
+  messages[idx] = { ...messages[idx], content: `${base}${todosBlockFor(agentId)}` };
 };
 
 const systemPromptFor = agent => {
@@ -3690,7 +3701,7 @@ const systemPromptFor = agent => {
   // Training mode heads the prompt: confine + retry rules must dominate the
   // agent instructions and any global pre-prompt while the drill runs.
   const headed = training ? (base ? `${training}\n\n${base}` : training) : base;
-  const append = [alwaysAppendFor(agent), filesBlockFor(agent), todosBlockFor()].filter(Boolean).join('\n\n');
+  const append = [alwaysAppendFor(agent), filesBlockFor(agent), todosBlockFor(agent && agent.id)].filter(Boolean).join('\n\n');
   return append ? `${headed}${headed ? '\n\n' : ''}${append}` : headed;
 };
 

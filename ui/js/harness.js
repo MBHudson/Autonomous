@@ -239,17 +239,32 @@ export function autoProtocol(provider, model, familyId) {
  * The dialect this agent should be taught. An explicit choice wins; otherwise
  * fall back to the provider/model mapping. Unknown ids are treated as auto so
  * a stale saved value can never break a call.
+ *
+ * @param {object} agent the agent row (provider, model, endpoint, toolProtocol)
+ * @param {string} [provider] override provider id (defaults to agent.provider)
+ * @param {string} [resolvedEndpoint] the fully-resolved request endpoint
+ *   (agent override + provider endpoint + {model} substitution). When given
+ *   it is used for family detection, because the raw agent.endpoint is empty
+ *   for most agents and would miss provider-level paths (e.g. an Ollama host
+ *   configured on a custom provider row).
  */
-export function toolProtocolFor(agent, provider) {
+export function toolProtocolFor(agent, provider, resolvedEndpoint) {
   const chosen = String(agent?.toolProtocol || '').trim().toLowerCase();
   if (chosen && chosen !== 'auto' && BY_ID.has(chosen)) return chosen;
-  // Learned dialect: a choice that actually worked on a previous turn for this
-  // exact provider::model wins over the heuristic. Feature-gated, and skipped
-  // when the operator has pinned one above.
+  const endpoint = resolvedEndpoint || agent?.endpoint || '';
+  const family = detectFamily({
+    provider: provider || agent?.provider, endpoint, model: agent?.model,
+  });
+  // The API family already implies the dialect for Claude: a stale memo from
+  // another shape (e.g. the same model id via an OpenAI-compatible relay)
+  // must not override it.
+  if (family === 'anthropic') return 'anthropic';
+  // Learned dialect: a choice whose calls actually EXECUTED ok on a previous
+  // turn for this exact provider::model wins over the heuristic.
+  // Feature-gated, and skipped when the operator has pinned one above.
   const memo = learnedDialect(provider || agent?.provider, agent?.model);
   if (memo && BY_ID.has(memo)) return memo;
-  return autoProtocol(provider || agent?.provider, agent?.model,
-    detectFamily({ provider: provider || agent?.provider, endpoint: agent?.endpoint, model: agent?.model }));
+  return autoProtocol(provider || agent?.provider, agent?.model, family);
 }
 
 // --- Learned tool dialect (Config → Labs → "Remember the working dialect") ---
@@ -273,7 +288,12 @@ export function learnedDialect(provider, model) {
   return map[key] || '';
 }
 
-/** Remember that `dialect` parsed successfully for this provider+model. */
+/**
+ * Remember that `dialect` produced calls that EXECUTED successfully for this
+ * provider+model. Call this only after the tool results come back ok -- a
+ * reply that merely parsed (wrong args, bad path, denied) must not be
+ * remembered, or one fluke parse poisons every future turn.
+ */
 export function rememberDialect(provider, model, dialect) {
   if (!dialectMemoEnabled()) return;
   const d = String(dialect || '').trim().toLowerCase();
@@ -284,6 +304,23 @@ export function rememberDialect(provider, model, dialect) {
   const map = { ...(settings.toolDialectMap || {}) };
   if (map[key] === d) return;
   map[key] = d;
+  store.set('settings.toolDialectMap', map);
+  try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
+}
+
+/**
+ * Drop the remembered dialect for this provider+model, if any. Used when the
+ * operator wants a clean re-learn (and available to future failure paths
+ * that prove a memo stale). A missing entry is a no-op.
+ */
+export function forgetDialect(provider, model) {
+  if (!dialectMemoEnabled()) return;
+  const key = dialectMemoKey(provider, model);
+  if (!key) return;
+  const settings = store.get('settings') || {};
+  if (!settings.toolDialectMap || !(key in settings.toolDialectMap)) return;
+  const map = { ...(settings.toolDialectMap || {}) };
+  delete map[key];
   store.set('settings.toolDialectMap', map);
   try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
 }

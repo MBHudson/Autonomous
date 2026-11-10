@@ -383,14 +383,24 @@ export const TOOL_REGISTRY = {
     label: 'todo_write',
     arg: '{"todos":[{"content":"...","status":"pending|in_progress|completed"}]}',
     describe: 'Write or update your task list for this session',
-    run: arg => {
+    run: (arg, _note, ctx) => {
       const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
       const todos = Array.isArray(a.todos) ? a.todos : (Array.isArray(arg) ? arg : []);
       const clean = todos.map(t => ({
         content: String((t && t.content) || '').slice(0, 300),
         status: ['pending', 'in_progress', 'completed'].includes(t && t.status) ? t.status : 'pending',
       })).filter(t => t.content);
-      try { store.set('ui.todos', clean); store.emit('todos:changed', clean); } catch { /* no store */ }
+      // Per-agent lists: a fleet training at once must not overwrite one
+      // another's plan through the old single global. The agent id scopes the
+      // record; `ui.todos` keeps the last write for the existing panel.
+      try {
+        const agentId = String((ctx && ctx.agentId) || 'shared');
+        const all = { ...((store.get('ui.todosByAgent')) || {}) };
+        all[agentId] = clean;
+        store.set('ui.todosByAgent', all);
+        store.set('ui.todos', clean);
+        store.emit('todos:changed', clean);
+      } catch { /* no store */ }
       if (!clean.length) return 'todo list cleared';
       const mark = { pending: '[ ]', in_progress: '[~]', completed: '[x]' };
       return clean.map((t, i) => `${mark[t.status]} ${i + 1}. ${t.content}`).join('\n');
