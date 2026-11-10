@@ -10,22 +10,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=428';
-import { K } from '../storage.js?v=428';
-import { persistence } from '../persistence.js?v=428';
-import { api } from '../api.js?v=428';
-import { isNoTokenError } from '../apiError.js?v=428';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=428';
-import { errText } from '../api.js?v=428';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=428';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=428';
-import { snapshot } from '../rateGovernor.js?v=428';
-import { trainingStepList, trainingKickoffFor } from '../training.js?v=428';
-import { resetBrowserEnabled } from '../toolManifest.js?v=428';
-import { perf } from '../perf.js?v=428';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=428';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=428';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=428';
+import { store } from '../store.js?v=429';
+import { K } from '../storage.js?v=429';
+import { persistence } from '../persistence.js?v=429';
+import { api } from '../api.js?v=429';
+import { isNoTokenError } from '../apiError.js?v=429';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=429';
+import { errText } from '../api.js?v=429';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=429';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=429';
+import { snapshot } from '../rateGovernor.js?v=429';
+import { trainingStepList, trainingKickoffFor } from '../training.js?v=429';
+import { resetBrowserEnabled } from '../toolManifest.js?v=429';
+import { perf } from '../perf.js?v=429';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=429';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=429';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=429';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -1973,6 +1973,46 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
         <div class="form-hint" id="sbMcpSrvStatus"></div>
       `)}
 
+      ${this._cfgSection('tunnels', 'Tunnels', { text: this._tun?.enabled ? 'ON' : '', cls: this._tun?.enabled ? 'ok' : '' }, `
+        <div class="form-hint">Expose this copy's MCP server off-LAN over ngrok and/or Cloudflare's quick tunnel — a friend's client then reaches it at a public <code>https://</code> URL under their friend token. Opening one is a public door into this machine, so it is off until you switch it on here, and nothing here starts on its own.</div>
+        <div class="toggle-row">
+          <span class="toggle-label">Enable tunnels</span>
+          <div class="toggle ${this._tun?.enabled ? 'active' : ''}" id="sbTunOn"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Provider</label>
+          <select class="form-input" id="sbTunProvider">
+            <option value="both">Both — ngrok's stable URL plus Cloudflare's disposable one</option>
+            <option value="ngrok">ngrok only — needs an authtoken, URL can be reserved</option>
+            <option value="cloudflare">Cloudflare only — no account, random URL each launch</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Port <span class="form-hint-inline">blank = this copy's own port</span></label>
+          <input class="form-input" id="sbTunPort" inputmode="numeric" placeholder="auto" style="max-width:120px">
+          <div class="form-hint">Fill it in when the app runs on another port. A bare number here is all a different port needs.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reserved ngrok domain <span class="form-hint-inline">optional</span></label>
+          <input class="form-input" id="sbTunDomain" placeholder="e.g. mine.ngrok-free.dev">
+          <div class="form-hint">Keeps the friend's saved URL working across restarts. The free tier includes one.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Binary paths <span class="form-hint-inline">only if installed but not found</span></label>
+          <input class="form-input" id="sbTunNgrokPath" placeholder="ngrok full path, e.g. C:\\tools\\ngrok.exe" style="margin-top:6px">
+          <input class="form-input" id="sbTunCfPath" placeholder="cloudflared full path" style="margin-top:6px">
+          <div class="form-hint">A service install's PATH is not the desktop's — a full path here is the fix when the binary is installed but the status below says it is missing.</div>
+        </div>
+        <button class="btn btn-primary btn-block" id="sbTunSave" style="margin-top:8px">SAVE TUNNELS</button>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost" id="sbTunStart" style="flex:1">START</button>
+          <button class="btn btn-ghost" id="sbTunStop" style="flex:1">STOP</button>
+          <button class="btn btn-ghost" id="sbTunRefresh" title="Re-check what is running">↻</button>
+        </div>
+        <div class="form-hint" id="sbTunStatus" style="margin-top:6px"></div>
+        <div id="sbTunUrls"></div>
+      `)}
+
       ${this._cfgSection('updates', 'Updates', (this._installPre?.pending || []).length
         ? { text: 'UNFINISHED', cls: 'danger' }
         : this._updatePlan
@@ -2129,6 +2169,8 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     this._initMcpSection();
     // MCP *server* config (friends connect in) — also server-side.
     this._initMcpServerSection();
+    // Tunnels (ngrok / Cloudflare) — operator-started, server-side.
+    this._initTunnelsSection();
 
     // Shell access lives server-side (config.json), because that is where the
     // gate is enforced — a browser-side flag would be a lie the server ignores.
@@ -3244,6 +3286,145 @@ const ghost = { on: true, color: '#a8c0d8', size: 11, opacity: 0.3, ...(settings
     } catch (err) {
       if (status) status.textContent = `Not saved: ${err.message}`;
       store.emit('toast', { message: `MCP server not saved: ${err.message}`, type: 'error' });
+    }
+  }
+
+  /**
+   * Tunnels: ngrok / Cloudflare quick tunnel, started and stopped from here.
+   * Everything lives server-side: the card only renders what /sandbox/tunnels
+   * reports, and starting one is an operator click, never an agent action.
+   */
+  _initTunnelsSection() {
+    document.getElementById('sbTunOn')?.addEventListener('click', (e) => {
+      e.currentTarget.classList.toggle('active');
+    });
+    document.getElementById('sbTunSave')?.addEventListener('click', () => this._saveTunnels());
+    document.getElementById('sbTunStart')?.addEventListener('click', () => this._startTunnels());
+    document.getElementById('sbTunStop')?.addEventListener('click', () => this._stopTunnels());
+    document.getElementById('sbTunRefresh')?.addEventListener('click', () => this._loadTunnels());
+    this._loadTunnels();
+  }
+
+  _tunPayload() {
+    const portRaw = (document.getElementById('sbTunPort')?.value || '').trim();
+    const port = portRaw === '' ? 0 : Math.max(0, Math.min(65535, parseInt(portRaw, 10) || 0));
+    const provider = document.getElementById('sbTunProvider')?.value || 'both';
+    return {
+      enabled: !!document.getElementById('sbTunOn')?.classList.contains('active'),
+      provider: ['ngrok', 'cloudflare', 'both'].includes(provider) ? provider : 'both',
+      port,
+      ngrok_domain: (document.getElementById('sbTunDomain')?.value || '').trim(),
+      ngrok_path: (document.getElementById('sbTunNgrokPath')?.value || '').trim(),
+      cloudflared_path: (document.getElementById('sbTunCfPath')?.value || '').trim(),
+    };
+  }
+
+  async _loadTunnels() {
+    const status = document.getElementById('sbTunStatus');
+    try {
+      const res = await api.sandbox('tunnels', { action: 'status' });
+      if (!document.getElementById('sbTunStatus')) return; // tab changed
+      this._tun = res;
+      document.getElementById('sbTunOn')?.classList.toggle('active', !!res.enabled);
+      const prov = document.getElementById('sbTunProvider');
+      if (prov && res.provider) prov.value = res.provider;
+      const port = document.getElementById('sbTunPort');
+      if (port && !port.value) port.placeholder = `auto (${res.port || 8080})`;
+      const dom = document.getElementById('sbTunDomain');
+      if (dom && !dom.value && res.ngrok_domain) dom.value = res.ngrok_domain;
+      this._renderTunnels(res);
+    } catch (err) {
+      if (status) status.textContent = `Could not load tunnel status: ${err.message}`;
+    }
+  }
+
+  _renderTunnels(res) {
+    const status = document.getElementById('sbTunStatus');
+    const urls = document.getElementById('sbTunUrls');
+    if (!status || !urls) return;
+    if (!res.enabled) {
+      status.textContent = 'Tunnels are off — switch them on and save to allow starting one.';
+      urls.innerHTML = '';
+      return;
+    }
+    const rows = [];
+    for (const name of ['ngrok', 'cloudflare']) {
+      const t = (res.tunnels || {})[name] || {};
+      if (t.up && t.url) {
+        rows.push({ name, url: t.url, rpc: t.rpc || (t.url + (res.prefix || '') + '/api/mcp-server') });
+      } else if (!t.installed) {
+        rows.push({
+          name, down: `${name === 'ngrok' ? 'ngrok' : 'cloudflared'} is not installed where the server can see it`
+            + ` — install it${name === 'ngrok' ? ' and add its authtoken' : ' (no account needed)'} first.`,
+        });
+      }
+    }
+    const ups = rows.filter(r => r.url);
+    status.textContent = ups.length
+      ? `${ups.length} tunnel(s) up on port ${res.port}. Hand a friend the URL plus their friend token.`
+      : `Nothing running on port ${res.port || 8080}. START launches the saved provider.`;
+    urls.innerHTML = rows.map(r => {
+      if (!r.url) return `<div class="form-hint" style="margin-top:4px">${esc(r.down)}</div>`;
+      const id = `tun-${r.name}`;
+      return `<div class="form-group" style="margin-top:6px">
+        <label class="form-label">${esc(r.name)} <span class="form-hint-inline">public URL</span></label>
+        <div style="display:flex;gap:6px">
+          <input class="form-input" id="${id}-url" readonly value="${escAttr(r.url)}" style="flex:1;min-width:0">
+          <button class="btn btn-ghost" data-tun-copy="${id}-url">Copy</button>
+        </div>
+        <div class="form-hint">Friend RPC: <code>${esc(r.rpc)}</code> + <code>Authorization: Bearer …</code></div>
+      </div>`;
+    }).join('');
+    urls.querySelectorAll('[data-tun-copy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.tunCopy);
+        if (!input) return;
+        copyToClipboard(input.value).then(ok => store.emit('toast', {
+          message: ok ? 'Public URL copied — pair it with the friend\'s token' : 'Copy failed — select the URL by hand',
+          type: ok ? 'success' : 'error',
+        }));
+      });
+    });
+  }
+
+  async _saveTunnels() {
+    const status = document.getElementById('sbTunStatus');
+    try {
+      const res = await api.sandbox('tunnels', { action: 'save', tunnels: this._tunPayload() });
+      if (!document.getElementById('sbTunStatus')) return;
+      this._tun = res;
+      this._renderTunnels(res);
+      store.emit('toast', { message: 'Tunnels saved', type: 'success' });
+    } catch (err) {
+      if (status) status.textContent = `Not saved: ${err.message}`;
+      store.emit('toast', { message: `Tunnels not saved: ${err.message}`, type: 'error' });
+    }
+  }
+
+  async _startTunnels() {
+    const status = document.getElementById('sbTunStatus');
+    try {
+      if (status) status.textContent = 'Starting — waiting for the public URL (up to ~25s)…';
+      const payload = this._tunPayload();
+      await api.sandbox('tunnels', { action: 'save', tunnels: payload });
+      await api.sandbox('tunnels', { action: 'start', provider: payload.provider, port: payload.port });
+      await this._loadTunnels();
+      store.emit('toast', { message: 'Tunnel starting — the public URL is below when it prints one', type: 'success' });
+    } catch (err) {
+      if (status) status.textContent = `Not started: ${err.message}`;
+      store.emit('toast', { message: `Tunnel not started: ${err.message}`, type: 'error' });
+    }
+  }
+
+  async _stopTunnels() {
+    const status = document.getElementById('sbTunStatus');
+    try {
+      await api.sandbox('tunnels', { action: 'stop', provider: 'all' });
+      await this._loadTunnels();
+      store.emit('toast', { message: 'Tunnels stopped', type: 'success' });
+    } catch (err) {
+      if (status) status.textContent = `Not stopped: ${err.message}`;
+      store.emit('toast', { message: `Tunnels not stopped: ${err.message}`, type: 'error' });
     }
   }
 

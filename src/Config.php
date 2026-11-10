@@ -280,6 +280,18 @@ class Config {
         return is_string($env) && trim($env) !== '' ? trim($env) : self::$configPath;
     }
     /**
+     * A sibling file next to the config, for ephemeral runtime state (pids,
+     * public tunnel URLs) that must survive requests but never a backup or a
+     * restore. Tests pointing ROUTER_CONFIG at a temp file land here too, so
+     * their state never touches the operator's storage/.
+     */
+    public static function runtimePath($name) {
+        $name = (string)$name;
+        $name = str_replace(['/', '\\', "\0"], '', basename($name));
+        if ($name === '') { $name = 'runtime.json'; }
+        return rtrim(dirname(self::configPath()), '/\\') . DIRECTORY_SEPARATOR . $name;
+    }
+    /**
      * Same override for the models catalog: point ROUTER_MODELS at another
      * JSON file and the catalog reads and writes land there instead of
      * storage/. A restore writes the catalog the backup carries, and the

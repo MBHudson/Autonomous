@@ -61,6 +61,7 @@ use Src\Sandbox;
 use Src\Mcp;
 use Src\McpServer;
 use Src\Programs;
+use Src\Tunnels;
 use Src\Browser;
 use Src\SessionManager;
 use Src\TopologyGraph;
@@ -954,6 +955,12 @@ function handleSandbox($method, $segments, $body) {
             // their resolved paths and running state.
             case 'program':
                 echo json_encode(Programs::handle($body));
+                break;
+            // Reverse-proxy tunnels (ngrok / Cloudflare) exposing this copy's
+            // MCP server off-LAN. Operator-only by design: no agent tool calls
+            // this route, and starting one is a click in Config, never a default.
+            case 'tunnels':
+                echo json_encode(Tunnels::handle($method, $body, $_SERVER));
                 break;
             case 'search':
                 echo json_encode(Sandbox::webSearch($body['query'] ?? '', $body['limit'] ?? 8));

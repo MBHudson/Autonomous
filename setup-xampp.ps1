@@ -27,7 +27,8 @@
 param(
     [int]$Port = 8080,
     [string]$XamppDir = 'C:\xampp',
-    [switch]$Repair
+    [switch]$Repair,
+    [switch]$Tunnels
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,6 +61,7 @@ if (-not (Test-Admin)) {
     if ($Port -ne 8080) { $elevArgs += @('-Port', "$Port") }
     if ($XamppDir -ne 'C:\xampp') { $elevArgs += @('-XamppDir', "`"$XamppDir`"") }
     if ($Repair) { $elevArgs += '-Repair' }
+    if ($Tunnels) { $elevArgs += '-Tunnels' }
     Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $elevArgs
     exit 0
 }
@@ -246,6 +248,31 @@ if ($running) {
         Fail "Apache did not stay up. Fix the issue above (often another program on port $Port) and run setup-xampp.bat again."
     }
     Write-Ok "Apache started on port $Port"
+}
+
+# --- 6. Tunnel binaries (only with -Tunnels) --------------------------------
+# ngrok + cloudflared, so Config -> Tunnels can expose the MCP server off-LAN.
+# Opt-in on purpose: these open a public door into this machine, and the app
+# never installs network-facing software behind the operator's back.
+if ($Tunnels) {
+    Write-Step "Installing tunnel binaries (ngrok + cloudflared)"
+    foreach ($app in @(
+        @{ Bin = 'ngrok'; WingetId = 'ngrok.ngrok'; Hint = 'ngrok config add-authtoken <token>' },
+        @{ Bin = 'cloudflared'; WingetId = 'cloudflare.cloudflared'; Hint = 'no account needed' }
+    )) {
+        if (Get-Command $app.Bin -ErrorAction SilentlyContinue) {
+            Write-Ok "$($app.Bin) already installed"
+        } else {
+            try {
+                & winget install -e --id $app.WingetId --silent `
+                    --accept-source-agreements --accept-package-agreements
+                Write-Ok "$($app.Bin) installed ($($app.Hint))"
+            } catch {
+                Write-Warn2 "$($app.Bin) install failed: $($_.Exception.Message)"
+                Write-Warn2 "Install it by hand: winget install $($app.WingetId)"
+            }
+        }
+    }
 }
 
 $url = "http://localhost:$Port/router/"

@@ -39,9 +39,9 @@
 
 **Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v446 — the Mesh section opens with both ends pictured 🤝
+### 🆕 v447 — tunnels leave the terminal: Config → Tunnels 🌐
 
-*The [🤝 Mesh](#-mesh--share-agents-between-copies) section now opens with the two ends of a mesh connection side by side: the **sharing side** (Config → MCP Server — enable toggle, Mesh discovery, friend tokens with scope and mesh-forwarding flag) and the **receiving side** (the server's graph card — advertise toggle, Shared agents with Install / Use remotely, Discover mesh). Docs and screenshots only; nothing behaves differently.*
+*Off-LAN friends without touching a terminal: the new **Tunnels** card starts and stops ngrok and Cloudflare quick tunnels from inside the app, detects the served port, and shows each public URL with its friend-ready RPC path to copy. The binaries install from the setup scripts only when asked (`setup-xampp.bat -Tunnels`, `INSTALL_TUNNELS=1 ./start.sh` into `tools/bin/`); `tunnel.bat` / `./tunnel.sh` remain for the command line, with a bare number meaning a port. Operator-only — there is no agent tool for this, the switch defaults off, and every start and stop is audited.*
 ---
 
 ## 🧭 Contents
@@ -269,6 +269,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🧠 | **Reasoning, in its own box** | Every shape's thinking — `reasoning_content`, Anthropic `thinking` blocks, Google `thought: true` parts, a runner's `{"type":"reasoning"}` blocks — lands in a collapsible panel on the message, and **Config → Interface** pins it Auto, always open or always collapsed |
 | 🧰 | **A sandbox per agent** | Add as many jail roots as you like in Brain Lab and hand a different one to each agent; the global default stays exactly where it was. |
 | 🔌 | **MCP client + server** | Connect to other MCP servers, *or* let a friend connect to you |
+| 🌐 | **Tunnels** | Expose the MCP server off-LAN over ngrok / Cloudflare from Config → Tunnels — installable from the setup scripts, port-aware, URLs copied from the card — [MCP server](#️-mcp--let-others-connect-in-server) |
 | 🤝 | **Mesh — share agents** | Lend agents to another copy over the MCP server — friend tokens with read/write scope, installs land inactive and keyless, or run remotely on the sharer's meter — [Mesh](#-mesh--share-agents-between-copies) |
 | 🎨 | **Themes** | Dark, Matrix, Cyberpunk |
 | 🖼️ | **Vision** | Attach images for vision-capable agents — the bytes never hit the server |
@@ -1438,13 +1439,15 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 The operator hands over the **URL + that friend's token** — that pair is all their client needs.
 
 ### 🌐 Reach it from outside (tunnels)
-Off-LAN friends reach the same endpoint through a reverse-proxy tunnel — no router configuration, and both tunnels can run at once against the same copy:
+Off-LAN friends reach the same endpoint through a reverse-proxy tunnel — no router configuration, and both tunnels can run at once against the same copy. Two ways to drive them:
 
-- **Windows:** `tunnel.bat [ngrok|cloudflare|both] [port]` — double-click for both tunnels on the auto-detected port. **Linux/macOS:** `./tunnel.sh` with the same arguments.
-- **Port:** omit it and the port is auto-detected (Apache's `Listen` line on Windows, else `8080`); pass it when the app runs elsewhere, e.g. `tunnel.bat both 8090`. A bare number is a port: `tunnel.bat 8090`.
-- **ngrok** needs an authtoken once (`ngrok config add-authtoken <token>`, ~1 GB/month on the free tier). A reserved domain keeps the friend's saved URL stable across restarts: `-NgrokDomain` on PowerShell, `NGROK_DOMAIN` in the environment on bash.
+- **Inside the app (recommended): Config → Tunnels.** Switch tunnels on, pick the provider, and press START — the public URL appears on the card with a Copy button and the friend-ready RPC path. STOP ends them. No terminal, and the app refuses to start what is not installed, telling you how to install it instead.
+- **From a terminal:** `tunnel.bat [ngrok|cloudflare|both] [port]` on Windows (double-click for both on the auto-detected port), `./tunnel.sh` with the same arguments on Linux/macOS.
+- **Port:** omit it and the port is auto-detected (the served port in the app, Apache's `Listen` line for the scripts, else `8080`); pass it when the app runs elsewhere, e.g. `tunnel.bat both 8090`. A bare number is a port: `tunnel.bat 8090`.
+- **Installing the binaries:** `setup-xampp.bat -Tunnels` on Windows (winget, only with that flag — the app never installs network-facing software unasked); `INSTALL_TUNNELS=1 ./start.sh` on Linux/macOS (into `tools/bin/`, no sudo). The installers are opt-in on purpose: a tunnel is a public door into this machine.
+- **ngrok** needs an authtoken once (`ngrok config add-authtoken <token>`, ~1 GB/month on the free tier). A reserved domain keeps the friend's saved URL stable across restarts: the card's domain field, `-NgrokDomain` on PowerShell, `NGROK_DOMAIN` in the environment on bash.
 - **Cloudflare quick tunnel** needs no account and prints a random `*.trycloudflare.com` URL on every launch — perfect as a disposable second route next to ngrok's stable one.
-- The friend URL keeps the same shape over either tunnel: `https://<tunnel-host>[/router]/api/mcp-server` (`/router` when Apache serves the app, bare path for `php -S`/`start.sh`) plus their `Authorization: Bearer <token>` header. Nothing listening locally? The script refuses to start a tunnel and says so — start the app first.
+- The friend URL keeps the same shape over either tunnel: `https://<tunnel-host>[/router]/api/mcp-server` (`/router` when Apache serves the app, bare path for `php -S`/`start.sh`) plus their `Authorization: Bearer <token>` header. Nothing listening locally? The start refuses and says so — start the app first.
 
 </details>
 
@@ -1675,8 +1678,9 @@ All under `/router/api/…` (or `/api/…`). Every route is token-gated.
 | 🗂️ State / config | `GET·PUT /state`, `GET·PUT /config` (secrets masked on read, restored on write), `GET /models` |
 | 💬 Sessions | `GET·POST /sessions`, `GET·PUT·DELETE /sessions/{id}`, `DELETE /sessions/close/{id}` |
 | 🤖 Models / relay | `POST /query`, `POST /llm` (relay + stream), `GET /catalog` |
-| 🛠️ Sandbox | `GET /sandbox/status`, `POST /sandbox/{search,fetch,read,write,list,glob,grep,str_replace,insert,apply_patch,multi_edit,git,git_commit,http,code,program,…}` |
+| 🛠️ Sandbox | `GET /sandbox/status`, `POST /sandbox/{search,fetch,read,write,list,glob,grep,str_replace,insert,apply_patch,multi_edit,git,git_commit,http,code,program,tunnels,…}` |
 | 🖥️ Programs | `POST /sandbox/program` — `{action:open\|close\|list, name, force}` |
+| 🌐 Tunnels | `POST /sandbox/tunnels` — `{action:start\|stop\|status\|save, provider, port}` — operator-only, no agent tool |
 | 🧑💻 Shell | `POST /exec`, `GET /exec/allowlist`, `GET /exec/pending`, `POST /exec/decide` |
 | 🔌 MCP | `GET·POST /mcp/servers`, `GET /mcp/status`, `POST /mcp/tools`, `POST /mcp/call` |
 | 🖥️ MCP server | `POST /mcp-server` (JSON-RPC), `GET·POST /mcp-server/config` |

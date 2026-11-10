@@ -107,6 +107,70 @@ if ! setup_php; then
   fi
 fi
 
+# --- Tunnel binaries (only with INSTALL_TUNNELS=1) ---------------------------
+# ngrok + cloudflared into tools/bin (no sudo, no package manager), so Config
+# -> Tunnels can expose the MCP server off-LAN. Opt-in on purpose: these open
+# a public door into this machine, and the app never installs network-facing
+# software unasked. Usage:  INSTALL_TUNNELS=1 ./start.sh
+install_tunnels() {
+  mkdir -p tools/bin
+  local os arch
+  case "$(uname -s)" in
+    Darwin) os="darwin" ;;
+    Linux)  os="linux" ;;
+    *) say "  Tunnel binaries: $(uname -s) is not covered; install ngrok and cloudflared by hand."; return 0 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64)  arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) say "  Tunnel binaries: $(uname -m) is not covered; install ngrok and cloudflared by hand."; return 0 ;;
+  esac
+  # cloudflared ships a static binary; ngrok a tarball. Pinned to files that
+  # do not move ("latest" for cloudflared, the v3-stable line for ngrok).
+  if [ ! -x tools/bin/cloudflared ]; then
+    say "Downloading cloudflared..."
+    if [ "$os" = "darwin" ]; then
+      fetch_to "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-${arch}" tools/bin/cloudflared \
+      && chmod +x tools/bin/cloudflared || say "  (could not download cloudflared; install it by hand)"
+    else
+      fetch_to "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}" tools/bin/cloudflared \
+      && chmod +x tools/bin/cloudflared || say "  (could not download cloudflared; install it by hand)"
+    fi
+  else
+    say "  cloudflared already in tools/bin"
+  fi
+  if [ ! -x tools/bin/ngrok ]; then
+    say "Downloading ngrok..."
+    if fetch_to "https://bin.equinox.io/c/bNyj59tP22/ngrok-v3-stable-${os}-${arch}.tgz" tools/ngrok.tgz; then
+      if tar -xzf tools/ngrok.tgz -C tools/bin ngrok 2>/dev/null && [ -x tools/bin/ngrok ]; then
+        say "  ngrok ready (run: ./tunnel.sh, after: ngrok config add-authtoken <token>)"
+      else
+        say "  (could not unpack ngrok; install it by hand: https://ngrok.com/download)"
+      fi
+      rm -f tools/ngrok.tgz
+    else
+      say "  (could not download ngrok; install it by hand: https://ngrok.com/download)"
+    fi
+  else
+    say "  ngrok already in tools/bin"
+  fi
+}
+
+# fetch_to <url> <dest> -- curl first, wget second, like the CA bundle above.
+fetch_to() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --max-time 120 -o "$2" "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -T 120 -O "$2" "$1"
+  else
+    return 1
+  fi
+}
+
+if [ "${INSTALL_TUNNELS:-0}" = "1" ]; then
+  install_tunnels
+fi
+
 # Free port at or above the request, so a second copy just works.
 PORT="$(php ${PHPARGS[@]+"${PHPARGS[@]}"} serve.php --free-port "${1:-8080}")" || exit 1
 

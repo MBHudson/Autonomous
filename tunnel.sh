@@ -18,6 +18,13 @@
 set -u
 cd "$(dirname "$0")"
 
+# Binaries the installer may have placed in tools/bin come first, so a copy
+# that installed them with INSTALL_TUNNELS=1 needs nothing on PATH.
+case ":${PATH:-}:" in
+  *":$PWD/tools/bin:"*) ;;
+  *) export PATH="$PWD/tools/bin:${PATH:-}" ;;
+esac
+
 PROVIDER="${1:-both}"
 PORT_ARG="${2:-}"
 # Explicit arg wins; a stray PORT=0 (or empty) in the environment falls back

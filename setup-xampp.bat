@@ -16,6 +16,7 @@ rem  Extra options, if you ever need them:
 rem     setup-xampp.bat -Port 9090
 rem     setup-xampp.bat -XamppDir D:\xampp
 rem     setup-xampp.bat -Repair        (re-run the XAMPP installer)
+rem     setup-xampp.bat -Tunnels       (also install ngrok + cloudflared for Config -^> Tunnels)
 rem
 rem  Linux / macOS do not need this: use ./start.sh.
 setlocal
