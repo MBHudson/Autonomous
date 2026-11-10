@@ -527,7 +527,7 @@ export class Sidebar {
         </div>
         <div style="font-size:10px;color:var(--text-secondary)">
           ${esc(agent.role)} &middot; ${esc(agent.model)}
-          ${provider ? ' &middot; ' + esc(provider.name) : ''}
+          ${provider ? ' &middot; ' + esc(provider.name) : ''}${agent.remote ? ` &middot; 🌐 via ${esc(agent.remote.owner || agent.remote.server)}` : ''}
         </div>
         <div class="agent-clock" data-clock-agent="${esc(agent.id)}" title=""></div>
         <div class="agent-menu" id="menu-${esc(agent.id)}" data-kind="agent" data-owner="${esc(agent.id)}">

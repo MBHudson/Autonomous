@@ -2372,6 +2372,13 @@ _makeLiveNode(agent) {
   }
 
   async _callAgent(prompt, agent, signal, liveNode, attachments, commsCtx) {
+    // Borrowed runner: this agent lives on another copy. Forward the question
+    // there and render what comes back — no provider, key or tools on this
+    // side. Every entry point (composer, ASK, agent-to-agent) funnels through
+    // here, so one branch covers them all.
+    if (agent && agent.remote && agent.remote.server) {
+      return this._callRemoteAgent(prompt, agent, attachments);
+    }
     const providers = store.get('providers');
     const found = providers.find(p => p.id === agent.provider);
     if (!found) {
@@ -2407,6 +2414,60 @@ _makeLiveNode(agent) {
       if (poolKey) noteResult(found, poolKey, { ok: false, rateLimited: isRateLimited(err) });
       throw err;
     }
+  }
+
+  /**
+   * Run one turn on ANOTHER copy of the app via its MCP server.
+   *
+   * The agent's system prompt, provider, key and meter all live on the far
+   * side: this copy only forwards the question plus recent history and
+   * renders the reply as the agent's message. One-shot — a remote turn does
+   * not stream, run tools, replay memory, or carry attachments. A failed call
+   * reads as an ordinary "could not answer" so the transcript stays honest.
+   */
+  async _callRemoteAgent(prompt, agent, attachments) {
+    const remote = agent.remote || {};
+    if (!remote.server) throw new Error(`${agent.name} is marked remote but names no server.`);
+    if (attachments && attachments.length) {
+      throw new Error(`${agent.name} runs on ${remote.owner || remote.server}'s copy and cannot see files — install it locally to use attachments.`);
+    }
+    const text = String(prompt || '').trim();
+    if (!text) throw new Error('Nothing to send.');
+    const where = remote.owner || remote.server;
+    // Recent transcript for context, already budgeted and trimmed; the far
+    // side re-caps it, so this is belt and braces, not the guardrail.
+    const history = (this._historyFor(agent.id) || [])
+      .filter(m => m && (m.role === 'user' || m.role === 'assistant')
+        && typeof m.content === 'string' && m.content.trim())
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
+    let res;
+    try {
+      res = await api.mcpCall(remote.server, 'remote_chat', {
+        id: remote.agentId || '', message: text, history,
+      });
+    } catch (err) {
+      throw new Error(`${agent.name} (on ${where}) is unreachable: ${err?.message || err}`);
+    }
+    if (res && res.is_error) throw new Error(res.text || 'remote_chat failed');
+    let reply = (res && res.text) || '';
+    let usage = null;
+    let reasoning = null;
+    try {
+      const parsed = JSON.parse(reply);
+      if (parsed && typeof parsed === 'object' && typeof parsed.reply === 'string') {
+        reply = parsed.reply;
+        usage = parsed.usage || null;
+        reasoning = parsed.reasoning || null;
+      }
+    } catch { /* plain-text reply from an older copy */ }
+    if (!reply.trim()) throw new Error(`${agent.name} (on ${where}) returned an empty reply.`);
+    this._recordUsage(agent.id, usage, reply);
+    const split = this._parseSections(reply);
+    return {
+      content: reply, text: split.text, sections: split.sections, reasoning,
+      remote: { server: remote.server, owner: where },
+    };
   }
 
   /** The request path with a key already chosen. See _callAgent. */

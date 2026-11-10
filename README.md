@@ -1448,7 +1448,7 @@ The operator hands over the **URL + that friend's token** — that pair is all t
 ---
 ## 🤝 Mesh — share agents between copies
 
-**Two studios, one shared shelf of agents.** 🤝 Your copy lends agents to a friend's copy over the MCP server you already run — no accounts, no cloud, no new dependencies. They browse your roster from their network map, install with one click, and whatever lands arrives **inactive, keyless, and freshly minted** — so nobody can spend anybody's money or overwrite anybody's agents. 📚🔑🚫
+**Two studios, one shared shelf of agents.** 🤝 Your copy lends agents to a friend's copy over the MCP server you already run — no accounts, no cloud, no new dependencies. They browse your roster from their network map, install a copy with one click — or chat with your agent *where it lives*, answering in their chat box on your meter. Whatever lands arrives **inactive, keyless, and freshly minted** — so nobody can spend anybody's money or overwrite anybody's agents. 📚🔑🚫
 
 <details>
 <summary>Both sides step by step, the safety rules, and troubleshooting</summary>
@@ -1461,20 +1461,22 @@ The operator hands over the **URL + that friend's token** — that pair is all t
 │  list_agents │   list + get  │  copy          │
 │  get_agent   │ ◀──────────── │  graph card →  │
 │  install_    │  write token  │  Shared agents │
-│   agent      │  (optional)   │  → Install ⬇   │
+│   agent      │  install +    │  → Install ⬇   │
+│  remote_chat │  remote run   │  → Use remotely🌐│
 └──────────────┘               └──────────────┘
    🔑 keys, 🌐 endpoints, 🐚 curl templates ❌ never cross
    installs land 😴 inactive with a fresh id + #code ✅
+   remote replies stream into THEIR chat box, on YOUR meter ✅
 ```
 
-Three tools on the MCP server you already have: `list_agents` and `get_agent` ride the **read** scope, `install_agent` needs **write**. Everything else about the server — sandbox, approvals, audit log — applies unchanged.
+Four tools on the MCP server you already have: `list_agents` and `get_agent` ride the **read** scope, `install_agent` and `remote_chat` need **write**. Everything else about the server — sandbox, approvals, audit log — applies unchanged.
 
 ### 🫵 Side A — sharing (yours)
 
 1. **Config → MCP Server** — switched on, as usual.
 2. **Add a token** for your friend:
    - 🔍 **read** — they may browse cards and copy agents onto *their* copy.
-   - ✍️ **write** — *also* lets their side place agents onto *yours* via `install_agent`. Only tick this for people you'd hand your keyboard to.
+   - ✍️ **write** — *also* lets their side place agents onto *yours* via `install_agent`, and run your agents remotely via `remote_chat` (your meter runs). Only tick this for people you'd hand your keyboard to.
    - Optional IP allowlist, one-click revoke / ROTATE any time.
 3. **Send them two things privately** (chat, QR, USB stick — never a screenshot): the server URL `https://YOUR-HOST/router/api/mcp-server` and that friend's token (shown **once**).
 
@@ -1482,9 +1484,13 @@ Three tools on the MCP server you already have: `list_agents` and `get_agent` ri
 
 1. **Config → MCP Client → + ADD SERVER** — name it (e.g. `you`), transport `http`, the URL above, and one header: `Authorization: Bearer <token>`. Save, then **Check now** — the tool count now includes the three mesh tools.
 2. Open the server's **node on the network map** → **Shared agents** → **List shared agents**. Cards show name, role, provider, model — nothing else, by design.
-3. Click **Install** ⬇ on one → toast `Installed "X" (inactive)` → find it in the **Agents tab, switched OFF** → set its provider/key → activate when ready.
+3. Pick one:
+   - **Install** ⬇ — a copy lands in the **Agents tab, switched OFF** → set its provider/key → activate when ready.
+   - **Use remotely** 🌐 — a live pointer lands instead (badge `🌐 via you`, no provider of its own). Activate it and chat: the question runs on YOUR copy and the reply appears in THEIR chat box.
 
 Installed agents are **copies, not links** — editing yours later doesn't touch theirs until they reinstall. No spooky remote overwrites. 👻🚫
+
+Remote agents never join Always-On ticks (their runner lives elsewhere), can't take file attachments, and answer one-shot — no streaming yet. Their history rides along for context; your memory, tools and file access stay home.
 
 ### 🛡️ What never crosses the wire
 
@@ -1506,7 +1512,7 @@ mcp_call(server="you", tool="list_agents")                   # browse the shelf
 mcp_call(server="you", tool="get_agent", args={id: "cmdr"})  # read the full def
 ```
 
-With a **write** token the far side's agents can also place agents onto you — where they land inactive, awaiting your switch-on. Revoking the token cuts all of this instantly. 🎫✂️
+With a **write** token the far side's agents can also place agents onto you — where they land inactive, awaiting your switch-on — and ask your agents questions through `remote_chat`, answered on your meter. Switch an agent OFF on your side and its remote use stops too: deactivation is the kill switch. Revoking the token cuts all of this instantly. 🎫✂️
 
 ### 🧯 If it sulks
 
@@ -1516,6 +1522,9 @@ With a **write** token the far side's agents can also place agents onto you — 
 | `the MCP server is disabled` | server toggle off on the sharing copy | Config → MCP Server → enable |
 | `No agents shared yet` | sharing copy has no agents, or runs a pre-mesh build | check its Agents tab; update that copy to this branch |
 | Install toast but no agent | local save failed (disk / permissions) | check `storage/state.json` is writable; the error names the cause |
+| Remote agent "is unreachable" | server down, URL changed, or token revoked | check the MCP server is up and **Check now** passes |
+| Remote agent "switched off" | you deactivated it on the sharing copy | switch it back on there — that's the kill switch working |
+| Remote agent refuses files | attachments never cross the mesh | install a local copy to use files |
 
 </details>
 

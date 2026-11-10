@@ -117,7 +117,7 @@ export class McpPanel {
         </div>
         <div class="mcp-shared" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
           <label class="form-label">Shared agents <span class="form-hint-inline">mesh: install one onto this copy</span></label>
-          <div class="form-hint">Lists what this server shares via <code>list_agents</code> — prompts and settings only, never keys. An install lands inactive with a fresh id.</div>
+          <div class="form-hint">Lists what this server shares via <code>list_agents</code> — prompts and settings only, never keys. Install lands a copy (inactive, fresh id); Use remotely adds a live pointer instead — chatter runs on their copy, on their meter.</div>
           <div class="mcp-edit-actions">
             <button class="btn btn-ghost" data-act="agents">List shared agents</button>
           </div>
@@ -169,6 +169,7 @@ export class McpPanel {
             <span class="tool-name">${esc(a.name || a.id)}</span>
             <span class="tool-desc">${esc([a.role, a.model].filter(Boolean).join(' · ') || a.id)}</span>
             <button class="btn btn-ghost btn-sm" data-install-agent="${esc(String(a.id))}">Install</button>
+            <button class="btn btn-ghost btn-sm" data-remote-agent="${esc(String(a.id))}" title="Chat with it where it lives — runs on their copy, on their meter">Use remotely</button>
           </div>`).join('');
         box.querySelectorAll('[data-install-agent]').forEach(b => b.addEventListener('click', async () => {
           b.disabled = true;
@@ -200,6 +201,38 @@ export class McpPanel {
             b.disabled = false;
             b.textContent = 'Install';
             store.emit('toast', { message: `Install failed: ${err.message || err}`, type: 'error' });
+          }
+        }));
+        box.querySelectorAll('[data-remote-agent]').forEach(b => b.addEventListener('click', async () => {
+          b.disabled = true;
+          b.textContent = 'Adding…';
+          try {
+            const card = list.find(x => String(x.id) === b.dataset.remoteAgent) || {};
+            const agents = store.get('agents') || [];
+            agents.push({
+              id: uuid('agent'),
+              code: makeAgentCode(),
+              name: card.name || 'Shared agent',
+              role: card.role || 'remote agent',
+              provider: '',
+              model: card.model || '',
+              color: card.color || '#00e5ff',
+              active: false,
+              alwaysOn: false,
+              tools: [],
+              systemPrompt: '',
+              memory: false,
+              remote: { server: id, agentId: String(card.id || ''), owner: id },
+            });
+            store.set('agents', agents);
+            persistence.set('agents', agents);
+            store.emit('agents:changed');
+            store.emit('toast', { message: `Added "${card.name || 'agent'}" (inactive) — runs on ${id}'s copy, on their meter`, type: 'success' });
+            b.textContent = 'Added';
+          } catch (err) {
+            b.disabled = false;
+            b.textContent = 'Use remotely';
+            store.emit('toast', { message: `Could not add agent: ${err.message || err}`, type: 'error' });
           }
         }));
       } catch (err) {

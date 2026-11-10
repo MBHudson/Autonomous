@@ -399,6 +399,13 @@ class McpServer {
                 'description' => 'Install a shared agent def onto this copy. Mints a fresh id; installs inactive.',
                 'schema' => ['type' => 'object', 'properties' => [
                     'agent' => ['type' => 'object', 'description' => 'agent def from get_agent']], 'required' => ['agent']]],
+            ['name' => 'remote_chat', 'scope' => 'write',
+                'description' => 'Ask one of this copy\'s agents a question and get its reply. Runs here, on this copy\'s meter: one inference turn, no tools, no memory.',
+                'schema' => ['type' => 'object', 'properties' => [
+                    'id' => self::str('agent id, or code like "#AB12CD"'),
+                    'message' => self::str('what to ask the agent'),
+                    'history' => ['type' => 'array', 'description' => 'prior turns [{role, content}], oldest first (max 20)',
+                        'items' => ['type' => 'object']]], 'required' => ['id', 'message']]],
         ];
     }
 
@@ -533,6 +540,10 @@ class McpServer {
                 if (!is_array($def)) { throw new \RuntimeException('install_agent needs an "agent" object from get_agent'); }
                 $saved = self::installSharedAgent($def);
                 return 'installed agent "' . $saved['name'] . '" as ' . $saved['id'] . ' (inactive — activate it in the Agents tab)';
+            }
+            case 'remote_chat': {
+                @set_time_limit(240);
+                return self::remoteChat($a);
             }
             case 'run_code': {
                 $res = Sandbox::runCode($s('language') ?: 'python', $s('code'), ['cwd' => $scope, 'root' => $scope]);
@@ -734,6 +745,179 @@ class McpServer {
             throw new \RuntimeException('could not write storage/state.json');
         }
         return ['id' => $row['id'], 'name' => $row['name']];
+    }
+
+    // ---------------------------------------------------------------
+    // Mesh: remote_chat runs one turn of a LOCAL agent for a friend.
+    // ---------------------------------------------------------------
+    //
+    // install_agent copies the recipe; remote_chat borrows the runner. The
+    // friend's copy forwards a question (+ recent history) and renders the
+    // reply in its own chat box, but the inference happens HERE: this copy's
+    // provider, key and system prompt, on this copy's meter. Deliberately
+    // narrow: a single turn, no tools (they would need the operator live to
+    // approve them), no memory replay (it can hold other sessions), and no
+    // curl-template agents (those execute in a browser, not on this server).
+    // Switched-off agents stay off remotely too — deactivating is the kill
+    // switch. Needs the write scope: it spends this copy's money.
+
+    /** Raw stored agent row by id or #code (full row — execution needs the real key). */
+    private static function storedAgent($id) {
+        $want = trim((string)$id);
+        if ($want === '') { return null; }
+        foreach (self::storedAgents() as $a) {
+            if (trim((string)($a['id'] ?? '')) === $want) { return $a; }
+            if (trim((string)($a['code'] ?? '')) === $want) { return $a; }
+        }
+        return null;
+    }
+
+    /** Provider rows from storage/state.json slots.providers. */
+    private static function storedProviders() {
+        $raw = @file_get_contents(self::statePath());
+        if ($raw === false) { return []; }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) { return []; }
+        $providers = $data['slots']['providers'] ?? $data['providers'] ?? [];
+        return is_array($providers) ? array_values(array_filter($providers, 'is_array')) : [];
+    }
+
+    /**
+     * Build everything a remote turn needs, without touching the network.
+     * Public so tests can prove the caps without spending a model call.
+     *
+     * @return array{family,endpoint,headers,payload,model}
+     */
+    public static function remoteChatPayload(array $agent, array $provider, $message, $history) {
+        $model = substr(trim((string)($agent['model'] ?? '')), 0, 200);
+        if ($model === '') { throw new \RuntimeException('that agent has no model set'); }
+        $endpoint = trim((string)($agent['endpoint'] ?? ''));
+        if ($endpoint === '') { $endpoint = trim((string)($provider['endpoint'] ?? '')); }
+        if ($endpoint === '') { throw new \RuntimeException('no endpoint for that agent on this copy'); }
+        if (strpos($endpoint, '{model}') !== false) {
+            $endpoint = str_replace('{model}', rawurlencode($model), $endpoint);
+        }
+        $key = trim((string)($agent['keyOverride'] ?? ''));
+        if ($key === '') { $key = trim((string)($provider['apiKey'] ?? ($provider['api_key'] ?? ''))); }
+        if ($key === '') {
+            throw new \RuntimeException('no API key for that agent on this copy — paste one into its provider Key box');
+        }
+        $temp = array_key_exists('temperature', $agent) && is_numeric($agent['temperature'])
+            ? max(0, min(2, (float)$agent['temperature'])) : 1.0;
+        $maxTokens = array_key_exists('maxTokens', $agent) && is_numeric($agent['maxTokens'])
+            ? max(256, min(128000, (int)$agent['maxTokens'])) : 4096;
+        $family = Harness::detect([
+            'provider' => (string)($provider['name'] ?? ($provider['id'] ?? '')),
+            'endpoint' => $endpoint,
+            'model' => $model,
+            'harness' => (string)($agent['harness'] ?? ''),
+        ]);
+        $cap = Harness::capMaxTokens($family, $model, $maxTokens);
+        if ($cap !== null) { $maxTokens = $cap; }
+        $messages = [];
+        $system = substr(trim((string)($agent['systemPrompt'] ?? '')), 0, 20000);
+        if ($system !== '') { $messages[] = ['role' => 'system', 'content' => $system]; }
+        if (is_array($history)) {
+            $clean = [];
+            foreach ($history as $m) {
+                if (!is_array($m)) { continue; }
+                $role = strtolower(trim((string)($m['role'] ?? '')));
+                if ($role === 'agent') { $role = 'assistant'; }
+                if ($role !== 'user' && $role !== 'assistant') { continue; }
+                $content = trim((string)($m['content'] ?? ''));
+                if ($content === '') { continue; }
+                $clean[] = ['role' => $role, 'content' => substr($content, 0, 4000)];
+            }
+            foreach (array_slice($clean, -20) as $m) { $messages[] = $m; }
+        }
+        $messages[] = ['role' => 'user', 'content' => substr(trim((string)$message), 0, 8000)];
+        $payload = Harness::payload($family, [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => $temp,
+            'max_tokens' => $maxTokens,
+        ], false);
+        $auth = Harness::auth($family, $endpoint, $key, (string)($provider['name'] ?? ''));
+        return [
+            'family' => $family,
+            'endpoint' => $auth['endpoint'],
+            'headers' => $auth['headers'],
+            'payload' => $payload,
+            'model' => $model,
+        ];
+    }
+
+    /** POST a chat payload and return the raw body (throws on failure). */
+    private static function postProvider($endpoint, $headers, $payload) {
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 240);
+        Tls::apply($ch, $endpoint);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        try {
+            $proxy = ModelManager::activeProxy(['endpoint' => $endpoint]);
+        } catch (\Throwable $e) { $proxy = null; }
+        if ($proxy) {
+            curl_setopt($ch, CURLOPT_PROXY, $proxy);
+            curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+        }
+        $response = curl_exec($ch);
+        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($response === false) {
+            throw new \RuntimeException('could not reach the provider'
+                . ($err !== '' ? ': ' . substr($err, 0, 200) : ''));
+        }
+        if ($http >= 400) {
+            $body = trim(preg_replace('/\s+/', ' ', (string)$response));
+            throw new \RuntimeException('the provider refused the call (HTTP ' . $http . '): ' . substr($body, 0, 300));
+        }
+        return (string)$response;
+    }
+
+    /**
+     * Run one turn of a local agent for a friend's copy.
+     * Returns a JSON string {reply, model, usage} for the caller to render.
+     */
+    public static function remoteChat(array $args) {
+        $id = trim((string)($args['id'] ?? ''));
+        if ($id === '') { throw new \RuntimeException('remote_chat needs an "id"'); }
+        $message = trim((string)($args['message'] ?? ''));
+        if ($message === '') { throw new \RuntimeException('remote_chat needs a "message"'); }
+        $agent = self::storedAgent($id);
+        if ($agent === null) { throw new \RuntimeException("no agent \"$id\" on this copy"); }
+        if (array_key_exists('active', $agent) && !$agent['active']) {
+            throw new \RuntimeException('"' . ($agent['name'] ?? 'that agent') . '" is switched off on this copy');
+        }
+        if (trim((string)($agent['curlTemplate'] ?? '')) !== '') {
+            throw new \RuntimeException('that agent runs a custom curl template in a browser — install it instead of running it remotely');
+        }
+        $provider = null;
+        $want = trim((string)($agent['provider'] ?? ''));
+        foreach (self::storedProviders() as $p) {
+            if ($want !== '' && (trim((string)($p['id'] ?? '')) === $want || trim((string)($p['name'] ?? '')) === $want)) {
+                $provider = $p;
+                break;
+            }
+        }
+        if ($provider === null) {
+            throw new \RuntimeException('that agent\'s provider is missing on this copy');
+        }
+        $built = self::remoteChatPayload($agent, $provider, $message, $args['history'] ?? []);
+        $raw = self::postProvider($built['endpoint'], $built['headers'], $built['payload']);
+        $data = json_decode($raw, true);
+        $text = is_array($data) ? Harness::content($data, $built['family']) : null;
+        if (!is_string($text) || trim($text) === '') {
+            throw new \RuntimeException('the provider returned no usable reply');
+        }
+        $usage = is_array($data) ? Harness::usage($data, $built['family']) : null;
+        return json_encode(
+            ['reply' => $text, 'model' => $built['model'], 'usage' => $usage],
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private static function clip($s, $n) {

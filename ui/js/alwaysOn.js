@@ -66,11 +66,11 @@ export class AlwaysOn {
     return Math.max(10, Math.min(3600, v));
   }
 
-  /** Agents with a standing goal, opted in, switched on, and not held. */
+  /** Agents with a standing goal, opted in, switched on, and not held. Remote agents never tick: their runner lives on another copy. */
   eligible() {
     return (store.get('agents') || []).filter(
       a => a && a.alwaysOn && a.active && String(a.alwaysOnGoal || '').trim()
-        && !this.held.has(a.id)
+        && !this.held.has(a.id) && !a.remote
     );
   }
 
