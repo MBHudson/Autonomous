@@ -1437,6 +1437,15 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 
 The operator hands over the **URL + that friend's token** — that pair is all their client needs.
 
+### 🌐 Reach it from outside (tunnels)
+Off-LAN friends reach the same endpoint through a reverse-proxy tunnel — no router configuration, and both tunnels can run at once against the same copy:
+
+- **Windows:** `tunnel.bat [ngrok|cloudflare|both] [port]` — double-click for both tunnels on the auto-detected port. **Linux/macOS:** `./tunnel.sh` with the same arguments.
+- **Port:** omit it and the port is auto-detected (Apache's `Listen` line on Windows, else `8080`); pass it when the app runs elsewhere, e.g. `tunnel.bat both 8090`. A bare number is a port: `tunnel.bat 8090`.
+- **ngrok** needs an authtoken once (`ngrok config add-authtoken <token>`, ~1 GB/month on the free tier). A reserved domain keeps the friend's saved URL stable across restarts: `-NgrokDomain` on PowerShell, `NGROK_DOMAIN` in the environment on bash.
+- **Cloudflare quick tunnel** needs no account and prints a random `*.trycloudflare.com` URL on every launch — perfect as a disposable second route next to ngrok's stable one.
+- The friend URL keeps the same shape over either tunnel: `https://<tunnel-host>[/router]/api/mcp-server` (`/router` when Apache serves the app, bare path for `php -S`/`start.sh`) plus their `Authorization: Bearer <token>` header. Nothing listening locally? The script refuses to start a tunnel and says so — start the app first.
+
 </details>
 
 ---
