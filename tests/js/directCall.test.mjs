@@ -43,8 +43,24 @@ globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, addListe
 globalThis.requestAnimationFrame = fn => setTimeout(fn, 0);
 globalThis.cancelAnimationFrame = id => clearTimeout(id);
 
-const { Chat } = await import('../../ui/js/components/chat.js?v=428');
-const { api } = await import('../../ui/js/api.js?v=428');
+// The `?v=` is not decoration: Node treats a specifier with a query string
+// as its own module, and chat.js imports api.js that way. A hardcoded copy
+// here would give this test a SECOND api instance, so the callProvider stub
+// below would land in the other one while Chat called the real one (a live
+// provider 401, in CI). The version is READ from store.js rather than
+// written here, because the cache-buster moves on every UI release.
+import { readFileSync } from 'node:fs';
+const version = /APP_VERSION\s*=\s*(\d+)/.exec(
+  readFileSync(new URL('../../ui/js/store.js', import.meta.url), 'utf8'),
+)?.[1];
+if (!version) {
+  console.error('direct call tests\n' + '-'.repeat(60));
+  console.error('Cannot read APP_VERSION from ui/js/store.js, so the api this');
+  console.error('test stubs cannot be proven to be the same instance Chat uses.');
+  process.exit(1);
+}
+const { Chat } = await import(`../../ui/js/components/chat.js?v=${version}`);
+const { api } = await import(`../../ui/js/api.js?v=${version}`);
 
 let pass = 0;
 let fail = 0;
