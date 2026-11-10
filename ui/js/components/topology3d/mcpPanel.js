@@ -24,7 +24,7 @@
 import { api } from '../../api.js?v=428';
 import { store } from '../../store.js?v=428';
 import { persistence } from '../../persistence.js?v=428';
-import { esc } from '../../utils.js?v=428';
+import { esc, uuid, makeAgentCode } from '../../utils.js?v=428';
 
 const KNOWN_INTERPRETERS = [
   'bash', 'sh', 'zsh',
@@ -115,6 +115,14 @@ export class McpPanel {
           <button class="btn btn-ghost" data-act="probe">Check now</button>
           <button class="btn btn-primary" data-act="save">Save</button>
         </div>
+        <div class="mcp-shared" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+          <label class="form-label">Shared agents <span class="form-hint-inline">mesh: install one onto this copy</span></label>
+          <div class="form-hint">Lists what this server shares via <code>list_agents</code> — prompts and settings only, never keys. An install lands inactive with a fresh id.</div>
+          <div class="mcp-edit-actions">
+            <button class="btn btn-ghost" data-act="agents">List shared agents</button>
+          </div>
+          <div data-agents-list style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+        </div>
       </div>`;
 
     const val = f => host.querySelector(`[data-f="${f}"]`)?.value ?? '';
@@ -140,6 +148,65 @@ export class McpPanel {
         this._done(`Saved ${id}`);
       } catch (err) {
         store.emit('toast', { message: `Not saved: ${err.message || err}`, type: 'error' });
+      }
+    });
+    host.querySelector('[data-act="agents"]')?.addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      const box = host.querySelector('[data-agents-list]');
+      btn.disabled = true;
+      btn.textContent = 'Listing…';
+      try {
+        const res = await api.mcpCall(id, 'list_agents', {});
+        if (res.is_error) throw new Error(res.text || 'list_agents failed');
+        let list = [];
+        try { list = JSON.parse(res.text || '[]'); } catch { list = []; }
+        if (!Array.isArray(list) || !list.length) {
+          box.innerHTML = '<div class="form-hint">No agents shared by this server.</div>';
+          return;
+        }
+        box.innerHTML = list.map(a => `
+          <div class="tool-option" style="align-items:center">
+            <span class="tool-name">${esc(a.name || a.id)}</span>
+            <span class="tool-desc">${esc([a.role, a.model].filter(Boolean).join(' · ') || a.id)}</span>
+            <button class="btn btn-ghost btn-sm" data-install-agent="${esc(String(a.id))}">Install</button>
+          </div>`).join('');
+        box.querySelectorAll('[data-install-agent]').forEach(b => b.addEventListener('click', async () => {
+          b.disabled = true;
+          b.textContent = 'Installing…';
+          try {
+            const got = await api.mcpCall(id, 'get_agent', { id: b.dataset.installAgent });
+            if (got.is_error) throw new Error(got.text || 'get_agent failed');
+            const def = JSON.parse(got.text || '{}');
+            // Defence in depth: the server already strips secrets, and so do we.
+            delete def.keyOverride; delete def.endpoint; delete def.curlTemplate;
+            delete def.curlTemplateAuto; delete def.apiKey; delete def.api_key;
+            const agents = store.get('agents') || [];
+            agents.push({
+              ...def,
+              id: uuid('agent'),
+              code: makeAgentCode(),
+              active: false,
+              alwaysOn: false,
+              keyOverride: '',
+              endpoint: '',
+              curlTemplate: '',
+            });
+            store.set('agents', agents);
+            persistence.set('agents', agents);
+            store.emit('agents:changed');
+            store.emit('toast', { message: `Installed "${def.name || 'agent'}" (inactive)`, type: 'success' });
+            b.textContent = 'Installed';
+          } catch (err) {
+            b.disabled = false;
+            b.textContent = 'Install';
+            store.emit('toast', { message: `Install failed: ${err.message || err}`, type: 'error' });
+          }
+        }));
+      } catch (err) {
+        box.innerHTML = `<div class="form-hint" style="color:var(--danger)">Could not list agents: ${esc(err.message || err)}. The other copy needs this update and a <code>read</code>-scoped friend token.</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'List shared agents';
       }
     });
   }
@@ -174,6 +241,8 @@ export class McpPanel {
           <label class="tool-option"><input type="checkbox" data-scope="read" ${has('read')}><span class="tool-name">read</span><span class="tool-desc">files, web, git read</span></label>
           <label class="tool-option"><input type="checkbox" data-scope="write" ${has('write')}><span class="tool-name">write</span><span class="tool-desc">edits and patches</span></label>
           <label class="tool-option"><input type="checkbox" data-scope="exec" ${has('exec')}><span class="tool-name">exec</span><span class="tool-desc">commands and code</span></label>
+        </div>
+        <div class="form-hint"><code>read</code> covers browsing + fetching your shared agents; <code>write</code> covers installing onto you. Keys never leave either way.</div>
         </div>
         <label class="form-label">IP allowlist <span class="form-hint-inline">optional, comma-separated</span></label>
         <input class="form-input" data-f="ips" value="${escAttr((token.ips || []).join(', '))}">

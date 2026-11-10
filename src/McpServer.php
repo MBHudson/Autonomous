@@ -386,6 +386,19 @@ class McpServer {
                 'schema' => ['type' => 'object', 'properties' => [
                     'message' => self::str('commit message'),
                     'paths' => ['type' => 'array', 'items' => ['type' => 'string']]], 'required' => ['message']]],
+
+            // ---- mesh: share agents between copies ----
+            ['name' => 'list_agents', 'scope' => 'read',
+                'description' => 'List this copy\'s shareable agents (id, name, role, provider, model). No keys or prompts.',
+                'schema' => ['type' => 'object', 'properties' => new \stdClass()]],
+            ['name' => 'get_agent', 'scope' => 'read',
+                'description' => 'Get one shareable agent def by id (system prompt + settings, never keys).',
+                'schema' => ['type' => 'object', 'properties' => [
+                    'id' => self::str('agent id, or code like "#AB12CD"')], 'required' => ['id']]],
+            ['name' => 'install_agent', 'scope' => 'write',
+                'description' => 'Install a shared agent def onto this copy. Mints a fresh id; installs inactive.',
+                'schema' => ['type' => 'object', 'properties' => [
+                    'agent' => ['type' => 'object', 'description' => 'agent def from get_agent']], 'required' => ['agent']]],
         ];
     }
 
@@ -503,6 +516,24 @@ class McpServer {
                 $parts[] = '[exit ' . ($res['exit'] ?? '?') . ', ' . ($res['ms'] ?? '?') . 'ms]';
                 return implode("\n", $parts);
             }
+            case 'list_agents': {
+                $list = self::sharedAgentList();
+                if (!$list) { return 'no agents shared'; }
+                return json_encode($list, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+            case 'get_agent': {
+                $id = trim($s('id'));
+                if ($id === '') { throw new \RuntimeException('get_agent needs an "id"'); }
+                $def = self::sharedAgentDef($id);
+                if ($def === null) { throw new \RuntimeException("no agent \"$id\""); }
+                return json_encode($def, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+            case 'install_agent': {
+                $def = $a['agent'] ?? null;
+                if (!is_array($def)) { throw new \RuntimeException('install_agent needs an "agent" object from get_agent'); }
+                $saved = self::installSharedAgent($def);
+                return 'installed agent "' . $saved['name'] . '" as ' . $saved['id'] . ' (inactive — activate it in the Agents tab)';
+            }
             case 'run_code': {
                 $res = Sandbox::runCode($s('language') ?: 'python', $s('code'), ['cwd' => $scope, 'root' => $scope]);
                 $parts = [];
@@ -545,6 +576,164 @@ class McpServer {
                 FILE_APPEND | LOCK_EX
             );
         } catch (\Throwable $e) { /* never fail a call over logging */ }
+    }
+
+    // ---------------------------------------------------------------
+    // Mesh: shareable agents (no new dependencies, no new transport)
+    // ---------------------------------------------------------------
+    //
+    // Three tools let copies of this app mesh: list_agents / get_agent
+    // (read scope) let a friend's client browse and fetch agent defs, and
+    // install_agent (write scope) installs one onto THIS copy. Agents carry
+    // prompts and settings only — provider keys, key overrides, endpoint
+    // overrides and curl templates never leave the host, and an install
+    // always lands inactive with no standing goal, so a remote copy can
+    // neither bill the operator nor exfiltrate credentials by sharing.
+
+    /** storage/state.json, honouring ROUTER_STATE for tests. */
+    private static function statePath() {
+        $env = getenv('ROUTER_STATE');
+        if (is_string($env) && trim($env) !== '') { return trim($env); }
+        return __DIR__ . '/../storage/state.json';
+    }
+
+    /** Raw agent rows from state.json slots.agents. */
+    private static function storedAgents() {
+        $raw = @file_get_contents(self::statePath());
+        if ($raw === false) { return []; }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) { return []; }
+        $agents = $data['slots']['agents'] ?? $data['agents'] ?? [];
+        return is_array($agents) ? array_values(array_filter($agents, 'is_array')) : [];
+    }
+
+    /** Short public card per agent: no prompts, no keys, no endpoints. */
+    public static function sharedAgentList() {
+        $out = [];
+        foreach (self::storedAgents() as $a) {
+            $id = trim((string)($a['id'] ?? ''));
+            if ($id === '') { continue; }
+            $out[] = [
+                'id' => $id,
+                'name' => substr((string)($a['name'] ?? $id), 0, 80),
+                'role' => substr((string)($a['role'] ?? ''), 0, 80),
+                'provider' => substr((string)($a['provider'] ?? ''), 0, 80),
+                'model' => substr((string)($a['model'] ?? ''), 0, 200),
+                'color' => (string)($a['color'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
+    /** Full shareable def for one agent (by id or #code), or null. */
+    public static function sharedAgentDef($id) {
+        $want = trim((string)$id);
+        if ($want === '') { return null; }
+        foreach (self::storedAgents() as $a) {
+            $aid = trim((string)($a['id'] ?? ''));
+            $code = trim((string)($a['code'] ?? ''));
+            if ($aid !== $want && $code !== $want) { continue; }
+            return self::shareableAgent($a);
+        }
+        return null;
+    }
+
+    /**
+     * Whitelist an agent row for sharing.
+     *
+     * Prompts and harmless settings travel; anything that authenticates or
+     * addresses a network — keyOverride, endpoint, curlTemplate, api keys —
+     * is dropped, whatever the stored row holds. The recipient re-points the
+     * agent at their own provider and key.
+     */
+    public static function shareableAgent(array $a) {
+        $tools = [];
+        foreach ((array)($a['tools'] ?? []) as $t) {
+            if (is_string($t) && $t !== '' && count($tools) < 60) { $tools[] = substr($t, 0, 80); }
+        }
+        $overrides = [];
+        foreach ((array)($a['overrides'] ?? []) as $k => $v) {
+            if (!is_string($k) || $k === '') { continue; }
+            if (preg_match('/token|key|secret|endpoint|curl|password|auth/i', $k)) { continue; }
+            if (is_scalar($v)) { $overrides[$k] = $v; }
+        }
+        $pitch = $a['pitch'] ?? null;
+        $pitch = is_numeric($pitch) ? max(0.5, min(1.6, (float)$pitch)) : null;
+        return [
+            'source_id' => substr(trim((string)($a['id'] ?? '')), 0, 120),
+            'source_code' => substr(trim((string)($a['code'] ?? '')), 0, 16),
+            'name' => substr(trim((string)($a['name'] ?? '')) ?: 'Shared agent', 0, 80),
+            'role' => substr((string)($a['role'] ?? ''), 0, 80),
+            'label' => substr((string)($a['label'] ?? ''), 0, 24),
+            'provider' => substr((string)($a['provider'] ?? ''), 0, 80),
+            'model' => substr((string)($a['model'] ?? ''), 0, 200),
+            'color' => preg_match('/^#[0-9a-fA-F]{6}$/', (string)($a['color'] ?? '')) ? $a['color'] : '#00e5ff',
+            'systemPrompt' => substr((string)($a['systemPrompt'] ?? ''), 0, 20000),
+            'temperature' => array_key_exists('temperature', $a) && is_numeric($a['temperature'])
+                ? max(0, min(2, (float)$a['temperature'])) : 1.0,
+            'maxTokens' => array_key_exists('maxTokens', $a) && is_numeric($a['maxTokens'])
+                ? max(256, min(128000, (int)$a['maxTokens'])) : 16384,
+            'tools' => $tools,
+            'memory' => !array_key_exists('memory', $a) || (bool)$a['memory'],
+            'voice' => substr((string)($a['voice'] ?? ''), 0, 80),
+            'pitch' => $pitch,
+            'alwaysOnGoal' => substr((string)($a['alwaysOnGoal'] ?? ''), 0, 2000),
+            'overrides' => $overrides,
+        ];
+    }
+
+    /** Random #XXXXXX handle in the same alphabet the UI mints. */
+    private static function mintAgentCode() {
+        $alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $out = '#';
+        for ($i = 0; $i < 6; $i++) { $out .= $alphabet[random_int(0, strlen($alphabet) - 1)]; }
+        return $out;
+    }
+
+    /**
+     * Install a shared def as a NEW local agent.
+     *
+     * The id and code are always minted fresh so a remote copy can neither
+     * collide with nor overwrite a local agent; the row lands inactive with
+     * no standing goal, so it cannot bill anything until the operator turns
+     * it on. Secrets are stripped even if the payload carries them — a
+     * hand-built call is not trusted the way get_agent output is.
+     *
+     * @return array{id:string,name:string}
+     */
+    public static function installSharedAgent(array $def) {
+        $name = trim((string)($def['name'] ?? ''));
+        if ($name === '') { throw new \RuntimeException('that agent has no name'); }
+        if (count(self::storedAgents()) >= 200) {
+            throw new \RuntimeException('this copy already holds 200 agents');
+        }
+        $row = self::shareableAgent($def + ['name' => $name]);
+        unset($row['source_id'], $row['source_code']);
+        $row['id'] = 'agent_' . bin2hex(random_bytes(6));
+        $row['code'] = self::mintAgentCode();
+        $row['active'] = false;
+        $row['alwaysOn'] = false;
+
+        $path = self::statePath();
+        $raw = @file_get_contents($path);
+        $data = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($data)) { $data = ['version' => 1, 'slots' => []]; }
+        if (!isset($data['slots']) || !is_array($data['slots'])) { $data['slots'] = []; }
+        $agents = isset($data['slots']['agents']) && is_array($data['slots']['agents'])
+            ? array_values(array_filter($data['slots']['agents'], 'is_array')) : [];
+        $agents[] = $row;
+        $data['slots']['agents'] = $agents;
+        $data['rev'] = (int)($data['rev'] ?? 0) + 1;
+        $data['updated'] = time();
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($json === false) { throw new \RuntimeException('could not encode state'); }
+        if (strlen($json) > 8 * 1024 * 1024) { throw new \RuntimeException('state bundle is too large to save'); }
+        $tmp = $path . '.' . getmypid() . '.tmp';
+        if (@file_put_contents($tmp, $json, LOCK_EX) === false || !@rename($tmp, $path)) {
+            @unlink($tmp);
+            throw new \RuntimeException('could not write storage/state.json');
+        }
+        return ['id' => $row['id'], 'name' => $row['name']];
     }
 
     private static function clip($s, $n) {
