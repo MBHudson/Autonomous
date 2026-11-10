@@ -47,6 +47,8 @@
 |---|---|
 | 🩹 **Prefix matched once** | path-relative patterns run whole from the root; escapes still filtered |
 | 🪞 **Errors echo the pattern** | zero-match message prints the pattern string, never the raw object |
+
+**🌱 Also on this branch: 🤝 Mesh — share agents between copies.** Lend agents to another copy of the studio straight from the MCP graph card — keys never travel, installs land inactive. Full both-sides walk-through in [🤝 Mesh](#-mesh--share-agents-between-copies).
 ---
 
 ## 🧭 Contents
@@ -102,6 +104,7 @@ Jump straight to a section — every heading on this page is linkable; these are
 
 - [🔌 MCP client](#-mcp--connect-out-to-other-servers-client)
 - [🖥️ MCP server](#️-mcp--let-others-connect-in-server)
+- [🤝 Mesh — share agents between copies](#-mesh--share-agents-between-copies)
 - [📱 Android & mobile](#-android--mobile)
 - [🧩 Architecture](#-architecture)
 - [🧪 Tests](#-tests)
@@ -1439,6 +1442,80 @@ Scope is a **ceiling**, not a bypass: a call still runs through the same sandbox
 3. **The friend runs their own copy of Loop Studio** — **Config → MCP Client → + ADD SERVER** (name, transport `http`, url, and a `headers` box with `Authorization: Bearer <token>`). Their agents then reach the operator's tools through `mcp_list` / `mcp_call`.
 
 The operator hands over the **URL + that friend's token** — that pair is all their client needs.
+
+</details>
+
+---
+## 🤝 Mesh — share agents between copies
+
+**Two studios, one shared shelf of agents.** 🤝 Your copy lends agents to a friend's copy over the MCP server you already run — no accounts, no cloud, no new dependencies. They browse your roster from their network map, install with one click, and whatever lands arrives **inactive, keyless, and freshly minted** — so nobody can spend anybody's money or overwrite anybody's agents. 📚🔑🚫
+
+<details>
+<summary>Both sides step by step, the safety rules, and troubleshooting</summary>
+
+### 🗺️ The shape of it
+
+```
+┌──────────────┐  read token   ┌──────────────┐
+│  🫵 YOUR copy │ ─────────────▶ │ 🙋 FRIEND'S   │
+│  list_agents │   list + get  │  copy          │
+│  get_agent   │ ◀──────────── │  graph card →  │
+│  install_    │  write token  │  Shared agents │
+│   agent      │  (optional)   │  → Install ⬇   │
+└──────────────┘               └──────────────┘
+   🔑 keys, 🌐 endpoints, 🐚 curl templates ❌ never cross
+   installs land 😴 inactive with a fresh id + #code ✅
+```
+
+Three tools on the MCP server you already have: `list_agents` and `get_agent` ride the **read** scope, `install_agent` needs **write**. Everything else about the server — sandbox, approvals, audit log — applies unchanged.
+
+### 🫵 Side A — sharing (yours)
+
+1. **Config → MCP Server** — switched on, as usual.
+2. **Add a token** for your friend:
+   - 🔍 **read** — they may browse cards and copy agents onto *their* copy.
+   - ✍️ **write** — *also* lets their side place agents onto *yours* via `install_agent`. Only tick this for people you'd hand your keyboard to.
+   - Optional IP allowlist, one-click revoke / ROTATE any time.
+3. **Send them two things privately** (chat, QR, USB stick — never a screenshot): the server URL `https://YOUR-HOST/router/api/mcp-server` and that friend's token (shown **once**).
+
+### 🙋 Side B — receiving (theirs)
+
+1. **Config → MCP Client → + ADD SERVER** — name it (e.g. `you`), transport `http`, the URL above, and one header: `Authorization: Bearer <token>`. Save, then **Check now** — the tool count now includes the three mesh tools.
+2. Open the server's **node on the network map** → **Shared agents** → **List shared agents**. Cards show name, role, provider, model — nothing else, by design.
+3. Click **Install** ⬇ on one → toast `Installed "X" (inactive)` → find it in the **Agents tab, switched OFF** → set its provider/key → activate when ready.
+
+Installed agents are **copies, not links** — editing yours later doesn't touch theirs until they reinstall. No spooky remote overwrites. 👻🚫
+
+### 🛡️ What never crosses the wire
+
+| 🧳 It travels | 🔒 It stays home |
+| --- | --- |
+| name, role, provider, model (cards) | 🔑 provider keys + per-agent key overrides |
+| system prompt + guidance (defs) | 🌐 endpoint overrides |
+| throttles, limits, memory settings | 🐚 curl / Python / Node templates (they can carry keys) |
+| tool allow-lists | 🆔 your agent's id and `#code` — installs mint fresh ones |
+
+Plus: installs are **forced inactive** with no standing goal, capped at 200 agents a copy, prompts truncated at 20,000 chars — a bloated or hostile share fails clean, and a refused install writes nothing.
+
+### 🤖 Agents can mesh too — no clicks needed
+
+Any agent allowed to call MCP servers can do the same through `mcp_call`:
+
+```
+mcp_call(server="you", tool="list_agents")                   # browse the shelf
+mcp_call(server="you", tool="get_agent", args={id: "cmdr"})  # read the full def
+```
+
+With a **write** token the far side's agents can also place agents onto you — where they land inactive, awaiting your switch-on. Revoking the token cuts all of this instantly. 🎫✂️
+
+### 🧯 If it sulks
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `401 invalid token` | wrong / rotated token, or pasted with whitespace | re-copy the one-time value (or ROTATE and re-send) |
+| `the MCP server is disabled` | server toggle off on the sharing copy | Config → MCP Server → enable |
+| `No agents shared yet` | sharing copy has no agents, or runs a pre-mesh build | check its Agents tab; update that copy to this branch |
+| Install toast but no agent | local save failed (disk / permissions) | check `storage/state.json` is writable; the error names the cause |
 
 </details>
 
