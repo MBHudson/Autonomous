@@ -1,9 +1,6 @@
 @echo off
-REM Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
-REM
-REM Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
-REM
-REM BryceFromIndiana@gmail.com
+REM Copyright 2026 M. Bryce Hudson
+REM SPDX-License-Identifier: Apache-2.0
 rem ============================================================
 rem  Loop Studio - one-click start (Windows)
 rem ============================================================

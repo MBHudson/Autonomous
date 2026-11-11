@@ -1,10 +1,7 @@
 <?php
 /*
- * Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
- *
- * Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
- *
- * BryceFromIndiana@gmail.com
+ * Copyright 2026 M. Bryce Hudson
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 // serve.php — run Loop Studio with no web server:  php -S 127.0.0.1:8080 serve.php

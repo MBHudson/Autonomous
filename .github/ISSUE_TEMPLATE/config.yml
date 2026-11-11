@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question, or "how do I…"
+    url: https://github.com/autonomous-loop-studio/Autonomous/discussions
+    about: Ask in Discussions instead of filing an issue — setup help, provider quirks, "is this supposed to work like this".
+  - name: Roadmap — what is next
+    url: https://github.com/autonomous-loop-studio/Autonomous/discussions
+    about: Read the pinned roadmap before requesting a feature; comment there if your idea is already listed.
+  - name: Security problem
+    url: https://github.com/autonomous-loop-studio/Autonomous/security/advisories/new
+    about: Please report anything that gets past the jail, the token gate or the SSRF guards privately, not in a public issue.

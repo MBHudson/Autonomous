@@ -1,0 +1,13 @@
+Autonomous Loop Studio
+Copyright 2026 M. Bryce Hudson
+
+This product is licensed under the Apache License, Version 2.0.
+See LICENSE. Source: https://github.com/autonomous-loop-studio/Autonomous
+
+Third-party components bundled with it remain under their own licenses:
+
+  tools/cacert.pem
+    Bundle of CA Root Certificates, derived from Mozilla's certificate store and
+    redistributed as published by the curl project (https://curl.se/docs/caextract.html).
+    The bundle is distributed under the Mozilla Public License 2.0
+    (https://mozilla.org/MPL/2.0/). The certificates themselves are public data.

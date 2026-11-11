@@ -1,0 +1,101 @@
+name: Bug report
+description: Something broke, refused, or behaved differently from what the docs say.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A report becomes fixable with three things: **the version**, **how you launched it**, and **the exact steps**. Everything else is a bonus.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The number in the `VERSION` file, or shown in Config → Updates.
+      placeholder: "447"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: launcher
+    attributes:
+      label: How are you running it?
+      options:
+        - start.bat (Apache on Windows)
+        - start-php.bat (PHP built-in server on Windows)
+        - ./start.sh on Linux or macOS
+        - Deployed to a host, Apache (.htaccess)
+        - Deployed to a host, nginx (nginx.example.conf)
+        - Deployed to a host, IIS
+        - Other / custom
+    validations:
+      required: true
+
+  - type: input
+    id: php
+    attributes:
+      label: PHP version
+      description: Output of `php -v`, first line.
+      placeholder: "PHP 8.3.12 (cli)"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 23H2 / Ubuntu 24.04 / macOS 15.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - Classic (the default)
+        - Glass / Desktop 2026
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead. Include the exact tool call, prompt or path where it went wrong.
+      placeholder: |
+        1. Opened Brain Lab and set the jail root to C:\work
+        2. Asked the agent to read training/notes.txt
+        3. Got "outside the allowed directories" even though the path is inside the root
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything in the logs?
+      description: "`storage/exec.log`, `storage/mcp.log`, or the browser console. Mask your keys and token before pasting."
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: suite
+    attributes:
+      label: Test suite output (optional)
+      description: "`node tests/run.mjs` or `php tests/php/run.php` — the last few lines are enough. Do not paste a passing run unless it is relevant."
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: I removed my access token, provider keys and personal paths from everything pasted above.
+          required: true

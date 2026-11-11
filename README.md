@@ -1,47 +1,108 @@
 <!--
-  Copyright M. Bryce Hudson 2026-2029 All Rights Reserved
+  Copyright 2026 M. Bryce Hudson
 
-  Unauthorized reproduction, distribution, or transmission of the work is prohibited without prior written permission, with exceptions for brief quotations and specific noncommercial uses under copyright law.
-
-  BryceFromIndiana@gmail.com
+  Licensed under the Apache License, Version 2.0 — see LICENSE.
+  SPDX-License-Identifier: Apache-2.0
 -->
-[![Watch a one-minute video tour of autonomous](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/mbhudson/autonomous/video?utm_source=readme&utm_medium=badge)
-[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/mbhudson/autonomous?utm_source=readme&utm_medium=badge)
 # 🧠 Autonomous Loop Studio
 
-> ## A self-hosted, universal multi-agent AI console. Point it at **any** model, hand the agents **real tools**, and watch the loop run.
+### A self-hosted AI agent console in plain **PHP**.
+**No Docker. No Node. No build step. No account.**
 
-<!-- [![License: Copyright](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) -->
+Point it at any model — hosted, or running on your own machine — hand the agents
+**real tools**, and watch the whole loop on a live map. It is one folder of PHP
+and static files: drop it on the host you already pay for, double-click, and a
+team of agents is running.
+
+![The loop, running](main-motion.gif)
+
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
+![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 ![No build step](https://img.shields.io/badge/build-none_needed-brightgreen)
-![Mobile friendly](https://img.shields.io/badge/mobile-first-00e5ff)
 ![Windows](https://img.shields.io/badge/Windows-double_click_to_run-0078D4?logo=windows&logoColor=white)
-![macOS](https://img.shields.io/badge/macOS-double_click_to_run-000000?logo=apple&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
-![Android](https://img.shields.io/badge/Android-coming_soon_to_Play_Store-3DDC84?logo=android&logoColor=white)
-[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-6E56CF?logo=readthedocs&logoColor=white)](https://deepwiki.com/MBHudson/Autonomous)
-[![Tests](https://github.com/MBHudson/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/MBHudson/Autonomous/actions/workflows/tests.yml)
+[![Tests](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml)
 
-![Glass Desktop Theme — the glass shell: edge rail, Config drawers, a wide chat and the live network map](screenshots/new-ui-main.png)
+**▶️ [One-minute video tour](https://gitdiagram.com/autonomous-loop-studio/autonomous/video?utm_source=readme&utm_medium=badge) · 🚀 [Quick start ↓](#-quick-start) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
 
-**☝️ NEW: Glass Themed Desktop** — the new face of the studio: 💎 floating glass cards on an edge rail, 🗂️ Config that flies out of its own label, 💬 a chat you can drag wider or throw to the full screen, 🕸️ the map front and center with its button group lifted into the header, and 🪶 panels that tuck away while you read a node. Pick it in Config → Interface — no reload, and nothing you had set is lost.
-<br>
+---
 
-<h6> NOTE: The Glass Theme is pretty GPU-resource-heavy, with all its shaders and animation. ☹️ See Config → Desktop and/or Config → Resource Manager for scaling options. OR... </h6>
+## Run it in five minutes
 
+**Windows** — double-click `start.bat`. First run installs Apache + PHP (no MySQL), creates your
+access token, starts the server and opens the app. Later runs just start Apache.
 
+**Linux / macOS** — `./start.sh` — or `./start.sh 8090` for another port.
 
-**🗂️ Classic is the DEFAULT** — perfect for all systems and devices! — and it is the picture right below. Setup panel, chat and map/network panel side by side, nothing behind a rail, everything where it has always been.
+Paste the token it prints into **Config → Access token**, add one provider key, and you have an
+agent. Nothing ships with a key, and a fresh copy **refuses to serve** (`503`) until a token
+exists — you cannot forget to set one.
 
-![Classic — the DEFAULT interface: setup panel, chat and network map side by side](screenshots/mainscreen01.png)
+Then add a provider — OpenAI, Anthropic, Google, OpenRouter, Groq, DeepSeek, xAI, Mistral,
+Cerebras, Together, Perplexity, NVIDIA NIM, or **Ollama / LM Studio / vLLM** on your own LAN.
 
-### 🆕 What's new
+## What it is
 
-**Newest first.** 🚀 Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section, where it stays as reference. The most recent release sits at the top.
+- 🤖 **Any model, any provider.** It detects each provider's API shape *and* its tool dialect —
+  JSON, Claude XML, raw tool-call tags — and remembers which one actually worked for that model.
+- 🛠️ **Real tools, not chat.** Read and write files inside a jail, run allowlisted commands
+  (argv only — no shell), drive a real Chrome/Edge over DevTools, commit with git, call MCP servers.
+- 🕸️ **You can watch it.** A live 3D map of agents, providers and traffic; every hop also written
+  out in words in a run trace; routing charts you draw instead of describing.
+- 🔐 **Safe by default.** `exec`, `run_code`, the browser and the MCP server are **off** until you
+  switch them on. Every write asks first. No accounts, no cloud, no telemetry.
 
-### 🆕 v447 — tunnels leave the terminal: Config → Tunnels 🌐
+## What it is not
 
-*Off-LAN friends without touching a terminal: the new **Tunnels** card starts and stops ngrok and Cloudflare quick tunnels from inside the app, detects the served port, and shows each public URL with its friend-ready RPC path to copy. The binaries install from the setup scripts only when asked (`setup-xampp.bat -Tunnels`, `INSTALL_TUNNELS=1 ./start.sh` into `tools/bin/`); `tunnel.bat` / `./tunnel.sh` remain for the command line, with a bare number meaning a port. Operator-only — there is no agent tool for this, the switch defaults off, and every start and stop is audited. Pictured and fully detailed in the new [🌐 Tunnels](#-tunnels--take-the-mcp-server-off-lan) section below.*
+Not a hosted service, not a wrapper around one vendor, not a SaaS with an account page. There is
+nothing to sign up for, and the only outbound calls are the provider endpoints you configure
+yourself.
+
+## A fleet for $0
+
+Free tiers and local models are first-class here, not an afterthought — and paced so one exhausted
+key does not stop the fleet.
+
+- ⏱️ **Paced to each provider's real ceiling** — the pacer knows the host's limit (NVIDIA NIM
+  40/min, Groq 30, OpenRouter 20, a default for anything unknown), and `0 = AUTO` uses it. Global,
+  per-provider or per-agent, and an agent can lock its own.
+- 🔑 **A 429 is not a stall** — a rate-limited key rests for 60 seconds and the next call reaches
+  for another; add extra keys and the API pool rotates them after N requests.
+- ♾️ **Loops that keep going** — Always-On re-prompts a standing goal on a cadence, with *max
+  iterations* and *max minutes* caps, per-agent hold/release and one master kill switch.
+
+Free tiers have daily caps, so pacing smooths bursts rather than making them infinite, and "always
+on" means the host stays awake — the tab-hidden worker, or a machine that does not sleep. Against
+Ollama, LM Studio or vLLM on your own box there is nothing to pace at all.
+
+---
+
+## A look at it
+
+<p>
+<img src="screenshots/new-ui-main.png" width="49%">
+<img src="screenshots/mainscreen01.png" width="49%">
+</p>
+<p>
+<img src="screenshots/routing-three-workfows.png" width="32%">
+<img src="screenshots/Brain-Lab.png" width="32%">
+<img src="screenshots/Browser.png" width="32%">
+</p>
+
+*Glass desktop and Classic (the default) · a routing chart · Brain Lab · the built-in browser.*
+
+## Everything else, below
+
+[Quick start](#-quick-start) · [Is it safe?](#-is-it-safe) · [What's inside](#-whats-inside) ·
+[Security & guardrails](#-security--guardrails--safe-by-construction-️) ·
+[Tools](#️-tools-agents-can-use) · [Routing chart](#-routing-chart) ·
+[MCP](#-mcp--connect-out-to-other-servers-client) · [Tunnels](#-tunnels--take-the-mcp-server-off-lan) ·
+[Architecture](#-architecture) · [Tests](#-tests) · [API](#-api-endpoints) ·
+[Troubleshooting](#-troubleshooting) · [Recent releases](#-whats-new)
+
+Everything above is the pitch. Everything below is the documentation — long, detailed, and
+written for someone who has already decided to run it.
+
 ---
 
 ## 🧭 Contents
@@ -52,7 +113,7 @@ Jump straight to a section — every heading on this page is linkable; these are
 
 - [🚀 Quick start](#-quick-start)
 - [🔒 Is it safe?](#-is-it-safe)
-- [🆕 What's new](#-whats-new)
+- [🆕 What's new — recent releases](#-whats-new)
 - [✨ What's inside](#-whats-inside)
 - [🖥️ Two interfaces, one switch](#️-two-interfaces-one-switch)
 - [🎛️ Config → Desktop](#️-config--desktop--the-machine-room-card)
@@ -1724,6 +1785,16 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 ---
 
+## 🆕 What's new
+
+**Newest first.** Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section above, where it stays as reference. The most recent release sits at the top.
+
+### 🆕 v447 — tunnels leave the terminal: Config → Tunnels 🌐
+
+*Off-LAN friends without touching a terminal: the new **Tunnels** card starts and stops ngrok and Cloudflare quick tunnels from inside the app, detects the served port, and shows each public URL with its friend-ready RPC path to copy. The binaries install from the setup scripts only when asked (`setup-xampp.bat -Tunnels`, `INSTALL_TUNNELS=1 ./start.sh` into `tools/bin/`); `tunnel.bat` / `./tunnel.sh` remain for the command line, with a bare number meaning a port. Operator-only — there is no agent tool for this, the switch defaults off, and every start and stop is audited. Pictured and fully detailed in the new [🌐 Tunnels](#-tunnels--take-the-mcp-server-off-lan) section below.*
+
+---
+
 ## 🧯 Troubleshooting
 
 - **"PHP's curl extension is not enabled"** → the server was started without the launcher (e.g. a bare `php -S`). Use `start.bat` / `start.sh`, or run `php serve.php --setup`.
@@ -1741,9 +1812,17 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 ## 📜 License
 
-**Copyright** — M. Bryce Hudson 2026-2029 All Rights Reserved See [`LICENSE`](LICENSE). 💙
+**Apache License 2.0** — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+Copyright 2026 M. Bryce Hudson.
 
-Made by [MBHudson](https://github.com/mbhudson/)
+Use it, fork it, run it at work, build a product on it. If you redistribute it,
+keep the copyright notice and the `NOTICE` file. There is no warranty. The one
+thing the licence does not require is that you ask me first.
+
+Contributions are accepted under the same license with a
+[DCO](CONTRIBUTING.md) sign-off (`git commit -s`).
+
+Made by M. Bryce Hudson
 
 
 

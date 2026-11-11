@@ -1,0 +1,68 @@
+name: Feature request
+description: Something the studio should do that it does not.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A request is strongest when it describes the **job**, not the button. There is a roadmap discussion pinned in **Discussions → Roadmap** — if your idea is already there, comment on it instead so the list stays honest.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to get done?
+      description: The real task, in your own words — not the feature you think solves it.
+      placeholder: "I want a run to survive a laptop sleep, so a long training drill does not have to start over."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+      description: One paragraph is plenty. Sketches and screenshots welcome.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Agents / Brain Lab / prompts
+        - Tools / sandbox / files / exec
+        - Providers / harness / dialects
+        - Routing chart / Always-On / scheduling
+        - Browser pane
+        - MCP client or server
+        - Interface / theme / mobile
+        - Install / launcher / updates
+        - Security / approvals / jail
+        - Docs
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do now instead
+      description: The workaround you are living with, so it is clear what this replaces.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: It has to keep these promises
+      description: This project is one folder of PHP. Requests that break that are very unlikely to land, however good they are.
+      options:
+        - label: It does not need Docker.
+          required: true
+        - label: It does not add a runtime dependency install, a build step, or a `package.json` the app needs.
+          required: true
+        - label: It works on a fresh copy with no token set (it may be off by default, but it cannot break the boot).
+          required: true
+        - label: It is not a licence for a model to skip an approval.
+          required: true

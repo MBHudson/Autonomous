@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#05080b">
+<meta name="color-scheme" content="dark">
+<title>Autonomous Loop Studio — a self-hosted AI agent console in plain PHP</title>
+<meta name="description" content="A self-hosted AI agent console in plain PHP. Any model, real tools, a live agent map. No Docker, no Node, no build step, no account.">
+<meta property="og:title" content="Autonomous Loop Studio">
+<meta property="og:description" content="A self-hosted AI agent console in plain PHP. No Docker, no Node, no build step.">
+<meta property="og:image" content="https://raw.githubusercontent.com/autonomous-loop-studio/Autonomous/master/screenshots/new-ui-main.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+<style>
+  :root{
+    --bg:#05080b; --panel:#0b1117; --panel-2:#0e161d;
+    --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
+    --text:#e9f1f7; --muted:#93a6b5; --dim:#6b7f8e;
+    --cyan:#00e5ff; --green:#3ddc84; --amber:#ffcb6b;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+    line-height:1.65; -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%;
+    background-image:
+      radial-gradient(900px 500px at 18% -10%, rgba(0,229,255,.10), transparent 60%),
+      radial-gradient(700px 400px at 88% 8%, rgba(61,220,132,.07), transparent 60%);
+    background-repeat:no-repeat;
+  }
+  a{color:var(--cyan); text-decoration:none}
+  a:hover{text-decoration:underline}
+  img{display:block; max-width:100%; height:auto}
+  .wrap{max-width:1040px; margin:0 auto; padding:0 clamp(16px,4vw,22px)}
+
+  header.top{border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px clamp(16px,4vw,22px)}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:-.01em; color:var(--text); font-size:15px}
+  .brand span.dot{width:8px;height:8px;border-radius:50%;background:var(--cyan); box-shadow:0 0 12px var(--cyan); flex:none}
+  nav.links{display:flex; gap:18px; font-size:14px; flex-wrap:wrap}
+  nav.links a{color:var(--muted)}
+  nav.links a:hover{color:var(--text); text-decoration:none}
+
+  .hero{padding:clamp(38px,8vw,74px) 0 clamp(16px,4vw,30px)}
+  .eyebrow{display:inline-flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px;
+    letter-spacing:.07em; text-transform:uppercase; color:var(--muted); border:1px solid var(--line);
+    background:rgba(255,255,255,.02); padding:5px 11px; border-radius:999px}
+  .eyebrow b{color:var(--green); font-weight:600}
+  h1{font-size:clamp(28px,6vw,54px); line-height:1.06; letter-spacing:-.025em;
+    margin:clamp(14px,3vw,22px) 0 clamp(12px,2.6vw,18px); max-width:19ch; text-wrap:balance}
+  h1 em{font-style:normal; color:var(--cyan)}
+  .lede{font-size:clamp(15.5px,3.9vw,19.5px); color:var(--muted); max-width:64ch; margin:0 0 clamp(20px,4vw,30px)}
+  .lede strong{color:var(--text); font-weight:600}
+  .cta{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:9px;
+    padding:12px 20px; border-radius:10px; font-weight:650; font-size:15px;
+    border:1px solid transparent; transition:transform .12s ease, background .15s ease; white-space:nowrap}
+  .btn:hover{text-decoration:none; transform:translateY(-1px)}
+  .btn.primary{background:var(--cyan); color:#04121a}
+  .btn.primary:hover{background:#42eeff}
+  .btn.ghost{border-color:var(--line-strong); color:var(--text); background:rgba(255,255,255,.02)}
+  .btn.ghost:hover{background:rgba(255,255,255,.05)}
+  .facts{display:flex; flex-wrap:wrap; gap:6px; margin:clamp(18px,3.5vw,26px) 0 0; padding:0;
+    list-style:none; font-size:12.5px; color:var(--dim)}
+  .facts li{border:1px solid var(--line); border-radius:999px; padding:3px 10px}
+
+  figure{margin:clamp(22px,4vw,34px) 0 0}
+  .shot{border:1px solid var(--line-strong); border-radius:12px; overflow:hidden; background:var(--panel);
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,229,255,.06)}
+  .shot img{width:100%}
+  figcaption{color:var(--dim); font-size:12.5px; margin-top:9px}
+
+  section{padding:clamp(34px,6vw,52px) 0; border-top:1px solid var(--line); scroll-margin-top:12px}
+  h2{font-size:clamp(20px,4.4vw,27px); letter-spacing:-.02em; margin:0 0 8px; text-wrap:balance}
+  .sub{color:var(--muted); margin:0 0 clamp(18px,3.5vw,26px); max-width:66ch; font-size:15px}
+
+  .run{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:clamp(15px,3.5vw,20px)}
+  .card h3{margin:0 0 10px; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+  .card p{margin:0 0 12px; color:var(--muted); font-size:14.5px}
+  pre{margin:0; background:#04070a; border:1px solid var(--line); border-radius:8px;
+    padding:13px 14px; font-family:var(--mono); font-size:13px; line-height:1.65; color:#cfe3ee;
+    overflow-x:auto; -webkit-overflow-scrolling:touch}
+  pre code{background:none; padding:0; font-size:inherit}
+  pre.flow{white-space:pre-wrap; overflow-wrap:anywhere}
+  pre .c{color:#5c7486}
+  code{font-family:var(--mono); font-size:.9em; background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px;
+    overflow-wrap:anywhere}
+  .after{margin:16px 0 0; color:var(--muted); font-size:14.5px}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,282px),1fr)); gap:14px}
+  .feature{background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:clamp(16px,3.5vw,20px)}
+  .feature h3{margin:0 0 8px; font-size:16px; letter-spacing:-.01em}
+  .feature p{margin:0; color:var(--muted); font-size:14.5px}
+  .feature .ico{display:block; font-size:18px; margin-bottom:9px; line-height:1}
+
+  .why{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:clamp(20px,4vw,34px); align-items:start}
+  .why p{color:var(--muted); margin:0 0 13px}
+  .why p strong{color:var(--text)}
+  .checklist{list-style:none; margin:0; padding:0; font-size:14.5px}
+  .checklist li{padding:9px 0 9px 24px; border-bottom:1px solid var(--line); position:relative; color:var(--muted)}
+  .checklist li:last-child{border-bottom:0}
+  .checklist li::before{content:"✓"; position:absolute; left:0; color:var(--green); font-weight:700}
+
+  .limits{list-style:none; margin:0; padding:0}
+  .limits li{display:grid; grid-template-columns:18px 1fr; gap:10px; padding:12px 0;
+    border-bottom:1px solid var(--line); color:var(--muted); font-size:14.5px}
+  .limits li:last-child{border-bottom:0}
+  .limits .m{color:var(--amber); font-weight:700}
+  .limits b{color:var(--text); font-weight:600}
+
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr)); gap:14px; margin-top:8px}
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px}
+  .stat .n{font-size:clamp(23px,5vw,26px); font-weight:700; letter-spacing:-.02em; color:var(--cyan)}
+  .stat .l{font-size:13px; color:var(--muted); margin-top:4px}
+
+  .shots3{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,258px),1fr)); gap:14px; margin-top:6px}
+  .shots3 figure{margin:0}
+  .shots3 .shot{border-radius:10px}
+  .shots3 figcaption{font-size:12px}
+
+  footer{border-top:1px solid var(--line); padding:28px 0 clamp(34px,6vw,44px); color:var(--dim); font-size:13px}
+  footer .row{display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:space-between; align-items:center}
+  footer a{color:var(--muted)}
+  footer .note{margin-top:12px}
+
+  @media (max-width:720px){
+    nav.links{display:none}
+    .cta{flex-direction:column; align-items:stretch}
+    .btn{width:100%}
+    .top .wrap{padding-block:12px}
+  }
+  @media (max-width:380px){
+    .facts li{font-size:11.5px; padding:3px 8px}
+    .eyebrow{font-size:10.5px; letter-spacing:.05em}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .btn{transition:none}
+    .btn:hover{transform:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> Autonomous Loop Studio</div>
+    <nav class="links">
+      <a href="#run">Quick start</a>
+      <a href="#what">What it is</a>
+      <a href="#free">For $0</a>
+      <a href="#not">What it isn't</a>
+      <a href="#guards">Guards</a>
+      <a href="https://github.com/autonomous-loop-studio/Autonomous">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap hero">
+  <div class="eyebrow">v447 · <b>Apache-2.0</b> · self-hosted</div>
+  <h1>Agents that run on the host you <em>already have</em>.</h1>
+  <p class="lede">
+    A self-hosted AI agent console in <strong>plain PHP</strong>. Point it at any model — hosted,
+    or running on your own machine — hand the agents real tools, and watch the loop on a live map.
+    <strong>No Docker, no Node, no build step, no account.</strong> One folder, one token, your keys.
+  </p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/autonomous-loop-studio/Autonomous">Get it on GitHub ↗</a>
+    <a class="btn ghost" href="#run">How to run it</a>
+  </div>
+  <ul class="facts">
+    <li>PHP 8</li><li>One folder, no build step</li><li>Any provider</li>
+    <li>Real tools, jailed</li><li>Free tiers, paced</li><li>No telemetry</li>
+  </ul>
+
+  <figure>
+    <div class="shot"><picture>
+        <source media="(max-width: 600px)" srcset="screenshots/classic.png">
+        <img src="screenshots/glass.png" width="1920" height="1080" alt="The console: an edge rail of floating glass cards, a wide chat, and the live 3D network map of agents and providers.">
+      </picture></div>
+    <figcaption>Glass on a desktop, Classic on a phone — Classic is the default either way.</figcaption>
+  </figure>
+</div>
+
+<section id="run">
+  <div class="wrap">
+    <h2>Run it in five minutes</h2>
+    <p class="sub">Nothing to install first except the folder. No container, no package manager, no compile step.</p>
+    <div class="run">
+      <div class="card">
+        <h3>Windows</h3>
+        <p style="margin:0 0 12px;color:var(--muted);font-size:14.5px">
+          Double-click <code>start.bat</code>. The first run installs Apache + PHP (no MySQL),
+          creates your access token, starts the server and opens the app.
+        </p>
+        <pre><span class="c">:: or repair / pick a port</span>
+setup-xampp.bat -Port 8090</pre>
+      </div>
+      <div class="card">
+        <h3>Linux / macOS</h3>
+        <pre class="flow">git clone https://github.com/autonomous-loop-studio/Autonomous.git
+cd Autonomous
+./start.sh          <span class="c"># or ./start.sh 8090</span></pre>
+      </div>
+    </div>
+    <p class="after">
+      Then paste the token it prints into <strong>Config → Access token</strong>, add one provider key,
+      and you are talking to an agent. Nothing ships with a key, and a fresh copy refuses to serve
+      (<code>503</code>) until a token exists — you cannot forget to set one.
+    </p>
+  </div>
+</section>
+
+<section id="what">
+  <div class="wrap">
+    <h2>What it is</h2>
+    <p class="sub">A console, not a chat window. Agents, tools, routing and a map, in one folder you own.</p>
+    <div class="grid">
+      <div class="feature">
+        <span class="ico">🤖</span>
+        <h3>Any model, any provider</h3>
+        <p>OpenAI, Anthropic, Google, OpenRouter, Groq, DeepSeek, xAI, Mistral, Cerebras, Together,
+        Perplexity, NVIDIA NIM — or Ollama, LM Studio and vLLM on your own box. It reads each
+        provider's API shape <em>and</em> its tool dialect, and remembers which one that model
+        actually accepts.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🛠️</span>
+        <h3>Real tools, not chat</h3>
+        <p>Files inside a jail, an allowlisted <code>exec</code> that takes an argv array (never a
+        shell string built from model text), git, a real Chrome or Edge driven over the DevTools
+        protocol, and an MCP client <em>and</em> server.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🕸️</span>
+        <h3>You can watch it happen</h3>
+        <p>A live 3D map of agents, providers and traffic; every hop written out in words in a run
+        trace; workflows drawn as a routing chart with loops, parallel fan-out and checkpoints.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🔐</span>
+        <h3>Off until you say so</h3>
+        <p><code>exec</code>, <code>run_code</code>, the built-in browser and the MCP server ship
+        disabled. Every write asks first. Every API route is token-gated. No accounts, no cloud,
+        no telemetry.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="free">
+  <div class="wrap">
+    <h2>A fleet for $0</h2>
+    <p class="sub">Free tiers and local models are first-class here, not an afterthought — and paced
+    so one exhausted key does not stop the fleet.</p>
+    <div class="grid">
+      <div class="feature">
+        <span class="ico">⏱️</span>
+        <h3>Paced to each provider's real ceiling</h3>
+        <p>The pacer knows the host's limit — NVIDIA NIM 40/min, Groq 30, OpenRouter 20, with a
+        default for anything unknown — and <code>0 = AUTO</code> uses it. Global, per-provider or
+        per-agent, and an agent can lock its own.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🔑</span>
+        <h3>A 429 is not a stall</h3>
+        <p>A rate-limited key rests for 60 seconds and the next call reaches for another. Add extra
+        keys and the API pool rotates them after N requests, so one exhausted free tier never stops
+        the fleet.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">♾️</span>
+        <h3>Loops that keep going</h3>
+        <p>Always-On re-prompts a standing goal on a cadence, with <em>max iterations</em> and
+        <em>max minutes</em> caps, per-agent hold and release, a release-all button and one master
+        kill switch.</p>
+      </div>
+    </div>
+    <p class="after">
+      Free tiers have daily caps — pacing smooths bursts, it does not make them infinite. And
+      "always on" means the host stays awake: the tab-hidden worker, or a machine that does not
+      sleep. Against Ollama, LM Studio or vLLM on your own box, there is nothing to pace at all.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The point: the boring host is enough</h2>
+    <div class="why">
+      <div>
+        <p>Almost everything in this category assumes Docker, or a Python toolchain, or a VPS you
+        rent by the month. This assumes <strong>the PHP you already have</strong>.</p>
+        <p>That is not a stunt. It changes who can run it: the shared host you pay $3 for, the
+        Windows machine in the office, the laptop in the drawer. You deploy by copying a folder, and
+        you back it up by copying one back.</p>
+        <p>The trade is real — PHP's built-in server is single-threaded, so parallel agents want
+        Apache or PHP-FPM, and the docs say so plainly. But "no containers required" is a
+        constraint worth keeping, and keeping it shaped the whole app.</p>
+      </div>
+      <ul class="checklist">
+        <li>No containers to run or update</li>
+        <li>No <code>composer install</code> before it boots</li>
+        <li>No <code>npm run build</code> before it loads</li>
+        <li>No database server — state is JSON in <code>storage/</code></li>
+        <li>No cloud account, no licence server, no phone-home</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>A look at it</h2>
+    <p class="sub">Classic is the default interface. Glass is the one with the shaders.</p>
+    <div class="shots3">
+      <figure>
+        <div class="shot"><img src="screenshots/classic.png" width="1920" height="1080" loading="lazy" alt="Classic interface: setup panel, chat and the network map side by side."></div>
+        <figcaption>Classic — setup, chat, map.</figcaption>
+      </figure>
+      <figure>
+        <div class="shot"><img src="screenshots/browser.png" width="1919" height="1080" loading="lazy" alt="The built-in browser pane: a live page, an address bar, and controls to click and type as an agent."></div>
+        <figcaption>The browser the agents drive.</figcaption>
+      </figure>
+      <figure>
+        <div class="shot"><img src="screenshots/routing.png" width="1920" height="1080" loading="lazy" alt="A routing chart with three workflows containing loops and a parallel fan-out."></div>
+        <figcaption>Draw the flow, don't describe it.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="not">
+  <div class="wrap">
+    <h2>What it isn't</h2>
+    <p class="sub">Cheaper to read now than to discover at 2am.</p>
+    <ul class="limits">
+      <li><span class="m">!</span><span><b>It is not hosted.</b> There is no hosted tier, no sign-up and no managed version. You run it, and you pay your model provider directly.</span></li>
+      <li><span class="m">!</span><span><b>One maintainer, small promises.</b> Releases are frequent and the changelog is honest about what broke, but nobody is on call.</span></li>
+      <li><span class="m">!</span><span><b>Parallel agents want Apache or PHP-FPM.</b> On PHP's built-in server a single streamed reply holds the only slot while it runs.</span></li>
+      <li><span class="m">!</span><span><b>The Glass theme is GPU-hungry.</b> Classic is the default for a reason; Config → Desktop has the dials if you want the pretty one.</span></li>
+      <li><span class="m">!</span><span><b>Android is documented, not shipped.</b> WebView, Termux and a PWA are all written up; there is no app store build.</span></li>
+      <li><span class="m">!</span><span><b>The documentation is one very long page.</b> It is thorough. It is not yet a docs site.</span></li>
+      <li><span class="m">!</span><span><b>It is not a fence around you.</b> Turn every capability on, auto-approve writes and point the jail at the filesystem root, and you have built a very capable foot-gun.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="guards">
+  <div class="wrap">
+    <h2>The guards are tested, not asserted</h2>
+    <p class="sub">A tool that gives a language model a shell deserves more than a paragraph of reassurance.</p>
+    <div class="stats">
+      <div class="stat"><div class="n">1,810</div><div class="l">assertions across 44 test files — 20 PHP, 24 JS</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">serving modes that refuse <code>storage/</code> and <code>tests/</code>: <code>serve.php</code>, Apache <code>.htaccess</code>, and the shipped nginx rules</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">capabilities on by default that can touch your machine — off means off</div></div>
+    </div>
+    <p class="after">
+      Every guard has a test that makes the real request, and the suite runs in a throwaway copy of
+      the tree. The design assumes the model is hostile and the pages it reads are booby-trapped;
+      the only trusted actor is the operator.
+    </p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <div>Autonomous Loop Studio · Apache-2.0 · © 2026 M. Bryce Hudson</div>
+    <div><a href="https://github.com/autonomous-loop-studio/Autonomous">Source</a> · <a href="https://github.com/autonomous-loop-studio/Autonomous/blob/master/README.md">Documentation</a> · <a href="https://github.com/autonomous-loop-studio/Autonomous/blob/master/LICENSE">License</a></div>
+  </div>
+  <div class="wrap" style="margin-top:14px">
+    One page, no JavaScript, no fonts to download, no trackers. If it looks wrong, the CSS is right above the fold and the whole thing is one file.
+  </div>
+</footer>
+
+</body>
+</html>
