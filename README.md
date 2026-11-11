@@ -14,7 +14,7 @@ Point it at any model — hosted, or running on your own machine — hand the ag
 and static files: drop it on the host you already pay for, double-click, and a
 team of agents is running.
 
-![The loop, running](main-motion.gif)
+![Autonomous Loop Studio — the Glass desktop: the chat, the edge rail and the live network map](screenshots/new-ui-main.png)
 
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
@@ -80,13 +80,12 @@ Ollama, LM Studio or vLLM on your own box there is nothing to pace at all.
 ## A look at it
 
 <p>
-<img src="screenshots/new-ui-main.png" width="49%">
 <img src="screenshots/mainscreen01.png" width="49%">
+<img src="screenshots/routing-three-workfows.png" width="49%">
 </p>
 <p>
-<img src="screenshots/routing-three-workfows.png" width="32%">
-<img src="screenshots/Brain-Lab.png" width="32%">
-<img src="screenshots/Browser.png" width="32%">
+<img src="screenshots/Brain-Lab.png" width="49%">
+<img src="screenshots/Browser.png" width="49%">
 </p>
 
 *Glass desktop and Classic (the default) · a routing chart · Brain Lab · the built-in browser.*
