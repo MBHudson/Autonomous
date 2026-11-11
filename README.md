@@ -23,7 +23,7 @@ team of agents is running.
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 [![Tests](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml)
 
-**🚀 [Quick start ↓](#-quick-start) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
+**🚀 [Quick start ↓](#-quick-start) · ✨ [Features ↓](#-whats-inside) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
 
 ---
 
