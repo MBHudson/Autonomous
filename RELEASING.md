@@ -53,6 +53,49 @@ no cached asset changed, so it cannot report one.
    load; the check is cached server-side for one hour, and nothing installs
    itself — **Config → Updates → DOWNLOAD UPDATE…** is still a manual,
    compare-first step.
+7. **Tag it** — `v<VERSION>` and nothing else. See *Tags* below.
+
+## Tags — one scheme, from here on
+
+The tag is the name a stranger reads on the releases page, and the thing a directory listing or a
+package manager keys on. It is not a status field.
+
+**Format:** `v` followed by the integer in `VERSION`, exactly — `v447`, `v448`. No suffix.
+
+| Do | Do not |
+| --- | --- |
+| `v448` | `v448-Open-Testing`, `Open-Testing-v448` |
+| `v448`, with the release marked **pre-release** | `v448-beta`, `v448-rc1` |
+| one tag, one commit, never moved | a tag re-pointed at a later commit |
+
+**Status belongs in the release, not in the tag.** A build you want to call "open testing" is a
+GitHub *pre-release*: the tag stays `v448`, the release is marked pre-release, and the body says what
+is unproven. That keeps the tag immutable and the channel explicit, instead of encoding a mood into
+the one string that is meant to be permanent.
+
+```bash
+git tag v448                       # on the commit that bumped VERSION
+git push origin v448
+gh release create v448 --title "v448 — one short phrase" --notes-file notes.md
+# add --prerelease only when it really is one
+```
+
+**The title carries the story, the body carries the changelog.** `v447 — Tunnels leave the terminal`,
+followed by that release name in the CHANGELOG entry, verbatim. A title of "v448" alone tells a
+reader nothing, and "various fixes" tells them less.
+
+**The tag must agree with `VERSION`.** If `VERSION` says 448 the tag is `v448`. There is no release
+where the two differ, and no tag for a number that was never shipped.
+
+**History stays where it is.** `v358-Open-testing`, `Open-Testing-v365`, `v374-Open-Testing`,
+`v381-Open-Testing` and `v437-Open-Testing` already exist with inconsistent naming. They are not
+renamed or deleted: a moved tag breaks every clone and every link that pinned it, and the cost lands
+on whoever tries to reproduce an old build six months from now. The scheme starts at the next
+release — and `v410` and `v447` are already in the target shape, so there is nothing new to invent.
+
+**One release, one tag.** Not one per commit. A release is a decision that the tree at that commit is
+installable, and `VERSION`, the CHANGELOG entry and the tag should all describe that same commit.
+
 
 ## The one caveat
 
