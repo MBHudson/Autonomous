@@ -14,7 +14,7 @@ Point it at any model — hosted, or running on your own machine — hand the ag
 and static files: drop it on the host you already pay for, double-click, and a
 team of agents is running.
 
-![Autonomous Loop Studio — the Glass desktop: the chat, the edge rail and the live network map](screenshots/new-ui-main.png)
+![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/banner.png)
 
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
