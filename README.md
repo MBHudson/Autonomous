@@ -23,7 +23,7 @@ team of agents is running.
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 [![Tests](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml)
 
-**▶️ [One-minute video tour](https://gitdiagram.com/autonomous-loop-studio/autonomous/video?utm_source=readme&utm_medium=badge) · 🚀 [Quick start ↓](#-quick-start) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
+**🚀 [Quick start ↓](#-quick-start) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
 
 ---
 
@@ -406,12 +406,17 @@ One rail for everything about the selected agent:
 Every setting has a 🔒 **lock**: unlocked agents follow the global value live; a lock pins the agent to its own value so a global change never moves it. 🔏
 
 ---
-Note: The "Memory", "Prompts and Profiles", "Agent Files", "Approvals and Tools" sections — thinly veiled security research tools. 🧠💉😉
 
----
-**!!!DISCLAIMER!!! - For educational and research purposes only! - I take no responsibility for your actions. I don't even plan on taking responsibility for my own actions.**
+**What these controls are for.** A file jail per agent, per-tool allow / ask / deny, and an `exec`
+you must switch on: everything dangerous ships off, every write asks first, and the refusals are
+proven by tests that make the real request - `serve.php`, the shipped `.htaccess` and the nginx
+regexes all run through `php tests/php/run.php`. Turn the jail off, point it at a filesystem root and
+auto-approve writes, and you have a capable tool with no brakes. The defaults are deliberately the
+opposite, and the locks exist so one agent cannot quietly change them.
 
----
+Apache-2.0, no warranty. The guards reduce risk; they do not make an agent safe to point at anything
+you cannot afford to lose.
+
 
 </details>
 
