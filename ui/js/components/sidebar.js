@@ -1510,7 +1510,12 @@ export class Sidebar {
     put('alwaysOnMaxIterations', num('sbAlwaysOnMaxIter', 0, 10000, 0));
     put('alwaysOnMaxMinutes', num('sbAlwaysOnMaxMin', 0, 100000, 0));
     put('rateLimitRpm', num('sbGovRpm', 0, 600, 0));
-    put('rateLimitMaxWaitMs', num('sbGovMaxWait', 5, 600, 65) * 1000);
+    // Multiply only a real number: num() returns null when the field is not in
+    // the DOM yet (this runs BEFORE renderConfig builds it), and null * 1000 is
+    // 0 -- which put() would happily store, zeroing the saved wait every time
+    // the Config panel was opened.
+    const waitSec = num('sbGovMaxWait', 5, 600, 65);
+    put('rateLimitMaxWaitMs', waitSec === null ? null : waitSec * 1000);
     put('tokenBudget', num('sbTokenBudget', 0, 1000000000, 0));
 
     // The project directory lives on the server and is fetched back on every
