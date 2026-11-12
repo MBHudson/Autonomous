@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#05080b">
 <meta name="color-scheme" content="dark">
-<title>Autonomous Loop Studio — a self-hosted AI agent console in plain PHP</title>
-<meta name="description" content="A self-hosted AI agent console in plain PHP. Any model, real tools, a live agent map. No Docker, no Node, no build step, no account.">
+<title>Autonomous Loop Studio — make any model an agent</title>
+<meta name="description" content="A self-hosted agent console in plain PHP. It learns each model's tool dialect, refuses false \"done\" claims, bounds runaway loops and keeps the context inside the window. No Docker, no Node, no build step, no account.">
 <meta property="og:title" content="Autonomous Loop Studio">
-<meta property="og:description" content="A self-hosted AI agent console in plain PHP. No Docker, no Node, no build step.">
+<meta property="og:description" content="Make any model an agent — learned tool dialects, no false \"done\", bounded loops. Self-hosted, plain PHP, no Docker.">
 <meta property="og:image" content="https://raw.githubusercontent.com/autonomous-loop-studio/Autonomous/master/screenshots/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
@@ -112,6 +112,15 @@
   .limits .m{color:var(--amber); font-weight:700}
   .limits b{color:var(--text); font-weight:600}
 
+  .fails{margin-top:6px; border-top:1px solid var(--line)}
+  .fail{display:grid; grid-template-columns:1fr; gap:5px; padding:15px 0; border-bottom:1px solid var(--line)}
+  @media (min-width:721px){ .fail{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); gap:4px 26px; align-items:start} }
+  .fail .f{color:var(--text); font-weight:600; font-size:15px; letter-spacing:-.01em; line-height:1.4}
+  .fail .f em{display:block; font-style:normal; font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:5px; overflow-wrap:anywhere}
+  .fail .fix{color:var(--muted); font-size:14.5px; margin:0}
+  .fail .fix b{color:var(--text); font-weight:600}
+  .fail .fix code{font-size:.86em}
+
   .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr)); gap:14px; margin-top:8px}
   .stat{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px}
   .stat .n{font-size:clamp(23px,5vw,26px); font-weight:700; letter-spacing:-.02em; color:var(--cyan)}
@@ -152,6 +161,7 @@
     <nav class="links">
       <a href="#run">Quick start</a>
       <a href="#what">What it is</a>
+      <a href="#fails">Why agents fail</a>
       <a href="#features">Features</a>
       <a href="#free">For $0</a>
       <a href="#not">What it isn't</a>
@@ -164,19 +174,21 @@
 <main>
 <div class="wrap hero">
   <div class="eyebrow">v447 · <b>Apache-2.0</b> · self-hosted</div>
-  <h1>Agents that run on the host you <em>already have</em>.</h1>
+  <h1>Make any model <em>an agent</em>.</h1>
   <p class="lede">
-    A self-hosted AI agent console in <strong>plain PHP</strong>. Point it at any model — hosted,
-    or running on your own machine — hand the agents real tools, and watch the loop on a live map.
-    <strong>No Docker, no Node, no build step, no account.</strong> One folder, one token, your keys.
+    A 7B on your laptop or a frontier API. This is a self-hosted agent console in
+    <strong>plain PHP</strong> that learns the tool dialect the model actually answers, refuses to let
+    it claim work it never did, bounds runaway loops before they cost anything, and keeps the
+    conversation inside the window — then shows you the whole loop on a live map.
   </p>
   <div class="cta">
     <a class="btn primary" href="https://github.com/autonomous-loop-studio/Autonomous">Get it on GitHub ↗</a>
     <a class="btn ghost" href="#run">How to run it</a>
   </div>
   <ul class="facts">
-    <li>One folder, no build step</li><li>Any provider, any API, cURL</li>
-    <li>Real tools, jailed</li><li>Turn free tiers into agents</li><li>No telemetry</li>
+    <li>Any model, any provider</li><li>Learned tool dialects</li><li>No false “done”</li>
+    <li>Loops bounded</li><li>Context budgeted</li><li>Memory across sessions</li>
+    <li>One folder, no build step</li><li>No telemetry</li>
   </ul>
 
   <figure>
@@ -186,6 +198,55 @@
     <figcaption>Self-hosted AI swarm — the live map, the chat and the rails, in plain PHP.</figcaption>
   </figure>
 </div>
+
+<section id="fails">
+  <div class="wrap">
+    <h2>Why local models fail at tools</h2>
+    <p class="sub">Six failures, all of them ordinary, and the code path that answers each. This is
+    the part that decides whether a small model is usable or merely amusing.</p>
+    <div class="fails">
+      <div class="fail">
+        <div class="f">It gets the tool syntax wrong<em>{"tool":"list_agent","arg":{}}</em></div>
+        <p class="fix">A guessed name is <b>repaired, not dropped</b> — <code>list_agent</code> runs
+        <code>list_agents</code>, a guessed wrapper parses like the real one, and an invented name is
+        still refused. A reply that looks like a call but parses to nothing is <b>re-taught in the next
+        dialect</b> (plain → JSON → native → Claude XML) instead of becoming the answer. The one that
+        worked is remembered per provider and model.</p>
+      </div>
+      <div class="fail">
+        <div class="f">It says it wrote the file. It didn't.<em>write_file completed the task</em></div>
+        <p class="fix">Only a <b>named tool plus a completion verb</b> counts, and only when no call ran
+        — then the turn is contradicted in the transcript: <b>“⚠ No tool call ran this turn, so nothing
+        was changed.”</b> An agent that runs tools and writes no answer says that too, instead of a blank
+        that reads as success.</p>
+      </div>
+      <div class="fail">
+        <div class="f">It loops and burns the budget<em>step 14 → step 15 → step 16</em></div>
+        <p class="fix">A hard step ceiling and a wall-clock deadline per turn, bounded steering, an
+        acyclic <code>ask_agent</code> chain (A→B→A is refused) and duplicate-call suppression. When a
+        ceiling is reached the transcript names it — <b>“You used all N tool calls on this task.”</b>
+        A runaway hits a wall, not your wallet.</p>
+      </div>
+      <div class="fail">
+        <div class="f">The conversation falls out of the window<em>context_length_exceeded</em></div>
+        <p class="fix">Budgeted against the model's <b>real</b> window, then compacted: old tool
+        exchanges keep their head and tail, the newest turns survive, oversized results are cut. A 128k
+        model is not replayed as if it had 6k.</p>
+      </div>
+      <div class="fail">
+        <div class="f">It forgets by the next session<em>“as I mentioned earlier…”</em></div>
+        <p class="fix">Private notes plus a deliberately small shared collective, with
+        <code>adopt</code> so a shared fact can become its own. Injected as <b>recollection, not
+        instructions</b> — the agent reads what it learned instead of being told what to do.</p>
+      </div>
+      <div class="fail">
+        <div class="f">You can't tell whether any of it works<em>“it seems to work”</em></div>
+        <p class="fix">A <b>12-step drill</b> any agent can be walked through against a real folder,
+        with the step that failed named instead of hidden. It proves the harness, not the model.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
 <section id="run">
   <div class="wrap">
@@ -308,6 +369,33 @@ cd Autonomous
   </div>
 </section>
 
+<section id="drill">
+  <div class="wrap">
+    <h2>The drill, in full</h2>
+    <p class="sub">Twelve real tool calls against a real folder. A model can be perfectly capable and
+    still be handed the wrong dialect — this is how you find out which one you have.</p>
+    <div class="card">
+      <pre class="flow"><span class="c"> 1</span>  think         one sentence about the drill before touching anything
+<span class="c"> 2</span>  todo_write    the steps below, first one in_progress
+<span class="c"> 3</span>  echo          the word "training"
+<span class="c"> 4</span>  now           the current date and time
+<span class="c"> 5</span>  write_file    training/training.txt containing exactly "training"   <span class="c">(asks approval)</span>
+<span class="c"> 6</span>  read_file     read it back and confirm
+<span class="c"> 7</span>  edit_file     append a second line, "drill 2 passed"                <span class="c">(asks approval)</span>
+<span class="c"> 8</span>  list_dir      list the training folder
+<span class="c"> 9</span>  glob_files    find training/*
+<span class="c">10</span>  grep_code     search the folder for "training"
+<span class="c">11</span>  exec          ["echo","training"] and confirm the output             <span class="c">(asks approval)</span>
+<span class="c">12</span>  todo_write    mark every step completed and stop</pre>
+    </div>
+    <p class="after">
+      What it does not do is adjust a single weight — nothing here teaches the model. It teaches you
+      what the model will and won't do once it has the right dialect, which is the question that
+      actually blocks people the first evening.
+    </p>
+  </div>
+</section>
+
 <section id="free">
   <div class="wrap">
     <h2>A fleet for $0</h2>
@@ -411,7 +499,7 @@ cd Autonomous
     <h2>The guards are tested, not asserted</h2>
     <p class="sub">A tool that gives a language model a shell deserves more than a paragraph of reassurance.</p>
     <div class="stats">
-      <div class="stat"><div class="n">1,810</div><div class="l">assertions across 44 test files — 20 PHP, 24 JS</div></div>
+      <div class="stat"><div class="n">67</div><div class="l">test files — 35 PHP, 32 JS — each one printing its own pass count</div></div>
       <div class="stat"><div class="n">3</div><div class="l">serving modes that refuse <code>storage/</code> and <code>tests/</code>: <code>serve.php</code>, Apache <code>.htaccess</code>, and the shipped nginx rules</div></div>
       <div class="stat"><div class="n">0</div><div class="l">capabilities on by default that can touch your machine — off means off</div></div>
     </div>

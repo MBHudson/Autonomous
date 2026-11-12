@@ -6,13 +6,15 @@
 -->
 # 🧠 Autonomous Loop Studio
 
-### A self-hosted AI agent console in plain **PHP**.
-**No Docker. No Node. No build step. No account.**
+### Make any model an agent — even a small one, even the one on your laptop.
 
-Point it at any model — hosted, or running on your own machine — hand the agents
-**real tools**, and watch the whole loop on a live map. It is one folder of PHP
-and static files: drop it on the host you already pay for, double-click, and a
-team of agents is running.
+**A self-hosted agent console in plain PHP.** No Docker. No Node. No build step. No account.
+
+A 7B on your laptop or a frontier API: it learns the tool dialect that model actually
+answers, refuses to let an agent claim work it never did, bounds runaway loops before
+they cost anything, and keeps the conversation inside the window. Then you watch the
+whole loop on a live map. One folder of PHP and static files — drop it on the host you
+already pay for, double-click, and a team of agents is running.
 
 ![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/banner.png)
 
@@ -23,7 +25,7 @@ team of agents is running.
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 [![Tests](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml)
 
-**🚀 [Quick start ↓](#-quick-start) · ✨ [Features ↓](#-whats-inside) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
+**🚀 [Quick start ↓](#-quick-start) · 🩺 [Why agents fail ↓](#-why-local-agents-fail--and-what-this-does-about-it) · ✨ [Features ↓](#-whats-inside) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
 
 ---
 
@@ -51,6 +53,22 @@ Cerebras, Together, Perplexity, NVIDIA NIM, or **Ollama / LM Studio / vLLM** on 
   out in words in a run trace; routing charts you draw instead of describing.
 - 🔐 **Safe by default.** `exec`, `run_code`, the browser and the MCP server are **off** until you
   switch them on. Every write asks first. No accounts, no cloud, no telemetry.
+
+## Why local agents fail — and what this does about it
+
+Six failures every operator hits in the first evening, and the code path that answers each.
+
+| The failure | What happens here |
+|---|---|
+| **The tool syntax is wrong** | A guessed name is repaired, not dropped — `list_agent` runs `list_agents`, a guessed wrapper parses like the real one, an invented name is still refused. A reply that looks like a call but parses to nothing is **re-taught in the next dialect** (plain → JSON → native → Claude XML) rather than becoming the answer, and the dialect that worked is remembered per provider and model. |
+| **It says it wrote the file — it didn't** | Only a **named tool plus a completion verb** counts, and only when no call ran. Then the turn is contradicted in the transcript: *"⚠ No tool call ran this turn, so nothing was changed."* An agent that runs tools and writes no answer says that too, instead of a blank that reads as success. |
+| **It loops and burns the budget** | A hard step ceiling and a wall-clock deadline per turn, bounded steering, an acyclic `ask_agent` chain (A→B→A is refused), and duplicate-call suppression. When a ceiling is reached the transcript names it: *"You used all N tool calls on this task."* A runaway hits a wall, not your wallet. |
+| **The conversation falls out of the window** | Budgeted against the model's **real** window, then compacted: old tool exchanges keep their head and tail, the newest turns survive, oversized results are cut. A 128k model is not replayed as if it had 6k. |
+| **It forgets by the next session** | Private notes plus a deliberately small shared collective, with `adopt` so a shared fact can become its own. Injected as **recollection, not instructions** — the agent reads what it learned instead of being told what to do. |
+| **You can't tell whether any of it works** | A **12-step drill** any agent can be walked through against a real folder, with the step that failed named instead of hidden. It proves the harness, not the model. |
+
+If a model is capable and still useless, it is usually one of those six — and each one has a
+code path here rather than a paragraph of advice.
 
 ## What it is not
 
