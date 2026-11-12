@@ -112,6 +112,9 @@
   .limits .m{color:var(--amber); font-weight:700}
   .limits b{color:var(--text); font-weight:600}
 
+  .mini{font-size:13px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:clamp(26px,4.5vw,34px) 0 12px}
+  .para{color:var(--muted); font-size:15px; margin:0 0 clamp(16px,3vw,20px); max-width:70ch}
+
   .fails{margin-top:6px; border-top:1px solid var(--line)}
   .fail{display:grid; grid-template-columns:1fr; gap:5px; padding:15px 0; border-bottom:1px solid var(--line)}
   @media (min-width:721px){ .fail{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); gap:4px 26px; align-items:start} }
@@ -159,12 +162,11 @@
   <div class="wrap">
     <div class="brand"><span class="dot"></span> Autonomous Loop Studio</div>
     <nav class="links">
-      <a href="#run">Quick start</a>
-      <a href="#what">What it is</a>
-      <a href="#fails">Why agents fail</a>
-      <a href="#features">Features</a>
       <a href="#free">For $0</a>
-      <a href="#not">What it isn't</a>
+      <a href="#what">What it is</a>
+      <a href="#features">What’s inside</a>
+      <a href="#harness">The harness</a>
+      <a href="#run">Quick start</a>
       <a href="#guards">Guards</a>
       <a href="https://github.com/autonomous-loop-studio/Autonomous">GitHub ↗</a>
     </nav>
@@ -199,80 +201,38 @@
   </figure>
 </div>
 
-<section id="fails">
+<section id="free">
   <div class="wrap">
-    <h2>Why local models fail at tools</h2>
-    <p class="sub">Six failures, all of them ordinary, and the code path that answers each. This is
-    the part that decides whether a small model is usable or merely amusing.</p>
-    <div class="fails">
-      <div class="fail">
-        <div class="f">It gets the tool syntax wrong<em>{"tool":"list_agent","arg":{}}</em></div>
-        <p class="fix">A guessed name is <b>repaired, not dropped</b> — <code>list_agent</code> runs
-        <code>list_agents</code>, a guessed wrapper parses like the real one, and an invented name is
-        still refused. A reply that looks like a call but parses to nothing is <b>re-taught in the next
-        dialect</b> (plain → JSON → native → Claude XML) instead of becoming the answer. The one that
-        worked is remembered per provider and model.</p>
+    <h2>A fleet for $0</h2>
+    <p class="sub">Free tiers and local models are first-class here, not an afterthought — and paced
+    so one exhausted key does not stop the fleet.</p>
+    <div class="grid">
+      <div class="feature">
+        <span class="ico">⏱️</span>
+        <h3>Paced to each provider's real ceiling</h3>
+        <p>The pacer knows the host's limit — NVIDIA NIM 40/min, Groq 30, OpenRouter 20, with a
+        default for anything unknown — and <code>0 = AUTO</code> uses it. Global, per-provider or
+        per-agent, and an agent can lock its own.</p>
       </div>
-      <div class="fail">
-        <div class="f">It says it wrote the file. It didn't.<em>write_file completed the task</em></div>
-        <p class="fix">Only a <b>named tool plus a completion verb</b> counts, and only when no call ran
-        — then the turn is contradicted in the transcript: <b>“⚠ No tool call ran this turn, so nothing
-        was changed.”</b> An agent that runs tools and writes no answer says that too, instead of a blank
-        that reads as success.</p>
+      <div class="feature">
+        <span class="ico">🔑</span>
+        <h3>A 429 is not a stall</h3>
+        <p>A rate-limited key rests for 60 seconds and the next call reaches for another. Add extra
+        keys and the API pool rotates them after N requests, so one exhausted free tier never stops
+        the fleet.</p>
       </div>
-      <div class="fail">
-        <div class="f">It loops and burns the budget<em>step 14 → step 15 → step 16</em></div>
-        <p class="fix">A hard step ceiling and a wall-clock deadline per turn, bounded steering, an
-        acyclic <code>ask_agent</code> chain (A→B→A is refused) and duplicate-call suppression. When a
-        ceiling is reached the transcript names it — <b>“You used all N tool calls on this task.”</b>
-        A runaway hits a wall, not your wallet.</p>
-      </div>
-      <div class="fail">
-        <div class="f">The conversation falls out of the window<em>context_length_exceeded</em></div>
-        <p class="fix">Budgeted against the model's <b>real</b> window, then compacted: old tool
-        exchanges keep their head and tail, the newest turns survive, oversized results are cut. A 128k
-        model is not replayed as if it had 6k.</p>
-      </div>
-      <div class="fail">
-        <div class="f">It forgets by the next session<em>“as I mentioned earlier…”</em></div>
-        <p class="fix">Private notes plus a deliberately small shared collective, with
-        <code>adopt</code> so a shared fact can become its own. Injected as <b>recollection, not
-        instructions</b> — the agent reads what it learned instead of being told what to do.</p>
-      </div>
-      <div class="fail">
-        <div class="f">You can't tell whether any of it works<em>“it seems to work”</em></div>
-        <p class="fix">A <b>12-step drill</b> any agent can be walked through against a real folder,
-        with the step that failed named instead of hidden. It proves the harness, not the model.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="run">
-  <div class="wrap">
-    <h2>Run it in five minutes</h2>
-    <p class="sub">Nothing to install first except the folder. No container, no package manager, no compile step.</p>
-    <div class="run">
-      <div class="card">
-        <h3>Windows</h3>
-        <p style="margin:0 0 12px;color:var(--muted);font-size:14.5px">
-          Double-click <code>start.bat</code>. The first run installs Apache + PHP (no MySQL),
-          creates your access token, starts the server and opens the app.
-        </p>
-        <pre><span class="c">:: or repair / pick a port</span>
-setup-xampp.bat -Port 8090</pre>
-      </div>
-      <div class="card">
-        <h3>Linux / macOS</h3>
-        <pre class="flow">git clone https://github.com/autonomous-loop-studio/Autonomous.git
-cd Autonomous
-./start.sh          <span class="c"># or ./start.sh 8090</span></pre>
+      <div class="feature">
+        <span class="ico">♾️</span>
+        <h3>Loops that keep going</h3>
+        <p>Always-On re-prompts a standing goal on a cadence, with <em>max iterations</em> and
+        <em>max minutes</em> caps, per-agent hold and release, a release-all button and one master
+        kill switch.</p>
       </div>
     </div>
     <p class="after">
-      Then paste the token it prints into <strong>Config → Access token</strong>, add one provider key,
-      and you are talking to an agent. Nothing ships with a key, and a fresh copy refuses to serve
-      (<code>503</code>) until a token exists — you cannot forget to set one.
+      Free tiers have daily caps — pacing smooths bursts, it does not make them infinite. And
+      "always on" means the host stays awake: the tab-hidden worker, or a machine that does not
+      sleep. Against Ollama, LM Studio or vLLM on your own box, there is nothing to pace at all.
     </p>
   </div>
 </section>
@@ -369,11 +329,86 @@ cd Autonomous
   </div>
 </section>
 
-<section id="drill">
+<section id="harness">
   <div class="wrap">
-    <h2>The drill, in full</h2>
-    <p class="sub">Twelve real tool calls against a real folder. A model can be perfectly capable and
-    still be handed the wrong dialect — this is how you find out which one you have.</p>
+    <h2>The harness fits itself to the model</h2>
+    <p class="sub">Every model speaks tool calls slightly differently, and most of them are wrong
+    about it. This does not ask you to pick the right format and hope — it works out what the model
+    answers, teaches it that, and remembers it.</p>
+    <div class="grid">
+      <div class="feature">
+        <span class="ico">🎛️</span>
+        <h3>Auto: detect it</h3>
+        <p>The API shape and the tool dialect are read from the endpoint host first, then the provider,
+        then the model id — OpenAI-style JSON, Claude XML, native tags, or strict plain JSON. Pin any
+        of it per agent when you know better than the guess.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🩹</span>
+        <h3>Near misses are read, not dropped</h3>
+        <p>A guessed name is repaired to the tool it meant — <code>list_agent</code> runs
+        <code>list_agents</code> — a guessed wrapper parses like the real one, and near-miss argument
+        fields are understood. An invented name and a fence full of prose are still refused.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🏆</span>
+        <h3>It learns the winner</h3>
+        <p>Once a call parses, that dialect is stored per <code>provider + model</code> and tried first
+        next time. Config → Labs turns the memo off, and detection then re-derives it every turn.</p>
+      </div>
+    </div>
+
+    <h3 class="mini">When a reply misses</h3>
+    <p class="para">A reply that looks like a call but parses to nothing is never allowed to become the
+    final answer. It is re-taught in the next untried dialect — plain → JSON → native → Claude XML — and
+    because every extra call spends one step of the same budget, the retries are bounded rather than
+    free.</p>
+
+    <h3 class="mini">The failures it answers</h3>
+    <div class="fails">
+      <div class="fail">
+        <div class="f">It gets the tool syntax wrong<em>{"tool":"list_agent","arg":{}}</em></div>
+        <p class="fix">The dialect is taught with one correct example per tool in the model's own
+        format, and a near miss is <b>repaired, not dropped</b>. A reply that parses to nothing is
+        re-taught in the next dialect before it can be mistaken for an answer.</p>
+      </div>
+      <div class="fail">
+        <div class="f">It says it wrote the file. It didn't.<em>write_file completed the task</em></div>
+        <p class="fix">Only a <b>named tool plus a completion verb</b> counts, and only when no call ran
+        — then the turn is contradicted in the transcript: <b>“⚠ No tool call ran this turn, so nothing
+        was changed.”</b> An agent that runs tools and writes no answer says that too, instead of a blank
+        that reads as success.</p>
+      </div>
+      <div class="fail">
+        <div class="f">It loops and burns the budget<em>step 14 → step 15 → step 16</em></div>
+        <p class="fix">A hard step ceiling and a wall-clock deadline per turn, bounded steering, an
+        acyclic <code>ask_agent</code> chain (A→B→A is refused) and duplicate-call suppression. When a
+        ceiling is reached the transcript names it — <b>“You used all N tool calls on this task.”</b>
+        A runaway hits a wall, not your wallet.</p>
+      </div>
+      <div class="fail">
+        <div class="f">The conversation falls out of the window<em>context_length_exceeded</em></div>
+        <p class="fix">Budgeted against the model's <b>real</b> window, then compacted: old tool
+        exchanges keep their head and tail, the newest turns survive, oversized results are cut. A 128k
+        model is not replayed as if it had 6k.</p>
+      </div>
+      <div class="fail">
+        <div class="f">It forgets by the next session<em>“as I mentioned earlier…”</em></div>
+        <p class="fix">Private notes plus a deliberately small shared collective, with
+        <code>adopt</code> so a shared fact can become its own. Injected as <b>recollection, not
+        instructions</b> — the agent reads what it learned instead of being told what to do.</p>
+      </div>
+      <div class="fail">
+        <div class="f">You can't tell whether any of it works<em>“it seems to work”</em></div>
+        <p class="fix">Training mode below: a <b>12-step drill</b> any agent can be walked through
+        against a real folder, with the step that failed named instead of hidden.</p>
+      </div>
+    </div>
+
+    <h3 class="mini">Training mode — the part you can run in ten minutes</h3>
+    <p class="para">Twelve real tool calls against a real folder, in order, asking for approval where
+    it writes. A model can be perfectly capable and still be handed the wrong dialect; the drill is how
+    you find out which one you have, and the step that fails is the one it names.</p>
     <div class="card">
       <pre class="flow"><span class="c"> 1</span>  think         one sentence about the drill before touching anything
 <span class="c"> 2</span>  todo_write    the steps below, first one in_progress
@@ -390,45 +425,59 @@ cd Autonomous
     </div>
     <p class="after">
       What it does not do is adjust a single weight — nothing here teaches the model. It teaches you
-      what the model will and won't do once it has the right dialect, which is the question that
-      actually blocks people the first evening.
+      what the model will and won't do once it has the right dialect. Run it again after a fix: the
+      second pass is the proof.
     </p>
   </div>
 </section>
 
-<section id="free">
+<section id="run">
   <div class="wrap">
-    <h2>A fleet for $0</h2>
-    <p class="sub">Free tiers and local models are first-class here, not an afterthought — and paced
-    so one exhausted key does not stop the fleet.</p>
-    <div class="grid">
-      <div class="feature">
-        <span class="ico">⏱️</span>
-        <h3>Paced to each provider's real ceiling</h3>
-        <p>The pacer knows the host's limit — NVIDIA NIM 40/min, Groq 30, OpenRouter 20, with a
-        default for anything unknown — and <code>0 = AUTO</code> uses it. Global, per-provider or
-        per-agent, and an agent can lock its own.</p>
+    <h2>Run it in five minutes</h2>
+    <p class="sub">Nothing to install first except the folder. No container, no package manager, no compile step.</p>
+    <div class="run">
+      <div class="card">
+        <h3>Windows</h3>
+        <p style="margin:0 0 12px;color:var(--muted);font-size:14.5px">
+          Double-click <code>start.bat</code>. The first run installs Apache + PHP (no MySQL),
+          creates your access token, starts the server and opens the app.
+        </p>
+        <pre><span class="c">:: or repair / pick a port</span>
+setup-xampp.bat -Port 8090</pre>
       </div>
-      <div class="feature">
-        <span class="ico">🔑</span>
-        <h3>A 429 is not a stall</h3>
-        <p>A rate-limited key rests for 60 seconds and the next call reaches for another. Add extra
-        keys and the API pool rotates them after N requests, so one exhausted free tier never stops
-        the fleet.</p>
-      </div>
-      <div class="feature">
-        <span class="ico">♾️</span>
-        <h3>Loops that keep going</h3>
-        <p>Always-On re-prompts a standing goal on a cadence, with <em>max iterations</em> and
-        <em>max minutes</em> caps, per-agent hold and release, a release-all button and one master
-        kill switch.</p>
+      <div class="card">
+        <h3>Linux / macOS</h3>
+        <pre class="flow">git clone https://github.com/autonomous-loop-studio/Autonomous.git
+cd Autonomous
+./start.sh          <span class="c"># or ./start.sh 8090</span></pre>
       </div>
     </div>
     <p class="after">
-      Free tiers have daily caps — pacing smooths bursts, it does not make them infinite. And
-      "always on" means the host stays awake: the tab-hidden worker, or a machine that does not
-      sleep. Against Ollama, LM Studio or vLLM on your own box, there is nothing to pace at all.
+      Then paste the token it prints into <strong>Config → Access token</strong>, add one provider key,
+      and you are talking to an agent. Nothing ships with a key, and a fresh copy refuses to serve
+      (<code>503</code>) until a token exists — you cannot forget to set one.
     </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>A look at it</h2>
+    <p class="sub">Classic is the default interface. Glass is the one with the shaders.</p>
+    <div class="shots3">
+      <figure>
+        <div class="shot"><img src="screenshots/classic.png" width="1920" height="1080" loading="lazy" alt="Classic interface: setup panel, chat and the network map side by side."></div>
+        <figcaption>Classic — setup, chat, map.</figcaption>
+      </figure>
+      <figure>
+        <div class="shot"><img src="screenshots/browser.png" width="1919" height="1080" loading="lazy" alt="The built-in browser pane: a live page, an address bar, and controls to click and type as an agent."></div>
+        <figcaption>The browser the agents drive.</figcaption>
+      </figure>
+      <figure>
+        <div class="shot"><img src="screenshots/routing.png" width="1920" height="1080" loading="lazy" alt="A routing chart with three workflows containing loops and a parallel fan-out."></div>
+        <figcaption>Draw the flow, don't describe it.</figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 
@@ -457,24 +506,20 @@ cd Autonomous
   </div>
 </section>
 
-<section>
+<section id="guards">
   <div class="wrap">
-    <h2>A look at it</h2>
-    <p class="sub">Classic is the default interface. Glass is the one with the shaders.</p>
-    <div class="shots3">
-      <figure>
-        <div class="shot"><img src="screenshots/classic.png" width="1920" height="1080" loading="lazy" alt="Classic interface: setup panel, chat and the network map side by side."></div>
-        <figcaption>Classic — setup, chat, map.</figcaption>
-      </figure>
-      <figure>
-        <div class="shot"><img src="screenshots/browser.png" width="1919" height="1080" loading="lazy" alt="The built-in browser pane: a live page, an address bar, and controls to click and type as an agent."></div>
-        <figcaption>The browser the agents drive.</figcaption>
-      </figure>
-      <figure>
-        <div class="shot"><img src="screenshots/routing.png" width="1920" height="1080" loading="lazy" alt="A routing chart with three workflows containing loops and a parallel fan-out."></div>
-        <figcaption>Draw the flow, don't describe it.</figcaption>
-      </figure>
+    <h2>The guards are tested, not asserted</h2>
+    <p class="sub">A tool that gives a language model a shell deserves more than a paragraph of reassurance.</p>
+    <div class="stats">
+      <div class="stat"><div class="n">67</div><div class="l">test files — 35 PHP, 32 JS — each one printing its own pass count</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">serving modes that refuse <code>storage/</code> and <code>tests/</code>: <code>serve.php</code>, Apache <code>.htaccess</code>, and the shipped nginx rules</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">capabilities on by default that can touch your machine — off means off</div></div>
     </div>
+    <p class="after">
+      Every guard has a test that makes the real request, and the suite runs in a throwaway copy of
+      the tree. The design assumes the model is hostile and the pages it reads are booby-trapped;
+      the only trusted actor is the operator.
+    </p>
   </div>
 </section>
 
@@ -494,22 +539,6 @@ cd Autonomous
   </div>
 </section>
 
-<section id="guards">
-  <div class="wrap">
-    <h2>The guards are tested, not asserted</h2>
-    <p class="sub">A tool that gives a language model a shell deserves more than a paragraph of reassurance.</p>
-    <div class="stats">
-      <div class="stat"><div class="n">67</div><div class="l">test files — 35 PHP, 32 JS — each one printing its own pass count</div></div>
-      <div class="stat"><div class="n">3</div><div class="l">serving modes that refuse <code>storage/</code> and <code>tests/</code>: <code>serve.php</code>, Apache <code>.htaccess</code>, and the shipped nginx rules</div></div>
-      <div class="stat"><div class="n">0</div><div class="l">capabilities on by default that can touch your machine — off means off</div></div>
-    </div>
-    <p class="after">
-      Every guard has a test that makes the real request, and the suite runs in a throwaway copy of
-      the tree. The design assumes the model is hostile and the pages it reads are booby-trapped;
-      the only trusted actor is the operator.
-    </p>
-  </div>
-</section>
 </main>
 
 <footer>
