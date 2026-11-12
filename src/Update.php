@@ -112,8 +112,14 @@ class Update
         'objects.githubusercontent.com',
     );
 
-    /** Top-level names that are never compared and never extracted. */
-    private static $neverTouch = array('storage', '.git', 'node_modules', '.freebuff');
+    /**
+     * Top-level names that are never compared and never extracted.
+     *
+     * `.github` matches Install's list: workflows and issue templates belong to
+     * the repository, not to a self-hosted copy, so a release that edits them
+     * must not report a file the install is forbidden to write.
+     */
+    private static $neverTouch = array('storage', '.git', 'node_modules', '.freebuff', '.github');
 
     /**
      * Folders whose contents are the operator's data, not app files. A release

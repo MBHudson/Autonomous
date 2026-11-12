@@ -41,8 +41,17 @@ namespace Src;
  */
 class Install
 {
-    /** Top-level names an install may never write. Mirrors Src\Update's list. */
-    private static $neverTouch = array('storage', '.git', 'node_modules', '.freebuff');
+    /**
+     * Top-level names an install may never write. Mirrors Src\Update's list.
+     *
+     * `.github` is repository metadata -- CI workflows, issue templates,
+     * dependabot -- not app files. An install has no use for it and may not own
+     * it: a copy deployed by root or by git left `.github` unwritable for the
+     * web server, and the preflight then refused the whole release over a file
+     * the app never reads. Skipping it removes that refusal without weakening
+     * anything the updater is meant to replace.
+     */
+    private static $neverTouch = array('storage', '.git', 'node_modules', '.freebuff', '.github');
 
     /** Folders that hold the operator's own files rather than app code. */
     private static $dataFolders = array('screenshots', 'sandbox');
@@ -180,6 +189,12 @@ class Install
             $rel = (string) (is_array($f) ? ($f['path'] ?? '') : '');
             $status = (string) (is_array($f) ? ($f['status'] ?? '') : '');
             if ($rel === '' || $status === 'same') {
+                continue;
+            }
+            // A folder the install will never write must not be probed for
+            // write access either: `.github/workflows/` used to fail the whole
+            // preflight here while the install loop was going to skip it.
+            if (self::isSkipped($rel)) {
                 continue;
             }
             $dir = str_replace('\\', '/', dirname($rel));

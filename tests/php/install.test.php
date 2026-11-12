@@ -428,22 +428,43 @@ ok(count($ages) === Install::BACKUP_KEEP
     'old rollback copies are pruned -- the two NEWEST survive, the two oldest go');
 
 // --- 6. a release that ADDS a folder -----------------------------------
-// .github/workflows did not exist on the host that first met one. The probe was
-// written into it anyway, failed with "No such file or directory", and the
-// preflight reported that as a permission refusal -- stopping an install that
-// put() would have completed, because put() creates the folder itself.
+// A folder the release adds that does not exist yet is not a locked one: put()
+// creates every level under a writable parent, so the preflight has to ask the
+// deepest folder that DOES exist instead of probing a path that is not there --
+// which used to fail with "No such file or directory" and read as a refusal.
+// The fixture is a real app folder (`tools/`); `.github` moved to the never-write
+// list in 6b, and a folder the install refuses to write can no longer stand in
+// for one it is expected to create.
 build($app, '360', null, [
-    ['path' => '.github/workflows/tests.yml', 'status' => 'new', 'from' => null, 'to' => 24],
+    ['path' => 'tools/newfolder/harness.sh', 'status' => 'new', 'from' => null, 'to' => 24],
 ]);
-put($app . '/storage/updates/staging/Autonomous-master/.github/workflows/tests.yml', "name: tests\n");
-ok(!is_dir($app . '/.github'), 'the folder this release adds does not exist yet');
+put($app . '/storage/updates/staging/Autonomous-master/tools/newfolder/harness.sh', "#!/bin/sh\n");
+ok(!is_dir($app . '/tools/newfolder'), 'the folder this release adds does not exist yet');
 $pre = Install::preflight();
 ok($pre['ok'] === true, 'a MISSING folder the release adds is not a locked one');
 ok($pre['blocked'] === null, 'and no folder is named as blocked');
-ok(!is_dir($app . '/.github'), 'asking the question did not create the folder');
+ok(!is_dir($app . '/tools/newfolder'), 'asking the question did not create the folder');
 $res = Install::apply();
-ok($res['ok'] === true && is_file($app . '/.github/workflows/tests.yml'),
+ok($res['ok'] === true && is_file($app . '/tools/newfolder/harness.sh'),
     'apply creates the missing folder and writes the file into it');
+
+// --- 6b. repository metadata is never written ---------------------------
+// `.github` holds CI workflows, issue templates and dependabot -- nothing the
+// app reads at runtime. A copy deployed by root or by git leaves that folder
+// owned by another account, and probing it stopped whole updates on a hosted
+// install. It is on the never-write list in both Install and Update.
+build($app, '362', null, [
+    ['path' => '.github/workflows/tests.yml', 'status' => 'new', 'from' => null, 'to' => 24],
+    ['path' => 'ui/js/store.js', 'status' => 'updated', 'from' => 10, 'to' => 12],
+]);
+put($app . '/storage/updates/staging/Autonomous-master/.github/workflows/tests.yml', "name: tests\n");
+ok(Install::writeTargets(['files' => [['path' => '.github/workflows/tests.yml', 'status' => 'new']]]) === [],
+    'writeTargets never asks for .github, so the preflight cannot refuse over it');
+ok(!is_dir($app . '/.github'), 'the .github folder was not there to begin with');
+$res = Install::apply();
+ok($res['ok'] === true, 'an install whose release also edits .github still completes');
+ok(!is_file($app . '/.github/workflows/tests.yml'),
+    'and none of its .github files are written into the copy');
 
 // --- 7. the folder recipe the panel prints ----------------------------
 // A refusal about a folder the release ADDS is the one the operator can finish
