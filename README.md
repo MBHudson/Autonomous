@@ -20,6 +20,10 @@ team of agents is running.
 
 ![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/auto-harness.gif)
 
+*Two runs of the same twelve-step drill. The first stops on a failed `edit` — twelve calls, one retry, the
+error visible in the transcript. With training mode back on, the second takes off and runs every step in
+order, its closing calls a few hundred milliseconds apart.*
+
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 ![No build step](https://img.shields.io/badge/build-none_needed-brightgreen)
