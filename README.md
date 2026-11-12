@@ -18,7 +18,7 @@ to a clean score: twelve steps, 12 calls, 0 retries.
 One folder of PHP and static files — drop it on the host you already pay for, double-click, and a
 team of agents is running.
 
-![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/banner.png)
+![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/auto-harness.gif)
 
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
