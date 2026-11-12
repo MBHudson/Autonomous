@@ -332,37 +332,41 @@
 <section id="harness">
   <div class="wrap">
     <h2>The harness fits itself to the model</h2>
-    <p class="sub">Every model speaks tool calls slightly differently, and most of them are wrong
-    about it. This does not ask you to pick the right format and hope — it works out what the model
-    answers, teaches it that, and remembers it.</p>
+    <p class="sub">One loop, run on every request: try a dialect, catch the miss, retry in the next
+    one, and keep the call that actually executed — then try that one first next time. Training mode
+    is the same loop made explicit: twelve steps, each retried until it passes, run again until the
+    score is 12 calls and 0 retries.</p>
     <div class="grid">
       <div class="feature">
         <span class="ico">🎛️</span>
-        <h3>Auto: detect it</h3>
+        <h3>1 · Try a dialect</h3>
         <p>The API shape and the tool dialect are read from the endpoint host first, then the provider,
         then the model id — OpenAI-style JSON, Claude XML, native tags, or strict plain JSON. Pin any
         of it per agent when you know better than the guess.</p>
       </div>
       <div class="feature">
         <span class="ico">🩹</span>
-        <h3>Near misses are read, not dropped</h3>
+        <h3>2 · Catch the miss</h3>
         <p>A guessed name is repaired to the tool it meant — <code>list_agent</code> runs
         <code>list_agents</code> — a guessed wrapper parses like the real one, and near-miss argument
-        fields are understood. An invented name and a fence full of prose are still refused.</p>
+        fields are understood. An invented name and a fence full of prose are still refused, because
+        running the wrong tool is worse than asking again.</p>
+      </div>
+      <div class="feature">
+        <span class="ico">🔁</span>
+        <h3>3 · Retry in the next one</h3>
+        <p>A reply that looks like a call but parses to nothing is never allowed to become the answer:
+        it is re-taught in the next untried dialect — plain → JSON → native → Claude XML — and every
+        retry spends a step of the same budget, so the loop cannot spin.</p>
       </div>
       <div class="feature">
         <span class="ico">🏆</span>
-        <h3>It learns the winner</h3>
-        <p>Once a call parses, that dialect is stored per <code>provider + model</code> and tried first
-        next time. Config → Labs turns the memo off, and detection then re-derives it every turn.</p>
+        <h3>4 · Keep the winner</h3>
+        <p>Only when <b>every</b> call in the turn came back ok is that dialect stored against
+        <code>provider + model</code>, and from then on it is tried first. A parse that then failed is
+        never kept. Config → Labs turns the memo off; detection then re-derives it every turn.</p>
       </div>
     </div>
-
-    <h3 class="mini">When a reply misses</h3>
-    <p class="para">A reply that looks like a call but parses to nothing is never allowed to become the
-    final answer. It is re-taught in the next untried dialect — plain → JSON → native → Claude XML — and
-    because every extra call spends one step of the same budget, the retries are bounded rather than
-    free.</p>
 
     <h3 class="mini">The failures it answers</h3>
     <div class="fails">
