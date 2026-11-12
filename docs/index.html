@@ -63,6 +63,10 @@
   .btn.primary:hover{background:#42eeff}
   .btn.ghost{border-color:var(--line-strong); color:var(--text); background:rgba(255,255,255,.02)}
   .btn.ghost:hover{background:rgba(255,255,255,.05)}
+  .cta-block{text-align:center}
+  .cta-block h2{font-size:clamp(23px,4.6vw,32px); letter-spacing:-.025em}
+  .cta-block p{color:var(--muted); font-size:16px; max-width:60ch; margin:0 auto clamp(18px,3.5vw,24px)}
+  .cta-block .cta{justify-content:center}
   .facts{display:flex; flex-wrap:wrap; gap:6px; margin:clamp(18px,3.5vw,26px) 0 0; padding:0;
     list-style:none; font-size:12.5px; color:var(--dim)}
   .facts li{border:1px solid var(--line); border-radius:999px; padding:3px 10px}
@@ -204,8 +208,9 @@
 <section id="free">
   <div class="wrap">
     <h2>A fleet for $0</h2>
-    <p class="sub">Free tiers and local models are first-class here, not an afterthought — and paced
-    so one exhausted key does not stop the fleet.</p>
+    <p class="sub">That laptop is not obsolete; it just hasn't been given a job. An 8B model and one
+    PHP folder will run this fleet all day at zero marginal cost — no key, no rate limit, no cap. The
+    hosted free tiers come second, paced to each host's real ceiling.</p>
     <div class="grid">
       <div class="feature">
         <span class="ico">⏱️</span>
@@ -546,11 +551,22 @@ cd Autonomous
       <li><span class="m">!</span><span><b>The Glass theme is GPU-hungry.</b> Classic is the default for a reason; Config → Desktop has the dials if you want the pretty one.</span></li>
       <li><span class="m">!</span><span><b>Android is documented, not shipped.</b> WebView, Termux and a PWA are all written up; there is no app store build.</span></li>
       <li><span class="m">!</span><span><b>The documentation is one very long page.</b> It is thorough. It is not yet a docs site.</span></li>
-      <li><span class="m">!</span><span><b>It is not a fence around you.</b> Turn every capability on, auto-approve writes and point the jail at the filesystem root, and you have built a very capable foot-gun.</span></li>
-    </ul>
+      <li><span class="m">!</span><span><b>It is not a fence around you.</b> Turn every capability on, auto-approve writes and point the jail at the filesystem root, and you have built a very capable foot-gun.</span></li>    </ul>
   </div>
 </section>
 
+<section id="start">
+  <div class="wrap cta-block">
+    <h2>Nothing to cancel.</h2>
+    <p>No account, no trial that expires, no seat count, no card on file. One folder, your own keys,
+    and a fleet that keeps running after you close the tab. Delete the folder and it is gone — that
+    is the whole cancellation flow.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/autonomous-loop-studio/Autonomous">Get it on GitHub ↗</a>
+      <a class="btn ghost" href="#run">Run it in five minutes</a>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
