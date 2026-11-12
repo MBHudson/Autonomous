@@ -10,11 +10,13 @@
 
 **A self-hosted agent console in plain PHP.** No Docker. No Node. No build step. No account.
 
-A 7B on your laptop or a frontier API: it learns the tool dialect that model actually
-answers, refuses to let an agent claim work it never did, bounds runaway loops before
-they cost anything, and keeps the conversation inside the window. Then you watch the
-whole loop on a live map. One folder of PHP and static files — drop it on the host you
-already pay for, double-click, and a team of agents is running.
+Point it at a 7B on your laptop or a frontier API. Every request runs the same loop: it tries the
+tool dialect that model answers, catches the near miss, retries in the next format, and keeps the
+call that actually executed — then leads with that one next time. Training mode is that loop driven
+to a clean score: twelve steps, 12 calls, 0 retries.
+
+One folder of PHP and static files — drop it on the host you already pay for, double-click, and a
+team of agents is running.
 
 ![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/banner.png)
 
@@ -45,14 +47,26 @@ Cerebras, Together, Perplexity, NVIDIA NIM, or **Ollama / LM Studio / vLLM** on 
 
 ## What it is
 
-- 🤖 **Any model, any provider.** It detects each provider's API shape *and* its tool dialect —
-  JSON, Claude XML, raw tool-call tags — and remembers which one actually worked for that model.
-- 🛠️ **Real tools, not chat.** Read and write files inside a jail, run allowlisted commands
-  (argv only — no shell), drive a real Chrome/Edge over DevTools, commit with git, call MCP servers.
-- 🕸️ **You can watch it.** A live 3D map of agents, providers and traffic; every hop also written
-  out in words in a run trace; routing charts you draw instead of describing.
-- 🔐 **Safe by default.** `exec`, `run_code`, the browser and the MCP server are **off** until you
-  switch them on. Every write asks first. No accounts, no cloud, no telemetry.
+One loop, run on every request. Training mode is the same loop, made explicit.
+
+1. 🎛️ **Try a dialect.** The API shape and the tool dialect are read from the endpoint host first,
+   then the provider, then the model id — OpenAI-style JSON, Claude XML, native tags, or strict
+   plain JSON. Pin any of it per agent when you know better than the guess.
+2. 🩹 **Catch the miss.** A guessed name is repaired to the tool it meant (`list_agent` runs
+   `list_agents`), a guessed wrapper parses like the real one, near-miss argument fields are read.
+   An invented name and a fence full of prose are still refused — running the wrong tool is worse
+   than asking again.
+3. 🔁 **Retry in the next one.** A reply that looks like a call but parses to nothing never becomes
+   the answer: it is re-taught in the next untried dialect — plain → JSON → native → Claude XML —
+   and every retry spends a step of the same budget, so the loop cannot spin.
+4. 🏆 **Keep the winner.** Only when **every** call in the turn came back ok is that dialect stored
+   against `provider + model`, and from then on it is tried first. A parse that then failed is never
+   kept. Config → Labs turns the memo off; detection then re-derives it every turn.
+
+Then: real tools (files in a jail, an allowlisted `exec` that takes argv only, git, a real Chrome or
+Edge over the DevTools protocol, MCP), a routing chart you draw instead of describe, and a live 3D
+map with every hop written out in words. `exec`, `run_code`, the browser and the MCP server are
+**off** until you switch them on, and every write asks first. No accounts, no cloud, no telemetry.
 
 ## Why local agents fail — and what this does about it
 
