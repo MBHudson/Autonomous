@@ -122,6 +122,19 @@ run — each landing once, in order, with its own timing:
 
 **[The whole 30 seconds, unedited ↗](https://github.com/autonomous-loop-studio/Autonomous/releases/download/v447/Training-Mode.mp4)** — the failed first pass, the correction, the `ok`, and the clean run. mp4, 43 MB — it downloads rather than streaming in the browser.
 
+## Downloads
+
+There is no binary to install — a release is the source folder, and "updating" is replacing its files.
+
+| | What it is | Get it |
+|---|---|---|
+| **v448** — current | The fix for **Config → Limits & Budgets → Longest single wait (seconds)** resetting itself to 0, plus the UI cache-buster that carries it to a browser which already loaded the old page. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v448) |
+| **v447** | Training mode (the twelve-step drill), the harness that learns a model's tool dialect, tunnels from Config, and the fixes that came out of testing them. This is the release carrying the **30-second drill video**. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v447) |
+
+Running an older copy? **Config → Updates → INSTALL UPDATE…** updates in place and keeps `storage/`.
+Every release, including the open-testing builds before these two, is listed on
+[Releases](https://github.com/autonomous-loop-studio/Autonomous/releases).
+
 ## Everything else, below
 
 [Quick start](#-quick-start) · [Is it safe?](#-is-it-safe) · [What's inside](#-whats-inside) ·
@@ -129,7 +142,7 @@ run — each landing once, in order, with its own timing:
 [Tools](#️-tools-agents-can-use) · [Routing chart](#-routing-chart) ·
 [MCP](#-mcp--connect-out-to-other-servers-client) · [Tunnels](#-tunnels--take-the-mcp-server-off-lan) ·
 [Architecture](#-architecture) · [Tests](#-tests) · [API](#-api-endpoints) ·
-[Troubleshooting](#-troubleshooting) · [Recent releases](#-whats-new)
+[Troubleshooting](#-troubleshooting) · [Downloads](#downloads) · [Recent releases](#-whats-new)
 
 Everything above is the pitch. Everything below is the documentation — long, detailed, and
 written for someone who has already decided to run it.
@@ -148,6 +161,7 @@ Jump straight to a section — every heading on this page is linkable; these are
 - [🚫 What it isn't](#what-it-is-not)
 - [💰 A fleet for $0](#a-fleet-for-0)
 - [🖼️ A look at it](#a-look-at-it)
+- [⬇️ Downloads](#downloads)
 - [✨ What's inside](#-whats-inside)
 - [🔒 Is it safe?](#-is-it-safe)
 - [🖥️ Two interfaces, one switch](#️-two-interfaces-one-switch)
