@@ -1829,7 +1829,9 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 **Newest first.** Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section above, where it stays as reference. The most recent release sits at the top.
 
-### 🆕 v447 — tunnels leave the terminal: Config → Tunnels 🌐
+### 🩹 v448 — opening Config stopped eating the saved rate-limit wait
+
+*Config → Limits & Budgets → **Longest single wait (seconds)** read 0 every time the panel opened, and saving while it read 0 wrote the 5-second minimum instead of your number. The field rescue that runs before the panel is drawn multiplied a missing value by 1000, and `null * 1000` is `0` — a number, so it was stored. It is multiplied only when the field is really there now, and `APP_VERSION` 429 → 430 so a browser holding the old `sidebar.js` fetches the fixed one.*
 
 *Off-LAN friends without touching a terminal: the new **Tunnels** card starts and stops ngrok and Cloudflare quick tunnels from inside the app, detects the served port, and shows each public URL with its friend-ready RPC path to copy. The binaries install from the setup scripts only when asked (`setup-xampp.bat -Tunnels`, `INSTALL_TUNNELS=1 ./start.sh` into `tools/bin/`); `tunnel.bat` / `./tunnel.sh` remain for the command line, with a bare number meaning a port. Operator-only — there is no agent tool for this, the switch defaults off, and every start and stop is audited. Pictured and fully detailed in the new [🌐 Tunnels](#-tunnels--take-the-mcp-server-off-lan) section below.*
 
