@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=429';
-import { K } from '../storage.js?v=429';
-import { persistence } from '../persistence.js?v=429';
-import { api } from '../api.js?v=429';
-import { isNoTokenError } from '../apiError.js?v=429';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=429';
-import { errText } from '../api.js?v=429';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=429';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=429';
-import { snapshot } from '../rateGovernor.js?v=429';
-import { trainingStepList, trainingKickoffFor } from '../training.js?v=429';
-import { resetBrowserEnabled } from '../toolManifest.js?v=429';
-import { perf } from '../perf.js?v=429';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=429';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=429';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=429';
+import { store } from '../store.js?v=430';
+import { K } from '../storage.js?v=430';
+import { persistence } from '../persistence.js?v=430';
+import { api } from '../api.js?v=430';
+import { isNoTokenError } from '../apiError.js?v=430';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=430';
+import { errText } from '../api.js?v=430';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=430';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=430';
+import { snapshot } from '../rateGovernor.js?v=430';
+import { trainingStepList, trainingKickoffFor } from '../training.js?v=430';
+import { resetBrowserEnabled } from '../toolManifest.js?v=430';
+import { perf } from '../perf.js?v=430';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=430';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=430';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=430';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open

@@ -25,7 +25,7 @@
 // the session; this is the traffic that never lands there, and a second copy on
 // disk would need its own retention decision.
 
-import { store } from './store.js?v=429';
+import { store } from './store.js?v=430';
 
 const MAX_EXCHANGES = 600;
 
