@@ -65,7 +65,7 @@ Six failures every operator hits in the first evening, and the code path that an
 | **It loops and burns the budget** | A hard step ceiling and a wall-clock deadline per turn, bounded steering, an acyclic `ask_agent` chain (A→B→A is refused), and duplicate-call suppression. When a ceiling is reached the transcript names it: *"You used all N tool calls on this task."* A runaway hits a wall, not your wallet. |
 | **The conversation falls out of the window** | Budgeted against the model's **real** window, then compacted: old tool exchanges keep their head and tail, the newest turns survive, oversized results are cut. A 128k model is not replayed as if it had 6k. |
 | **It forgets by the next session** | Private notes plus a deliberately small shared collective, with `adopt` so a shared fact can become its own. Injected as **recollection, not instructions** — the agent reads what it learned instead of being told what to do. |
-| **You can't tell whether any of it works** | A **12-step drill** any agent can be walked through against a real folder, with the step that failed named instead of hidden. It proves the harness, not the model. |
+| **You can't tell whether any of it works** | A **12-step drill** in one sandbox folder, worked in order and **retried until every step passes** — never skipped. The call that actually executed is what gets remembered as the winning syntax, and the score to chase is 12 calls, 0 retries. |
 
 If a model is capable and still useless, it is usually one of those six — and each one has a
 code path here rather than a paragraph of advice.

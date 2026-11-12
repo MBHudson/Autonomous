@@ -400,15 +400,22 @@
       </div>
       <div class="fail">
         <div class="f">You can't tell whether any of it works<em>“it seems to work”</em></div>
-        <p class="fix">Training mode below: a <b>12-step drill</b> any agent can be walked through
-        against a real folder, with the step that failed named instead of hidden.</p>
+        <p class="fix">Training mode below: a <b>12-step drill</b> worked in order and retried until
+        each step passes — never skipped. It is scored by retries, and the call that actually executed
+        is what gets remembered.</p>
       </div>
     </div>
 
-    <h3 class="mini">Training mode — the part you can run in ten minutes</h3>
-    <p class="para">Twelve real tool calls against a real folder, in order, asking for approval where
-    it writes. A model can be perfectly capable and still be handed the wrong dialect; the drill is how
-    you find out which one you have, and the step that fails is the one it names.</p>
+    <h3 class="mini">Training mode — brute force, until it is clean</h3>
+    <p class="para">Arm it and every active agent is locked to one drill, paced to half its normal
+    request rate. Twelve steps in one sandbox folder, simplest first, in order — and a step that fails
+    is <b>retried until it passes</b>. No skipping, no reordering, no moving on because the error
+    looked close enough. The approval prompts on the writing steps are part of the drill: waiting for
+    one is a step, not an interruption.</p>
+    <p class="para">Each pass goes into the agent's own todo list, and the call that actually executed
+    is what gets remembered: the <b>winning syntax</b> is stored against that provider and model and
+    offered first the next time that model is asked for a tool. The score to chase is <b>12 calls,
+    0 retries</b> — the first run rarely gets there, the second usually does.</p>
     <div class="card">
       <pre class="flow"><span class="c"> 1</span>  think         one sentence about the drill before touching anything
 <span class="c"> 2</span>  todo_write    the steps below, first one in_progress
@@ -424,9 +431,10 @@
 <span class="c">12</span>  todo_write    mark every step completed and stop</pre>
     </div>
     <p class="after">
-      What it does not do is adjust a single weight — nothing here teaches the model. It teaches you
-      what the model will and won't do once it has the right dialect. Run it again after a fix: the
-      second pass is the proof.
+      Nothing here changes a weight — models do not keep those between calls. What survives the drill is
+      the shape of the call that worked, so the next turn starts from the syntax you already watched
+      succeed. It lifts models above roughly 1.5B parameters; below that the drill keeps failing, and
+      that is a straight answer too.
     </p>
   </div>
 </section>
