@@ -305,13 +305,38 @@ class Config {
         return file_put_contents(self::modelsPath(), json_encode(array_values($models), JSON_PRETTY_PRINT)) !== false;
     }
 
+    /**
+     * Read the config, creating a default one the first time.
+     *
+     * A fresh copy has no `storage/config.json`: the file is git-ignored, so no
+     * clone, zip or release archive contains it, and the first request is
+     * supposed to write one. That write was never checked. On a copy whose
+     * `storage/` the web server cannot write -- the usual cause being that the
+     * files were uploaded by root or by a cPanel account while PHP runs as
+     * someone else -- the write failed silently, the read that followed warned
+     * "file_get_contents(storage/config.json): No such file or directory", and
+     * the caller got `null` instead of a config. It read as a broken install on
+     * a copy that was fine; only the folder's owner was wrong.
+     *
+     * So: write it, and if that is refused say which folder and answer with the
+     * defaults anyway. A read must never turn into null because a file it was
+     * about to create does not exist yet.
+     */
     public static function loadConfig() {
         $path = self::configPath();
-        if (!file_exists($path)) {
-            if ($path === self::$configPath) { self::saveDefaultConfig(); }
-            else { return []; }
+        if (file_exists($path)) {
+            return json_decode(file_get_contents($path), true);
         }
-        return json_decode(file_get_contents($path), true);
+
+        $default = self::defaultConfig();
+        if (!self::saveDefaultConfig()) {
+            // One line in the server log, naming the folder, because the next
+            // symptom (settings that do not persist) looks like a UI bug.
+            error_log('Autonomous: could not create ' . $path . ' -- the web server cannot write to '
+                . dirname($path) . '. Settings will not persist until that folder is writable by '
+                . 'the account PHP runs as.');
+        }
+        return $default;
     }
     
     public static function saveConfig($config) {
@@ -443,8 +468,9 @@ class Config {
         return [$config, $notes];
     }
     
-    private static function saveDefaultConfig() {
-        $default = [
+    /** What a copy with no config.json starts as. Written to disk AND returned. */
+    private static function defaultConfig() {
+        return [
             'theme' => 'neon',
             'sounds_enabled' => true,
             'auto_scroll' => true,
@@ -453,7 +479,24 @@ class Config {
             // Certificate policy for outbound calls: auto | on | off. See Tls.php.
             'tls' => ['verify' => 'auto']
         ];
-        file_put_contents(self::configPath(), json_encode($default, JSON_PRETTY_PRINT));
+    }
+
+    /**
+     * Write the first config. Returns whether the file is there afterwards.
+     *
+     * False is a real answer -- the caller hands back the defaults in memory and
+     * logs the folder -- so the failure is not swallowed here as it used to be.
+     * `@` keeps a refused write from printing a warning into a JSON response;
+     * the log line in loadConfig() is the message that survives.
+     */
+    private static function saveDefaultConfig() {
+        $path = self::configPath();
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return false;
+        }
+        $wrote = @file_put_contents($path, json_encode(self::defaultConfig(), JSON_PRETTY_PRINT));
+        return $wrote !== false && is_file($path);
     }
     
     public static function getModels() {

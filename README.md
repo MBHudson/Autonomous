@@ -128,7 +128,8 @@ There is no binary to install — a release is the source folder, and "updating"
 
 | | What it is | Get it |
 |---|---|---|
-| **v449** — current | Updating no longer refuses to start on a hosted copy because it cannot write `.github/workflows/`. Repository metadata is skipped now; app files update as before. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v449) |
+| **v450** — current | A fresh download boots without `storage/config.json`, and on a copy whose `storage/` is not writable it says which folder instead of handing the app a `null` config. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v450) |
+| **v449** | Updating no longer refuses to start on a hosted copy because it cannot write `.github/workflows/`. Repository metadata is skipped now; app files update as before. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v449) |
 | **v448** | The fix for **Config → Limits & Budgets → Longest single wait (seconds)** resetting itself to 0, plus the UI cache-buster that carries it to a browser which already loaded the old page. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v448) |
 | **v447** | Training mode (the twelve-step drill), the harness that learns a model's tool dialect, tunnels from Config, and the fixes that came out of testing them. This is the release carrying the **30-second drill video**. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v447) |
 
@@ -1845,9 +1846,9 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 **Newest first.** Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section above, where it stays as reference. The most recent release sits at the top.
 
-### 🩹 v449 — an update no longer stops on `.github`
+### 🩹 v450 — a fresh copy boots without `storage/config.json`
 
-*Updating refused to start on a hosted copy with **Cannot write to `.github/workflows/`** — CI files, issue templates and dependabot, owned by the account that deployed the copy rather than the one running PHP. `.github` is repository metadata the app never reads, so it is now on the never-write list in both `Install` and `Update` and the preflight no longer probes it; the case that guard was written for, a release adding a real app folder that does not exist yet, is unchanged and still tested under `tools/`. Nothing else about updating changed.*
+*The file is git-ignored, so no download contains it and the first request writes it — but the write was never checked. On a copy whose `storage/` the web server could not write, it failed silently, the read that followed warned **No such file or directory**, and the app received `null` where a config belongs: an install that was fine except for one folder's owner looked broken, and nothing saved afterwards persisted. It now writes the default, checks that it landed, and hands back the same defaults in memory if it cannot, so a read-only copy boots instead of collapsing. A refusal logs one line naming the folder and the account — the symptom it replaces, settings that quietly revert, reads like a UI bug.*
 
 
 ---
