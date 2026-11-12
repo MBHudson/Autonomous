@@ -123,12 +123,12 @@ Ollama, LM Studio or vLLM on your own box there is nothing to pace at all.
 
 *Glass desktop and Classic (the default) · a routing chart · Brain Lab · the built-in browser.*
 
-**[The drill, recorded](screenshots/training-mode.gif)** — a local model worked through the twelve-step
-training drill against a real folder. The run before this one repeated `list_dir`, `grep_code` and
-`exec`, and said so in the transcript; asked to try again, every call landed once, in order, each
-with its own timing:
+**[The drill, recorded](screenshots/training-mode.gif)** — a local model running the training drill
+against a real folder. The attempt before this one repeated `list_dir`, `grep_code` and `exec`, and
+said so in the transcript; asked to try again it ran clean, and these are the closing calls of that
+run — each landing once, in order, with its own timing:
 
-<p><a href="screenshots/training-mode-poster.png"><img src="screenshots/training-mode.gif" width="880" alt="A local agent completing the twelve-step training drill — ten tool calls finishing in sequence, each with its own timing."></a></p>
+<p><a href="screenshots/training-mode-poster.png"><img src="screenshots/training-mode.gif" width="880" alt="A local agent running the training drill — its closing tool calls landing once each, in order, each with its own timing."></a></p>
 
 *Click it for the full-size still.*
 
