@@ -108,6 +108,15 @@ Ollama, LM Studio or vLLM on your own box there is nothing to pace at all.
 
 *Glass desktop and Classic (the default) · a routing chart · Brain Lab · the built-in browser.*
 
+**[The drill, recorded](screenshots/training-mode.gif)** — a local model worked through the twelve-step
+training drill against a real folder. The run before this one repeated `list_dir`, `grep_code` and
+`exec`, and said so in the transcript; asked to try again, every call landed once, in order, each
+with its own timing:
+
+<p><a href="screenshots/training-mode-poster.png"><img src="screenshots/training-mode.gif" width="880" alt="A local agent completing the twelve-step training drill — ten tool calls finishing in sequence, each with its own timing."></a></p>
+
+*Click it for the full-size still.*
+
 ## Everything else, below
 
 [Quick start](#-quick-start) · [Is it safe?](#-is-it-safe) · [What's inside](#-whats-inside) ·
