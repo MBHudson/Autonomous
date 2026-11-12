@@ -20,9 +20,10 @@ team of agents is running.
 
 ![Autonomous Loop Studio — a self-hosted AI agent console in plain PHP](screenshots/auto-harness.gif)
 
-*Two runs of the same twelve-step drill. The first stops on a failed `edit` — twelve calls, one retry, the
-error visible in the transcript. With training mode back on, the second takes off and runs every step in
-order, its closing calls a few hundred milliseconds apart.*
+*Two runs of the same twelve-step training drill to auto fit the harness. The first run ends with twelve
+calls, one successful retry, the error visible in the transcript. The harness has learned from its
+successful retry. With training mode back on, the second run is completed without error. The harness has
+been successfully custom-fitted, and your model is now an agent.*
 
 ![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
