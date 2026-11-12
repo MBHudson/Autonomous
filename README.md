@@ -92,8 +92,9 @@ yourself.
 
 ## A fleet for $0
 
-Free tiers and local models are first-class here, not an afterthought — and paced so one exhausted
-key does not stop the fleet.
+That laptop is not obsolete; it just hasn't been given a job. An 8B model and one PHP folder will
+run this fleet all day at zero marginal cost — no key, no rate limit, no cap. The hosted free tiers
+come second, paced to each host's real ceiling so one exhausted key does not stop the fleet.
 
 - ⏱️ **Paced to each provider's real ceiling** — the pacer knows the host's limit (NVIDIA NIM
   40/min, Groq 30, OpenRouter 20, a default for anything unknown), and `0 = AUTO` uses it. Global,
@@ -1858,6 +1859,17 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 - **MCP client gets `missing bearer token` even with a token** → under Apache + PHP-FPM the `Authorization` header is stripped before PHP sees it. Redeploy `api/.htaccess` (shipped): it has `CGIPassAuth On` plus the `RewriteCond %{HTTP:Authorization}` fallback, so `$_SERVER['HTTP_AUTHORIZATION']` is populated. Without that file both are empty. If a proxy/WAF also strips the header, the host must allow it through (nginx: `fastcgi_param HTTP_AUTHORIZATION $http_authorization;`).
 - **Local models not connecting** → make sure Ollama/LM Studio is running and reachable (Ollama `:11434`, LM Studio `:1234`).
 - **A reply arrives as raw JSON** → the server answered in a shape the app did not recognise, and the last-resort fallback printed the body rather than swallowing it. The `{"output":[{"type":"message","content":…}],"stats":{…}}` envelope is read natively as of **v374** — hard-refresh first, because the newer parsers live in `ui/js/harness.js` and an open tab keeps the old bundle. A body in some other shape still arrives verbatim on purpose: that is how a missing shape gets noticed, and teaching the extractor another one is a few lines in `src/Harness.php` plus its browser copy.
+
+---
+
+## Nothing to cancel
+
+No account, no trial that expires, no seat count, no card on file. One folder, your own keys, and a
+fleet that keeps running after you close the tab. Delete the folder and it is gone — that is the
+whole cancellation flow.
+
+**[Get it on GitHub ↗](https://github.com/autonomous-loop-studio/Autonomous)** — the install is
+`start.bat` or `./start.sh`, and the [five-minute version](#run-it-in-five-minutes) is near the top.
 
 ---
 
