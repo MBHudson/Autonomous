@@ -27,7 +27,7 @@ team of agents is running.
 ![Linux](https://img.shields.io/badge/Linux-one_command-FCC624?logo=linux&logoColor=black)
 [![Tests](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml/badge.svg)](https://github.com/autonomous-loop-studio/Autonomous/actions/workflows/tests.yml)
 
-**🚀 [Quick start ↓](#-quick-start) · 🩺 [Why agents fail ↓](#-why-local-agents-fail--and-what-this-does-about-it) · ✨ [Features ↓](#-whats-inside) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
+**🚀 [Quick start ↓](#-quick-start) · 🩺 [Why agents fail ↓](#why-local-agents-fail--and-what-this-does-about-it) · 🏋 [The harness ↓](#-auto-forming-harnesses-dialects--training-mode) · ✨ [Features ↓](#-whats-inside) · 🔒 [How the guards work ↓](#-security--guardrails--safe-by-construction-️) · 🧩 [Architecture ↓](#-architecture)**
 
 ---
 
@@ -153,10 +153,14 @@ Jump straight to a section — every heading on this page is linkable; these are
 
 **🚀 Start here**
 
-- [🚀 Quick start](#-quick-start)
-- [🔒 Is it safe?](#-is-it-safe)
-- [🆕 What's new — recent releases](#-whats-new)
+- [🚀 Run it in five minutes](#run-it-in-five-minutes)
+- [🧭 What it is — the loop](#what-it-is)
+- [🩺 Why local agents fail](#why-local-agents-fail--and-what-this-does-about-it)
+- [🚫 What it isn't](#what-it-is-not)
+- [💰 A fleet for $0](#a-fleet-for-0)
+- [🖼️ A look at it](#a-look-at-it)
 - [✨ What's inside](#-whats-inside)
+- [🔒 Is it safe?](#-is-it-safe)
 - [🖥️ Two interfaces, one switch](#️-two-interfaces-one-switch)
 - [🎛️ Config → Desktop](#️-config--desktop--the-machine-room-card)
 
