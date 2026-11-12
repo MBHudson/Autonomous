@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#05080b">
+<meta name="color-scheme" content="dark">
+<title>Where Autonomous Loop Studio fits — an honest comparison</title>
+<meta name="description" content="How a plain-PHP self-hosted agent console compares with container-first agent stacks, IDE extensions and self-hosted chat front-ends: the seven questions that decide it, what this project gives up, and how to check every claim in five minutes.">
+<meta property="og:title" content="Where Autonomous Loop Studio fits">
+<meta property="og:description" content="Four ways to run an agent on your own machine, seven questions that decide between them, and the honest column on what this one gives up.">
+<meta property="og:image" content="https://raw.githubusercontent.com/autonomous-loop-studio/Autonomous/master/screenshots/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+<style>
+  :root{
+    --bg:#05080b; --panel:#0b1117; --panel-2:#0e161d;
+    --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
+    --text:#e9f1f7; --muted:#93a6b5; --dim:#6b7f8e;
+    --cyan:#00e5ff; --green:#3ddc84; --amber:#ffcb6b;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+    line-height:1.65; -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; text-size-adjust:100%;
+    background-image:
+      radial-gradient(900px 500px at 18% -10%, rgba(0,229,255,.10), transparent 60%),
+      radial-gradient(700px 400px at 88% 8%, rgba(61,220,132,.07), transparent 60%);
+    background-repeat:no-repeat;
+  }
+  a{color:var(--cyan); text-decoration:none}
+  a:hover{text-decoration:underline}
+  img{display:block; max-width:100%; height:auto}
+  .wrap{max-width:1040px; margin:0 auto; padding:0 clamp(16px,4vw,22px)}
+
+  header.top{border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px clamp(16px,4vw,22px)}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:-.01em; color:var(--text); font-size:15px}
+  .brand span.dot{width:8px;height:8px;border-radius:50%;background:var(--cyan); box-shadow:0 0 12px var(--cyan); flex:none}
+  nav.links{display:flex; gap:18px; font-size:14px; flex-wrap:wrap}
+  nav.links a{color:var(--muted)}
+  nav.links a:hover{color:var(--text); text-decoration:none}
+
+  .hero{padding:clamp(38px,8vw,74px) 0 clamp(16px,4vw,30px)}
+  .eyebrow{display:inline-flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px;
+    letter-spacing:.07em; text-transform:uppercase; color:var(--muted); border:1px solid var(--line);
+    background:rgba(255,255,255,.02); padding:5px 11px; border-radius:999px}
+  .eyebrow b{color:var(--green); font-weight:600}
+  h1{font-size:clamp(28px,6vw,54px); line-height:1.06; letter-spacing:-.025em;
+    margin:clamp(14px,3vw,22px) 0 clamp(12px,2.6vw,18px); max-width:19ch; text-wrap:balance}
+  h1 em{font-style:normal; color:var(--cyan)}
+  .lede{font-size:clamp(15.5px,3.9vw,19.5px); color:var(--muted); max-width:64ch; margin:0 0 clamp(20px,4vw,30px)}
+  .lede strong{color:var(--text); font-weight:600}
+  .cta{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:9px;
+    padding:12px 20px; border-radius:10px; font-weight:650; font-size:15px;
+    border:1px solid transparent; transition:transform .12s ease, background .15s ease; white-space:nowrap}
+  .btn:hover{text-decoration:none; transform:translateY(-1px)}
+  .btn.primary{background:var(--cyan); color:#04121a}
+  .btn.primary:hover{background:#42eeff}
+  .btn.ghost{border-color:var(--line-strong); color:var(--text); background:rgba(255,255,255,.02)}
+  .btn.ghost:hover{background:rgba(255,255,255,.05)}
+  .cta-block{text-align:center}
+  .cta-block h2{font-size:clamp(23px,4.6vw,32px); letter-spacing:-.025em}
+  .cta-block p{color:var(--muted); font-size:16px; max-width:60ch; margin:0 auto clamp(18px,3.5vw,24px)}
+  .cta-block .cta{justify-content:center}
+  .facts{display:flex; flex-wrap:wrap; gap:6px; margin:clamp(18px,3.5vw,26px) 0 0; padding:0;
+    list-style:none; font-size:12.5px; color:var(--dim)}
+  .facts li{border:1px solid var(--line); border-radius:999px; padding:3px 10px}
+
+  figure{margin:clamp(22px,4vw,34px) 0 0}
+  .shot{border:1px solid var(--line-strong); border-radius:12px; overflow:hidden; background:var(--panel);
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,229,255,.06)}
+  .shot img{width:100%}
+  figcaption{color:var(--dim); font-size:12.5px; margin-top:9px}
+
+  section{padding:clamp(34px,6vw,52px) 0; border-top:1px solid var(--line); scroll-margin-top:12px}
+  h2{font-size:clamp(20px,4.4vw,27px); letter-spacing:-.02em; margin:0 0 8px; text-wrap:balance}
+  .sub{color:var(--muted); margin:0 0 clamp(18px,3.5vw,26px); max-width:66ch; font-size:15px}
+
+  .run{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:clamp(15px,3.5vw,20px)}
+  .card h3{margin:0 0 10px; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+  .card p{margin:0 0 12px; color:var(--muted); font-size:14.5px}
+  pre{margin:0; background:#04070a; border:1px solid var(--line); border-radius:8px;
+    padding:13px 14px; font-family:var(--mono); font-size:13px; line-height:1.65; color:#cfe3ee;
+    overflow-x:auto; -webkit-overflow-scrolling:touch}
+  pre code{background:none; padding:0; font-size:inherit}
+  pre.flow{white-space:pre-wrap; overflow-wrap:anywhere}
+  pre .c{color:#5c7486}
+  code{font-family:var(--mono); font-size:.9em; background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px;
+    overflow-wrap:anywhere}
+  .after{margin:16px 0 0; color:var(--muted); font-size:14.5px}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,282px),1fr)); gap:14px}
+  .feature{background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:clamp(16px,3.5vw,20px)}
+  .feature h3{margin:0 0 8px; font-size:16px; letter-spacing:-.01em}
+  .feature p{margin:0; color:var(--muted); font-size:14.5px}
+  .feature .ico{display:block; font-size:18px; margin-bottom:9px; line-height:1}
+
+  .why{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:clamp(20px,4vw,34px); align-items:start}
+  .why p{color:var(--muted); margin:0 0 13px}
+  .why p strong{color:var(--text)}
+  .checklist{list-style:none; margin:0; padding:0; font-size:14.5px}
+  .checklist li{padding:9px 0 9px 24px; border-bottom:1px solid var(--line); position:relative; color:var(--muted)}
+  .checklist li:last-child{border-bottom:0}
+  .checklist li::before{content:"✓"; position:absolute; left:0; color:var(--green); font-weight:700}
+
+  .limits{list-style:none; margin:0; padding:0}
+  .limits li{display:grid; grid-template-columns:18px 1fr; gap:10px; padding:12px 0;
+    border-bottom:1px solid var(--line); color:var(--muted); font-size:14.5px}
+  .limits li:last-child{border-bottom:0}
+  .limits .m{color:var(--amber); font-weight:700}
+  .limits b{color:var(--text); font-weight:600}
+
+  .mini{font-size:13px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:clamp(26px,4.5vw,34px) 0 12px}
+  .para{color:var(--muted); font-size:15px; margin:0 0 clamp(16px,3vw,20px); max-width:70ch}
+
+  .fails{margin-top:6px; border-top:1px solid var(--line)}
+  .fail{display:grid; grid-template-columns:1fr; gap:5px; padding:15px 0; border-bottom:1px solid var(--line)}
+  @media (min-width:721px){ .fail{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); gap:4px 26px; align-items:start} }
+  .fail .f{color:var(--text); font-weight:600; font-size:15px; letter-spacing:-.01em; line-height:1.4}
+  .fail .f em{display:block; font-style:normal; font-family:var(--mono); font-size:12px; color:var(--dim); margin-top:5px; overflow-wrap:anywhere}
+  .fail .fix{color:var(--muted); font-size:14.5px; margin:0}
+  .fail .fix b{color:var(--text); font-weight:600}
+  .fail .fix code{font-size:.86em}
+
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr)); gap:14px; margin-top:8px}
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px}
+  .stat .n{font-size:clamp(23px,5vw,26px); font-weight:700; letter-spacing:-.02em; color:var(--cyan)}
+  .stat .l{font-size:13px; color:var(--muted); margin-top:4px}
+
+  .shots3{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,258px),1fr)); gap:14px; margin-top:6px}
+  .shots3 figure{margin:0}
+  .shots3 .shot{border-radius:10px}
+  .shots3 figcaption{font-size:12px}
+
+  footer{border-top:1px solid var(--line); padding:28px 0 clamp(34px,6vw,44px); color:var(--dim); font-size:13px}
+  footer .row{display:flex; flex-wrap:wrap; gap:10px 18px; justify-content:space-between; align-items:center}
+  footer a{color:var(--muted)}
+  footer .note{margin-top:12px}
+
+  @media (max-width:720px){
+    nav.links{display:none}
+    .cta{flex-direction:column; align-items:stretch}
+    .btn{width:100%}
+    .top .wrap{padding-block:12px}
+  }
+  @media (max-width:380px){
+    .facts li{font-size:11.5px; padding:3px 8px}
+    .eyebrow{font-size:10.5px; letter-spacing:.05em}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .btn{transition:none}
+    .btn:hover{transform:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> Autonomous Loop Studio</div>
+    <nav class="links">
+      <a href="index.html#what">What it is</a>
+      <a href="index.html#harness">The harness</a>
+      <a href="#approaches">Approaches</a>
+      <a href="#questions">Questions</a>
+      <a href="#giveup">What you give up</a>
+      <a href="index.html#run">Quick start</a>
+      <a href="https://github.com/autonomous-loop-studio/Autonomous">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap hero">
+  <div class="eyebrow">v449 · <b>Apache-2.0</b> · self-hosted</div>
+  <h1>Where this <em>fits</em>.</h1>
+  <p class="lede">
+    People arrive here already comparing something. This page is the comparison, written to be
+    checkable rather than flattering: <strong>approaches</strong> weighed against each other, the
+    questions that actually decide the choice, and the things this project is honestly worse at.
+  </p>
+  <p class="lede" style="font-size:14.5px">
+    No feature grids against named products. Those go stale in a week and are usually written by
+    whoever is selling the thing. Where a neighbour is named, it is to point at it, not to score it.
+  </p>
+</div>
+
+<section id="approaches">
+  <div class="wrap">
+    <h2>Four ways to run an agent on your own machine</h2>
+    <p class="sub">Not brands — shapes. Most tools are one of these, and each one asks something different of you.</p>
+    <div class="grid">
+      <div class="feature">
+        <span class="ico">📦</span>
+        <h3>A container-first agent stack</h3>
+        <p>
+          Docker or Compose, a database container, a web container, an agent runtime container.
+          <b>Choose it if</b> you already live in Docker, you want someone else's images to maintain
+          the moving parts, and a <code>docker compose up</code> is your idea of a clean install.
+          <b>You take on</b> the daemon, the images, and a second filesystem to keep backed up.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="ico">🧩</span>
+        <h3>An editor extension</h3>
+        <p>
+          The agent lives inside your IDE, reads the file you have open, and edits in place.
+          <b>Choose it if</b> your work is one repository at a time and you want the agent beside the
+          cursor. <b>You take on</b> a single editor's lifetime: close the laptop and the agent stops,
+          and there is no fleet, no scheduler and no map of what ran while you were away.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="ico">💬</span>
+        <h3>A self-hosted chat front-end</h3>
+        <p>
+          A good UI over a model, accounts for a household or a team, history that persists.
+          <b>Choose it if</b> what you want is a private chat app. <b>You take on</b> that it is a chat
+          app: conversation is the unit of work, and "go run this and report back" is not.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="ico">🧠</span>
+        <h3>This: a console in plain PHP</h3>
+        <p>
+          One folder you drop on a web server. The model is asked to call tools in a fixed syntax,
+          a harness fits that syntax to whichever model you point at, and a fleet of agents works
+          behind routing charts, approvals and a live map. <b>No Docker, no build, no database.</b>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="questions">
+  <div class="wrap">
+    <h2>Seven questions that decide it</h2>
+    <p class="sub">Ask these of any tool in this space, this one included. The right-hand column is this project's answer, so you can hold it to it.</p>
+    <div class="fails">
+      <div class="fail">
+        <div class="f">What has to be installed before it boots?<em>containers · runtime · build step · database</em></div>
+        <p class="fix"><b>PHP 8 and a web server.</b> No <code>composer install</code>, no <code>npm run build</code>, no DB server — state is JSON under <code>storage/</code>. Upload the folder and it runs.</p>
+      </div>
+      <div class="fail">
+        <div class="f">Whose models can it use?</div>
+        <p class="fix"><b>Any of them,</b> hosted or local: OpenAI-compatible endpoints, Anthropic, Gemini, Ollama, LM Studio, OpenRouter, a model you are serving yourself. Switching model does not mean switching tool.</p>
+      </div>
+      <div class="fail">
+        <div class="f">Where do the tools actually run?</div>
+        <p class="fix"><b>On your machine, under a jail and an allowlist,</b> with approvals per action and a kill switch. The default is that nothing dangerous is on.</p>
+      </div>
+      <div class="fail">
+        <div class="f">What happens when the model gets the tool syntax wrong?</div>
+        <p class="fix"><b>Near misses are read, not dropped.</b> The harness learns the dialect a model settles into, so a malformed call is a repair, not a failed run.</p>
+      </div>
+      <div class="fail">
+        <div class="f">Can more than one agent run at once?</div>
+        <p class="fix"><b>Yes — a fleet,</b> with routing, pipelines and a live map of who is doing what. This is the part most chat-shaped tools do not have, because chat is one turn at a time.</p>
+      </div>
+      <div class="fail">
+        <div class="f">What leaves this machine?</div>
+        <p class="fix"><b>What you send to your model provider, and nothing else.</b> No telemetry, no licence check, no phone-home. Drive it entirely with models on localhost and nothing leaves at all.</p>
+      </div>
+      <div class="fail">
+        <div class="f">What does it cost?</div>
+        <p class="fix"><b>The PHP host you already have.</b> Apache-2.0, no seat count, no hosted tier to upsell you into. You pay your model provider directly, or nothing if the model is local.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="unusual">
+  <div class="wrap">
+    <h2>Three things that are unusual here</h2>
+    <p class="sub">Stated as what they are, not as digs at anything else. It is a crowded space and most tools do most things well.</p>
+    <div class="why">
+      <div>
+        <p><strong>The harness fits the model.</strong> Most agents are written against one provider's tool-calling format and quietly degrade for everything else. Here the call format is discovered per model — the Training drill proves it in twelve calls, and the console keeps whatever won.</p>
+        <p><strong>Distribution is a folder.</strong> No image to pull, no dependency tree to resolve, no build artifact to trust. The thing you audit is the thing that runs, and updating is the app replacing its own files with a rollback kept on disk.</p>
+      </div>
+      <div>
+        <ul class="checklist">
+          <li>One folder — no Docker, no Node, no database server</li>
+          <li>Every guard has a test that makes the real request</li>
+          <li>Refusals are documented, not discovered at 2am</li>
+          <li>Updates roll back on their own if the version disagrees</li>
+          <li>Deleting the folder is the whole uninstall</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="giveup">
+  <div class="wrap">
+    <h2>What you give up</h2>
+    <p class="sub">The honest column. If any of these is a hard requirement, another shape is the better tool for you.</p>
+    <ul class="limits">
+      <li><span class="m">!</span><span><b>No containers means no isolation theatre.</b> The jail and the allowlist are real, but a container is a stronger wall than a PHP process. If you need per-agent kernel isolation, run it inside one.</span></li>
+      <li><span class="m">!</span><span><b>One maintainer.</b> Releases are frequent and the changelog names what broke. Nobody is on call, and there is no support contract to buy.</span></li>
+      <li><span class="m">!</span><span><b>No team accounts.</b> It is built for one operator with a token. Multi-user permissions are not a feature here.</span></li>
+      <li><span class="m">!</span><span><b>Not an IDE.</b> If your work is one file under the cursor, an editor extension will feel faster.</span></li>
+      <li><span class="m">!</span><span><b>Parallel agents want Apache or PHP-FPM.</b> On PHP's built-in server a single streamed reply holds the only slot.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="check">
+  <div class="wrap">
+    <h2>How to check any of this in five minutes</h2>
+    <p class="sub">Every claim above is something you can verify without trusting this page.</p>
+    <div class="run">
+      <div class="card">
+        <h3>Read the guards</h3>
+        <p>The refusals are in the docs, and each one has a test that makes the real request against a throwaway copy of the tree.</p>
+        <pre class="flow"><code>git clone https://github.com/autonomous-loop-studio/Autonomous
+cd Autonomous
+php tests/run.mjs</code></pre>
+      </div>
+      <div class="card">
+        <h3>Watch it refuse</h3>
+        <p>Point it at a model, leave the tools off, and try to make it run one. Off is off by construction, not by prompt.</p>
+        <pre class="flow"><code># README → Guards
+# README → What it isn't</code></pre>
+      </div>
+      <div class="card">
+        <h3>Run it, then delete it</h3>
+        <p>No licence server to deactivate, no account to close. The folder is the install and the uninstall.</p>
+        <pre class="flow"><code>php -S localhost:8787 serve.php</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap cta-block">
+    <h2>Compare it by running it.</h2>
+    <p>A shape that fits is easier to feel than to read about. One folder, your own keys, and nothing to cancel.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/autonomous-loop-studio/Autonomous">Get it on GitHub ↗</a>
+      <a class="btn ghost" href="index.html#run">Run it in five minutes</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <div>Autonomous Loop Studio · Apache-2.0 · © 2026 M. Bryce Hudson</div>
+    <div><a href="index.html">Home</a> · <a href="https://github.com/autonomous-loop-studio/Autonomous">Source</a> · <a href="https://github.com/autonomous-loop-studio/Autonomous/blob/master/README.md">Documentation</a> · <a href="https://github.com/autonomous-loop-studio/Autonomous/blob/master/LICENSE">License</a></div>
+  </div>
+  <div class="wrap" style="margin-top:14px">
+    One page, no JavaScript, no fonts to download, no trackers.
+  </div>
+</footer>
+
+</body>
+</html>
