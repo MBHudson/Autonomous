@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=444';
+import { store } from './store.js?v=446';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -91,6 +91,37 @@ export const TRAINING_TASKS = [
   { tool: 'show_file', label: 'Show {file} to me with show_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
 ];
 
+/**
+ * Easy mode: the original 12-step sequence, kept for comparison.
+ *
+ * The wording is taken from commit 53b05a9, with two deliberate changes:
+ *   * the hard-coded training/training.txt path became {file}, so two agents
+ *     still drill in their own files instead of colliding in one;
+ *   * the final "and stop: the drill is done" became "this completes the
+ *     12-step pass", because the current harness sends Continue and owns the
+ *     ending.
+ *
+ * Everything else is the old wording — including "Append a second line" on
+ * step 7. That instruction is the point of Easy mode: it is the step that did
+ * not match what edit_file can do, and keeping it lets you see which models
+ * still fail there and at which step number. Do not "fix" it here; Hard mode
+ * is where the anchored edit is taught.
+ */
+export const TRAINING_TASKS_EASY = [
+  { tool: 'think', label: 'Think one sentence about the drill before touching anything.' },
+  { tool: 'todo_write', label: 'Write the drill steps below as your todo list, first one in_progress.' },
+  { tool: 'echo', label: 'Echo the word "training" back.' },
+  { tool: 'now', label: 'Report the current date and time.' },
+  { tool: 'write_file', label: 'Create {file} containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
+  { tool: 'read_file', label: 'Read {file} back and confirm it says "training".' },
+  { tool: 'edit_file', label: 'Append a second line "drill 2 passed" to {file}. (Asks approval — wait for it.)' },
+  { tool: 'list_dir', label: 'List the training folder.' },
+  { tool: 'glob_files', label: 'Find files matching "training/*".' },
+  { tool: 'grep_code', label: 'Search the training folder for the word "training".' },
+  { tool: 'exec', label: 'Run ["echo","training"] and confirm the output. (Asks approval — wait for it.)' },
+  { tool: 'todo_write', label: 'Mark every drill step completed — this completes the 12-step pass.' },
+];
+
 /** Terms used by the checks below, tolerant of how a model spells an argument. */
 const argText = (call) => {
   try { return JSON.stringify((call && call.arg) ?? '').toLowerCase(); }
@@ -136,6 +167,45 @@ export const DRILL_CHECKS = [
 ];
 
 /**
+ * Easy-mode checks, aligned with TRAINING_TASKS_EASY.
+ *
+ * Step 7 is deliberately lenient: the old label says "append", a capability
+ * edit_file does not have. A model that anchors the edit correctly passes; a
+ * model that sends an empty old_string fails at step 7, which is the failure
+ * this mode exists to expose. The check does not require the hard mode's
+ * exact old_string/new_string pair, because the old wording never taught it.
+ */
+export const DRILL_CHECKS_EASY = [
+  null,                                                                     // 1 think
+  null,                                                                     // 2 todo_write
+  (c) => showsTraining(c),                                                  // 3 echo
+  null,                                                                     // 4 now
+  (c, file) => namesTrainingFile(c, file) && /"content"\s*:\s*"training/.test(argText(c)), // 5 write_file
+  (c, file) => namesTrainingFile(c, file) && showsTraining(c),                // 6 read back
+  (c, file) => namesTrainingFile(c, file) && /drill 2 passed/.test(argText(c)), // 7 append attempt
+  (c) => showsTraining(c),                                                  // 8 list_dir
+  (c) => showsTraining(c),                                                  // 9 glob_files
+  (c) => showsTraining(c),                                                  // 10 grep_code
+  (c) => showsTraining(c),                                                  // 11 exec
+  null,                                                                     // 12 todo_write
+];
+
+/** Which drill a mode setting selects. Unknown/legacy settings are Hard. */
+export function trainingDifficulty(mode) {
+  return mode && mode.difficulty === 'easy' ? 'easy' : 'hard';
+}
+
+/** The ordered task table for a difficulty. */
+export function trainingTasksFor(difficulty) {
+  return difficulty === 'easy' ? TRAINING_TASKS_EASY : TRAINING_TASKS;
+}
+
+/** The index-aligned checks for a difficulty. */
+export function trainingChecksFor(difficulty) {
+  return difficulty === 'easy' ? DRILL_CHECKS_EASY : DRILL_CHECKS;
+}
+
+/**
  * Grade a drill pass from the tool records alone.
  *
  * The point is not to ask the model whether it succeeded -- its todo list is a
@@ -158,8 +228,10 @@ export const DRILL_CHECKS = [
  * an approval never prove a step passed -- and a skipped call is not a
  * failure either.
  */
-export function drillVerdict(calls, file = TRAINING_FILE) {
-  const total = TRAINING_TASKS.length;
+export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard') {
+  const tasks = trainingTasksFor(difficulty);
+  const checks = trainingChecksFor(difficulty);
+  const total = tasks.length;
   const list = Array.isArray(calls) ? calls.filter(c => c && c.tool) : [];
   const blank = () => ({ step: 0, failures: 0, retries: 0, pending: false, failedAt: null, offStep: 0, offTool: '' });
   let cur = blank();
@@ -175,15 +247,15 @@ export function drillVerdict(calls, file = TRAINING_FILE) {
 
     // A finished pass: only the drill's first step opens the next one.
     if (cur.step >= total) {
-      if (tool !== TRAINING_TASKS[0].tool) continue;
+      if (tool !== tasks[0].tool) continue;
       passes++;
       if (cur.failures === 0 && !cur.pending) cleanPasses++;
       last = cur;
       cur = blank();
     }
 
-    const want = TRAINING_TASKS[cur.step];
-    const check = DRILL_CHECKS[cur.step];
+    const want = tasks[cur.step];
+    const check = checks[cur.step];
     const key = `${tool}|${argText(call)}`;
     const retry = lastKey === key && lastStatus === 'error';
     lastKey = key;
@@ -264,7 +336,7 @@ export function drillVerdict(calls, file = TRAINING_FILE) {
     // that lost its place.
     offStep: cur.offStep,
     offTool: cur.offTool,
-    nextTool: complete ? '' : (TRAINING_TASKS[cur.step]?.tool || ''),
+    nextTool: complete ? '' : (tasks[cur.step]?.tool || ''),
   };
 }
 
@@ -291,8 +363,9 @@ export function reachedCleanTarget(mode, verdicts) {
  */
 export function drillStripTitle(mode) {
   const n = Math.max(0, Math.floor(Number(mode && mode.cleanPassTarget) || 0));
-  if (!n) return 'drill';
-  return `drill \u00b7 stop at ${n} clean pass${n === 1 ? '' : 'es'}`;
+  const base = trainingDifficulty(mode) === 'easy' ? 'easy drill' : 'drill';
+  if (!n) return base;
+  return `${base} \u00b7 stop at ${n} clean pass${n === 1 ? '' : 'es'}`;
 }
 
 /**
@@ -328,8 +401,8 @@ export function isTrainingActive() {
 }
 
 /** Short numbered recap for the popup dialog. */
-export function trainingStepList(agent = null) {
-  return TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool} — ${fillFile(t.label, agent)}`);
+export function trainingStepList(agent = null, difficulty = 'hard') {
+  return trainingTasksFor(difficulty).map((t, i) => `${i + 1}. ${t.tool} — ${fillFile(t.label, agent)}`);
 }
 
 /**
@@ -340,16 +413,23 @@ export function trainingStepList(agent = null) {
  * their next tool-loop boundary. Either way the drill runs through the normal
  * turn path, so messages, topology, metrics and trace all behave as usual.
  */
-export function trainingKickoffFor() {
+export function trainingKickoffFor(difficulty = null) {
   // This one text reaches every agent, so it must never contain the literal
   // `<agent>` placeholder: a live run had the model stop to work out what its
   // "agent id" was instead of reading the exact path its own prompt block
   // already carried. The block is authoritative; this message stays generic.
+  const diff = difficulty || trainingDifficulty(store.get('settings.trainingMode'));
+  const tasks = trainingTasksFor(diff);
   const stepLabel = (label) => String(label).split(TRAINING_FILE_TOKEN).join('your drill file');
-  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${stepLabel(t.label)}`).join('\n');
+  const steps = tasks.map((t, i) => `${i + 1}. ${t.tool}: ${stepLabel(t.label)}`).join('\n');
+  // Easy ends on todo_write, Hard ends on show_file: naming the wrong final
+  // tool here would send an Easy run looking for a step it does not have.
+  const ending = diff === 'easy'
+    ? 'After each passed step, update your todo list; the final todo_write completes the 12-step pass — the mode then sends Continue again, so begin a fresh pass instead of waiting.'
+    : 'After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the PASS — the mode then sends Continue again, so begin a fresh pass instead of waiting.';
   return `Training mode is ON — work this drill now, step by step, inside the "training" sandbox folder. Nothing else while it is on.\n`
     + `Steps:\n${steps}\n`
-    + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; every agent has its OWN file in the training folder — use the exact path in your TRAINING MODE block, which the app also repeats when this kickoff reaches a turn already in flight — never another agent's file, and never the project folder above the sandbox; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the PASS — the mode then sends Continue again, so begin a fresh pass instead of waiting.`;
+    + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; every agent has its OWN file in the training folder — use the exact path in your TRAINING MODE block, which the app also repeats when this kickoff reaches a turn already in flight — never another agent's file, and never the project folder above the sandbox; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. ${ending}`;
 }
 
 /**
@@ -394,20 +474,43 @@ export function trainingResumeFor() {
  */
 export function trainingBlockFor(agent = null) {
   if (!isTrainingActive()) return '';
+  const mode = store.get('settings.trainingMode') || {};
+  const difficulty = trainingDifficulty(mode);
+  const tasks = trainingTasksFor(difficulty);
   const file = fileForSteps(agent);
-  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${fillFile(t.label, agent)}`).join('\n');
+  const steps = tasks.map((t, i) => `${i + 1}. ${t.tool}: ${fillFile(t.label, agent)}`).join('\n');
   const mine = agent ? (store.get('trainingVerdicts') || {})[agent.id] : null;
-  const step = mine && Number.isFinite(Number(mine.step)) ? Math.max(0, Number(mine.step)) : null;
-  const total = (mine && Number(mine.totalSteps)) || TRAINING_TASKS.length;
-  const next = step !== null ? TRAINING_TASKS[step] : null;
+  const total = tasks.length;
+  const recorded = mine && Number.isFinite(Number(mine.step)) ? Math.max(0, Number(mine.step)) : null;
+  const step = recorded === null ? null : Math.min(recorded, total);
+  const complete = !!(mine && (mine.complete || step >= total));
+  const next = step !== null && step < total ? tasks[step] : null;
   const positionRule = step === null ? ''
-    : mine.complete
-      ? `- YOUR recorded position: pass complete (${step}/${total}) — start a fresh pass at step 1.\n`
+    : complete
+      ? `- YOUR recorded position: pass complete (${total}/${total}) — start a fresh pass at step 1.\n`
       : `- YOUR recorded position: ${step}/${total} — next is step ${step + 1}${next ? ` (${next.tool})` : ''}. Resume there; never restart the pass early.\n`;
-  return `[TRAINING MODE — paced drill, ~50% request rate. Nothing else matters until training mode is switched off.]\n`
+  const opening = `[TRAINING MODE — paced drill, ~50% request rate. Nothing else matters until training mode is switched off.]\n`
     + `Work ONLY these steps, in order, inside the "training" sandbox folder. Do not answer other questions, do not touch other files, do not start other work — if asked anything else, finish the current drill step first and say the drill comes first.\n`
     + `Steps:\n${steps}\n`
-    + `Rules:\n`
+    + `Rules:\n`;
+
+  // Easy keeps the old drill's rules (there is no edit_file contract and no
+  // display-tool lesson) so step 7 stays the diagnostic it was. The path,
+  // old-transcript and position rules are harness safety, not difficulty.
+  if (difficulty === 'easy') {
+    return opening
+      + `- One step at a time. Call the step's tool, read its result, then move on.\n`
+      + `- If a tool call errors, is denied, or returns the wrong thing, read the error message and TRY AGAIN with fixed arguments. Keep retrying the SAME step — never skip a failed step, never move on until it returns ok.\n`
+      + `- Paths are relative to the sandbox: ${file}. Never the project folder above it, and never an absolute C:\\... path. Every agent has its OWN drill file — do not read or edit another agent's.\n`
+      + `- THIS RUN uses the file above. Any earlier training transcript that mentions training/training.txt is an OLD run: ignore its paths and copy nothing from it.\n`
+      + positionRule
+      + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
+      + `- The Continue message names the step the app recorded for you. Resume there; do not start another pass while steps remain — the app saw every call you made, so an early restart shows up as off-step calls.\n`
+      + `- This mode never lets the drill stop. When a turn ends — a short reply or a completed pass — you are sent "Continue" automatically. Treat Continue as the next instruction: pick up the first step your todo list does not show completed, and when every step is complete, start a fresh pass at step 1. Never say the drill is finished, never ask whether to continue, never wait for the operator.\n`
+      + `- After each passed step, update your todo_write list so what worked is written down.`;
+  }
+
+  return opening
     + `- One step at a time. Call the step's tool, read its result, then move on.\n`
     + `- If a tool call errors, is denied, or returns the wrong thing, read the error message and TRY AGAIN with fixed arguments. Keep retrying the SAME step — never skip a failed step, never move on until it returns ok.\n`
     + `- An error that says "Did you mean ..." or "not a file" is telling you the ARGUMENT is wrong: change it. Sending the identical call again fails identically.\n`

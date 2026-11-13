@@ -23,7 +23,7 @@ if (!version) {
   console.error('Cannot read APP_VERSION from ui/js/store.js.');
   process.exit(1);
 }
-const { TRAINING_TASKS, DRILL_CHECKS, drillVerdict, drillVerdictText } =
+const { TRAINING_TASKS, TRAINING_TASKS_EASY, DRILL_CHECKS, DRILL_CHECKS_EASY, drillVerdict, drillVerdictText } =
   await import(`../../ui/js/training.js?v=${version}`);
 const { parseToolCalls, TOOL_REGISTRY } =
   await import(`../../ui/js/tools.js?v=${version}`);
@@ -60,9 +60,28 @@ const cleanPass = () => [
   call('show_file', { path: 'training/training.txt' }, 'ok', '1  training\n2  drill 2 passed'),
 ];
 
+/** One clean pass of the original 12-step drill. Step 7 anchors the edit even
+ *  though the old wording says "append": the check accepts a working edit, and
+ *  a model that sends an empty old_string fails there instead. */
+const cleanEasyPass = () => [
+  call('think', { note: 'start' }, 'ok', 'thinking'),
+  call('todo_write', { todos: [] }, 'ok', 'updated'),
+  call('echo', { text: 'training' }, 'ok', 'training'),
+  call('now', {}, 'ok', '2026-11-12 12:00'),
+  call('write_file', { path: 'training/training.txt', content: 'training' }, 'ok', 'wrote 8 bytes'),
+  call('read_file', { path: 'training/training.txt' }, 'ok', '1  training'),
+  call('edit_file', { path: 'training/training.txt', old_string: 'training', new_string: 'training\ndrill 2 passed' }, 'ok', 'replaced 1'),
+  call('list_dir', { path: 'training' }, 'ok', 'training.txt  21 bytes'),
+  call('glob_files', { pattern: 'training/*' }, 'ok', 'training/training.txt'),
+  call('grep_code', { pattern: 'training' }, 'ok', 'training/training.txt:1:training'),
+  call('exec', { argv: ['echo', 'training'] }, 'ok', 'training'),
+  call('todo_write', { todos: [] }, 'ok', 'complete'),
+];
+
 // The table and its checks stay aligned; a new step without a check is a gap
 // the verdict would silently grade as "ok is enough".
 eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slot');
+eq(DRILL_CHECKS_EASY.length, TRAINING_TASKS_EASY.length, 'every easy step has a check slot');
 
 // A pass that went through cleanly.
 {
@@ -75,6 +94,41 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   eq(v.retries, 0, 'no retries');
   eq(v.pending, false, 'nothing waiting on an approval');
   eq(v.cleanPasses, 1, 'a clean pass counts toward the stopping rule');
+}
+
+// Easy mode grades the same calls against 12 steps, not 17.
+{
+  const v = drillVerdict(cleanEasyPass(), 'training/training.txt', 'easy');
+  eq(v.totalSteps, 12, 'easy mode has 12 total steps');
+  eq(v.complete, true, 'a full easy pass reads complete');
+  eq(v.clean, true, 'a clean easy pass reads clean');
+  eq(v.step, 12, 'easy mode counts all 12 steps');
+  eq(v.cleanPasses, 1, 'a clean easy pass counts once');
+  eq(drillVerdictText(v), '12/12 \u00b7 clean \u00b7 1 pass', 'the strip text names the easy total');
+}
+
+// The old append step is the diagnostic. A model that sends the old empty
+// old_string fails at step 7; a working anchored edit can still pass it.
+{
+  const calls = cleanEasyPass();
+  calls.splice(6, 0,
+    call('edit_file', { path: 'training/training.txt', old_string: '', new_string: 'drill 2 passed' }, 'error', 'error: old_string is required'),
+  );
+  const v = drillVerdict(calls, 'training/training.txt', 'easy');
+  eq(v.complete, true, 'the corrected append still finishes the easy pass');
+  eq(v.clean, false, 'a failed append makes the easy pass not clean');
+  eq(v.failures, 1, 'the failed append is counted');
+  eq(v.failedAt, 7, 'the failure is named at step 7, where the old wording breaks');
+}
+
+// The same 12 calls are not a 17-step pass: the step tables are not
+// interchangeable, and a mode switch must not silently grade against the
+// other drill.
+{
+  const v = drillVerdict(cleanEasyPass());
+  eq(v.totalSteps, 17, 'the default remains the hard drill');
+  eq(v.complete, false, '12 calls do not complete the 17-step drill');
+  eq(v.step, 6, 'the hard drill stops where the easy edit diverges');
 }
 
 // A pass is graded against the file its own agent was told to use. Two agents

@@ -20,7 +20,7 @@
  *   * ui/index.html + index.html : <span id="appVersion"> and every ?v=
  *   * every `from './x.js?v='`   : this number
  */
-export const APP_VERSION = 444;
+export const APP_VERSION = 446;
 
 class Store {
   constructor() {
@@ -73,7 +73,7 @@ class Store {
       globalPrePrompt: { text: '', active: false, mode: 'prepend' },
       // Training mode (Agents-tab header, dumbbell button). While active,
       // agents run at ~50% request rate and are locked to the training drill.
-      trainingMode: { active: false, startedAt: 0 },
+      trainingMode: { active: false, startedAt: 0, difficulty: 'hard' },
       // The routing chart's ghost transcript: the chat printed faintly behind
       // the canvas. On by default at a low opacity because the whole point is
       // knowing that work is happening without switching screens; the four

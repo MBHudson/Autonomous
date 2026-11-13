@@ -26,9 +26,9 @@ if (!version) {
   process.exit(1);
 }
 const {
-  TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_FILE_TOKEN, TRAINING_TASKS,
+  TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_FILE_TOKEN, TRAINING_TASKS, TRAINING_TASKS_EASY,
   trainingFileFor, isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
-  shouldResumeDrill, reachedCleanTarget, drillStripTitle,
+  shouldResumeDrill, reachedCleanTarget, drillStripTitle, trainingDifficulty, trainingTasksFor, trainingChecksFor,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const trainingModule = await import(`../../ui/js/training.js?v=${version}`);
 const { store } = await import(`../../ui/js/store.js?v=${version}`);
@@ -81,6 +81,23 @@ ok(trainingFileFor({ id: 'agent_a' }) !== trainingFileFor({ id: 'agent_b' }),
 eq(trainingStepList().length, TRAINING_TASKS.length, 'step list covers every task');
 ok(trainingStepList()[0].startsWith('1. think'), 'step list is numbered from 1');
 
+// Easy mode is the original 12-step sequence, kept beside the current drill.
+eq(TRAINING_TASKS_EASY.length, 12, 'easy mode has the original 12 steps');
+eq(TRAINING_TASKS_EASY[TRAINING_TASKS_EASY.length - 1].tool, 'todo_write',
+  'easy mode ends on the original completion step');
+ok(TRAINING_TASKS_EASY.some(t => t.tool === 'edit_file' && t.label.includes('Append a second line')),
+  'easy mode keeps the old append wording that step 7 is meant to diagnose');
+ok(!TRAINING_TASKS_EASY.some(t => t.tool.startsWith('show_')),
+  'easy mode has no display-tool steps');
+eq(trainingTasksFor('easy'), TRAINING_TASKS_EASY, 'easy selects the 12-step table');
+eq(trainingTasksFor('hard'), TRAINING_TASKS, 'hard selects the current table');
+eq(trainingDifficulty({}), 'hard', 'a missing difficulty defaults to hard');
+eq(trainingDifficulty({ difficulty: 'easy' }), 'easy', 'easy reads back');
+eq(trainingChecksFor('easy').length, 12, 'easy checks align with its 12 steps');
+eq(trainingChecksFor('hard').length, TRAINING_TASKS.length, 'hard checks align with its steps');
+eq(trainingStepList(null, 'easy').length, 12, 'the dialog can list the easy steps');
+eq(trainingStepList(null, 'hard').length, 17, 'the dialog can list the hard steps');
+
 // Disarmed by default: the prompt block injects nothing.
 store.set('settings.trainingMode', { active: false, startedAt: 0 });
 eq(isTrainingActive(), false, 'off by default');
@@ -112,6 +129,23 @@ ok(block.includes('start a fresh pass at step 1'), 'block says a completed drill
 ok(block.includes('Continue'), 'block names the Continue message the app sends');
 ok(block.includes('Did you mean'), 'block tells the agent to fix the argument an error names');
 ok(block.includes('relative to the sandbox'), 'block states the path rule');
+
+// Easy gets the old drill's rules: no anchored-edit contract, and step 7 is
+// still the old append instruction. The harness rules (paths, Continue) stay.
+store.set('settings.trainingMode', { active: true, startedAt: 2, difficulty: 'easy' });
+store.set('trainingVerdicts', {});
+const easyBlock = trainingBlockFor({ id: 'agent_test' });
+ok(easyBlock.includes('Append a second line'), 'easy block keeps the old append step');
+ok(easyBlock.includes('12-step pass'), 'easy block names the 12-step pass');
+ok(!easyBlock.includes('never an append'), 'easy block has no anchored-edit contract');
+ok(!easyBlock.includes('17. show_file:'), 'easy block never lists the 17-step ending');
+ok(easyBlock.includes(drillFile), 'easy block still names this agent\'s own file');
+ok(easyBlock.includes('never lets the drill stop'), 'easy block keeps the Continue loop');
+const easyKickoff = trainingKickoffFor();
+ok(easyKickoff.includes('12. todo_write:'), 'easy kickoff lists all 12 steps');
+ok(!easyKickoff.includes('show_file'), 'easy kickoff does not name the hard ending');
+ok(easyKickoff.includes('12-step pass'), 'easy kickoff names the pass length');
+store.set('settings.trainingMode', { active: true, startedAt: 1, difficulty: 'hard' });
 
 // The recorded position is per agent, in that agent's own block. One shared
 // "Continue" used to list every agent's position, and a live run had a second
@@ -146,6 +180,7 @@ eq(reachedCleanTarget({ cleanPassTarget: 2 }, { a: { cleanPasses: 1 } }), null,
 
 // The strip says the rule only when there is one.
 eq(drillStripTitle({}), 'drill', 'no target keeps the one-word header');
+eq(drillStripTitle({ difficulty: 'easy' }), 'easy drill', 'easy mode is named in the strip');
 eq(drillStripTitle({ cleanPassTarget: 0 }), 'drill', 'target 0 keeps the one-word header');
 eq(drillStripTitle({ cleanPassTarget: 1 }), 'drill \u00b7 stop at 1 clean pass', 'one pass is singular');
 eq(drillStripTitle({ cleanPassTarget: 3 }), 'drill \u00b7 stop at 3 clean passes', 'the header names the target');

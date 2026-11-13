@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=444';
-import { K } from '../storage.js?v=444';
-import { persistence } from '../persistence.js?v=444';
-import { api } from '../api.js?v=444';
-import { isNoTokenError } from '../apiError.js?v=444';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=444';
-import { errText } from '../api.js?v=444';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=444';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=444';
-import { snapshot } from '../rateGovernor.js?v=444';
-import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget } from '../training.js?v=444';
-import { resetBrowserEnabled } from '../toolManifest.js?v=444';
-import { perf } from '../perf.js?v=444';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=444';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=444';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=444';
+import { store } from '../store.js?v=446';
+import { K } from '../storage.js?v=446';
+import { persistence } from '../persistence.js?v=446';
+import { api } from '../api.js?v=446';
+import { isNoTokenError } from '../apiError.js?v=446';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=446';
+import { errText } from '../api.js?v=446';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=446';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=446';
+import { snapshot } from '../rateGovernor.js?v=446';
+import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty } from '../training.js?v=446';
+import { resetBrowserEnabled } from '../toolManifest.js?v=446';
+import { perf } from '../perf.js?v=446';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=446';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=446';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=446';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -773,9 +773,15 @@ export class Sidebar {
   _openTrainingDialog() {
     const tm = store.get('settings.trainingMode') || { active: false, startedAt: 0 };
     const armed = !!tm.active;
+    const difficulty = trainingDifficulty(tm);
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
-    const steps = trainingStepList().map(s => `<li>${esc(s)}</li>`).join('');
+    const stepRows = (d) => trainingStepList(null, d).map(s => `<li>${esc(s)}</li>`).join('');
+    const steps = stepRows(difficulty);
+    const difficultyCopy = (d) => d === 'easy'
+      ? 'Easy runs the original 12-step sequence, including its old append step. Per-agent files and the Continue loop still apply.'
+      : 'Hard runs the current 17-step drill with the ranged read, anchored edits and display tools.';
+    const difficultyNote = armed ? ' Stop training to switch.' : '';
     const cleanTarget = Math.max(0, Math.floor(Number(tm.cleanPassTarget) || 0));
     // The same verdicts the live strip shows, so the dialog is a snapshot of
     // the run rather than a second, differently-computed opinion.
@@ -797,6 +803,11 @@ export class Sidebar {
         </div>
         <div class="modal-body">
           <div class="form-hint" style="margin-bottom:8px">A paced tool drill for every active agent. While armed:</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px" role="group" aria-label="Drill difficulty">
+            <button type="button" class="btn btn-sm ${difficulty === 'easy' ? 'btn-primary' : 'btn-secondary'}" id="trainingEasy"${armed ? ' disabled' : ''} style="flex:1">Easy · 12 steps</button>
+            <button type="button" class="btn btn-sm ${difficulty === 'hard' ? 'btn-primary' : 'btn-secondary'}" id="trainingHard"${armed ? ' disabled' : ''} style="flex:1">Hard · 17 steps</button>
+          </div>
+          <div class="form-hint" id="trainingDifficultyHint" style="margin-bottom:10px">${esc(difficultyCopy(difficulty) + difficultyNote)}</div>
                      ${statusBlock}
           <div class="form-hint" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <label for="trainingCleanTarget">Stop after</label>
@@ -806,10 +817,10 @@ export class Sidebar {
           <ul class="training-points">
             <li>All active agents are throttled to ~50% of their normal request rate.</li>
             <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else while the mode is on.</li>
-            <li><strong>It only stops when you say so.</strong> Every finished turn — a <code>show_*</code> step, a short reply, even the last step of the drill — is followed automatically by <code>Continue</code>, so agents cannot end the loop early; the clean-pass limit below is the one exception, and 0 leaves it off. Display tools are therefore practiced mid-drill, not only at the end.</li>
+            <li><strong>It only stops when you say so.</strong> Every finished turn — a display step, a short reply, even the last step of the drill — is followed automatically by <code>Continue</code>, so agents cannot end the loop early; the clean-pass limit below is the one exception, and 0 leaves it off.</li>
             <li>A failed step must be retried until it passes, never skipped; each pass is logged to the todo list.</li>
           </ul>
-          <ol class="training-steps">${steps}</ol>
+          <ol class="training-steps" id="trainingSteps">${steps}</ol>
           <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. Start sends the drill into chat straight away, so every attempt, the map and the metrics show exactly as usual. The loop keeps going — and starts another pass once the drill is complete — until you press Stop, switch training off, or the clean-pass limit is reached.</div>
         </div>
         <div class="modal-footer">
@@ -819,6 +830,24 @@ export class Sidebar {
       </div>`;
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
+    // Switching is a setup action, not a mid-run one: a different step table
+    // would invalidate the live position and verdict. Disabled while armed.
+    if (!armed) {
+      const setDifficulty = (next) => {
+        const cur = store.get('settings.trainingMode') || {};
+        store.set('settings.trainingMode', { ...cur, difficulty: next });
+        try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
+        const easy = next === 'easy';
+        const easyBtn = overlay.querySelector('#trainingEasy');
+        const hardBtn = overlay.querySelector('#trainingHard');
+        easyBtn.className = `btn btn-sm ${easy ? 'btn-primary' : 'btn-secondary'}`;
+        hardBtn.className = `btn btn-sm ${easy ? 'btn-secondary' : 'btn-primary'}`;
+        overlay.querySelector('#trainingSteps').innerHTML = stepRows(next);
+        overlay.querySelector('#trainingDifficultyHint').textContent = difficultyCopy(next);
+      };
+      overlay.querySelector('#trainingEasy').addEventListener('click', () => setDifficulty('easy'));
+      overlay.querySelector('#trainingHard').addEventListener('click', () => setDifficulty('hard'));
+    }
     overlay.querySelector('#trainingClose').addEventListener('click', close);
     overlay.querySelector('#trainingCancel').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -849,8 +878,46 @@ export class Sidebar {
    * the normal turn path, so everything behaves exactly as it does for a
    * typed message — a fresh turn when idle, a steer when already working.
    */
-  _startTraining(close) {
+  /**
+   * Create and switch to the empty session a training run starts in.
+   *
+   * The drill block is authoritative, but the transcript in front of it is
+   * not: old runs are full of training/training.txt paths and finished passes,
+   * and live models copied both. Starting in a fresh session removes that
+   * history entirely. A turn already in flight belongs to the old
+   * conversation, so it is stopped rather than steered into.
+   */
+  async _openTrainingSession() {
+    if (this.chat && this.chat.aborter) {
+      // Abort directly instead of chat.stop(): STOP is a one-shot flag that
+      // suppresses the drill's next Continue, and Start wants the opposite.
+      try { this.chat.aborter.abort(); } catch { /* already gone */ }
+      for (let i = 0; i < 40 && this.chat.aborter; i++) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+    try {
+      const stamp = new Date().toLocaleString([], {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+      const title = `Training drill — ${stamp}`;
+      const res = await api.createSession(title);
+      const id = res && (res.session_id || res.id);
+      if (!id) return null;
+      const conv = { id, title, createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+      store.set('currentConversation', conv);
+      store.emit('conversation:loaded', conv);
+      if (typeof this.loadSessions === 'function') await this.loadSessions();
+      return conv;
+    } catch (err) {
+      console.warn('[training] fresh session failed; starting in the current one:', err);
+      return null;
+    }
+  }
+
+  async _startTraining(close) {
     const tm = store.get('settings.trainingMode') || {};
+    const difficulty = trainingDifficulty(tm);
     const actives = (store.get('agents') || []).filter(a => a && a.active);
     if (!actives.length) {
       store.emit('toast', {
@@ -859,6 +926,8 @@ export class Sidebar {
       });
       return;
     }
+    // Before arming: the kickoff must be the first message in a clean session.
+    const fresh = await this._openTrainingSession();
     // drillResumes/drillFails are counters now, not a budget: the loop is
     // unbounded and Start only resets what the dialog reports. The clean-pass
     // target is a setting, not a counter, so it survives the restart.
@@ -866,25 +935,31 @@ export class Sidebar {
     const cleanPassTarget = targetEl
       ? Math.max(0, Math.min(99, Math.floor(Number(targetEl.value) || 0)))
       : Math.max(0, Math.floor(Number(tm.cleanPassTarget) || 0));
-    store.set('settings.trainingMode', { ...tm, active: true, startedAt: Date.now(), drillResumes: 0, drillFails: 0, cleanPassTarget });
+    store.set('settings.trainingMode', { ...tm, difficulty, active: true, startedAt: Date.now(), drillResumes: 0, drillFails: 0, cleanPassTarget });
     // A new run starts with a blank scoreboard: last run's verdicts describe
     // different calls and would sit in the strip as if they were current.
     store.set('trainingVerdicts', {});
     persistence.set('settings', store.get('settings'));
+    const modeLabel = difficulty === 'easy' ? 'Easy · 12 steps' : 'Hard · 17 steps';
     store.emit('toast', {
-      message: 'Training mode ON — continuous drill at ~50% rate (Stop to end)',
+      message: fresh
+        ? `Training mode ON — ${modeLabel}, fresh session (${fresh.title.replace('Training drill — ', '')}), ~50% rate (Stop to end)`
+        : `Training mode ON — ${modeLabel}, continuous drill at ~50% rate (Stop to end)`,
       type: 'success',
     });
     store.emit('training:changed', { active: true });
     close();
     this.renderAgents();
     // Dispatch after arming so the fresh turn's system prompt already carries
-    // the drill block; the kickoff text itself is self-contained for a turn
-    // that is already in flight (steer path).
+    // the drill block. This is a new turn in the new session, never a steer:
+    // the old conversation is exactly what the fresh session replaced.
     try {
       const kickoff = trainingKickoffFor();
-      if (this.chat && typeof this.chat.steer === 'function' && this.chat.aborter) {
-        this.chat.steer(kickoff);
+      if (this.chat && this.chat.aborter) {
+        store.emit('toast', {
+          message: 'Training armed — the previous turn is still stopping; the drill will continue when it ends',
+          type: 'info',
+        });
       } else if (this.chat && typeof this.chat.sendMessage === 'function') {
         const input = document.getElementById('inputField');
         if (input) {
