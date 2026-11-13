@@ -31,11 +31,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=435';
-import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=435';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=435';
-import { settingFor } from './agentConfig.js?v=435';
-import { trace } from './trace.js?v=435';
+import { store } from './store.js?v=436';
+import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=436';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=436';
+import { settingFor } from './agentConfig.js?v=436';
+import { trace } from './trace.js?v=436';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -2543,8 +2543,12 @@ export const TOOL_ALIASES = {
   glob: 'glob_files', find_files: 'glob_files', file_search: 'glob_files',
   // Web
   fetch: 'fetch_url', webfetch: 'fetch_url', web_fetch: 'fetch_url', open_url: 'fetch_url',
-  // Writers
-  write: 'write_file', create_file: 'write_file', edit_file: 'write_file',
+  // Writers. edit_file is deliberately absent: it is a REAL tool (exact
+  // search-and-replace), so an entry here could never take effect — registered
+  // names win. Mapping it to write_file would also be dangerous: a misspelled
+  // or empty old_string would become a whole-file overwrite instead of the
+  // loud failure that makes a bad edit safe.
+  write: 'write_file', create_file: 'write_file',
   write_to_file: 'write_file', save_file: 'write_file',
 };
 

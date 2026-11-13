@@ -46,7 +46,7 @@ const cleanPass = () => [
   call('write_file', { path: 'training/training.txt', content: 'training' }, 'ok', 'wrote 8 bytes'),
   call('read_file', { path: 'training/training.txt' }, 'ok', '1  training'),
   call('read_file', { path: 'training/training.txt', range: '1-1' }, 'ok', '1  training'),
-  call('edit_file', { path: 'training/training.txt', old_string: '', new_string: 'drill 2 passed' }, 'ok', 'appended'),
+  call('edit_file', { path: 'training/training.txt', old_string: 'training', new_string: 'training\ndrill 2 passed' }, 'ok', 'replaced 1'),
   call('edit_file', { path: 'training/training.txt', old_string: 'drill 2 passed', new_string: 'drill 2 passed (exact match)' }, 'ok', 'replaced 1'),
   call('list_dir', { path: 'training' }, 'ok', 'training.txt  21 bytes'),
   call('glob_files', { pattern: 'training/*' }, 'ok', 'training/training.txt'),

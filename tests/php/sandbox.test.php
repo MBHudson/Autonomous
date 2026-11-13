@@ -241,6 +241,28 @@ $wFile = $writeDir . '/test.txt';
 $wr = Sandbox::writeFile($wFile, 'hello write');
 ok($wr['bytes_written'] > 0, 'write file');
 
+// 9b. the drill's edit sequence, against real bytes. Step 8 adds a line by
+// replacing an anchor (edit_file never appends), step 9 renames that line, and
+// a miss is refused without touching the file.
+@mkdir($writeDir . '/training', 0777, true);
+$drillFile = $writeDir . '/training/training.txt';
+Sandbox::writeFile($drillFile, 'training');
+Sandbox::strReplace($drillFile, 'training', "training\ndrill 2 passed");
+ok(file_get_contents($drillFile) === "training\ndrill 2 passed",
+    'drill edit: a line is added by replacing its anchor');
+Sandbox::strReplace($drillFile, 'drill 2 passed', 'drill 2 passed (exact match)');
+ok(file_get_contents($drillFile) === "training\ndrill 2 passed (exact match)",
+    'drill edit: the exact replace lands');
+$beforeMiss = file_get_contents($drillFile);
+throws(function () use ($drillFile) {
+    Sandbox::strReplace($drillFile, 'drill 9 passed', 'x');
+}, 'drill edit: a missing old_string is refused', 'not found');
+ok(file_get_contents($drillFile) === $beforeMiss,
+    'drill edit: a refused edit leaves the file untouched');
+throws(function () use ($drillFile) {
+    Sandbox::strReplace($drillFile, '', "bare append\n");
+}, 'drill edit: an empty old_string is refused', 'empty');
+
 // 10. list_dir on subdir
 $lsSub = Sandbox::listDir('sub', 200, $writeDir);
 ok(count($lsSub['entries']) > 0, 'list subdirectory');

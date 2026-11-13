@@ -58,7 +58,11 @@ eq(TRAINING_TASKS[TRAINING_TASKS.length - 2].tool, 'todo_write',
   'completion is recorded immediately before the final show');
 ok(TRAINING_TASKS.some(t => t.label.includes(TRAINING_FILE)), 'drill creates training.txt');
 ok(TRAINING_TASKS.filter(t => t.tool === 'edit_file').length >= 2,
-  'drill edits twice: append, then an exact old_string/new_string replace');
+  'drill edits twice with exact old_string/new_string replaces');
+const appendStep = TRAINING_TASKS.find(t => t.tool === 'edit_file'
+  && t.label.includes('drill 2 passed') && !t.label.includes('(exact match)'));
+ok(!!appendStep && /old_string/.test(appendStep.label) && /new_string/.test(appendStep.label),
+  'the add-a-line step teaches an anchored old_string/new_string replace, not a bare append');
 ok(TRAINING_TASKS.some(t => t.tool === 'read_file' && /1-1/.test(t.label)),
   'drill teaches a ranged read so a big file is not pulled in whole');
 // A display step ends the turn, and training mode resumes the drill -- so the

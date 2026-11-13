@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=435';
+import { store } from './store.js?v=436';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -55,7 +55,7 @@ export const TRAINING_TASKS = [
   { tool: 'write_file', label: 'Create training/training.txt containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
   { tool: 'read_file', label: 'Read training/training.txt back and confirm it says "training".' },
   { tool: 'read_file', label: 'Read only line 1: call read_file with "training/training.txt 1-1". A range keeps a big file out of your context instead of pulling all of it in.' },
-  { tool: 'edit_file', label: 'Append a second line "drill 2 passed" to training/training.txt. (Asks approval — wait for it.)' },
+  { tool: 'edit_file', label: 'In training/training.txt, replace the exact text "training" with "training\\ndrill 2 passed" — old_string is the text you match, new_string is what replaces it; edit_file is search-and-replace, never an append. (Asks approval — wait for it.)' },
   { tool: 'edit_file', label: 'Replace the exact line "drill 2 passed" with "drill 2 passed (exact match)". (Asks approval — old_string/new_string edits only touch the text you name.)' },
   { tool: 'list_dir', label: 'List the training folder.' },
   { tool: 'glob_files', label: 'Find files matching "training/*".' },
@@ -96,7 +96,8 @@ export const DRILL_CHECKS = [
   (c) => namesTrainingFile(c) && /"content"\s*:\s*"training/.test(argText(c)), // 5 write_file
   (c) => namesTrainingFile(c) && showsTraining(c),                          // 6 read back
   (c) => /1-1|"range"/.test(argText(c)),                                    // 7 ranged read
-  (c) => namesTrainingFile(c) && /drill 2 passed/.test(argText(c)),         // 8 append
+  (c) => namesTrainingFile(c) && /old_string/.test(argText(c))
+    && /new_string/.test(argText(c)) && /drill 2 passed/.test(argText(c)),  // 8 anchored append
   (c) => namesTrainingFile(c) && /drill 2 passed/.test(argText(c)),         // 9 exact replace
   (c) => showsTraining(c),                                                  // 10 list_dir
   (c) => showsTraining(c),                                                  // 11 glob_files
@@ -300,6 +301,7 @@ export function trainingBlockFor() {
     + `- One step at a time. Call the step's tool, read its result, then move on.\n`
     + `- If a tool call errors, is denied, or returns the wrong thing, read the error message and TRY AGAIN with fixed arguments. Keep retrying the SAME step — never skip a failed step, never move on until it returns ok.\n`
     + `- An error that says "Did you mean ..." or "not a file" is telling you the ARGUMENT is wrong: change it. Sending the identical call again fails identically.\n`
+    + `- edit_file is exact search-and-replace, never an append: old_string is the text you match, new_string replaces it. To add a line, anchor on the neighbouring text (old_string "training" → new_string "training\\ndrill 2 passed"). An empty or ambiguous old_string is refused, so a bare append can never pass.\n`
     + `- Paths are relative to the sandbox: training/training.txt. Never the project folder above it, and never an absolute C:\\... path.\n`
     + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
     + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec.\n`
