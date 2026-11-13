@@ -9,7 +9,7 @@
 //
 // Pure functions only; no browser globals. Exits 0 on success, 1 on failure.
 
-import { detectFamily, harnessFor, autoProtocol, toolProtocolFor, harnessOverride, defaultRpmFor, contextLimitFor, outputText, outputUsage } from '../../ui/js/harness.js';
+import { detectFamily, harnessFor, autoProtocol, toolProtocolFor, harnessOverride, defaultRpmFor, contextLimitFor, learnedContextLimit, rememberContextLimit, outputText, outputUsage } from '../../ui/js/harness.js';
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -100,6 +100,28 @@ eq(envU.total, 5, 'outputUsage: total');
 eq(outputUsage({ usage: {} }), null, 'outputUsage: no stats -> null');
 eq(outputText({ output: [{ type: 'reasoning', content: 'a' }, { type: 'message', content: 'x' }, { type: 'reasoning', content: 'b' }] }, ['reasoning']), 'a\n\nb',
   'outputText: blocks stay separated');
+
+// --- the runner's real window beats the model-name guess ---------------
+// `nemotron` in a model id used to mean 131k no matter how the runner actually
+// loaded it, which is how an 8k LM Studio session kept getting 8,836 tokens.
+eq(contextLimitFor('nvidia/nemotron-3-nano-4b'), 131072, 'the name table guesses 131k');
+eq(learnedContextLimit('nvidia/nemotron-3-nano-4b'), null, 'nothing learned yet');
+rememberContextLimit('nvidia/nemotron-3-nano-4b', 8192);
+eq(learnedContextLimit('nvidia/nemotron-3-nano-4b'), 8192, 'a learned window is remembered');
+eq(contextLimitFor('nvidia/nemotron-3-nano-4b'), 8192, 'the learned window wins over the name');
+eq(contextLimitFor('nVIDIA/Nemotron-3-Nano-4B'), 8192, 'model ids match case-insensitively');
+eq(contextLimitFor('nvidia/nemotron-3-ultra-550b-a55b'), 131072, 'other ids keep the table value');
+rememberContextLimit('', 4096);
+eq(learnedContextLimit(''), null, 'an empty model id is ignored');
+
+// --- the window belongs to the RUNNER, not just the model --------------
+const lmsHost = 'http://10.0.0.57:1234/v1/chat/completions';
+const cloud = 'https://openrouter.ai/api/v1/chat/completions';
+rememberContextLimit('acme/mystery-3b', 4096, lmsHost);
+eq(learnedContextLimit('acme/mystery-3b', lmsHost), 4096, 'a learned window is scoped to its host');
+eq(learnedContextLimit('acme/mystery-3b', cloud), null, 'another host does not inherit it');
+eq(contextLimitFor('acme/mystery-3b', cloud), null, 'the other host falls back to the table');
+eq(contextLimitFor('acme/mystery-3b', lmsHost), 4096, 'the recorded host still gets it');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

@@ -134,6 +134,18 @@ export const TOOL_SCHEMAS = {
   browser_read: obj(),
   browser_wait: obj({ ms: num('Milliseconds to wait for the page to settle') }),
   declare_goal_complete: obj({ summary: str('What was finished') }, ['summary']),
+  show_file: obj({
+    path: str('File to show the operator'),
+    range: str('Line range, e.g. "1-200" (optional)'),
+  }, ['path']),
+  show_command: obj({
+    argv: arr('Command and arguments, one array entry per argument'),
+    timeout: num('Seconds before the command is killed (default 60, max 600)'),
+  }, ['argv']),
+  show_find: obj({
+    query: str('Text or file name to find'),
+  }, ['query']),
+  show_url: obj({ url: str('Page URL') }, ['url']),
 };
 
 /** API families whose native tool interface this client can drive. */
@@ -227,6 +239,8 @@ const SCALAR_ARGS = {
   think: 'thought',
   exec_poll: 'handle',
   exec_kill: 'handle',
+  show_url: 'url',
+  show_find: 'query',
 };
 
 /**

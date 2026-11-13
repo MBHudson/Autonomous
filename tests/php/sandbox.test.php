@@ -96,6 +96,15 @@ $s = Sandbox::status();
 ok(!empty($s['ok']), 'status ok');
 ok(in_array(rtrim(str_replace('\\','/',$readOnly),'/'), $s['read_roots']), 'status read_roots');
 ok(in_array(rtrim(str_replace('\\','/',$writeDir),'/'), $s['write_roots']), 'status write_roots');
+// The manifest needs to know which configured roots are NOT on this machine:
+// a Windows install carrying the Linux MCP root used to advertise it as
+// readable and every agent probed a path that could not exist.
+ok(is_array($s['read_roots_missing'] ?? null), 'status reports which read roots are missing');
+ok(is_array($s['write_roots_missing'] ?? null), 'status reports which write roots are missing');
+ok(array_reduce($s['read_roots_missing'], function ($carry, $r) { return $carry && !is_dir($r); }, true),
+    'and only roots that are really absent are named');
+ok(!in_array(rtrim(str_replace('\\','/',$readOnly),'/'), array_map(function ($r) { return rtrim(str_replace('\\','/',$r),'/'); }, $s['read_roots_missing']), true),
+    'a root that exists is not reported missing');
 
 // 1a. Roots default to the app's own folder when the roots KEYS are absent,
 // even though the sandbox block itself exists. Saving the programs list (or a
@@ -135,6 +144,43 @@ ok(count($lsR['entries']) > 0, 'list has entries');
 $r = Sandbox::readFile($fileInR, null, $readOnly);
 ok(stripos($r['content'], 'world') !== false, 'read file');
 
+// 5a-5d. text budget: the MODEL keeps 60k, a DISPLAY call gets the operator one.
+// show_file delegates to read_file, so without this the operator budget on the
+// client was unreachable -- the server handed back 60k plus a marker whose
+// advice ("read a file by line range") is aimed at a model, not a person.
+$bigFile = $readOnly . '/big.txt';
+file_put_contents($bigFile, str_repeat("line of text\n", 6000));
+$bigDefault = Sandbox::readFile($bigFile, null, $readOnly);
+ok(strpos($bigDefault['content'], 'truncated at 60000 characters') !== false,
+    'a plain read still stops at the model cap');
+$bigDisplay = Sandbox::readFile($bigFile, null, $readOnly, Sandbox::MAX_DISPLAY_CHARS);
+ok(strpos($bigDisplay['content'], 'truncated at') === false,
+    'a display read is not cut at the model cap');
+ok(strlen($bigDisplay['content']) > 60000,
+    'a display read actually returns more than the model cap');
+$tinyAsk = Sandbox::readFile($bigFile, null, $readOnly, 10);
+ok(strlen($tinyAsk['content']) > 10 && strlen($tinyAsk['content']) < 1300,
+    'an absurdly small ask is clamped to a floor, not obeyed');
+$overAsk = Sandbox::readFile($bigFile, null, $readOnly, 99999999);
+ok(strlen($overAsk['content']) === strlen($bigDisplay['content']),
+    'asking for more than the display ceiling is clamped to it');
+// The budget is reported back, so "why is this 60,000?" is answerable from the
+// result itself instead of guessed at from the length.
+ok(($bigDefault['limit'] ?? 0) === 60000,
+    'a plain read reports the 60k model cap it applied');
+ok(($bigDisplay['limit'] ?? 0) === Sandbox::MAX_DISPLAY_CHARS,
+    'a display read reports the operator cap it applied');
+
+// 5e. the read ceiling has to reach the display budget, or the bigger budget is
+// a promise the server cannot keep: 200KB of read capped a 230KB log.
+$hugeFile = $readOnly . '/huge.txt';
+file_put_contents($hugeFile, str_repeat("0123456789\n", 20000));   // 220KB raw
+$huge = Sandbox::readFile($hugeFile, null, $readOnly, Sandbox::MAX_DISPLAY_CHARS);
+ok(strlen($huge['content']) > 200000,
+    'a 220KB file is read past the old 200KB ceiling');
+ok(strpos($huge['content'], 'truncated at') === false,
+    'and is shown whole at the display budget');
+
 // 6. read path escape refused
 throws(function () use ($secretFile, $readOnly) {
     Sandbox::readFile($secretFile, null, $readOnly);
@@ -144,6 +190,46 @@ throws(function () use ($secretFile, $readOnly) {
 throws(function () use ($readOnly) {
     Sandbox::readFile('../secret-outside/secret.txt', null, $readOnly);
 }, 'read ../ refused');
+
+// 7a-7b. A refusal should point at the file the agent CAN reach. An agent told
+// "outside the allowed directories" about <project>/test_read.txt, when the file
+// is <project>/sandbox/test_read.txt, otherwise stops and reports that it cannot
+// see a file it wrote itself.
+file_put_contents($readOnly . '/hintme.txt', 'inside');
+$read = Sandbox::readFile('../hintme.txt', null, $readOnly);
+ok(strpos($read['content'], 'inside') !== false,
+    'an outside READ with a matching name reaches the copy inside the sandbox');
+file_put_contents($writeDir . '/hintme.txt', 'inside');
+try {
+    Sandbox::writeFile('../hintme.txt', 'x', 'write', $writeDir);
+    ok(false, 'an outside write with a matching name is still refused');
+} catch (\Throwable $e) {
+    ok(stripos($e->getMessage(), 'Did you mean "hintme.txt"') !== false,
+        'the WRITE refusal names the copy that IS inside the sandbox');
+}
+try {
+    Sandbox::readFile('../nothing-here-xyz.txt', null, $readOnly);
+    ok(false, 'an unrelated outside path is refused');
+} catch (\Throwable $e) {
+    ok(stripos($e->getMessage(), 'Did you mean') === false,
+        'no hint when nothing inside matches');
+}
+
+// 7c-7e. A path naming the folder ABOVE the sandbox still reaches the file that
+// is inside it -- the model asked for <project>/notes.txt, the file is
+// <sandbox>/notes.txt, and refusing it made the agent report that it could not
+// see the file it had just written.
+file_put_contents($readOnly . '/sub.txt', 'sub-content');
+$sub = Sandbox::readFile('../sub.txt', null, $readOnly);
+ok(strpos($sub['content'], 'sub-content') !== false,
+    'reading "<parent>/sub.txt" finds the copy inside the sandbox');
+ok(strpos(str_replace('\\', '/', $sub['path']), '/sub.txt') !== false,
+    'and reports the real path it read');
+
+// 7f-7g. Listing a refused folder answers with the sandbox and names the refusal.
+$l = Sandbox::listDir('../', 200, $readOnly);
+ok(!empty($l['warning']), 'listing the folder above is refused with a warning');
+ok(!empty($l['entries']), 'and still shows a listing to work from');
 
 // 8. scope escape: scope not in any root
 throws(function () use ($nestedW, $outside) {

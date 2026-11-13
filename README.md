@@ -373,6 +373,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🧪 | **API Lab** | Paste a curl → get it in 10 languages → actually send it server-side |
 | 🔀 | **Routing chart** | Draw workflows: agents, loops, checkpoints, delays, parallel fan-out |
 | 🛠️ | **Real tools** | Files, shell, web, a code interpreter, git, editors, MCP — with timeouts that end the process instead of the turn, argv shapes models actually write, and approvals that resume the agent where it left off |
+| 📺 | **Show, don't paste** | `show_file` / `show_command` / `show_find` / `show_url` put the answer in the transcript and end the turn — 400k characters shown, none of it re-sent as prompt, and every failed call counted in the header instead of buried |
 | 🚀 | **Background commands** | `exec_start` runs a server, watcher or anything that never exits and hands back a handle at once; `exec_poll` reads its output and says whether it is alive, `exec_kill` stops it |
 | ⏱️ | **Pacer / limiter** | Per-key rate limiting that knows each provider's free-tier ceiling, and gives a slot back when a call is cancelled or goes out early — a learned 429 reaches callers already queued |
 | 📊 | **Metrics + 🔎 trace** | Uptime, requests, tokens, budgets, and a live run timeline |
@@ -1214,6 +1215,7 @@ Tick tools per agent in the editor. They're grouped:
 | --- | --- |
 | 🌐 `web_search` | Search the web, no API key (DuckDuckGo → Marginalia → Wiby) |
 | 📄 `fetch_url` | Read a page as plain text (refuses private/metadata hosts) |
+| 📺 `show_file` / `show_command` / `show_find` / `show_url` | Show a file, a command's output, a search or a page as the reply — **ends the turn**, and the output is never sent back as prompt (display budget 400k, model reads stay 60k) |
 | 📖 `read_file` / `list_dir` / `glob_files` / `grep_code` / `stat` | Explore a jailed filesystem |
 | ✍️ `write_file` | Create or edit a file — **asks you first** |
 | 🧑💻 `exec` | Run one command as an **argv array** (no shell), allowlisted — `"timeout"` for slow commands, several calls per reply |
@@ -1314,7 +1316,7 @@ The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains th
 
 - ⚡ **Speed up custom forming harnesses and learning dialect via a brute force training method.** This method is especially successful on models above the 1.5b parameters mark (1.4-1.9gb) but not typically any lower. Run the agent through the 1st time, takes around 2-4 minutes with varying degrees of success. Run that same agent a 2nd time, and it's more common to see a 100% success rate (12 calls/0 retries) than anything lower. The system remembers only successful calls and makes sure to use the winning syntax from that point forward. 🏆
 - 🐢 **~50% request rate** — every active agent is throttled to half pace (`TRAINING_THROTTLE = 0.5` in `ui/js/training.js`), so the drill exercises patience as well as tools. ⏳
-- 🔒 **One drill, nothing else** — the system prompt locks to 12 steps in `training/`, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → `edit_file` 🩹, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `exec` ⌨️, and a final `todo_write` to mark everything done. Approval-gated steps (write/edit/exec) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
+- 🔒 **One drill, nothing else** — the system prompt locks to 17 steps in `training/`, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → a ranged read (line 1 only) → `edit_file` 🩹 append and exact replace, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `show_find` 📺, `exec` ⌨️, `show_command` 📺, a `todo_write` ✅, and a final `show_file` 📺. A display step ends the turn by design, so the drill **resumes itself** after it (six-resume leash, reset by Start). Approval-gated steps (write/edit/exec/show_command) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
 - 🔁 **Retry until it passes** — a failed step is never skipped; the error comes back with the shape to retry with, so a miss becomes practice instead of a skip. Each pass is logged with `todo_write`. ✅
 - ▶️ **Start dispatches the drill** — Start posts it into chat as a turn (or steers it into a running one), so messages 🗨️, map 🗺️, metrics 📊 and trace 🔎 all move exactly as usual. With no active agents it says so instead of arming. 🤫
 - 🧠 **Nothing mystical is stored** — model weights never change; *"remember what worked"* means the todo record (kept per agent), the run transcript, and the dialect memo: a tool-call dialect is only remembered after its calls execute ok, and native-API turns never write it. Stop on the same button ends it with a recap: which tools passed, how many retries each took. 📋
@@ -1851,9 +1853,9 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 **Newest first.** Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section above, where it stays as reference. The most recent release sits at the top.
 
-### 🩹 v450 — a fresh copy boots without `storage/config.json`
+### 📺 v451 — show, don't paste: display tools, a legible sandbox, and a drill that survives a display
 
-*The file is git-ignored, so no download contains it and the first request writes it — but the write was never checked. On a copy whose `storage/` the web server could not write, it failed silently, the read that followed warned **No such file or directory**, and the app received `null` where a config belongs: an install that was fine except for one folder's owner looked broken, and nothing saved afterwards persisted. It now writes the default, checks that it landed, and hands back the same defaults in memory if it cannot, so a read-only copy boots instead of collapsing. A refusal logs one line naming the folder and the account — the symptom it replaces, settings that quietly revert, reads like a UI bug.*
+*`show_file` / `show_command` / `show_find` / `show_url` end the turn with the output **on screen** instead of in the prompt: 400,000 characters for a display, while a model's own `read_file` keeps its 60,000, and the tool box header now counts failed calls and retries. The sandbox became legible: a refused path names the file that **is** inside it (*"Did you mean \"test_read.txt\"?"*), a read of the project folder reaches the same-named file in the sandbox, `list_dir` on a refused folder answers with the sandbox listing and a warning, and a directory handed to `read_file` is listed instead of called *not a file*. Training mode practices all three show tools mid-drill and resumes itself after one ends a turn (six-resume leash); its completion note is a *drill* marker, not a message from you. Learning stopped leaking: a display turn can remember its dialect, and a sync **unions** the remembered dialect and context windows instead of replacing them. `APP_VERSION` 430 → 431.*
 
 
 ---

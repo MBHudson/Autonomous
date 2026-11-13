@@ -31,11 +31,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=430';
-import { asText, compactText } from './utils.js?v=430';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=430';
-import { settingFor } from './agentConfig.js?v=430';
-import { trace } from './trace.js?v=430';
+import { store } from './store.js?v=431';
+import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=431';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=431';
+import { settingFor } from './agentConfig.js?v=431';
+import { trace } from './trace.js?v=431';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -216,7 +216,7 @@ export const TOOL_REGISTRY = {
   read_file: {
     label: 'read_file',
     arg: 'path',
-    describe: 'Read a file on the server (numbered lines)',
+    describe: 'Read a file into your own context (numbered lines) so you can use it. When the operator asked to SEE the file, use show_file instead.',
     // A THROW, not a string. These ran returned "sandbox tools are not bound
     // yet" as ordinary output, so runTool marked the call ok, the model read a
     // benign sentence as confirmation, and a turn could report a file it never
@@ -226,7 +226,7 @@ export const TOOL_REGISTRY = {
   list_dir: {
     label: 'list_dir',
     arg: 'path',
-    describe: 'List a directory the sandbox is allowed to read',
+    describe: 'List the names in a directory the sandbox may read. Names only — this does not show a file\'s contents.',
     // A THROW, not a string. These ran returned "sandbox tools are not bound
     // yet" as ordinary output, so runTool marked the call ok, the model read a
     // benign sentence as confirmation, and a turn could report a file it never
@@ -517,10 +517,186 @@ export const TOOL_REGISTRY = {
       return summary || 'Goal declared complete.';
     },
   },
+
+  // --- Display tools ---
+  // The request IS the answer: the app performs it and paints the result into
+  // the transcript, so the content never becomes a token. Each one mirrors a
+  // normal tool and inherits its gate (see policyAs), so asking to be shown a
+  // log is cheaper without being a way around the sandbox.
+  //
+  // A show_* result is NOT fed back to the model and there is no follow-up
+  // request, which is where the saving actually comes from: one whole prompt
+  // re-send plus the reply that would have pasted the output again.
+  show_file: {
+    label: 'show_file',
+    arg: '{"path":"logs/app.log","range":"1-200"}',
+    // Deliberately never names read_file. A description that mentions the
+    // competing tool taught a 7B to pick it: measured with
+    // tools/measure-tool-choice.mjs, "print the contents of docs/notes.md" fell
+    // from 5/5 to 2/5 when the earlier routing draft pointed at read_file here.
+    describe: 'Show a file, log, essay, document or config to the operator as your reply. This '
+      + 'ENDS your turn: they see the contents and you never write them out.',
+    display: true,
+    policyAs: 'read_file',
+    run: displayDelegate('read_file'),
+  },
+  show_command: {
+    label: 'show_command',
+    arg: '{"argv":["tail","-n","2000","logs/app.log"]}',
+    describe: 'Run one program and show its output to the operator as your reply. This ENDS your turn. '
+      + 'Same argv rules and approval as exec, and the same result: use exec instead when you need to '
+      + 'read the output to decide what to do next.',
+    display: true,
+    policyAs: 'exec',
+    needsApproval: true,
+    run: displayDelegate('exec'),
+  },
+  show_find: {
+    label: 'show_find',
+    arg: '{"query":"timeout"}',
+    describe: 'Find something and show the matches to the operator as your reply: searches file '
+      + 'contents and file names for the query. This ENDS your turn. Use grep_code / glob_files '
+      + 'instead when you need the hits back to work with.',
+    display: true,
+    policyAs: 'grep_code',
+    run: (arg, _note, ctx) => findAndShow(arg, ctx),
+  },
+  show_url: {
+    label: 'show_url',
+    arg: '{"url":"https://example.com/docs"}',
+    describe: 'Fetch a page and show its text to the operator as your reply. This ENDS your turn. '
+      + 'Same block list as fetch_url. Use fetch_url instead when you need to read the page yourself.',
+    display: true,
+    policyAs: 'fetch_url',
+    run: displayDelegate('fetch_url'),
+  },
 };
 
 /** Only ever offered to an agent that has a standing goal. */
 export const ALWAYS_ON_TOOLS = ['declare_goal_complete'];
+
+/**
+ * Tools whose result IS the answer.
+ *
+ * One of these ends the turn: the app paints what it ran into the transcript and
+ * nothing is handed back for the model to repeat. The content is therefore
+ * never a token — not output, and (because there is no follow-up request) not
+ * input either.
+ */
+export const DISPLAY_TOOLS = DISPLAY_TOOL_NAMES;
+
+export function isDisplayTool(name) {
+  return DISPLAY_TOOLS.includes(String(name || ''));
+}
+
+// Declared in utils.js so the renderer can use the same budget; re-exported
+// here because every tool-side caller already imports it from this module.
+export { MAX_DISPLAY_CHARS };
+
+/** Cut a displayed value honestly: say how much was left out. */
+export function clipDisplay(text, max = MAX_DISPLAY_CHARS) {
+  const s = String(text ?? '');
+  const cap = Math.max(1024, Number(max) || MAX_DISPLAY_CHARS);
+  if (s.length <= cap) return s;
+  return s.slice(0, cap) + `\n…[${s.length - cap} more characters not shown]`;
+}
+
+/**
+ * Run a normal tool and hand back its output for the transcript.
+ *
+ * Delegation happens at call time so the base tool's binding state, sandbox
+ * root and policy all apply exactly as they do for a normal call.
+ */
+function displayDelegate(base) {
+  return function (arg, note, ctx) {
+    if (isUnboundTool(base)) throwUnbound();
+    const target = TOOL_REGISTRY[base];
+    if (!target || typeof target.run !== 'function') throwUnbound();
+    // Tell the base runner that its output is going to the operator, not back
+    // into a prompt. That flag -- not the tool's name -- is what earns the
+    // bigger text budget on the server, so it cannot be set by a model.
+    return target.run(arg, note, { ...(ctx || {}), display: true });
+  };
+}
+
+/**
+ * show_find: the app picks the searches.
+ *
+ * The model supplies what to look for and nothing about how, which is the point
+ * of the tool — a plain word is escaped so it cannot arrive as a broken regular
+ * expression, and the same query is also tried as a file name.
+ */
+async function findAndShow(arg, ctx) {
+  const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
+  const query = String(a.query ?? a.pattern ?? a.text ?? (typeof arg === 'string' ? arg : '')).trim();
+  if (!query) {
+    return 'error: show_find needs "query" as a plain string, e.g. {"query":"timeout"} — retry the step with that shape';
+  }
+  if (!sandboxClient) throwUnbound();
+  const api = sandboxClient;
+  const scope = (ctx && ctx.sandboxRoot) || undefined;
+  const parts = [];
+  // A plain word must behave like a plain word: escape the regex metacharacters
+  // so a query of "f(x)" cannot arrive as an unbalanced group.
+  const safeRe = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try {
+    const g = await api.sandbox('grep', { pattern: safeRe, max_matches: 80, scope });
+    parts.push(g.count
+      ? `${g.count} matches for "${query}" in ${g.files_scanned} files:\n`
+        + g.matches.map(m => `${m.rel}:${m.line}: ${m.text}`).join('\n')
+      : `no content matches for "${query}" in ${g.files_scanned} files`);
+  } catch (err) {
+    parts.push(`content search failed: ${err && err.message ? err.message : String(err)}`);
+  }
+  const nameGlob = query.replace(/[*?[\]{}]/g, '').trim();
+  if (nameGlob) {
+    try {
+      const f = await api.sandbox('glob', { pattern: `**/*${nameGlob}*`, scope });
+      if (f.count) parts.push(`${f.count} files named like "${query}":\n${f.matches.join('\n')}`);
+    } catch (err) {
+      parts.push(`name search failed: ${err && err.message ? err.message : String(err)}`);
+    }
+  }
+  return parts.join('\n\n');
+}
+
+/**
+ * The one line that stands in for a display result in the conversation.
+ *
+ * This is the ONLY part of a show_* turn stored as message content, and so the
+ * only part re-sent on later turns. It stays short on purpose: the output lives
+ * in the tool-call record, which is rendered and never sent.
+ */
+export function displayCaption(call) {
+  const tool = String((call && call.tool) || '');
+  const raw = call && call.arg;
+  const a = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  const scalar = (raw && typeof raw !== 'object') ? String(raw) : '';
+  if (tool === 'show_command') {
+    const argv = Array.isArray(a.argv) ? a.argv.map(String)
+      : (Array.isArray(raw) ? raw.map(String) : (scalar ? [scalar] : []));
+    return argv.length ? `Ran \`${argv.join(' ')}\` — output below.` : 'Command output below.';
+  }
+  if (tool === 'show_file') {
+    const p = String((a.path ?? a.file ?? scalar) || '').trim();
+    return p ? `Contents of \`${p}\` below.` : 'File contents below.';
+  }
+  if (tool === 'show_url') {
+    const u = String((a.url ?? a.href ?? scalar) || '').trim();
+    return u ? `Text of ${u} below.` : 'Page text below.';
+  }
+  if (tool === 'show_find') {
+    const q = String((a.query ?? a.pattern ?? scalar) || '').trim();
+    return q ? `Search results for “${q}” below.` : 'Search results below.';
+  }
+  return 'Output below.';
+}
+
+/** The tool whose allow/deny decision a tool inherits. */
+export function policyNameFor(name) {
+  const def = TOOL_REGISTRY[name];
+  return (def && def.policyAs) || name;
+}
 
 /**
  * The built-in browser's tools. Offered to EVERY agent automatically while the
@@ -534,6 +710,19 @@ const BUILTIN_TOOL_NAMES = new Set(Object.keys(TOOL_REGISTRY));
 
 /** The message every unbound placeholder runner throws, used to find them. */
 export const SANDBOX_UNBOUND_MARKER = 'sandbox file API is not bound';
+
+/**
+ * Throw the unbound-runner message.
+ *
+ * A function rather than an inline literal on purpose: PLACEHOLDER_RUNS finds
+ * placeholders by searching a runner's source for the marker, and the show_*
+ * tools delegate to a real runner at call time. Spelling the marker inside a
+ * delegator would enrol it as a permanently-unbound placeholder and put a false
+ * warning on the badge for a tool that works.
+ */
+function throwUnbound() {
+  throw new Error('the ' + SANDBOX_UNBOUND_MARKER + ' — reload the page, and if it persists the server\'s sandbox route is unreachable');
+}
 
 // ONLY the runners that are placeholders, captured before anything can bind
 // them. Identity against these decides "still unbound" for this app's registry,
@@ -981,8 +1170,13 @@ export function bindSandboxTools(api) {
         `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet || ''}`));
   };
 
-  TOOL_REGISTRY.fetch_url.run = async (arg) => {
-    const res = await api.sandbox('fetch', { url: String(arg ?? ''), max_chars: 20000 });
+  TOOL_REGISTRY.fetch_url.run = async (arg, _note, ctx) => {
+    const res = await api.sandbox('fetch', {
+      url: String(arg ?? ''),
+      // A display call is painted for the operator, so it gets the operator
+      // budget; a model call keeps the small one it is about to pay for.
+      max_chars: (ctx && ctx.display) ? MAX_DISPLAY_CHARS : 20000,
+    });
     return `URL: ${res.url} (HTTP ${res.status}${res.title ? ', ' + res.title : ''})\n\n${res.text}`;
   };
 
@@ -992,24 +1186,55 @@ export function bindSandboxTools(api) {
     if (raw == null) return 'error: read_file needs "path" as a plain string, e.g. {"path":"training/training.txt"} — retry the step with that shape';
     const m = /^(.*?)\s+(\d+)\s*-\s*(\d+)$/.exec(raw.trim());
     const path = m ? m[1].trim() : raw;
-    const range = m ? `${m[2]}-${m[3]}` : undefined;
-    const res = await api.sandbox('read', { path, range, root: scopeOf(ctx) });
-    const head = `${res.path} — ${res.bytes} bytes${res.truncated ? ', truncated' : ''}`;
+    // Two spellings, both used in practice: "path 20-80" in the string, and a
+    // JSON object with "range". The object form used to be dropped, so a model
+    // asking for one line got the whole file and never knew why.
+    const obj = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
+    const range = m ? `${m[2]}-${m[3]}`
+      : (obj.range !== undefined && obj.range !== null && obj.range !== '' ? String(obj.range) : undefined);
+    let res;
+    try {
+      res = await api.sandbox('read', {
+        path, range, root: scopeOf(ctx),
+        max_chars: (ctx && ctx.display) ? MAX_DISPLAY_CHARS : undefined,
+      });
+    } catch (err) {
+      // "show ." / "show the folder" is a model asking what is THERE. Answering
+      // "not a file" costs a retry, and a small model retries the same call and
+      // fails the same way for the rest of the turn. Listing it answers instead.
+      const msg = (err && err.message) ? err.message : String(err);
+      if (/not a file/.test(msg)) {
+        try { return await TOOL_REGISTRY.list_dir.run({ path }, null, ctx); }
+        catch { throw err; }
+      }
+      throw err;
+    }
+    // Say the budget when the output was cut: "truncated at 60000" names the
+    // caller's limit (a model read), while 400000 is the display budget.
+    const cut = res.truncated
+      ? `, truncated${res.limit ? ` at ${res.limit}` : ''}`
+      : '';
+    const head = `${res.path} — ${res.bytes} bytes${cut}`;
     return `${head}\n\n${res.content}`;
   };
 
   TOOL_REGISTRY.list_dir.run = async (arg, _note, ctx) => {
-    const raw = pathText(arg);
-    if (raw == null) return 'error: list_dir needs "path" as a plain string, e.g. {"path":"training"} — retry the step with that shape';
+    // No path is an orientation call, not a mistake: the server answers it with
+    // the allowed directories. Erroring here turned "where am I?" into a dead
+    // end the model could only repeat.
+    const raw = pathText(arg) || '';
     const a = raw.trim();
     const res = await api.sandbox('list', a ? { path: a, limit: 200, root: scopeOf(ctx) } : { root: scopeOf(ctx) });
+    // A refused path now comes back with the sandbox listing attached and a
+    // warning naming what was refused; lead with the warning so the model is not
+    // tempted to believe it listed the folder it asked for.
+    const head = res.warning ? `warning: ${res.warning}\n\n` : '';
     if (!res.entries) {
       // The server can answer the orientation call even when the agent's own
       // root was refused; lead with that refusal so the model stops guessing.
-      const head = res.warning ? `warning: ${res.warning}\n\n` : '';
       return `${head}allowed directories:\n${(res.dirs || []).join('\n')}`;
     }
-    return lines(res.entries.map(e =>
+    return head + lines(res.entries.map(e =>
       e.type === 'dir' ? `${e.name}/` : `${e.name}  (${e.size} bytes)`));
   };
 
@@ -1519,11 +1744,47 @@ function writeNotes(notes) {
   try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes.slice(-20))); } catch { /* ignore */ }
 }
 
+/**
+ * "Show or read?" — the routing rule mapless models get wrong.
+ *
+ * A local model asked to print a file reaches for read_file, which hands the
+ * contents back to the model instead of to the operator: the turn buys another
+ * request and the operator is charged for text they already own. Placed
+ * immediately before the tool list, because the notes at the end of this prompt
+ * are where a 7B stops reading.
+ */
+function showOrReadBlock(displayNames) {
+  if (!displayNames.length) return '';
+  const has = t => displayNames.includes(t);
+  const lines = [
+    'WHICH TOOL - show or read?',
+    'If the request is to SEE something ("show me", "print", "paste", "display",',
+    '"what is in", "what does it say"), use a show_* tool: it ENDS your turn and the',
+    'operator sees the output themselves, so you never write it out.',
+  ];
+  if (has('show_file')) lines.push('  a file, document, essay, config  -> show_file');
+  if (has('show_command')) lines.push('  a command, log tail, build output -> show_command');
+  if (has('show_find')) lines.push('  "find", "where is", "every place"  -> show_find');
+  if (has('show_url')) lines.push('  a web page                        -> show_url');
+  lines.push(
+    'Use read_file / list_dir / grep_code / exec / fetch_url only when YOU need the',
+    'content to decide what to do next: those hand the result back to you instead, so',
+    'the operator sees nothing until you write it out again.',
+    'list_dir lists names only; it never shows what is inside a file.',
+    '',
+  );
+  return lines.join('\n') + '\n';
+}
+
 /** The system-prompt block that teaches a model the tool protocol. */
 export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
   const names = enabledTools.filter(t => TOOL_REGISTRY[t]);
   if (!names.length) return '';
   const mode = ['json', 'anthropic', 'native', 'native-api', 'plain'].includes(protocol) ? protocol : 'json';
+  // Declared before every use: the examples, the routing block and the notes all
+  // read it, and a const used above its declaration is a TDZ crash, not a bug
+  // the tests forgive.
+  const displayNames = names.filter(isDisplayTool);
 
   const jsonExample = t => {
     const def = TOOL_REGISTRY[t];
@@ -1536,6 +1797,18 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     }
     if (t === 'declare_goal_complete') {
       return '{"tool":"declare_goal_complete","arg":{"summary":"what you finished"}}';
+    }
+    if (t === 'show_file') {
+      return '{"tool":"show_file","arg":{"path":"logs/app.log","range":"1-200"}}';
+    }
+    if (t === 'show_command') {
+      return '{"tool":"show_command","arg":{"argv":["tail","-n","2000","logs/app.log"]}}';
+    }
+    if (t === 'show_find') {
+      return '{"tool":"show_find","arg":{"query":"timeout"}}';
+    }
+    if (t === 'show_url') {
+      return '{"tool":"show_url","arg":{"url":"https://example.com/docs"}}';
     }
     // exec's value is an array, not a string, so the generic "arg" example
     // ("<argv>") actively misled models into sending a bare string.
@@ -1660,6 +1933,15 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     } else if (t === 'run_code') {
       params.push('<parameter name="language">python</parameter>');
       params.push('<parameter name="code">print(1+1)</parameter>');
+    } else if (t === 'show_file') {
+      params.push('<parameter name="path">logs/app.log</parameter>');
+      params.push('<parameter name="range">1-200</parameter>');
+    } else if (t === 'show_command') {
+      params.push('<parameter name="argv">["tail","-n","2000","logs/app.log"]</parameter>');
+    } else if (t === 'show_find') {
+      params.push('<parameter name="query">timeout</parameter>');
+    } else if (t === 'show_url') {
+      params.push('<parameter name="url">https://example.com/docs</parameter>');
     } else if (def.arg) {
       params.push(`<parameter name="${def.arg}">...</parameter>`);
     }
@@ -1668,11 +1950,16 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
 
   const nativeExample = t => `<|tool_call|>${jsonExample(t)}<|/tool_call|>`;
 
+  // Display tools lead the list on purpose. A small model reads the first
+  // examples as the default, and a "show me" request that lands on read_file
+  // costs a whole extra request — which is exactly what these tools exist to
+  // remove. Measured with tools/measure-tool-choice.mjs.
+  const ordered = [...displayNames, ...names.filter(t => !isDisplayTool(t))];
   const examples = mode === 'anthropic'
-    ? names.map(anthropicExample).join('\n')
+    ? ordered.map(anthropicExample).join('\n')
     : mode === 'native'
-      ? names.map(nativeExample).join('\n')
-      : names.map(jsonExample).join('  ');
+      ? ordered.map(nativeExample).join('\n')
+      : ordered.map(jsonExample).join('  ');
 
   const customHelp = names
     .filter(t => TOOL_REGISTRY[t]?.custom)
@@ -1859,6 +2146,17 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       + 'with read_mailbox.'
     );
   }
+  const shown = displayNames;
+  if (shown.length) {
+    notes.push(
+      shown.join(' / ') + ' END YOUR TURN: the app performs the request and the operator sees the '
+      + 'output, which is never written as text — so do not repeat it, summarise it, or add it to your '
+      + 'reply. Reach for them when the request is to SHOW something (print, paste, display, "what does '
+      + 'it say", "what is in this log / file / page"). Use read_file / exec / grep_code / fetch_url '
+      + 'instead when you need to read the content yourself to decide something, because a show_* '
+      + 'result never comes back to you.'
+    );
+  }
   // Tell the model where it stands. Without this, agents guess at paths and
   // burn a step on a rejected one.
   if (sandboxRoot && names.some(t => SANDBOX_TOOLS.includes(t) && t !== 'web_search' && t !== 'fetch_url')) {
@@ -1926,6 +2224,7 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
     + 'Right:  ' + exampleTurn + '\n'
     + 'Never print an example call you do not mean to run: prose in a reply is scanned for\n'
     + 'calls, so a shape you are only describing can execute for real.\n\n'
+    + showOrReadBlock(displayNames)
     + 'Available tools:\n'
     + examples
     + (customHelp ? '\n\nCustom tools:\n' + customHelp : '')
@@ -2055,7 +2354,9 @@ export function policyFor(name, ctx) {
     : store.get('settings.autoDeny') === true;
   if (autoDeny) return 'deny';
   const p = (agent ? settingFor(agent, 'toolPolicy') : store.get('settings.toolPolicy')) || {};
-  const mode = p[name];
+  // A show_* tool asks for permission as the tool it mirrors, so denying exec
+  // denies show_command as well instead of leaving a second way to run one.
+  const mode = p[def.policyAs || name];
   return mode === 'allow' || mode === 'deny' ? mode : 'ask';
 }
 
@@ -2096,7 +2397,7 @@ export async function runTool(name, arg, noteName, ctx) {
   if (isUnboundTool(name)) autoBindSandboxOnce();
   // The operator's deny list wins over everything, including an agent that
   // still has the tool ticked from before the deny was saved.
-  if (deniedToolNames().includes(name)) {
+  if ([name, def.policyAs].filter(Boolean).some(k => deniedToolNames().includes(k))) {
     return `denied: ${name} is switched off in Config \u2192 Permissions \u2192 Tools`;
   }
   // Which tools this turn may run. The loop hands over the exact set it
@@ -2138,7 +2439,9 @@ export async function runTool(name, arg, noteName, ctx) {
     // JSON, never "[object Object]".
     const out = asText(await def.run(arg, noteName, ctx));
     try { trace('tool', { ...who(), tool: name, ms: Date.now() - t0, ok: true }); } catch { /* best-effort */ }
-    return compactText(out, MAX_TOOL_OUTPUT_CHARS);
+    // A display result never enters the model's context, so the 16k transcript
+    // budget does not apply; it only has to stay a sane size for a session file.
+    return def.display ? clipDisplay(out) : compactText(out, MAX_TOOL_OUTPUT_CHARS);
   } catch (err) {
     try {
       trace('tool', { ...who(), tool: name, ms: Date.now() - t0, ok: false,
@@ -2204,7 +2507,177 @@ export function parseToolCall(text, fallback) {
   return null;
 }
 
+// --- Foreign tool names ------------------------------------------------------
+//
+// A model trained on ANOTHER agent's tools calls `bash`, `Read`, `Grep` -- the
+// vocabulary it saw in training, in the argument shape it saw there. Those calls
+// are not confused about what they want, only about what we named it, so they
+// are resolved here instead of being rejected as an unknown tool. This is a
+// parse-time table: no prompt tokens, no extra request, and it cannot change
+// which tool the model chooses -- only whether we understand the choice.
+//
+// Measured with tools/measure-tool-choice.mjs MODE=vocab: offering Bash/Read/
+// Grep instead of exec/read_file/grep_code did NOT improve choice on a 7B (it
+// scored worse, and the model kept emitting `exec` anyway). So this is a
+// compatibility net, not a selection trick -- it costs no prompt tokens and
+// makes an unfamiliar vocabulary executable.
+//
+// Display tools are deliberately NOT targets. `bash` means "run it"; quietly
+// turning that into show_command would render output to the operator while the
+// agent believes it can read the result, and every later step would be built on
+// something it never got.
+export const TOOL_ALIASES = {
+  // Command runners
+  bash: 'exec', shell: 'exec', sh: 'exec', zsh: 'exec', cmd: 'exec',
+  run_command: 'exec', execute: 'exec', execute_command: 'exec', run_shell: 'exec',
+  shell_command: 'exec', terminal: 'exec', run_terminal_cmd: 'exec', bash_exec: 'exec',
+  // File readers
+  read: 'read_file', view: 'read_file', cat: 'read_file', open_file: 'read_file',
+  readfile: 'read_file', read_text_file: 'read_file',
+  // Directories
+  ls: 'list_dir', dir: 'list_dir', list_directory: 'list_dir', list_files: 'list_dir',
+  // Contents search
+  grep: 'grep_code', rg: 'grep_code', ripgrep: 'grep_code', search_files: 'grep_code',
+  grep_search: 'grep_code', code_search: 'grep_code',
+  // Filename search
+  glob: 'glob_files', find_files: 'glob_files', file_search: 'glob_files',
+  // Web
+  fetch: 'fetch_url', webfetch: 'fetch_url', web_fetch: 'fetch_url', open_url: 'fetch_url',
+  // Writers
+  write: 'write_file', create_file: 'write_file', edit_file: 'write_file',
+  write_to_file: 'write_file', save_file: 'write_file',
+};
+
+// Keys a foreign caller uses for the one argument a scalar tool takes, in the
+// order we prefer them. Reading the first present one is what makes
+// {"file_path":"x"} run as read_file's bare path.
+// Only tools whose argument is genuinely one scalar. show_file and show_find are
+// absent on purpose: their argument is a structured object ({path, range}), and
+// collapsing it to a bare string would throw away the range.
+const ARG_KEY_ALIASES = {
+  read_file: ['path', 'file_path', 'filepath', 'file', 'filename', 'target_file'],
+  list_dir: ['path', 'dir', 'directory', 'folder', 'file_path'],
+  glob_files: ['pattern', 'glob', 'query'],
+  grep_code: ['pattern', 'query', 'regex', 'search', 'needle'],
+  fetch_url: ['url', 'href', 'link'],
+  show_url: ['url', 'href', 'link'],
+  web_search: ['query', 'q', 'search'],
+};
+
+/**
+ * Split a shell command line into argv, or null when it needs a real shell.
+ *
+ * exec runs one program with an argv array and has no shell, so a `bash`
+ * caller's single string has to become tokens -- but only when that is
+ * faithful. Pipes, redirection, &&, ;, substitution and grouping are REFUSED:
+ * returning a mangled argv would run a different command than the model asked
+ * for, which is worse than failing loudly.
+ */
+export function splitCommandLine(text) {
+  const s = String(text ?? '').trim();
+  if (!s) return null;
+  // Strip quoted spans first so a pipe inside quotes is not read as a pipe.
+  const bare = s.replace(/"[^"]*"|'[^']*'/g, '');
+  if (/[|&;<>$`(){}\n\r]/.test(bare)) return null;
+  const argv = [];
+  let cur = '';
+  let quote = '';
+  let seen = false;
+  for (const ch of s) {
+    if (quote) {
+      if (ch === quote) quote = '';
+      else cur += ch;
+      seen = true;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; seen = true; continue; }
+    if (/\s/.test(ch)) {
+      if (seen) { argv.push(cur); cur = ''; seen = false; }
+      continue;
+    }
+    cur += ch;
+    seen = true;
+  }
+  if (quote) return null;          // unterminated quote: do not guess
+  if (seen) argv.push(cur);
+  return argv.length ? argv : null;
+}
+
+/** Our tool name for a foreign one, or the name unchanged when unknown. */
+export function resolveToolName(name) {
+  const given = String(name || '').trim();
+  if (!given) return given;
+  if (Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, given)) return given;
+  return repairToolName(given) || given;
+}
+
+/**
+ * Reshape a foreign caller's arguments into what our tool actually takes.
+ * Only touches shapes we can map without guessing; anything else is returned
+ * as-is so the tool reports a real argument error instead of running on a
+ * silent misinterpretation.
+ */
+export function aliasToolArgs(tool, arg) {
+  if (arg == null) return arg;
+  if (tool === 'exec' || tool === 'exec_start' || tool === 'show_command') {
+    if (typeof arg === 'string') {
+      const argv = splitCommandLine(arg);
+      return argv || arg;
+    }
+    if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+      if (Array.isArray(arg.argv) || Array.isArray(arg.args)) {
+        return Array.isArray(arg.argv) ? arg : { ...arg, argv: arg.args };
+      }
+      const cmd = [arg.command, arg.cmd, arg.script, arg.args]
+        .find(v => typeof v === 'string' && v.trim());
+      if (cmd) {
+        const argv = splitCommandLine(cmd);
+        if (argv) {
+          const out = { argv };
+          if (arg.timeout !== undefined) out.timeout = arg.timeout;
+          return out;
+        }
+      }
+    }
+    return arg;
+  }
+  if (tool === 'write_file' && arg && typeof arg === 'object' && !Array.isArray(arg)) {
+    const out = { ...arg };
+    if (out.path === undefined) out.path = out.file_path ?? out.filepath ?? out.filename ?? out.file;
+    if (out.content === undefined) out.content = out.file_text ?? out.text ?? out.contents ?? out.body;
+    for (const k of ['file_path', 'filepath', 'filename', 'file_text', 'contents', 'body']) delete out[k];
+    return out;
+  }
+  const keys = ARG_KEY_ALIASES[tool];
+  if (!keys) return arg;
+  if (typeof arg === 'string' || typeof arg === 'number') return arg;
+  if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+    // Lossless only: every key present must be one this tool takes as its
+    // scalar, or collapsing the object would silently drop something the model
+    // asked for (a range, an offset, an encoding). read_file and friends reject
+    // the object form outright ("needs path as a plain string"), so this turns a
+    // guaranteed failure into the call the model meant -- and leaves anything
+    // with extra keys alone to fail loudly instead.
+    const present = Object.keys(arg).filter(k => arg[k] !== undefined);
+    if (present.length && present.every(k => keys.includes(k))) {
+      for (const key of keys) {
+        if (arg[key] !== undefined && arg[key] !== null && arg[key] !== '') return arg[key];
+      }
+    }
+  }
+  return arg;
+}
+
 function _parseToolCall(text) {
+  const call = _parseToolCallRaw(text);
+  if (!call) return null;
+  // Names are already aliased by repairToolName, which every dialect goes
+  // through; the argument reshape is what is left to do here.
+  const tool = resolveToolName(call.tool);
+  return { tool, arg: aliasToolArgs(tool, call.arg) };
+}
+
+function _parseToolCallRaw(text) {
   const raw = String(text || '').trim();
   // 2000 chars was fine when every tool took a short argument, but a file
   // write carries its whole content inline and overflows that instantly.
@@ -2740,6 +3213,10 @@ export function repairToolName(raw) {
   const has = name => Object.prototype.hasOwnProperty.call(TOOL_REGISTRY, name);
   for (const form of forms) {
     if (has(form)) return form;
+    // A tool we know under another agent's name (bash, Read, Grep). Resolved
+    // before fuzzy repair, which would otherwise drop the name entirely.
+    const alias = TOOL_ALIASES[form];
+    if (alias && has(alias)) return alias;
     // A name differing only by the plural "s" is the same tool: this is the
     // "list_agent" case, and it is the commonest miss by a wide margin.
     const singular = form.replace(/_?s$/, '');

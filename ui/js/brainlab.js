@@ -3,20 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { store } from './store.js?v=430';
-import { persistence } from './persistence.js?v=430';
-import { esc, escAttr, agentCode } from './utils.js?v=430';
-import { api } from './api.js?v=430';
-import * as memory from './memory.js?v=430';
+import { store } from './store.js?v=431';
+import { persistence } from './persistence.js?v=431';
+import { esc, escAttr, agentCode } from './utils.js?v=431';
+import { api } from './api.js?v=431';
+import * as memory from './memory.js?v=431';
 import {
   profiles, newProfileId, alwaysAppendFor,
   settingFor, isLocked, lockSetting, unlockSetting, setSetting, sandboxRootFor,
-} from './agentConfig.js?v=430';
+} from './agentConfig.js?v=431';
 import {
   customToolDefs, defaultTools, loadCustomTools, validateCustomTool,
-} from './tools.js?v=430';
-import { SandboxFiles } from './sandboxFiles.js?v=430';
-import { TOOL_PROTOCOLS, HARNESS_CHOICES, toolProtocolFor, protocolLabel, protocolHint, harnessFor, harnessOverride } from './toolProtocol.js?v=430';
+} from './tools.js?v=431';
+import { SandboxFiles } from './sandboxFiles.js?v=431';
+import { TOOL_PROTOCOLS, HARNESS_CHOICES, toolProtocolFor, protocolLabel, protocolHint, harnessFor, harnessOverride } from './toolProtocol.js?v=431';
 
 const ZOOM_KEY = 'als.brainLab.zoom.v1';
 const ZOOM_STEPS = [130, 160, 190, 225, 270, 320];
@@ -581,6 +581,9 @@ export class BrainLab {
           `<input class="form-input" type="number" min="0" max="2" step="0.1" data-bl-field="temperature" value="${esc(String(settingFor(agent, 'temperature')))}"${isLocked(agent, 'temperature') ? '' : ' disabled'}>`)}
         ${this._lockRow(agent, 'maxTokens', 'Max tokens',
           `<input class="form-input" type="number" min="256" max="131072" step="256" data-bl-field="maxTokens" value="${esc(String(settingFor(agent, 'maxTokens')))}"${isLocked(agent, 'maxTokens') ? '' : ' disabled'}>`)}
+        ${this._lockRow(agent, 'contextWindow', 'Context window',
+          `<input class="form-input" type="number" min="0" max="2000000" step="1024" placeholder="auto" data-bl-field="contextWindow" value="${esc(String(settingFor(agent, 'contextWindow') || ''))}"${isLocked(agent, 'contextWindow') ? '' : ' disabled'}>`,
+          'Tokens the runner actually loaded. Auto learns it from a refusal, then falls back to the model table.')}
         ${this._lockRow(agent, 'historyTurns', 'History turns',
           `<input class="form-input" type="number" min="0" max="50" data-bl-field="historyTurns" value="${esc(String(settingFor(agent, 'historyTurns')))}"${isLocked(agent, 'historyTurns') ? '' : ' disabled'}>`,
           'How many earlier user messages this agent is shown.')}
@@ -947,6 +950,9 @@ export class BrainLab {
         break;
       case 'maxTokens':
         this._updateAgent(agent => setSetting(agent, 'maxTokens', Math.min(131072, Math.max(256, parseInt(value, 10) || 256))));
+        break;
+      case 'contextWindow':
+        this._updateAgent(agent => setSetting(agent, 'contextWindow', Math.min(2000000, Math.max(0, parseInt(value, 10) || 0))));
         break;
       case 'historyTurns':
         this._updateAgent(agent => setSetting(agent, 'historyTurns', Math.max(0, parseInt(value, 10) || 0)));

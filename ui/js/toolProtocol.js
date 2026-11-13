@@ -25,7 +25,9 @@ export {
   harnessFor,
   describeHarness,
   contextLimitFor,
+  learnedContextLimit,
+  rememberContextLimit,
   learnedDialect,
   rememberDialect,
   forgetDialect,
-} from './harness.js?v=430';
+} from './harness.js?v=431';

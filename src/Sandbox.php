@@ -34,7 +34,7 @@
 //     "write_roots": ["/var/www/site/router/storage/workspace"],
 //     "search_engine": "ddg",
 //     "search_url":   "",
-//     "max_read_bytes": 200000,
+//     "max_read_bytes": 400000,
 //     "require_token": false,
 //     "token": ""
 //   }
@@ -43,9 +43,27 @@
 namespace Src;
 
 class Sandbox {
-    /** Refuse outbound requests to these; they are the local network, not the internet. */
-    const DEFAULT_MAX_READ_BYTES = 200000;
+    /**
+     * How much of a file is read at all, before any text budget applies.
+     *
+     * Sized to MAX_DISPLAY_CHARS: show_file could ask for 400k and never get
+     * more than this, so a 400k budget with a 200k read was a promise the server
+     * could not keep -- a 230KB log still arrived half-missing. Raising it does
+     * NOT widen what a MODEL can pull into its context: read_file's own text
+     * budget is 60k and is applied after this, and the numbered text costs
+     * roughly a tenth more than the raw bytes.
+     */
+    const DEFAULT_MAX_READ_BYTES = 400000;
     const MAX_FETCH_BYTES = 3000000;
+    /**
+     * Operator-facing cap for a display result.
+     *
+     * Display tools paint their output into the transcript and END the turn, so
+     * those bytes never become prompt tokens. The model tools keep their own
+     * much smaller caps (60k for a read, 120k for a fetch) precisely because
+     * their output does. Same split as the client's renderLimitFor().
+     */
+    const MAX_DISPLAY_CHARS = 400000;
     const USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
     private static function config() {
@@ -440,6 +458,12 @@ class Sandbox {
             'enabled' => !empty($c['read_roots']) || !empty($c['write_roots']),
             'read_roots' => $c['read_roots'],
             'write_roots' => $c['write_roots'],
+            // Configured but not present on THIS machine. A Windows install can
+            // carry a Linux root (the MCP server's sandbox) in its config; the
+            // manifest listed it anyway, so every agent probed a path that
+            // could not exist here and collected "not a file" errors.
+            'read_roots_missing' => array_values(array_filter($c['read_roots'], function ($r) { return !is_dir($r); })),
+            'write_roots_missing' => array_values(array_filter($c['write_roots'], function ($r) { return !is_dir($r); })),
             'app_dir' => self::appDir(),
             'defaulted' => $defaulted,
             'search_engine' => $c['search_engine'],
@@ -2416,7 +2440,7 @@ class Sandbox {
      * @return string absolute path inside a root
      * @throws \RuntimeException when the path escapes the jail
      */
-    private static function jail($path, $roots, $label) {
+    private static function jail($path, $roots, $label, $insideFallback = false) {
         $path = trim(str_replace('\\', '/', (string)$path));
         if ($path === '') { throw new \RuntimeException("$label: empty path"); }
         if (strpos($path, "\0") !== false) { throw new \RuntimeException("$label: path contains a null byte"); }
@@ -2449,9 +2473,49 @@ class Sandbox {
                 }
             }
         }
+        if ($insideFallback) {
+            // A model asked for <project>/notes.txt when the file it means is
+            // <sandbox>/notes.txt: the operator sees the sandbox as a subfolder
+            // of the project, so the model treats the project as "here". Reading
+            // the copy that IS reachable -- and reporting its real path, which
+            // the caller does -- is what was meant. A refusal here only taught it
+            // to report that it cannot see a file it just wrote.
+            $name = basename($path);
+            if ($name !== '' && $name !== '.' && $name !== '..' && $name !== '/') {
+                foreach ($roots as $root) {
+                    $resolved = self::resolveExisting($root . '/' . $name);
+                    if ($resolved !== null && is_file($resolved) && !self::isProtectedPath($resolved)) {
+                        return $resolved;
+                    }
+                }
+            }
+        }
         throw new \RuntimeException(
             "$label: path is outside the allowed directories. Allowed: " . implode(', ', $roots)
+                . self::outsideHint($path, $roots)
         );
+    }
+
+    /**
+     * A way back for a refused path.
+     *
+     * "Outside the allowed directories" is true and useless. An agent asked to
+     * show <project>/test_read.txt when the file is <project>/sandbox/test_read.txt
+     * has no idea the sandbox IS that subfolder, so it stops and tells the
+     * operator it cannot see the file -- the behaviour that reads as "the agent
+     * thinks everything is outside the sandbox". Naming the file it CAN reach
+     * turns a dead end into a retry that works.
+     */
+    private static function outsideHint($path, $roots) {
+        $name = basename($path);
+        if ($name === '' || $name === '.' || $name === '/') { return ''; }
+        foreach ($roots as $root) {
+            if (file_exists($root . '/' . $name) || is_dir($root . '/' . $name)) {
+                return " Did you mean \"$name\"? It is inside the sandbox (\"$root\"), "
+                    . 'and paths are addressed relative to it.';
+            }
+        }
+        return '';
     }
 
     /**
@@ -2568,10 +2632,14 @@ class Sandbox {
     /**
      * Read a text file, with line numbers so a model can quote accurately.
      * Optional $range = "start-end" (1-based, inclusive) reads a slice.
+     *
+     * $maxChars is the caller's text budget: omitted means the model default
+     * (60k), and a display tool passes MAX_DISPLAY_CHARS instead. The file itself
+     * is still read no further than the operator's max_read_bytes setting.
      */
-    public static function readFile($path, $range = null, $scope = null) {
+    public static function readFile($path, $range = null, $scope = null, $maxChars = null) {
         $roots = self::scopeRoots($scope, self::readRoots(), 'read_file');
-        $full = self::jail($path, $roots, 'read_file');
+        $full = self::jail($path, $roots, 'read_file', true);
         if (!is_file($full)) {
             throw new \RuntimeException("read_file: not a file: $full");
         }
@@ -2604,12 +2672,18 @@ class Sandbox {
         }
 
         $body = implode("\n", $numbered);
-        $body = self::clip($body);
+        $limit = self::textLimit($maxChars, 60000);
+        $clipped = self::clip($body, $limit);
         return [
             'path' => $full,
             'bytes' => $size,
-            'truncated' => $truncated || strlen($body) < strlen(implode("\n", $numbered)),
-            'content' => $body,
+            'truncated' => $truncated || strlen($clipped) < strlen($body),
+            'content' => $clipped,
+            // The budget that produced the content, so a short result is never
+            // a mystery: a display read says 400000, a model read says 60000,
+            // and an old client that never asked says 60000 too -- visibly the
+            // caller's fault rather than the file's.
+            'limit' => $limit,
         ];
     }
 
@@ -3872,7 +3946,18 @@ class Sandbox {
                 'hint' => 'Pass a path relative to one of these, or an absolute path inside them.',
             ];
         }
-        $full = self::jail($path, $roots, 'list_dir');
+        $warning = null;
+        try {
+            $full = self::jail($path, $roots, 'list_dir');
+        } catch (\RuntimeException $e) {
+            // The model asked to list somewhere it cannot reach. The refusal is
+            // true and leaves nothing to work with, so answer the question it
+            // plainly had -- what CAN I see? -- and name the refused path above
+            // the listing. Without this, every "list the project" turn failed
+            // identically and the agent concluded everything was off-limits.
+            $full = $roots[0];
+            $warning = $e->getMessage();
+        }
         // Report writability for the directory that was actually listed, not
         // for "any root somewhere": a read-only root must not answer true just
         // because a different allowlisted root is writable.
@@ -3886,12 +3971,14 @@ class Sandbox {
         // Listing the single entry answers the actual question.
         if (!is_dir($full)) {
             if (is_file($full)) {
-                return [
+                $single = [
                     'path' => $full,
                     'entries' => [self::entryInfo($full, basename($full))],
                     'skipped' => 0,
                     'writable' => $canWrite,
                 ];
+                if ($warning !== null) { $single['warning'] = $warning; }
+                return $single;
             }
             throw new \RuntimeException("list_dir: not a directory: $full");
         }
@@ -3912,10 +3999,12 @@ class Sandbox {
             if ($a['type'] !== $b['type']) { return $a['type'] === 'dir' ? -1 : 1; }
             return strcmp($a['name'], $b['name']);
         });
-        return [
+        $listing = [
             'path' => $full, 'entries' => $out, 'skipped' => $skipped,
             'writable' => $canWrite,
         ];
+        if ($warning !== null) { $listing['warning'] = $warning; }
+        return $listing;
     }
 
     /** Filename glob, e.g. "*.php", or a path-relative one like "ui/js/ *.js". */
@@ -4459,7 +4548,7 @@ class Sandbox {
         if (!preg_match('~^https?://~i', $url)) { $url = 'https://' . $url; }
         self::assertPublicUrl($url);
 
-        $maxChars = max(500, min(120000, (int)$maxChars));
+        $maxChars = max(500, min(self::MAX_DISPLAY_CHARS, (int)$maxChars));
         $res = self::httpGet($url, self::USER_AGENT, self::MAX_FETCH_BYTES);
         if (isset($res['error'])) { throw new \RuntimeException('fetch_url: ' . $res['error']); }
 
@@ -4675,6 +4764,18 @@ class Sandbox {
             $out[] = str_pad((string)($start + $i), $pad, ' ', STR_PAD_LEFT) . '  ' . $line;
         }
         return $out;
+    }
+
+    /**
+     * A text cap the caller asked for, clamped to what may ever be painted.
+     *
+     * Anything unrecognised or absent keeps $fallback, so a caller cannot widen
+     * its own budget by accident: only a display tool asks, and it asks for
+     * MAX_DISPLAY_CHARS.
+     */
+    private static function textLimit($requested, $fallback) {
+        if ($requested === null || $requested === '' || !is_numeric($requested)) { return $fallback; }
+        return max(1024, min(self::MAX_DISPLAY_CHARS, (int)$requested));
     }
 
     /** Hard cap on any text handed back to a model, with a visible marker. */

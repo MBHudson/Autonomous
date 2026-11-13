@@ -217,6 +217,46 @@ ok(Harness::defaultRpmFor('https://openrouter.ai/api/v1/chat/completions') === 2
 ok(Harness::defaultRpmFor('http://localhost:11434/api/chat') === 0, 'default rpm: local unpaced');
 ok(Harness::defaultRpmFor('https://unknown.example/v1/x') === 20, 'default rpm: unknown host 20');
 
+// --- empty JSON objects survive the array round-trip -------------------
+// The relay decodes the browser's body with json_decode(..., true), where {}
+// and [] are the same thing. Re-encoding "properties": [] makes a strict
+// server refuse the WHOLE request -- Ollama: 400 "Value looks like object, but
+// can't find closing '}' symbol" -- so one zero-argument tool broke every turn.
+$zeroArg = ['type' => 'function', 'function' => [
+    'name' => 'now', 'description' => 'now',
+    'parameters' => ['type' => 'object', 'properties' => [], 'required' => [], 'additionalProperties' => false],
+]];
+$wire = json_encode(Harness::payload('openrouter', ['model' => 'm', 'messages' => [], 'tools' => [$zeroArg]], true));
+ok(strpos($wire, '"properties":{}') !== false, 'tool schema: an empty properties map goes out as {}');
+ok(strpos($wire, '"properties":[]') === false, 'tool schema: properties is never sent as an array');
+ok(strpos($wire, '"required":[]') !== false, 'tool schema: an empty required list stays an array');
+
+$oneArg = ['type' => 'function', 'function' => ['name' => 'read_file', 'parameters' => [
+    'type' => 'object', 'properties' => ['path' => ['type' => 'string']], 'required' => ['path'],
+]]];
+$wire2 = json_encode(Harness::payload('openrouter', ['model' => 'm', 'messages' => [], 'tools' => [$oneArg]], true));
+ok(strpos($wire2, '"properties":{"path"') !== false, 'tool schema: a populated properties map is left alone');
+
+// Nested maps (a $defs entry) are objects too, not just the top level.
+$nested = ['type' => 'function', 'function' => ['name' => 'x', 'parameters' => [
+    'type' => 'object', '$defs' => [], 'properties' => ['a' => ['type' => 'object', 'properties' => []]],
+]]];
+$wire3 = json_encode(Harness::payload('openrouter', ['model' => 'm', 'messages' => [], 'tools' => [$nested]], true));
+ok(strpos($wire3, '"$defs":{}') !== false, 'tool schema: a nested empty $defs map is restored too');
+ok(strpos($wire3, '"a":{"type":"object","properties":{}}') !== false, 'tool schema: nested empty properties restored');
+
+// --- errorReason: the provider's own sentence, not just a status ------
+ok(Harness::errorReason("{\"error\":{\"message\":\"Value looks like object, but can't find closing '}' symbol\"}}")
+    === "Value looks like object, but can't find closing '}' symbol",
+    'errorReason: plain JSON error object');
+ok(Harness::errorReason('data: {"error":{"message":"bad model"}}') === 'bad model',
+    'errorReason: unwraps an SSE frame');
+ok(Harness::errorReason("{\"error\":{\"message\":\"Provider returned error\",\"metadata\":{\"raw\":\"{\\\"error\\\":{\\\"message\\\":\\\"content is required for non-assistant roles\\\"}}\"}}}") === 'content is required for non-assistant roles',
+    'errorReason: prefers the provider words hidden in metadata.raw');
+ok(Harness::errorReason('<html><body>502 Bad Gateway</body></html>') === '502 Bad Gateway',
+    'errorReason: an HTML page collapses to its text');
+ok(Harness::errorReason('') === '', 'errorReason: an empty body says nothing');
+
 echo str_repeat('-', 60) . "\n";
 echo "$pass passed, $fail failed\n";
 foreach ($errors as $e) { echo "  $e\n"; }

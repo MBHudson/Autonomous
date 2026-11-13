@@ -12,6 +12,7 @@
 import {
   estimateTokens, historyCharBudget, compactText, contentText,
   estimateContentTokens, estimateMessagesTokens, contextInputBudget, compactMessages,
+  isContextOverflow, contextLimitFromError,
 } from '../../ui/js/utils.js';
 
 let pass = 0, fail = 0;
@@ -72,6 +73,28 @@ ok(compacted.some(m => m.role === 'system'), 'system prompt is kept');
 const small = [{ role: 'user', content: 'short' }];
 ok(compactMessages(small, 16000) !== small, 'within-budget lists are copied, not mutated');
 eq(compactMessages(small, 16000)[0].content, 'short', 'within-budget content survives');
+
+// --- refusals about size, and the window they name ---------------------
+// An 8k LM Studio session serving a 131k model used to be sent 8,836 tokens
+// and answer 400 on every turn; the refusal names the window it really has.
+const lms = 'I could not finish: the model request failed (Engine protocol predict request '
+  + 'returned 400: {"error":{"code":400,"message":"request (8836 tokens) exceeds the '
+  + 'available context size (8192 tokens), try increasing it"}})'; // eslint-disable-line
+ok(isContextOverflow(lms), 'a context refusal is recognised');
+eq(contextLimitFromError(lms), 8192, 'the real 8192-token window is read from the refusal');
+const oai = '{"error":{"message":"maximum context length is 4096 tokens"}}';
+ok(isContextOverflow(oai), 'openai wording is recognised');
+eq(contextLimitFromError(oai), 4096, 'openai window read');
+eq(contextLimitFromError('{"error":{"message":"model nope not found"}}'), null,
+  'no window in an unrelated error');
+ok(!isContextOverflow('upstream error (HTTP 404). model "nope" not found'),
+  'a 404 is not a size problem');
+
+// An 8k window has to hold the tool schemas (~3.5k tokens) as well, so the old
+// 4096-token floor left no room for chat at all.
+const eightK = contextInputBudget(8192, 4096);
+ok(eightK >= 512 && eightK < 8192, `an 8k window stays under its own size (got ${eightK})`);
+ok(eightK - 3487 >= 512, `the schemas still leave room for a prompt (got ${eightK - 3487})`);
 
 console.log('-'.repeat(60));
 if (fail) {

@@ -7,32 +7,15 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho } from '../utils.js?v=430';
-import { renderMarkdown } from '../markdown.js?v=430';
-import { CodeBlock, splitFences } from './codeBlock.js?v=430';
-import { createAvatar } from './avatar.js?v=430';
-import { store } from '../store.js?v=430';
-import { persistence } from '../persistence.js?v=430';
-import { audio, AudioController } from '../audio.js?v=430';
+import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho, toolValueText, renderLimitFor, toolCallSummary } from '../utils.js?v=431';
+import { renderMarkdown } from '../markdown.js?v=431';
+import { CodeBlock, splitFences } from './codeBlock.js?v=431';
+import { createAvatar } from './avatar.js?v=431';
+import { store } from '../store.js?v=431';
+import { persistence } from '../persistence.js?v=431';
+import { audio, AudioController } from '../audio.js?v=431';
 
-const TOOL_DISPLAY_LIMIT = 8000;
 
-function toolValueText(value, limit = TOOL_DISPLAY_LIMIT) {
-  if (value === undefined || value === null) return '';
-  let text;
-  if (typeof value === 'string') {
-    text = value;
-  } else {
-    try {
-      text = JSON.stringify(value, null, 2);
-    } catch {
-      text = String(value);
-    }
-  }
-  text = String(text || '');
-  if (text.length <= limit) return text;
-  return `${text.slice(0, limit)}\n\u2026 (${text.length - limit} more characters)`;
-}
 
 function toolPreview(arg) {
   if (arg === undefined || arg === null) return '';
@@ -67,6 +50,10 @@ function toolStatus(call) {
     pending: { icon: '\u23F8', label: 'approval' },
     ok: { icon: '\u2713', label: 'done' },
     error: { icon: '\u2715', label: 'error' },
+    // Not a failure: the step never ran because a display tool ended the turn
+    // with the answer already on screen. Showing it as an error made a clean
+    // drill look broken.
+    skipped: { icon: '\u2192', label: 'skipped' },
   }[key] || { icon: '\u2022', label: key };
   const ms = call && call.ms !== undefined && call.ms !== null && Number.isFinite(Number(call.ms))
     ? ` ${Math.round(Number(call.ms))}ms` : '';
@@ -75,7 +62,10 @@ function toolStatus(call) {
 
 function renderToolCall(call, opts) {
   const status = toolStatus(call);
-  const open = opts.open === true || status.key === 'running'
+  // A display tool's result IS the reply, so it must not arrive folded shut:
+  // the operator asked to see this, and hiding it behind a disclosure triangle
+  // would undo the thing the tool exists for.
+  const open = opts.open === true || call.display === true || status.key === 'running'
     || status.key === 'pending' || status.key === 'error';
 
   const details = document.createElement('details');
@@ -132,7 +122,11 @@ function renderToolCall(call, opts) {
     body.appendChild(pre);
   }
 
-  const resultText = toolValueText(call && call.result);
+  // A display result IS the answer: it gets its own budget (400k), not the
+  // 8,000-character per-call copy budget that keeps token-bound results small.
+  // Capping it here was clipping exactly the output the operator asked to see.
+  const resultText = toolValueText(call && call.result,
+    renderLimitFor(!!(call && call.display)));
   if (resultText) {
     const label = document.createElement('div');
     label.className = 'tool-call-label';
@@ -164,7 +158,14 @@ export function renderToolCalls(calls, opts = {}) {
   box.className = 'tool-calls';
   const head = document.createElement('div');
   head.className = 'tool-calls-head';
-  head.textContent = `${calls.length} tool call${calls.length === 1 ? '' : 's'}`;
+  // Failures and retries belong in the header, not only inside each box: the
+  // operator's question during a drill is "how many times did that fail?", and
+  // the answer must not require opening six disclosures to count red lines.
+  const { total, failed, retries } = toolCallSummary(calls);
+  head.textContent = `${total} tool call${total === 1 ? '' : 's'}`
+    + (failed ? ` \u00b7 ${failed} failed` : '')
+    + (retries ? ` \u00b7 ${retries} retr${retries === 1 ? 'y' : 'ies'}` : '');
+  if (failed) head.classList.add('has-failures');
   box.appendChild(head);
   calls.forEach(call => box.appendChild(renderToolCall(call, opts)));
   return box;
@@ -203,6 +204,29 @@ export function messageToText(msg) {
 
 export class MessageRenderer {
   /**
+   * Render an app-authored marker (currently: a training-drill resume).
+   *
+   * A resume continues a turn without the operator typing anything. Rendered as
+   * a user message it put words in their mouth, and every non-user message gets
+   * a Speak button -- offering to read the app's own bookkeeping aloud. This is
+   * deliberately a thin line: no avatar, no sender, no actions.
+   */
+  _renderNotice(msg) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message message-notice';
+    wrapper.dataset.messageId = msg.id || '';
+    wrapper.title = msg.title || 'Sent by the app to continue the training drill — not a message from you';
+    const tag = document.createElement('span');
+    tag.className = 'message-notice-tag';
+    tag.textContent = msg.tag || 'drill';
+    const text = document.createElement('span');
+    text.className = 'message-notice-text';
+    text.textContent = msg.content;
+    wrapper.append(tag, text);
+    return wrapper;
+  }
+
+  /**
    * Render a message element
    * @param {Object} msg - Message data
    * @param {string} msg.role - 'user' | 'agent'
@@ -212,6 +236,7 @@ export class MessageRenderer {
    * @param {Array} msg.sections - Collapsible sections
    */
   render(msg) {
+    if (msg.role === 'notice') return this._renderNotice(msg);
     const wrapper = document.createElement('div');
     wrapper.className = `message message-${msg.role}`;
     wrapper.dataset.messageId = msg.id || '';

@@ -96,6 +96,228 @@ export function isPlaceholderReply(text) {
  * counts: a reply discussing a plan in the abstract is not a claim, and the
  * warning this drives must stay rare to stay believable.
  */
+/**
+ * Did the reply TRY to call a tool, in some syntax, and parse to nothing?
+ *
+ * This is the gate on the dialect re-teach: a reply shaped like a call in the
+ * wrong dialect is worth re-asking in the next one. A reply that never mentions
+ * a call shape is not — re-teaching cannot fix a model that ignored the tool
+ * interface entirely, so the loop must not spend three requests pretending it
+ * can. Extracted from the tool loop so this boundary can be tested without a
+ * browser; the measured case is in tests/js/dialectRetry.test.mjs.
+ */
+export function looksLikeToolReply(text) {
+  return /(\{\s*"tool"\s*:|<\|tool_call\||<function_calls|<invoke\s|\{"tool")/i
+    .test(String(text ?? ''));
+}
+
+/**
+ * Did the reply DESCRIBE using a tool instead of calling one?
+ *
+ * "I'll use the exec tool" is the failure this detects. It is deliberately
+ * narrow: a real answer may mention a tool by name without meaning to run one,
+ * so both a tool word and an intent phrase have to be present.
+ */
+export function narratesToolUse(text, toolNames = []) {
+  const s = String(text ?? '');
+  // The literal word "tool" is not enough on its own: a model that says "I'll
+  // use read_file" never mentions it, and that phrasing is at least as common
+  // as "I'll use the read tool". The loop passes the tools it actually offered,
+  // so a named tool counts only when the agent could really call it.
+  const names = Array.isArray(toolNames) ? toolNames.filter(Boolean).map(String) : [];
+  const namedTool = names.some(n => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(s));
+  if (!/(\btool\b|\b\w+_?tool\b)/i.test(s) && !namedTool) return false;
+  return /(i'?ll|i will|let me|i'?m going|going to|i would|now i|i'?d )/i.test(s);
+}
+
+/**
+ * Should the loop drop native tool schemas and re-teach the prompt dialect?
+ *
+ * Only after a native-mode nudge has already failed to produce a call, and only
+ * once per turn. A provider that REJECTS the schemas is a different case and is
+ * handled where the request is made (HTTP 400/422); this is the quieter failure
+ * where the schemas are accepted and the model simply never calls anything.
+ */
+// Tools whose result IS the answer: they end the turn and paint the output into
+// the transcript instead of handing it back to the model. Declared here, in the
+// module that imports nothing, so persistence can backfill them into old agents
+// without pulling the whole tool harness (and its dialogs) into the boot path.
+export const DISPLAY_TOOL_NAMES = ['show_file', 'show_command', 'show_find', 'show_url'];
+
+/**
+ * The operator-facing cap on a displayed result.
+ *
+ * Not a context budget: these bytes are never sent to a provider, so the only
+ * cost is the session file that stores the tool-call record and the cost of
+ * painting it. Sized against the case the tool exists for -- a 2,000-line log at
+ * ~115 characters a line is ~230,000 characters, and a 120,000 cap clipped it.
+ *
+ * Lives here rather than in tools.js because the RENDERER needs it too: a
+ * display result that is stored in full but painted up to 8,000 characters is
+ * clipped exactly when the operator asked to see all of it.
+ */
+export const MAX_DISPLAY_CHARS = 400000;
+
+/**
+ * Add the display tools to an agent's saved tool list.
+ *
+ * `agent.tools` is a snapshot, so every agent saved before these existed has a
+ * list that predates them. Absent already means "the defaults", which include
+ * them; only an explicit list needs this.
+ *
+ * Returns the new list, or null when there is nothing to add. An EMPTY list is
+ * left alone: that is an agent whose tools were deliberately switched off, and
+ * handing it four new ones would override the operator. Denied tools are
+ * skipped for the same reason.
+ */
+export function withDisplayTools(toolList, denied = []) {
+  if (!Array.isArray(toolList) || !toolList.length) return null;
+  const skip = new Set(Array.isArray(denied) ? denied : Object.keys(denied || {}));
+  const missing = DISPLAY_TOOL_NAMES.filter(t => !toolList.includes(t) && !skip.has(t));
+  return missing.length ? toolList.concat(missing) : null;
+}
+
+/**
+ * Backfill every agent that has not been looked at yet. Returns how many gained
+ * tools.
+ *
+ * The marker is PER AGENT, not a flag in settings, because the agent list is
+ * what gets replaced: state sync adopts the server's copy wholesale, so a
+ * settings flag can end up saying "already done" while the agents it was
+ * supposed to fix are the old ones -- which is exactly what happened, leaving
+ * four tools missing and no second chance. A marker travels with the agent it
+ * describes, so the migration survives any ordering.
+ *
+ * It records the DECISION, not the result: an agent with no tools, or with its
+ * tools switched off, is marked too. That is what keeps a later removal by the
+ * operator from being undone on the next load.
+ */
+export function backfillDisplayTools(agents, denied = []) {
+  let added = 0;
+  for (const agent of Array.isArray(agents) ? agents : []) {
+    if (!agent || agent.displayToolsBackfilled) continue;
+    const next = withDisplayTools(agent.tools, denied);
+    if (next) { agent.tools = next; added++; }
+    agent.displayToolsBackfilled = true;
+  }
+  return added;
+}
+
+/** Per-call copy budget for a tool value painted in the transcript. */
+export const TOOL_DISPLAY_LIMIT = 8000;
+
+/**
+ * How much of a tool result to paint.
+ *
+ * A display result IS the answer: it was never sent to a provider, and the
+ * operator asked to see it, so it gets MAX_DISPLAY_CHARS. Everything else is a
+ * detail panel and stays at the small budget, because those bytes exist to
+ * explain a step, not to be read like a document.
+ */
+export function renderLimitFor(display) {
+  return display ? MAX_DISPLAY_CHARS : TOOL_DISPLAY_LIMIT;
+}
+
+/**
+ * Merge an incoming settings bundle into this browser's copy.
+ *
+ * `settings` travelled between devices as ONE slot and the bundle REPLACED it,
+ * so a device that pushed an older copy silently erased what this one had
+ * learned: the tool dialect remembered for a model, and the context window a
+ * runner reported. Those two maps are measurements taken on this machine -- a
+ * key missing from the other copy means "never learned there", not "forget
+ * it" -- so they are unioned, while every other setting follows the incoming
+ * copy (the server's version wins on a conflict, same rule memory uses).
+ */
+export function mergeLearnedSettings(local, incoming) {
+  if (!incoming || typeof incoming !== 'object') return local;
+  if (!local || typeof local !== 'object') return incoming;
+  const isMap = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const merged = { ...incoming };
+  for (const key of ['toolDialectMap', 'contextLimits']) {
+    if (!isMap(local[key]) && !isMap(incoming[key])) continue;
+    merged[key] = {
+      ...(isMap(local[key]) ? local[key] : {}),
+      ...(isMap(incoming[key]) ? incoming[key] : {}),
+    };
+  }
+  return merged;
+}
+
+/**
+ * Sandbox roots worth telling a model about: the ones that exist HERE.
+ *
+ * A Windows install can carry a Linux root in its config (the MCP server's
+ * /var/www/... sandbox), and the manifest listed it as readable anyway. Models
+ * dutifully probed a path that cannot exist and collected `not a file` errors.
+ * When NONE of the roots exist the full list comes back: a broken config is
+ * still better described than hidden.
+ */
+export function visibleRoots(roots, missing) {
+  const list = Array.isArray(roots) ? roots.filter(Boolean) : [];
+  const gone = new Set(Array.isArray(missing) ? missing : []);
+  const present = list.filter(r => !gone.has(r));
+  return present.length ? present : list;
+}
+
+/** JSON for an argument, never throwing on a cyclic value. */
+function summaryArg(arg) {
+  try { return JSON.stringify(arg === undefined ? null : arg); } catch { return String(arg); }
+}
+
+/**
+ * Counts for the tool-call box header: calls, FAILURES, and retries.
+ *
+ * The header used to say only "5 tool calls", so a drill that burned six
+ * attempts on one step read as a clean five-call turn unless every box was
+ * opened by hand. A retry is the same tool + the same arguments sent again
+ * after an attempt that failed -- the shape almost every correction takes.
+ * A step the app skipped (a display tool already answered) is neither.
+ */
+export function toolCallSummary(calls) {
+  const list = Array.isArray(calls) ? calls.filter(Boolean) : [];
+  const lastStatus = new Map();
+  let failed = 0, retries = 0;
+  for (const call of list) {
+    const status = String((call && call.status) || '');
+    const key = `${(call && call.tool) || 'tool'}|${summaryArg(call && call.arg)}`;
+    if (lastStatus.get(key) === 'error') retries++;
+    if (status === 'error') failed++;
+    lastStatus.set(key, status);
+  }
+  return { total: list.length, failed, retries };
+}
+
+/**
+ * Text for a tool value, cut honestly: a clip says how much was left out.
+ *
+ * Measured against the case that matters -- show_command on a 2,000-line log
+ * stores ~230,000 characters, and painting it with the 8,000 default printed
+ * "… (50963 more characters)" instead of the log the operator asked for.
+ */
+export function toolValueText(value, limit = TOOL_DISPLAY_LIMIT) {
+  if (value === undefined || value === null) return '';
+  let text;
+  if (typeof value === 'string') {
+    text = value;
+  } else {
+    try {
+      text = JSON.stringify(value, null, 2);
+    } catch {
+      text = String(value);
+    }
+  }
+  text = String(text || '');
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}\n\u2026 (${text.length - limit} more characters)`;
+}
+
+export function shouldFallBackFromNative(state) {
+  const s = state || {};
+  if (!s.nativeMode || !s.nudgedInNative || s.fallbackUsed) return false;
+  return s.hasCall !== true;
+}
+
 export function claimsCompletedToolWork(text) {
   const s = String(text ?? '');
   if (!s.trim()) return false;
@@ -267,6 +489,10 @@ export function historyCharBudget(contextLimit) {
   // Keep a fixed reserve for the output, system prompt, memory and tool
   // instructions. Without it a 128k window can still overflow once a large
   // agent prompt is prepended to a maximal history.
+  //
+  // This is only the FIRST pass: compactMessages() trims the live list to the
+  // input budget, which is what actually enforces a small window (an 8k runner
+  // would otherwise inherit this floor and overflow before compaction runs).
   const usable = Math.max(4096, limit - 32768);
   return Math.max(24000, Math.min(160000, Math.floor(usable * 2.5)));
 }
@@ -348,9 +574,51 @@ export function contextInputBudget(contextLimit, maxTokens) {
   const limit = Number(contextLimit);
   const out = Number(maxTokens);
   if (!Number.isFinite(limit) || limit <= 0) return 16000;
-  const reserve = Math.max(1024, Math.min(Number.isFinite(out) && out > 0 ? out : 4096,
-    Math.floor(limit * 0.5)));
-  return Math.max(4096, Math.floor(limit - reserve - 2048));
+  // Reserve at most a QUARTER of the window for the reply, however many tokens
+  // the agent asked for. Asking for 4096 out of an 8192 window left no room for
+  // chat at all: the reserve plus the tool schemas already exceeded the model.
+  const ask = Number.isFinite(out) && out > 0 ? out : 4096;
+  const reserve = Math.min(ask, Math.max(512, Math.floor(limit / 4)));
+  return Math.max(512, Math.floor(limit - reserve - 512));
+}
+
+/**
+ * A refusal that means "the prompt did not fit", however the runner words it.
+ *
+ * This has to be told apart from every other 400: the fix is to shorten the
+ * prompt and try again, not to change dialect or give up.
+ */
+export function isContextOverflow(message) {
+  const m = String(message || '');
+  if (!m) return false;
+  return /exceeds the (?:available )?context|context (?:size|length|window)|maximum context|too many tokens|input is too long|prompt is too long|reduce the length of the messages|"n_ctx"|n_prompt_tokens/i.test(m);
+}
+
+/**
+ * The window a refusal actually names, or null when it names none.
+ *
+ * A model NAME is a guess at the context size; the runner knows the truth. LM
+ * Studio loads an 8k session of a 131k model and says so in the refusal --
+ * "request (8836 tokens) exceeds the available context size (8192 tokens)" --
+ * so the number is worth keeping.
+ */
+export function contextLimitFromError(message) {
+  const m = String(message || '');
+  if (!m) return null;
+  const patterns = [
+    /"n_ctx"\s*:\s*(\d{3,})/i,
+    /available context size\D{0,12}(\d{3,})/i,
+    /maximum context length is\D{0,12}(\d{3,})/i,
+    /context length of (?:only )?(\d{3,})/i,
+    /context (?:size|length|window) is\D{0,12}(\d{3,})/i,
+  ];
+  for (const re of patterns) {
+    const hit = re.exec(m);
+    if (!hit) continue;
+    const n = Number(hit[1]);
+    if (Number.isFinite(n) && n >= 256 && n <= 20000000) return n;
+  }
+  return null;
 }
 
 /**

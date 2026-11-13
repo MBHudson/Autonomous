@@ -31,10 +31,11 @@
 // browser loads a second copy of persistence.js (one module per distinct URL)
 // and the singleton this file hooks would not be the one the UI edits -- so
 // edits would never reach the server.
-import { persistence } from './persistence.js?v=430';
-import { store } from './store.js?v=430';
-import { api } from './api.js?v=430';
-import { K } from './storage.js?v=430';
+import { persistence } from './persistence.js?v=431';
+import { store } from './store.js?v=431';
+import { api } from './api.js?v=431';
+import { K } from './storage.js?v=431';
+import { backfillDisplayTools, mergeLearnedSettings } from './utils.js?v=431';
 
 /** Slots mirrored to the server. Order is irrelevant; keys must match. */
 const SLOTS = ['agents', 'providers', 'conversations', 'metrics', 'settings', 'pipelines'];
@@ -126,10 +127,16 @@ function collect() {
 function applyLocally(slots) {
   for (const slot of SLOTS) {
     if (slots[slot] === undefined) continue;
-    persistence.cache.set(slot, slots[slot]);
+    // Settings are merged, not replaced: replacing them wiped the tool dialect
+    // and context windows this browser had learned whenever an older copy
+    // arrived from another device. Everything else in the bundle is adopted.
+    const value = slot === 'settings'
+      ? mergeLearnedSettings(persistence.get('settings') || {}, slots.settings)
+      : slots[slot];
+    persistence.cache.set(slot, value);
     const key = persistence._getStorageKey(slot);
     if (key) {
-      try { localStorage.setItem(key, JSON.stringify(slots[slot])); } catch { /* quota */ }
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
     }
   }
   for (const [name, storageKey] of Object.entries(EXTRA_KEYS)) {
@@ -360,6 +367,19 @@ export async function startStateSync() {
     }
 
     lastRev = Number(res.rev) || Number(res.state.rev) || 0;
+    // The display-tool backfill runs HERE as well as at load. applyLocally
+    // replaces the agent list with the server's copy, so a migration that only
+    // ran on the local list is undone by the very first sync -- which is how
+    // four tools ended up missing while the settings flag said it was done.
+    // `server` IS the slot map here (res.state.slots), not a wrapper around it.
+    const unmarked = Array.isArray(server.agents)
+      && server.agents.some(a => a && !a.displayToolsBackfilled);
+    if (unmarked) {
+      backfillDisplayTools(server.agents, (server.settings || {}).deniedTools);
+      // Push even when nothing was added: the per-agent marker has to reach the
+      // server, or the next adopt brings back a copy that looks unmigrated.
+      dirty = true;
+    }
     applyLocally(server);
     syncedOnce = true;
     if (dirty) scheduleSave();

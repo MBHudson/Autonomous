@@ -322,7 +322,7 @@ class Harness {
      */
     private static function withTools(array $body, array $spec) {
         if (!empty($spec['tools']) && is_array($spec['tools'])) {
-            $body['tools'] = $spec['tools'];
+            $body['tools'] = self::restoreObjects($spec['tools']);
         }
         if (array_key_exists('tool_choice', $spec) && $spec['tool_choice'] !== null) {
             $body['tool_choice'] = $spec['tool_choice'];
@@ -331,6 +331,69 @@ class Harness {
             $body['toolConfig'] = $spec['tool_config'];
         }
         return $body;
+    }
+
+    /**
+     * The provider's own sentence out of an error body.
+     *
+     * A bare "upstream error (HTTP 400)" is a status, not a reason: it says the
+     * call was refused and nothing about why. The body almost always carries the
+     * answer -- "Value looks like object, but can't find closing '}' symbol",
+     * "content is required for non-assistant roles" -- so the relay puts it in
+     * the error frame and the node card can show it.
+     *
+     * Handles the shapes that actually arrive: a plain JSON error object, an SSE
+     * `data:` line, an HTML error page, and OpenRouter's habit of hiding the
+     * provider's words in error.metadata.raw.
+     */
+    public static function errorReason($raw, $depth = 0) {
+        $raw = trim((string)$raw);
+        if ($raw === '' || $depth > 4) { return ''; }
+        if (preg_match('/^data:\s*(.+)$/m', $raw, $m)) { $raw = trim($m[1]); }
+        $j = json_decode($raw, true);
+        if (!is_array($j)) {
+            return trim(preg_replace('/\s+/', ' ', strip_tags($raw)));
+        }
+        // OpenRouter wraps the provider's own 400 in metadata.raw. Without this
+        // the card would show its useless "Provider returned error" instead.
+        if (isset($j['error']['metadata']['raw']) && is_string($j['error']['metadata']['raw'])) {
+            $inner = self::errorReason($j['error']['metadata']['raw'], $depth + 1);
+            if ($inner !== '') { return $inner; }
+        }
+        foreach (['error', 'message', 'detail', 'msg', 'raw'] as $k) {
+            if (!array_key_exists($k, $j)) { continue; }
+            $v = $j[$k];
+            $reason = is_array($v)
+                ? self::errorReason(json_encode($v), $depth + 1)
+                : self::errorReason((string)$v, $depth + 1);
+            if ($reason !== '') { return $reason; }
+        }
+        return '';
+    }
+
+    /**
+     * Keep empty JSON objects as objects.
+     *
+     * The browser posts a body the relay decodes with json_decode(..., true), and
+     * a PHP array cannot tell {} from []. Re-encoding then sends "properties": []
+     * where JSON Schema requires an object -- and a strict server rejects the
+     * WHOLE request for it. Ollama answers 400 "Value looks like object, but
+     * can't find closing '}' symbol", so any agent whose tools include a
+     * zero-argument one (now, recall, list_agents, read_mailbox, browser_read)
+     * failed every single turn, while the same agent worked on hosted providers
+     * that quietly tolerate it.
+     *
+     * Only the keys JSON Schema says are objects are restored. `required` is a
+     * real array, and an empty one is valid, so it is left as [].
+     */
+    private static function restoreObjects($value, $key = '') {
+        if (!is_array($value)) { return $value; }
+        if (!$value && in_array($key, ['properties', 'patternProperties', '$defs', 'definitions'], true)) {
+            return new \stdClass();
+        }
+        $out = [];
+        foreach ($value as $k => $v) { $out[$k] = self::restoreObjects($v, (string)$k); }
+        return $out;
     }
 
     /**

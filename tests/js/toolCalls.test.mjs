@@ -32,7 +32,10 @@ console.log('-'.repeat(60));
   );
   eq(calls.length, 2, 'two JSON calls parse');
   eq(calls[0].tool, 'list_dir', 'first call keeps its tool');
-  eq(calls[1].arg, { path: 'x' }, 'second call keeps its arg');
+  // Canonicalised to the scalar read_file declares: it rejects the object form
+  // outright, so this is the shape that runs. Nothing is dropped -- the object
+  // held only the path.
+  eq(calls[1].arg, 'x', 'second call keeps its arg');
 }
 {
   const calls = parseToolCalls('{"tool":"think","arg":{"thought":"hi"}}');
@@ -82,7 +85,7 @@ eq(normaliseExecArgv([]), null, 'empty array is nothing');
 {
   const calls = parseToolCalls('{"tool":"read_file","parameters":{"path":"x"}}');
   eq(calls.length, 1, 'parameters form parses');
-  eq(calls[0].arg, { path: 'x' }, 'parameters become the arg');
+  eq(calls[0].arg, 'x', 'parameters become the arg');
 }
 {
   const calls = parseToolCalls('{"tool":"think","input":{"thought":"hi"}}');
@@ -139,7 +142,7 @@ eq(repairToolName(''), '', 'an empty name repairs to nothing');
 {
   const calls = parseToolCalls('<|begin|>read_file{"path":"x"}<|end|>');
   eq(calls.length, 1, 'a begin/end fence around name+JSON parses');
-  eq(calls[0].arg, { path: 'x' }, 'the fenced name+JSON keeps its arg');
+  eq(calls[0].arg, 'x', 'the fenced name+JSON keeps its arg');
 }
 {
   const calls = parseToolCalls('<|begin|>I will look at the files now.<|end|>');

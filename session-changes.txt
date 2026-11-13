@@ -1,0 +1,147 @@
+SESSION CHANGES
+Release: VERSION 450 -> 451, APP_VERSION (cache-buster) 430 -> 431
+Files: ui/**, index.html, ui/index.html, src/Sandbox.php, src/Harness.php,
+       src/ModelManager.php, api/index.php, tests/**, tools/**
+Suites: PHP 33/33 files, SDK sandbox harness 146 assertions,
+        JS 40 files / 1,094 assertions (all passing)
+
+
+1. DISPLAY TOOLS (show_file / show_command / show_find / show_url)
+--------------------------------------------------------------------------
+- A display call paints its output into the transcript and ends the turn.
+  None of it becomes prompt tokens: no result is sent back to the model and
+  no follow-up request is made.
+- Server budget for a display read is 400,000 characters
+  (Sandbox::MAX_DISPLAY_CHARS). A model's own read_file keeps 60,000.
+- Client sends max_chars only when ctx.display is set, so a model cannot ask
+  for the operator budget by naming the argument.
+- Sandbox::DEFAULT_MAX_READ_BYTES raised to 400,000 so a 220 KB log is not
+  cut by the old 200 KB read ceiling.
+- fetch_url is clamped to the same display budget.
+- read_file results now report the budget they applied (`limit`), and the
+  transcript header says "truncated at 60000" or 400000, so a short result
+  names its own cause instead of being guessed at.
+- read_file honours BOTH range spellings: "path 20-80" and
+  {"path": "...", "range": "20-80"}. The object form used to be dropped
+  silently, returning the whole file.
+
+
+2. SANDBOX LEGIBILITY (agents no longer conclude "everything is outside")
+--------------------------------------------------------------------------
+- A refused path names the copy that IS reachable:
+  'Did you mean "test_read.txt"? It is inside the sandbox (...), and paths
+  are addressed relative to it.'
+- A READ naming the folder above the sandbox reaches the same-named file
+  inside it and reports the real path it read. Writes still refuse (they now
+  carry the same hint) - the app never guesses at a write target.
+- list_dir on a refused folder returns the sandbox listing with a warning
+  naming what was refused, instead of a bare refusal.
+- list_dir with no argument is an orientation call: it lists the allowed
+  roots instead of returning 'needs "path" as a plain string'.
+- read_file/show_file on a directory lists it instead of 'not a file'.
+- A missing path argument still returns a shape to retry with.
+- Sandbox::status() reports read_roots_missing / write_roots_missing, and
+  the environment block lists only roots that exist on this machine, so a
+  configured root that is not present here is not advertised to models.
+- The environment block now states: "File paths are relative to that
+  directory (\"notes.txt\"); a path outside it is refused."
+
+
+3. TOOL CALLS AND LEARNING
+--------------------------------------------------------------------------
+- Harness::withTools() restores empty JSON objects before sending schemas.
+  A jq-style pass turned "properties": {} into "properties": [], which made
+  Ollama refuse every turn with 400 "Value looks like object, but can't find
+  closing '}' symbol". Five zero-argument tools triggered it every turn.
+- ModelManager::relayStream() captures 4 KB of an upstream error body and
+  appends Harness::errorReason(), so a failure reads
+  "upstream error (HTTP 404). model 'x:latest' not found" instead of a code.
+- A turn that ends with a display tool can now remember its tool dialect.
+  Steps skipped by the display call are no longer counted as failures, which
+  used to make every drill turn ineligible ("it never learns").
+- state sync UNIONS settings.toolDialectMap and settings.contextLimits when
+  it adopts another device's bundle. The whole settings slot used to be
+  replaced, so an older copy silently erased the dialect and context windows
+  this browser had learned.
+- Tool-call box header now reads "N tool calls - M failed - K retries"
+  (red when anything failed). A retry = the same tool + same arguments sent
+  again after a failed attempt. Errors stay expanded with their full text.
+- Calls skipped because a display tool already answered are status
+  "skipped" (dim, arrow icon), not "error" - a clean drill no longer looks
+  broken.
+
+
+4. CONTEXT WINDOWS
+--------------------------------------------------------------------------
+- A runner's real window is learned from its own refusal message, keyed
+  host|model, and remembered in settings.contextLimits.
+- Per-agent context window override: Brain Lab row + agent editor field,
+  stored as overrides.contextWindow; wired into the input budget and the
+  agent clock.
+- A context-overflow refusal triggers one retry with a fitted budget in both
+  chat paths, instead of failing the turn.
+- Tool-schema tokens are measured and subtracted from the input budget.
+
+
+5. TRAINING MODE
+--------------------------------------------------------------------------
+- The drill is now 17 steps and practices the display family:
+  show_find and show_command mid-drill, show_file as the final step.
+- Training mode resumes the drill after a display step ends the turn, with a
+  budget of 6 resumes (TRAINING_RESUME_LIMIT), reset by Start/Stop. show_file
+  never resumes (it is the last step). A resume is skipped if you have typed
+  something or a turn is already running.
+- Resume turns render as a muted "drill" marker, not a user message, and are
+  saved with user_input: "" + synthetic: true so the stored session never
+  claims you typed them.
+- New steps: a ranged read (line 1 only) and an exact old_string/new_string
+  replace, alongside the existing append.
+- New rules in the drill: fix the argument an error names instead of sending
+  the identical call again; keep paths relative to the sandbox; display
+  tools end the turn and their output is never restated.
+- The two-line summary now goes in the final todo item, because the last
+  step (show_file) ends the turn.
+- Training dialog documents the display steps and the auto-resume.
+
+
+6. DOCS / RELEASE
+--------------------------------------------------------------------------
+- README: What's new entry for v451, a What's inside row for the display
+  tools, a row in the sandbox tool table, and the training drill list
+  updated from 12 steps to 17.
+- CHANGELOG: v451 entry.
+- VERSION 450 -> 451.
+- APP_VERSION 430 -> 431 in ui/js/store.js, every ?v= module import under
+  ui/**, index.html and ui/index.html (and the one test that imports with a
+  literal ?v=), so an already-open tab cannot mix old and new modules.
+
+
+7. TESTS ADDED / EXTENDED
+--------------------------------------------------------------------------
+New JS suites:
+  tests/js/contextWindow.test.mjs    - learned vs declared context windows
+  tests/js/dialectRetry.test.mjs     - dialect fallback + memo
+  tests/js/displayBackfill.test.mjs  - display tools backfilled per agent
+  tests/js/showTools.test.mjs        - display tool routing + captions
+  tests/js/toolAliases.test.mjs      - foreign tool names repaired
+  tests/js/sandboxRecovery.test.mjs  - dir->listing, missing path, range forms
+  tests/js/toolCallSummary.test.mjs  - failed/retry counting
+  tests/js/settingsMerge.test.mjs    - learned maps survive a sync
+  tests/js/visibleRoots.test.mjs     - missing roots hidden from the manifest
+Extended: tests/js/{context,harness,toolCalls,training}.test.mjs,
+          tests/php/{harness,sandbox}.test.php
+New dev tools:
+  tools/measure-display-tokens.mjs   - structural cost of a "show me" turn
+  tools/measure-live-usage.mjs       - per-turn usage measurement
+  tools/measure-tool-choice.mjs      - does a model pick the right tool
+
+
+KNOWN LIMITATIONS (deliberate, not bugs)
+--------------------------------------------------------------------------
+- read_file (model-facing) stays at 60,000 characters: those bytes become
+  prompt tokens. Only show_file gets 400,000.
+- An agent that calls show_file before the last step ends the drill; press
+  Start to continue. The final-step rule cannot be fooled by a model's own
+  checklist.
+- Resume turns still appear as user hops in the comms/topology log, which
+  keys on from: "user" to draw the beam.

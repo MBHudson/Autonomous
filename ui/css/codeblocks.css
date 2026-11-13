@@ -170,6 +170,7 @@
 .tool-call[data-status="ok"] { border-left-color: var(--accent-green); }
 .tool-call[data-status="error"] { border-left-color: var(--accent-red); }
 .tool-call[data-status="pending"] { border-left-color: var(--accent-orange); }
+.tool-call[data-status="skipped"] { border-left-color: var(--text-dim); opacity: 0.75; }
 
 .tool-call-summary {
   display: flex;
@@ -205,6 +206,7 @@
 .tool-call[data-status="ok"] .tool-call-icon { color: var(--accent-green); }
 .tool-call[data-status="error"] .tool-call-icon { color: var(--accent-red); }
 .tool-call[data-status="pending"] .tool-call-icon { color: var(--accent-orange); }
+.tool-call[data-status="skipped"] .tool-call-icon { color: var(--text-dim); }
 
 .tool-call-name {
   flex: 0 0 auto;
@@ -235,6 +237,11 @@
 .tool-call[data-status="ok"] .tool-call-status { color: var(--accent-green); }
 .tool-call[data-status="error"] .tool-call-status { color: var(--accent-red); }
 .tool-call[data-status="pending"] .tool-call-status { color: var(--accent-orange); }
+.tool-call[data-status="skipped"] .tool-call-status { color: var(--text-dim); }
+
+/* A failed call is counted in the header as well as inside its own box: during
+   a drill the operator needs the tally at a glance. */
+.tool-calls-head.has-failures { color: var(--accent-red); }
 
 .tool-call-body {
   padding: 8px 10px 9px;

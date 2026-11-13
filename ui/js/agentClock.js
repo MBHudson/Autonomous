@@ -23,10 +23,10 @@
 // Metrics start at zero on an install that has never recorded a call, so a new
 // clock reads "no usage yet" until the agent actually calls.
 
-import { store } from './store.js?v=430';
-import { usageFor, limitsFor } from './rateGovernor.js?v=430';
-import { settingFor } from './agentConfig.js?v=430';
-import { contextLimitFor } from './harness.js?v=430';
+import { store } from './store.js?v=431';
+import { usageFor, limitsFor } from './rateGovernor.js?v=431';
+import { settingFor, contextLimitForAgent } from './agentConfig.js?v=431';
+import { contextLimitFor } from './harness.js?v=431';
 
 export { contextLimitFor };
 
@@ -110,7 +110,7 @@ export function clockFor(agentId) {
   const { agent, provider } = agentAndProvider(agentId);
   if (!agent) return { text: '', title: '', waiting: false, over: false };
   const t = agentTotals(agentId);
-  const limit = contextLimitFor(agent.model);
+  const limit = contextLimitForAgent(agent);
   const cap = settingFor(agent, 'maxTokens') ?? 16384;
   const budget = Number(settingFor(agent, 'tokenBudget')) || 0;
   const waiting = agentWaiting(agentId);

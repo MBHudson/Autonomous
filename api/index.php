@@ -966,10 +966,13 @@ function handleSandbox($method, $segments, $body) {
                 echo json_encode(Sandbox::fetchUrl($body['url'] ?? '', $body['max_chars'] ?? 20000));
                 break;
             case 'read':
+                // max_chars lets a display tool ask for the operator budget;
+                // omitted (read_file) keeps the 60k model default.
                 echo json_encode(Sandbox::readFile(
                     $body['path'] ?? '',
                     $body['range'] ?? null,
-                    $body['root'] ?? null
+                    $body['root'] ?? null,
+                    $body['max_chars'] ?? null
                 ));
                 break;
             case 'read_text':

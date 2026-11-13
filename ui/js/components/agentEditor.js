@@ -7,16 +7,16 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=430';
-import { persistence } from '../persistence.js?v=430';
-import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=430';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=430';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=430';
-import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=430';
-import { sandboxRootFor } from '../agentConfig.js?v=430';
-import { audio } from '../audio.js?v=430';
-import { api } from '../api.js?v=430';
-import * as memory from '../memory.js?v=430';
+import { store } from '../store.js?v=431';
+import { persistence } from '../persistence.js?v=431';
+import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=431';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=431';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=431';
+import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow, DISPLAY_TOOLS } from '../tools.js?v=431';
+import { sandboxRootFor } from '../agentConfig.js?v=431';
+import { audio } from '../audio.js?v=431';
+import { api } from '../api.js?v=431';
+import * as memory from '../memory.js?v=431';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
@@ -51,6 +51,48 @@ export class AgentEditor {
    * The state line is per agent, because a per-agent root can point at a folder
    * the server does not allow -- which no global line would ever mention.
    */
+  /**
+   * The tool checkboxes, grouped by what a result DOES to the turn.
+   *
+   * A flat list made show_file look interchangeable with read_file, when the
+   * difference is the whole point: a display tool ends the turn and paints its
+   * output into the transcript, so those bytes never become tokens; read_file
+   * hands the file back and every later step pays for it again. Grouping is
+   * presentation only -- every checkbox still lives inside #agentTools, so
+   * Select all and Apply All keep working unchanged.
+   */
+  _toolPicker(agent) {
+    // No tools array = an agent saved before everything was on by default, so
+    // show the full set ticked rather than an empty list that looks powerless.
+    // The deny list is applied on top, so a tool hidden by the policy editor
+    // cannot be re-enabled here even by accident.
+    const denied = this._deniedTools();
+    const chosen = (Array.isArray(agent?.tools) ? agent.tools : defaultTools())
+      .filter(t => !denied.includes(t));
+    const entries = Object.entries(TOOL_REGISTRY)
+      .filter(([id]) => !memory.MEMORY_TOOLS.includes(id) && !denied.includes(id));
+    const option = ([id, def]) => `
+                  <label class="tool-option">
+                    <input type="checkbox" value="${esc(id)}" ${chosen.includes(id) ? 'checked' : ''}>
+                    <span class="tool-name">${esc(id)}</span>
+                    <span class="tool-desc">${esc(def.describe)}</span>
+                  </label>`;
+    const group = (name, hint, list) => (list.length ? `
+              <div class="tool-group">
+                <div class="tool-group-head">
+                  <span class="tool-group-name">${name}</span>
+                  <span class="tool-group-hint">${hint}</span>
+                </div>
+                <div class="tool-group-tools">${list.map(option).join('')}</div>
+              </div>` : '');
+    return group('Show to the operator',
+      'ends the turn — shown to you, never paid for',
+      entries.filter(([id]) => DISPLAY_TOOLS.includes(id)))
+      + group('Work on it',
+        'the result comes back, and is paid for on every step after',
+        entries.filter(([id]) => !DISPLAY_TOOLS.includes(id)));
+  }
+
   _describeToolPermissions(agent = null) {
     const hint = document.getElementById('toolHint');
     if (!hint) return;
@@ -229,27 +271,7 @@ export class AgentEditor {
           </div>
           <div class="form-group">
             <label class="form-label">Tools <span class="form-hint-inline">the model may call these by replying with JSON</span></label>
-            <div class="tool-picker" id="agentTools">
-              ${Object.entries(TOOL_REGISTRY)
-                .filter(([id]) => !memory.MEMORY_TOOLS.includes(id))
-                .filter(([id]) => !this._deniedTools().includes(id))
-                .map(([id, def]) => {
-                  // No tools array = an agent saved before everything was on
-                  // by default, so show the full set ticked rather than an
-                  // empty list that looks like the agent has no powers.
-                  // The deny list is applied on top, so a tool hidden by the
-                  // policy editor cannot be re-enabled here even by accident.
-                  const chosen = (Array.isArray(agent?.tools) ? agent.tools : defaultTools())
-                    .filter(t => !this._deniedTools().includes(t));
-                  const on = chosen.includes(id);
-                  return `
-                <label class="tool-option">
-                  <input type="checkbox" value="${esc(id)}" ${on ? 'checked' : ''}>
-                  <span class="tool-name">${esc(id)}</span>
-                  <span class="tool-desc">${esc(def.describe)}</span>
-                </label>`;
-                }).join('')}
-            </div>
+            <div class="tool-picker" id="agentTools">${this._toolPicker(agent)}</div>
             <div class="tool-actions" style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
               <label class="tool-option" style="font-size:11px; margin:0; display:flex; align-items:center; gap:6px;">
                 <input type="checkbox" id="agentToolsSelectAll">
@@ -304,6 +326,11 @@ export class AgentEditor {
               <label class="form-label">Max Tokens</label>
               <input type="number" class="form-input" id="agentMaxTokens" min="256" max="32768" step="256" value="${agent?.maxTokens ?? 4096}">
             </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Context window <span class="form-hint-inline">tokens the runner actually loaded</span></label>
+            <input type="number" class="form-input" id="agentContextWindow" min="0" max="2000000" step="1024" placeholder="auto" value="${agent?.overrides?.contextWindow || ''}">
+            <div class="form-hint">Leave empty to learn it: a runner that refuses an oversized prompt states its real window, and the app keeps it for this host and model.</div>
           </div>
           <div class="form-group">
             <label class="form-label">Voice <span class="form-hint-inline">used when replies are read aloud</span></label>
@@ -821,6 +848,9 @@ export class AgentEditor {
     const alwaysOn = !!document.getElementById('agentAlwaysOn')?.checked && !!alwaysOnGoal;
     const temperature = parseFloat(document.getElementById('agentTemp').value) || 0.7;
     const maxTokens = parseInt(document.getElementById('agentMaxTokens').value, 10) || 4096;
+    // 0/empty means AUTO. Stored as an override, the same place Brain Lab keeps
+    // it, so the two screens cannot disagree.
+    const contextWindow = parseInt(document.getElementById('agentContextWindow')?.value, 10) || 0;
     const active = document.getElementById('agentActive').classList.contains('active');
     const endpoint = document.getElementById('agentEndpoint').value.trim();
     const keyOverride = document.getElementById('agentKeyOverride').value.trim();
@@ -849,7 +879,10 @@ export class AgentEditor {
       const idx = agents.findIndex(a => a.id === this.editingId);
       if (idx >= 0) {
         // The code is a permanent handle: renaming must never change it.
-        agents[idx] = { ...agents[idx], code: agentCode(agents[idx]), name, role, provider, model, color, systemPrompt, temperature, maxTokens, active, endpoint, keyOverride, curlTemplate, curlTemplateAuto, tools, memory: memoryOn, voice, pitch, label, alwaysOn, alwaysOnGoal };
+        const overrides = { ...(agents[idx].overrides || {}) };
+        if (contextWindow > 0) overrides.contextWindow = contextWindow;
+        else delete overrides.contextWindow;
+        agents[idx] = { ...agents[idx], code: agentCode(agents[idx]), name, role, provider, model, color, systemPrompt, temperature, maxTokens, overrides, active, endpoint, keyOverride, curlTemplate, curlTemplateAuto, tools, memory: memoryOn, voice, pitch, label, alwaysOn, alwaysOnGoal };
       }
       store.emit('toast', { message: 'Agent updated', type: 'success' });
     } else {
@@ -865,6 +898,7 @@ export class AgentEditor {
         systemPrompt,
         temperature,
         maxTokens,
+        overrides: contextWindow > 0 ? { contextWindow } : {},
         active,
         endpoint,
         keyOverride,

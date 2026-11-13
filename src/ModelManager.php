@@ -258,11 +258,17 @@ class ModelManager {
         } else {
             // No proxy configured, so nothing to set.
         }
-        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) {
+        // The head of the upstream body, kept so a refusal can say WHY. The
+        // error status arrives in a header and the body was forwarded verbatim
+        // but never retained, so every failure read "upstream error (HTTP 400)"
+        // with the provider's own explanation dropped on the floor.
+        $upstreamHead = '';
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) use (&$upstreamHead) {
             // MUST return the ORIGINAL length. Returning the trimmed length
             // tells curl we under-consumed, which aborts the transfer after the
             // first chunk — that is what collapsed a 397-event stream to 2.
             $len = strlen($chunk);
+            if (strlen($upstreamHead) < 4096) { $upstreamHead .= $chunk; }
             $data = trim((string)$chunk);
             if ($data === '') { return $len; }
             if (strpos($data, 'data:') !== 0 && strpos($data, 'event:') !== 0
@@ -334,8 +340,13 @@ class ModelManager {
             @flush();
         } elseif ($httpCode >= 400) {
             $retryable = $httpCode >= 500 && $httpCode < 600;
+            // The provider's own words, when it gave any. "HTTP 400" alone left
+            // the operator guessing; the body names the field and the reason.
+            $why = Harness::errorReason($upstreamHead);
+            if (strlen($why) > 240) { $why = substr($why, 0, 240) . '…'; }
             echo 'data: ' . json_encode([
                 'error' => "upstream error (HTTP $httpCode)."
+                    . ($why !== '' ? " $why" : '')
                     . ($retryable ? ' The app will retry automatically.' : ''),
                 'status' => $httpCode,
                 'retryable' => $retryable,

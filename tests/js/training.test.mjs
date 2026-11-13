@@ -26,8 +26,9 @@ if (!version) {
   process.exit(1);
 }
 const {
-  TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_TASKS,
-  isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor,
+  TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_TASKS, TRAINING_RESUME_LIMIT,
+  isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
+  shouldResumeDrill,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const { store } = await import(`../../ui/js/store.js?v=${version}`);
 const { limitsFor } = await import(`../../ui/js/rateGovernor.js?v=${version}`);
@@ -47,8 +48,27 @@ eq(TRAINING_THROTTLE, 0.5, 'throttle is 50%');
 ok(TRAINING_TASKS.length >= 10, `drill has a full tool list (got ${TRAINING_TASKS.length})`);
 ok(TRAINING_TASKS.every(t => t.tool && t.label), 'every step names a tool and a task');
 eq(TRAINING_TASKS[0].tool, 'think', 'drill starts free (no approval gate)');
-eq(TRAINING_TASKS[TRAINING_TASKS.length - 1].tool, 'todo_write', 'drill ends by recording completion');
+// The drill ends on a display tool ON PURPOSE: show_file paints the result into
+// the transcript and ends the turn, so a show step anywhere earlier would strand
+// every step after it. Completion is recorded in the step just before it.
+eq(TRAINING_TASKS[TRAINING_TASKS.length - 1].tool, 'show_file',
+  'drill ends by showing its result, not by describing it');
+eq(TRAINING_TASKS[TRAINING_TASKS.length - 2].tool, 'todo_write',
+  'completion is recorded immediately before the final show');
 ok(TRAINING_TASKS.some(t => t.label.includes(TRAINING_FILE)), 'drill creates training.txt');
+ok(TRAINING_TASKS.filter(t => t.tool === 'edit_file').length >= 2,
+  'drill edits twice: append, then an exact old_string/new_string replace');
+ok(TRAINING_TASKS.some(t => t.tool === 'read_file' && /1-1/.test(t.label)),
+  'drill teaches a ranged read so a big file is not pulled in whole');
+// A display step ends the turn, and training mode resumes the drill -- so the
+// family can be practiced mid-drill, not only as the last step.
+const showSteps = TRAINING_TASKS.filter(t => t.tool.startsWith('show_'));
+ok(showSteps.length >= 3, `drill practices several display tools (got ${showSteps.length})`);
+ok(showSteps.some(t => t.tool === 'show_file'), 'show_file is practiced');
+ok(showSteps.some(t => t.tool === 'show_find'), 'show_find is practiced');
+ok(showSteps.some(t => t.tool === 'show_command'), 'show_command is practiced');
+ok(TRAINING_RESUME_LIMIT >= showSteps.length,
+  'the resume budget covers every display step with room to retry');
 ok(TRAINING_DIR === 'training' && TRAINING_FILE === 'training/training.txt', 'drill folder/file constants');
 eq(trainingStepList().length, TRAINING_TASKS.length, 'step list covers every task');
 ok(trainingStepList()[0].startsWith('1. think'), 'step list is numbered from 1');
@@ -67,6 +87,33 @@ ok(block.includes('TRY AGAIN'), 'block orders retries on failure');
 ok(block.includes('never skip'), 'block forbids skipping failed steps');
 ok(block.includes(TRAINING_FILE), 'block names the drill file');
 for (const t of TRAINING_TASKS) ok(block.includes(t.tool), `block lists ${t.tool}`);
+// The display family is taught by name even though only one is practiced, and
+// the error-reading rule names the recoveries the sandbox returns.
+for (const name of ['show_file', 'show_find', 'show_command', 'show_url']) {
+  ok(block.includes(name), `block teaches ${name}`);
+}
+ok(block.includes('END the turn'), 'block says a display call ends the turn');
+ok(block.includes('resumes the drill'), 'block says the drill resumes after a display step');
+ok(block.includes('Do not restart from step 1'), 'block forbids restarting the drill on resume');
+ok(block.includes('Did you mean'), 'block tells the agent to fix the argument an error names');
+ok(block.includes('relative to the sandbox'), 'block states the path rule');
+
+// The resumed turn is short and points at the todo list, not at a re-run.
+const resume = trainingResumeFor();
+ok(resume.includes('NEXT step'), 'the resume names the next step');
+ok(resume.includes('Do not repeat'), 'the resume forbids repeating a completed step');
+ok(!resume.includes('Steps:'), 'the resume does not re-send the whole drill');
+
+// --- the resume decision (chat.js asks this after every display turn) --------
+ok(shouldResumeDrill('show_find', {}) === true, 'a show_find turn resumes the drill');
+ok(shouldResumeDrill('show_command', {}) === true, 'a show_command turn resumes it too');
+ok(shouldResumeDrill('show_file', {}) === false,
+  'show_file is the drill’s last step: showing the file ends it');
+ok(shouldResumeDrill('', {}) === false, 'a turn that showed nothing does not resume');
+ok(shouldResumeDrill('show_find', { drillResumes: TRAINING_RESUME_LIMIT - 1 }) === true,
+  'the last unit of budget still resumes');
+ok(shouldResumeDrill('show_find', { drillResumes: TRAINING_RESUME_LIMIT }) === false,
+  'an exhausted budget stops the auto-resume instead of looping');
 
 // The Start dispatch: self-contained, so a fresh turn AND a steered in-flight
 // turn both get the drill even though only the fresh turn carries the block.

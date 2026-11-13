@@ -18,9 +18,10 @@
 // Toggle: Config → Labs → "Dynamic tools" (settings.dynamicTools). Off = the
 // exact classic toolInstructions() output, byte for byte.
 
-import { store } from './store.js?v=430';
-import { api } from './api.js?v=430';
-import { toolInstructions } from './tools.js?v=430';
+import { store } from './store.js?v=431';
+import { api } from './api.js?v=431';
+import { toolInstructions } from './tools.js?v=431';
+import { visibleRoots } from './utils.js?v=431';
 
 const TTL_MS = 5 * 60 * 1000;
 let _facts = null;
@@ -89,9 +90,19 @@ function envHeader(env, enabledTools) {
   lines.push(`- Shell: ${env.os === 'windows' ? 'Windows' : 'POSIX (Linux/macOS)'}.`);
 
   const root = (env.write_roots && env.write_roots[0]) || env.app_dir || '';
-  if (root) lines.push(`- Working directory: "${root}".`);
-  if (Array.isArray(env.read_roots) && env.read_roots.length) {
-    lines.push(`- Readable paths: ${env.read_roots.join(', ')}.`);
+  if (root) {
+    lines.push(`- Working directory: "${root}".`);
+    // Said out loud because a model that only sees absolute paths concludes the
+    // folder ABOVE the sandbox is the workspace, then reports that every file
+    // it just wrote is "outside" — the exact confusion this line prevents.
+    lines.push('- File paths are relative to that directory ("notes.txt"); a path outside it is refused.');
+  }
+  // Only roots that exist on THIS machine: a Windows install can carry a Linux
+  // root in its config, and naming it invited agents to probe a path that
+  // cannot exist here ("not a file" x4 in one session).
+  const readable = visibleRoots(env.read_roots, env.read_roots_missing);
+  if (readable.length) {
+    lines.push(`- Readable paths: ${readable.join(', ')}.`);
   }
 
   const shellTools = enabledTools.includes('exec') || enabledTools.includes('run_code');

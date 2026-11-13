@@ -27,9 +27,9 @@ import {
   TOOL_PATTERNS,
   CONTEXT_LIMITS,
   DEFAULT_RPM,
-} from './harness.data.js?v=430';
-import { store } from './store.js?v=430';
-import { persistence } from './persistence.js?v=430';
+} from './harness.data.js?v=431';
+import { store } from './store.js?v=431';
+import { persistence } from './persistence.js?v=431';
 
 export { API_FAMILIES };
 
@@ -322,8 +322,62 @@ export function forgetDialect(provider, model) {
   try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
 }
 
-/** Known context window for a model id, or null. */
-export function contextLimitFor(model) {
+const LEARNED_CONTEXT_KEY = 'settings.contextLimits';
+
+/**
+ * A context window this app was TOLD by the runner, or null.
+ *
+ * The static table guesses the size from the model NAME, and a name cannot know
+ * how the model was loaded: an 8k LM Studio session serving `nemotron-...`
+ * matched the table's 131072, was handed 8,836 tokens, and refused with 400
+ * "exceeds the available context size" on every turn. What the runner says wins
+ * over what the name suggests.
+ */
+function hostKey(endpoint) {
+  try { return String(new URL(String(endpoint)).host || '').toLowerCase(); } catch { return ''; }
+}
+
+export function learnedContextLimit(model, endpoint) {
+  const key = String(model || '').toLowerCase();
+  if (!key) return null;
+  try {
+    const map = store.get(LEARNED_CONTEXT_KEY) || {};
+    const host = hostKey(endpoint);
+    // Host+model first: the SAME model on a big cloud provider must not inherit
+    // the 8k an LM Studio session reported. Model-only entries are the older
+    // shape and still answer when no host was given or none was recorded.
+    const scoped = host ? map[`${host}|${key}`] : undefined;
+    const raw = scoped !== undefined ? scoped : map[key];
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch { return null; }
+}
+
+/**
+ * Remember a real window for this model, so the budgets stop guessing.
+ *
+ * Scoped by the endpoint's host when one is known: a runner's load settings are
+ * a property of THAT runner, not of the model's name.
+ */
+export function rememberContextLimit(model, limit, endpoint) {
+  const key = String(model || '').toLowerCase();
+  const n = Number(limit);
+  if (!key || !Number.isFinite(n) || n < 256) return;
+  try {
+    const host = hostKey(endpoint);
+    const slot = host ? `${host}|${key}` : key;
+    const map = { ...(store.get(LEARNED_CONTEXT_KEY) || {}) };
+    if (map[slot] === n) return;
+    map[slot] = n;
+    store.set(LEARNED_CONTEXT_KEY, map);
+    persistence.set('settings', store.get('settings'));
+  } catch { /* a budget hint is never worth breaking a turn over */ }
+}
+
+/** Known context window for a model id, or null. Host-scoped when given. */
+export function contextLimitFor(model, endpoint) {
+  const learned = learnedContextLimit(model, endpoint);
+  if (learned) return learned;
   const m = String(model || '').toLowerCase();
   for (const [sub, limit] of CONTEXT_LIMITS) {
     if (m.includes(sub)) return limit;

@@ -20,8 +20,9 @@
 // Keeping one source per setting is what stops the UI, the resolver and the
 // call paths from disagreeing about what an agent is actually using.
 
-import { store } from './store.js?v=430';
-import { DEFAULT_HISTORY_TURNS } from './utils.js?v=430';
+import { store } from './store.js?v=431';
+import { DEFAULT_HISTORY_TURNS } from './utils.js?v=431';
+import { contextLimitFor } from './harness.js?v=431';
 
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o || {}, k);
 
@@ -32,6 +33,7 @@ export const overridesOf = agent => (agent && agent.overrides) || {};
 export const LOCKABLE = [
   'temperature',
   'maxTokens',
+  'contextWindow',
   'historyTurns',
   'rateEnabled',
   'rateRpm',
@@ -75,6 +77,12 @@ export function settingFor(agent, key) {
       return agent?.temperature ?? s.temperature ?? 1;
     case 'maxTokens':
       return agent?.maxTokens ?? s.maxTokens ?? 16384;
+    case 'contextWindow':
+      // 0 means AUTO: learn the real window from the runner, then fall back to
+      // the model table. An explicit number wins over both, because a model
+      // name cannot know how the runner loaded it.
+      return has(o, 'contextWindow') ? clampInt(o.contextWindow, 0, 2000000, 0)
+        : clampInt(s.contextWindow, 0, 2000000, 0);
     case 'historyTurns':
       return has(o, 'historyTurns') ? o.historyTurns : (s.historyTurns ?? DEFAULT_HISTORY_TURNS);
     case 'rateEnabled':
@@ -104,6 +112,7 @@ export function globalFor(key) {
   switch (key) {
     case 'temperature': return s.temperature ?? 1;
     case 'maxTokens': return s.maxTokens ?? 16384;
+    case 'contextWindow': return clampInt(s.contextWindow, 0, 2000000, 0);
     case 'historyTurns': return s.historyTurns ?? DEFAULT_HISTORY_TURNS;
     case 'rateEnabled': return s.rateLimitEnabled !== false;
     case 'rateRpm': return clampInt(s.rateLimitRpm, 0, 600, 0);
@@ -115,6 +124,29 @@ export function globalFor(key) {
     case 'toolPolicy': return s.toolPolicy || {};
     default: return undefined;
   }
+}
+
+/** The endpoint this agent actually calls, for host-scoped lookups. */
+export function endpointForAgent(agent) {
+  if (!agent) return '';
+  if (agent.endpoint) return String(agent.endpoint);
+  try {
+    const p = (store.get('providers') || []).find(x => x && x.id === agent.provider);
+    return String(p?.endpoint || '');
+  } catch { return ''; }
+}
+
+/**
+ * The context window this agent is really working with.
+ *
+ * Precedence, widest knowledge last: an explicit per-agent number, then what a
+ * runner told us for THIS host and model, then the model-name table, then null
+ * (an unknown model, which budgets treat conservatively).
+ */
+export function contextLimitForAgent(agent) {
+  const declared = Number(settingFor(agent, 'contextWindow'));
+  if (Number.isFinite(declared) && declared > 0) return declared;
+  return contextLimitFor(agent?.model, endpointForAgent(agent));
 }
 
 /**

@@ -1046,6 +1046,22 @@ body.agent-reordering .agent-editor:hover {
 .tool-name { font-weight: 700; color: var(--accent-cyan); font-family: var(--font-mono); }
 .tool-desc { color: var(--text-dim); }
 
+/* Two groups, split by what a result does to the turn: one ends it and paints
+   the output, the other hands it back to the model. Each group is a full-width
+   row inside the wrapping .tool-picker, with its own chip row. */
+.tool-group { width: 100%; }
+.tool-group + .tool-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.tool-group-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.tool-group-name {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.tool-group-hint { font-size: 10px; color: var(--text-dim); opacity: 0.8; }
+.tool-group-tools { display: flex; flex-wrap: wrap; gap: 5px; }
+
 /* ---- Image attachments (vision agents) ---- */
 /* The bytes stay in the browser as a data: URL. Nothing is uploaded, so
    there is no server-side file to validate and nothing to write to disk. */
@@ -1941,6 +1957,36 @@ body.agent-reordering .agent-editor:hover {
 @media (max-width: 560px) {
   .interp-row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
 }
+
+/* ---- App-authored notice ("drill") ----
+   A training-drill resume continues a turn without the operator speaking.
+   A thin marker keeps the turn visible without impersonating them. */
+.message-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.message-notice::before {
+  content: '';
+  flex: 0 0 22px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.25;
+}
+.message-notice-tag {
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
+.message-notice-text { opacity: 0.9; }
 
 /* ---- Always-on ("AUTO") messages ----
    An autonomous turn posts through the same path as a reply you asked for.

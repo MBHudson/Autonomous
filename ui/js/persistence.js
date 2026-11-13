@@ -7,9 +7,9 @@
 // PERSISTENCE.JS — localStorage abstraction layer
 // ============================================
 
-import { store } from './store.js?v=430';
-import { deepClone, makeAgentCode } from './utils.js?v=430';
-import { K, initStorage } from './storage.js?v=430';
+import { store } from './store.js?v=431';
+import { deepClone, makeAgentCode, backfillDisplayTools } from './utils.js?v=431';
+import { K, initStorage } from './storage.js?v=431';
 
 // Storage keys are namespaced per app directory so several copies served from
 // one host cannot overwrite each other's settings. See ui/js/storage.js.
@@ -226,6 +226,21 @@ class Persistence {
       savedSettings.uiPanelsDefaultOff = true;
       settingsMigrated = true;
     }
+    // One-time per agent: tools are a saved snapshot, so an agent created before
+    // the display tools existed holds a list that predates them -- asking it to
+    // show a log fell back to read_file and pasted the file into the transcript.
+    // The marker rides on the agent (see backfillDisplayTools): state sync
+    // replaces this list wholesale, and a settings flag would be left claiming
+    // the job was done while the old agents came back.
+    // Written whenever an agent had not been looked at yet, even if it gained
+    // nothing: the marker is the thing that stops a later removal coming back.
+    if (agents.some(a => a && !a.displayToolsBackfilled)) {
+      backfillDisplayTools(agents, savedSettings.deniedTools);
+      // The cache already holds this array, so the mutation is live; only the
+      // saved copy needs writing.
+      this._persist(STORAGE_KEYS.AGENTS, agents);
+    }
+
     this.cache.set('settings', savedSettings);
     if (settingsMigrated) this._persist(STORAGE_KEYS.SETTINGS, savedSettings);
 

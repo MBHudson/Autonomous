@@ -7,8 +7,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=430';
-import { K as STORAGE_K } from '../storage.js?v=430';
+import { store } from '../store.js?v=431';
+import { K as STORAGE_K } from '../storage.js?v=431';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -17,29 +17,29 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=430';
-import { persistence } from '../persistence.js?v=430';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning } from '../utils.js?v=430';
-import { settingFor, alwaysAppendFor, sandboxRootFor } from '../agentConfig.js?v=430';
-import { toolProtocolFor, contextLimitFor, detectFamily, harnessOverride, rememberDialect } from '../toolProtocol.js?v=430';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=430';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=430';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=430';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=430';
-import { usageFor } from '../rateGovernor.js?v=430';
-import { trace } from '../trace.js?v=430';
-import { offerRebind } from './rebindOffer.js?v=430';
-import { latency } from '../latency.js?v=430';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=430';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=430';
-import { trainingBlockFor } from '../training.js?v=430';
-import { SlashCommands } from '../slashCommands.js?v=430';
-import { parseRoute, routingHelp } from '../routing.js?v=430';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=430';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=430';
-import { MessageRenderer, renderToolCalls } from './message.js?v=430';
-import { createAvatar } from './avatar.js?v=430';
-import * as comms from '../commsLog.js?v=430';
+import { api, errText } from '../api.js?v=431';
+import { persistence } from '../persistence.js?v=431';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=431';
+import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=431';
+import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=431';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=431';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=431';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=431';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=431';
+import { usageFor } from '../rateGovernor.js?v=431';
+import { trace } from '../trace.js?v=431';
+import { offerRebind } from './rebindOffer.js?v=431';
+import { latency } from '../latency.js?v=431';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=431';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=431';
+import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill } from '../training.js?v=431';
+import { SlashCommands } from '../slashCommands.js?v=431';
+import { parseRoute, routingHelp } from '../routing.js?v=431';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=431';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=431';
+import { MessageRenderer, renderToolCalls } from './message.js?v=431';
+import { createAvatar } from './avatar.js?v=431';
+import * as comms from '../commsLog.js?v=431';
 
 /**
  * How long an agent may keep working on a single task.
@@ -66,10 +66,13 @@ function toolArgForUi(arg) {
   return { _truncated: true, preview: String(text).slice(0, 4000) };
 }
 
-function toolResultForUi(result) {
+function toolResultForUi(result, display = false) {
   const text = asText(result);
-  if (text.length <= TOOL_RECORD_CHARS) return text;
-  return `${text.slice(0, TOOL_RECORD_CHARS)}\n\u2026 (${text.length - TOOL_RECORD_CHARS} more characters)`;
+  // A display result is the reply, not a detail: it never reaches a provider,
+  // so it gets the display budget rather than the per-call UI copy budget.
+  const cap = display ? MAX_DISPLAY_CHARS : TOOL_RECORD_CHARS;
+  if (text.length <= cap) return text;
+  return `${text.slice(0, cap)}\n\u2026 (${text.length - cap} more characters)`;
 }
 
 function toolResultStatus(text) {
@@ -594,7 +597,11 @@ export class Chat {
     });
   }
 
-  async sendMessage() {
+  async sendMessage(opts = {}) {
+    // A training-drill resume is dispatched through this same path so the turn
+    // behaves like every other, but it is NOT a message from the operator: it
+    // renders as a marker and is saved with no user input.
+    const trainingResume = !!(opts && opts.trainingResume);
     const input = document.getElementById('inputField');
     // A run is already in flight: this is a steering message, not a new turn
     // and emphatically not a STOP. It joins the running agents' conversation
@@ -679,10 +686,11 @@ export class Chat {
     // The STORED message carries text only. A base64 image would bloat
     // localStorage and blow the replayed-history budget, so images are
     // referenced by name and never persisted as bytes.
-    const userMsg = { role: 'user', content: text, timestamp: Date.now(),
+    const userMsg = { role: trainingResume ? 'notice' : 'user', content: text, timestamp: Date.now(),
       images: pending.map(a => ({ name: a.name, w: a.w, h: a.h })),
       // null when the message was a plain broadcast.
       addressed: route.addressed };
+    if (trainingResume) userMsg.tag = 'drill';
     this._addMessage(userMsg);
 
     // Say it BEFORE the reply. A model that could not write still reports the
@@ -826,7 +834,12 @@ export class Chat {
       this._removeTyping(typingId);
 
       // Persist the whole turn as one dialog (the only shape the backend keeps)
-      this._saveDialog(text, uniqueAgents, results);
+      this._saveDialog(text, uniqueAgents, results, trainingResume);
+
+      // Training mode: a display step is a completed step, not the end of the
+      // drill. Scheduling the next turn here is what lets show_find and
+      // show_command be practiced mid-drill.
+      this._scheduleDrillResume(results);
     } catch (err) {
       this._removeTyping(typingId);
       const errorMsg = { role: 'agent', content: 'Error: ' + err.message, agentId: null, timestamp: Date.now() };
@@ -852,6 +865,50 @@ export class Chat {
       this.alwaysOn?.noteUserTurn();
       input.focus();
     }
+  }
+
+  /**
+   * While training is armed, a turn that ended by SHOWING output (show_file /
+   * show_find / show_command / show_url) continues the drill on the next turn.
+   *
+   * A display call is the reply and ends the turn by design, which used to end
+   * the DRILL with it: every step after a show_* never ran, so those tools could
+   * only ever be taught as the final step. The resume turn is short -- the drill
+   * itself is already in the system prompt -- and it is skipped when the operator
+   * has started typing, because a draft in the composer wins over the drill.
+   *
+   * Bounded: settings.trainingMode.drillResumes counts resumes and Start resets
+   * it. Without that, an agent that keeps showing the same file would loop.
+   */
+  _scheduleDrillResume(results) {
+    if (!isTrainingActive()) return;
+    if (!Array.isArray(results) || !results.length) return;
+    const shown = results.find(r => r && r.status === 'fulfilled' && r.value && r.value.displayShown);
+    if (!shown) return;
+    const tool = shown.value.displayShown;
+    const tm = store.get('settings.trainingMode') || {};
+    if (String(tool) === 'show_file') return;   // the drill's final step
+    if (!shouldResumeDrill(tool, tm)) {
+      store.emit('toast', {
+        message: `Training drill paused after ${Number(tm.drillResumes || 0)} display steps — press Start to continue it`,
+        type: 'info',
+      });
+      return;
+    }
+    store.set('settings.trainingMode', { ...tm, active: true, drillResumes: Number(tm.drillResumes || 0) + 1 });
+    try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
+    // After the finally block has cleared aborter/busy: sendMessage() would
+    // otherwise read this as a steer for the turn that just finished.
+    setTimeout(() => {
+      // aborter is set if the operator sent something in the meantime: their
+      // turn wins over the drill, and sendMessage() would read this as a steer.
+      if (!isTrainingActive() || this.aborter) return;
+      const input = document.getElementById('inputField');
+      if (!input || input.value.trim()) return;
+      input.value = trainingResumeFor();
+      this.sendMessage({ trainingResume: true })
+        .catch(err => console.warn('[training] drill resume failed:', err));
+    }, 250);
   }
 
   /** User pressed STOP (or send while busy): cancel in-flight provider calls. */
@@ -986,7 +1043,7 @@ export class Chat {
   }
 
   /** Persist one full turn (user prompt + all agent responses) as a dialog. */
-  async _saveDialog(userText, agents, results) {
+  async _saveDialog(userText, agents, results, synthetic = false) {
     if (!this.currentSessionId) return;
     // Create the record BEFORE the server round-trip, so a failed or slow
     // update can never leave this turn unrecorded.
@@ -1011,7 +1068,15 @@ export class Chat {
     });
     try {
       await api.updateSession(this.currentSessionId, {
-        dialog: { timestamp: Math.floor(Date.now() / 1000), user_input: userText, responses },
+        // A drill resume has no user input by definition; it is recorded with
+        // an empty prompt plus the marker, so the stored session never claims
+        // the operator typed it.
+        dialog: {
+          timestamp: Math.floor(Date.now() / 1000),
+          user_input: synthetic ? '' : userText,
+          ...(synthetic ? { synthetic: true } : {}),
+          responses,
+        },
       });
       // The transcript itself is written as each message lands (_addMessage /
       // _replaceLiveNode), so this only touches freshness. Pushing the same turn
@@ -1478,7 +1543,7 @@ _makeLiveNode(agent) {
 
     // Budget against the model's real context window when we know it. A 128k
     // model should not replay history as if it had 6k tokens.
-    const budget = historyCharBudget(agent ? contextLimitFor(agent.model) : null);
+    const budget = historyCharBudget(agent ? contextLimitForAgent(agent) : null);
     let total = picked.reduce((s, m) => s + m.content.length, 0);
     while (picked.length > 2 && total > budget) {
       const dropped = picked.shift();
@@ -1653,6 +1718,12 @@ _makeLiveNode(agent) {
   async _toolLoop({ agent, signal, liveNode, commsCtx, messages, specFor,
     remainingSteps, deadline, forceSummarise, toolLog }) {
     const log = Array.isArray(toolLog) ? toolLog : [];
+    // One retry after a runner says the prompt did not fit its context. The
+    // refusal names the real window, which is then remembered for this model.
+    // Declared here because BOTH paths below need it.
+    let contextRetried = false;
+    // Fallback shrink for a refusal that names no number at all.
+    let budgetScale = 1;
     // Memory tools ride along unless the agent has memory explicitly switched off.
     // An agent with no tools array at all predates the "everything on by
     // default" change, so it gets the same set a new agent would. An explicit
@@ -1688,7 +1759,7 @@ _makeLiveNode(agent) {
       // a steering message could land. Without this loop, anything typed while
       // the agent was thinking sat in the queue and was never seen -- shown in
       // the transcript, so it looked delivered, and simply did nothing.
-      const inputBudget = inputBudgetFor(agent);
+      let inputBudget = inputBudgetFor(agent);
       let convo = messages();
       let res = null;
       for (let pass = 0; pass <= MAX_STEER_STEPS; pass++) {
@@ -1697,7 +1768,7 @@ _makeLiveNode(agent) {
         // Same retry policy as the tool path. This branch used to call the
         // relay directly, so one rate-limit refusal killed an agent that had
         // tools switched off, with no retry at all.
-        res = await relayWithRetry(specFor(convo), {
+        const callOnce = () => relayWithRetry(specFor(convo), {
           signal,
           attempts: 3,
           onDelta: (_p, w) => this._paintStream(liveNode, _p, w),
@@ -1706,6 +1777,20 @@ _makeLiveNode(agent) {
             type: 'info',
           }),
         });
+        try {
+          res = await callOnce();
+        } catch (err) {
+          // Same context rescue as the tool path: learn the real window and
+          // try once more with the history trimmed to it.
+          const whyText = errText(err.message) || errText(err);
+          if (contextRetried || err?.name === 'AbortError' || !isContextOverflow(whyText)) throw err;
+          contextRetried = true;
+          const windowSize = contextLimitFromError(whyText);
+          if (windowSize) rememberContextLimit(agent.model, windowSize, endpointForAgent(agent));
+          inputBudget = inputBudgetFor(agent);
+          convo = compactMessages(messages(), inputBudget);
+          res = await callOnce();
+        }
         // Only keep looping if the person actually said something new.
         if (!(this._steerQueue && this._steerQueue.length)) break;
       }
@@ -1724,7 +1809,9 @@ _makeLiveNode(agent) {
     // Tool-enabled: stream the first step, then keep the text we already have
     // and continue the loop on the server.
     let working = messages();
-    const inputBudget = inputBudgetFor(agent);
+    // The tool schemas are part of the prompt, and a budget that forgot them is
+    // why an 8k runner was sent 8,836 tokens: `tools` alone is ~3.5k tokens.
+    let inputBudget = inputBudgetFor(agent);
     const sandboxRoot = sandboxRootFor(agent);
 
     // Native tool calling is used where the API family supports it. The model
@@ -1737,11 +1824,26 @@ _makeLiveNode(agent) {
       harness: harnessOverride(agent),
     });
     let nativeMode = NATIVE_FAMILIES.has(family) && agent.nativeTools !== false;
+    // A remembered dialect is proof, not a guess: rememberDialect only writes
+    // after a NON-native turn whose calls every one executed cleanly. So this
+    // model answers in the prompt dialect, and offering API schemas anyway costs
+    // two wasted requests every turn -- a measured runner advertised tool
+    // support, accepted every schema, and never once sent a tool_calls frame
+    // (0/24). Native is still tried for models with no memo.
+    if (nativeMode && learnedDialect(agent.provider, agent.model)) nativeMode = false;
     const describeTool = name => TOOL_REGISTRY[name]?.describe || name;
     const nativeDefinitions = () => nativeToolDefs(
       enabled.map(name => ({ name, description: describeTool(name) })),
       family,
     );
+    // What the schemas cost, in the units the budget is measured in.
+    const toolTokens = () => (nativeMode ? estimateTokens(JSON.stringify(nativeDefinitions())) : 0);
+    // Recomputed per use: the window can be learned mid-turn from a refusal,
+    // and the dialect can fall back to the prompt protocol (which drops the
+    // schemas). Either one changes how much room the messages really have.
+    const fitBudget = () => Math.max(512,
+      Math.floor((inputBudgetFor(agent) - toolTokens()) * budgetScale));
+    inputBudget = fitBudget();
     const requestFor = messagesForCall => {
       const spec = specFor(messagesForCall);
       if (!nativeMode) return spec;
@@ -1819,6 +1921,19 @@ _makeLiveNode(agent) {
     // parses to nothing — usually the wrong dialect for this model. See the
     // parse-failure escalation below.
     let parseRetries = 0;
+    // Native schemas can be accepted and silently ignored: the model answers in
+    // prose and no tool_calls frame ever arrives. A nudge is tried first; if
+    // that also produces no call, the loop drops the schemas and re-teaches the
+    // prompt dialect ONCE. Without this the turn ends on the narration, which
+    // is what a measured 7B runner did on all 24 native requests.
+    let nativeNudged = false;
+    let nativeFallbackUsed = false;
+    // Where `working` stood before the nudge added the model's narration back
+    // into the conversation. The fallback rewinds to here: nothing ran, so
+    // those exchanges carry no state — only the model's own wrong idea of how to
+    // call a tool, which measurably biased the next choice (44% picked a display
+    // tool with them in, 92% on a clean turn).
+    let workingBeforeNudge = -1;
     const triedDialects = new Set([dialect]);
     // Only the tool exchanges, so a follow-up round can resume this work.
     const transcript = [];
@@ -1853,7 +1968,7 @@ _makeLiveNode(agent) {
 
       // The live tool transcript is the part that grows without bound. Compact
       // it against the same input budget the history already respects.
-      working = compactMessages(working, inputBudget);
+      working = compactMessages(working, fitBudget());
 
       let res;
       try {
@@ -1881,6 +1996,24 @@ _makeLiveNode(agent) {
           }),
         });
       } catch (err) {
+        // A prompt that does not fit the model's window is refused before any
+        // work happens. It used to fall into the native-tool branch below,
+        // which switched dialects and re-sent the SAME oversized prompt -- an
+        // 8k local runner therefore 400'd on every single turn. Learn the real
+        // window from the refusal, then retry once with a trimmed prompt.
+        const whyText = errText(err.message) || errText(err);
+        if (!contextRetried && err?.name !== 'AbortError' && isContextOverflow(whyText)) {
+          contextRetried = true;
+          const windowSize = contextLimitFromError(whyText);
+          if (windowSize) rememberContextLimit(agent.model, windowSize, baseSpec.endpoint);
+          else budgetScale = 0.5;
+          step--;   // the retry is not a tool step
+          store.emit('toast', {
+            message: `${agent.name}: prompt did not fit${windowSize ? ` this runner's ${windowSize.toLocaleString()}-token context` : ' the model context'} — retrying with a shorter one`,
+            type: 'info',
+          });
+          continue;
+        }
         // A provider that does not accept native tool schemas rejects the
         // request before doing any work. Retry the same step in the prompt
         // dialect rather than failing the turn. Only the first step is retried:
@@ -1956,8 +2089,11 @@ _makeLiveNode(agent) {
         ? res.toolCalls.filter(c => c && c.name)
         : [];
       const calls = nativeCalls.map(c => {
-        const { arg, note } = nativeToolArgs(c.name, c.arguments);
-        return { tool: c.name, arg, note, native: true };
+        // A native call can carry another agent's vocabulary too (Read, Bash):
+        // resolve the name and reshape the arguments before the gate sees it.
+        const tool = resolveToolName(c.name);
+        const { arg, note } = nativeToolArgs(tool, aliasToolArgs(tool, c.arguments));
+        return { tool, arg, note, native: true };
       });
       if (!calls.length) {
         // Several tool calls may share one reply; they run in order (see
@@ -1973,8 +2109,7 @@ _makeLiveNode(agent) {
         // dialect taught was the wrong one for this model. Re-teach with each
         // untried dialect in turn rather than letting the near-miss become the
         // final answer, which reads as "the tool did not work".
-        const looksLikeTool = enabled.length > 0
-          && /(\{\s*"tool"\s*:|<\|tool_call\||<function_calls|<invoke\s|\{"tool")/i.test(String(chunk || ''));
+        const looksLikeTool = enabled.length > 0 && looksLikeToolReply(chunk);
         // Brute-force every untried dialect before giving up: plain, json,
         // native, anthropic. The first guess is already in triedDialects, so
         // up to three reteaches cover the whole set.
@@ -2025,11 +2160,10 @@ _makeLiveNode(agent) {
         // Without this the turn ends having done nothing, which reads as "the
         // tool did not work". Nudge it ONCE to actually send the call.
         const claim = String(chunk || '');
-        const claimsTool = enabled.length > 0
-          && /(\btool\b|\b\w+_?tool\b)/i.test(claim)
-          && /(i'?ll|i will|let me|i'?m going|going to|i would|now i|i'?d )/i.test(claim);
+        const claimsTool = enabled.length > 0 && narratesToolUse(claim, enabled);
         if (claimsTool && narratedRetries < 1 && !outOfTime() && !(signal && signal.aborted)) {
           narratedRetries++;
+          if (nativeMode) { nativeNudged = true; workingBeforeNudge = working.length; }
           // The sentence the model wrote instead of a call. It separates "it
           // described a tool" from "it ignored the tools entirely" -- the two
           // cases this retry exists to tell apart, and the reason a turn made
@@ -2055,6 +2189,46 @@ _makeLiveNode(agent) {
           ]);
           store.emit('toast', {
             message: `${agent.name} described a tool instead of calling it — asking again…`,
+            type: 'info',
+          });
+          continue;
+        }
+        // The nudge came back with no call either. In native mode that would end
+        // the turn on prose, so drop the schemas and re-teach the prompt dialect
+        // — the same switch a provider rejection causes, bounded to once. The
+        // full narration above is deliberately not repeated: this reply is the
+        // second attempt, and the re-teach message says what to do instead.
+        if (shouldFallBackFromNative({
+          nativeMode, nudgedInNative: nativeNudged, fallbackUsed: nativeFallbackUsed,
+        }) && !outOfTime() && !(signal && signal.aborted)) {
+          nativeFallbackUsed = true;
+          nativeMode = false;
+          dialect = toolProtocolFor(agent, undefined, baseSpec.endpoint);
+          const promptDialect = buildToolInstructions(enabled, sandboxRoot, dialect, envFacts);
+          const sysAt = working.findIndex(m => m && m.role === 'system');
+          if (sysAt !== -1) {
+            const old = String(working[sysAt].content || '');
+            working[sysAt] = {
+              ...working[sysAt],
+              content: old.includes(instructions) ? old.replace(instructions, promptDialect) : `${old}${promptDialect}`,
+            };
+          }
+          instructions = promptDialect;
+          trace('note', {
+            agentId: agent.id, agentName: agent.name, model: agent.model,
+            note: 'nudge — native fallback', step: step + 1,
+            detail: 'no tool call after the nudge; re-taught the prompt dialect',
+          });
+          text = '';
+          // Rewind past the failed native attempt and its nudge. Nothing ran, so
+          // nothing is lost — and the model gets the clean JSON turn it would
+          // have had if the schemas had never been offered. Appending the
+          // narration instead left it arguing with its own prose, and the calls
+          // it finally made were the wrong ones.
+          if (workingBeforeNudge >= 0) working = working.slice(0, workingBeforeNudge);
+          step--;   // the fallback retry is not a tool step
+          store.emit('toast', {
+            message: `${agent.name}: native tools produced no call — retrying in the prompt dialect`,
             type: 'info',
           });
           continue;
@@ -2144,12 +2318,14 @@ _makeLiveNode(agent) {
         note: call.note || '',
         status: 'running',
         started: Date.now(),
+        display: isDisplayTool(call.tool),
       }));
       log.push(...records);
       this._paintToolCalls(liveNode, log);
 
       const exchanges = [];
       let completedSummary = null;
+      let shownCall = null;
       for (let ci = 0; ci < calls.length; ci++) {
         const call = calls[ci];
         const record = records[ci];
@@ -2176,7 +2352,7 @@ _makeLiveNode(agent) {
         }
         record.status = toolResultStatus(asText(result));
         record.ms = Date.now() - record.started;
-        record.result = toolResultForUi(result);
+        record.result = toolResultForUi(result, record.display);
         this._paintToolCalls(liveNode, log);
 
         this._recordToolCall(agent.id, call.tool);
@@ -2193,6 +2369,25 @@ _makeLiveNode(agent) {
           records.slice(ci + 1).forEach(skipped => {
             skipped.status = 'error';
             skipped.result = 'Skipped after the agent declared its goal complete.';
+          });
+          this._paintToolCalls(liveNode, log);
+          break;
+        }
+
+        // A display tool (show_file / show_command / show_find / show_url) IS
+        // the answer. The app ran it, the operator is looking at the output, and
+        // nothing it printed has to be paid for a second time as prose. Ending
+        // here removes both the TOOL_RESULT and the follow-up request that would
+        // have restated it. A refusal or a missing path is different: the agent
+        // gets the error back below so it can correct the call instead of the
+        // turn ending on "no such file".
+        if (isDisplayTool(call.tool) && record.status === 'ok') {
+          shownCall = call;
+          records.slice(ci + 1).forEach(skipped => {
+            // 'skipped', not 'error': these calls never ran, and marking them
+            // red made a clean display step look like a pile of failures.
+            skipped.status = 'skipped';
+            skipped.result = 'Skipped: this step ended by showing output.';
           });
           this._paintToolCalls(liveNode, log);
           break;
@@ -2220,9 +2415,36 @@ _makeLiveNode(agent) {
       // Native-API turns skip this: the prompt dialect was never tested, and
       // writing it would memoize a guess. Anything less than all-ok (an
       // error, a denial, a pending approval) is not "what worked".
+      //
+      // Steps after a display tool are marked "Skipped", not failed: they never
+      // ran because the answer was already on screen. Counting those as errors
+      // meant a turn that ended in show_file (the most common kind) could never
+      // teach the app its dialect, so every such agent re-guessed forever.
+      const skippedInTurn = r => String((r && r.result) || '').startsWith('Skipped: this step ended');
       if (calls.length && calls.every(c => !c.native) && !nativeMode
-        && records.every(r => r && r.status === 'ok')) {
+        && records.every(r => r && (r.status === 'ok' || skippedInTurn(r)))) {
         rememberDialect(agent.provider, agent.model, dialect);
+      }
+
+      if (shownCall) {
+        // Only the caption is stored as message content. The output itself
+        // stays in the tool-call record: rendered to the operator, never sent
+        // back to a provider on a later turn.
+        //
+        // `completed` stays false on purpose. An Always-On run ends when a turn
+        // reports completion (alwaysOn.js), and showing a file is not the
+        // standing goal being met — an autonomous agent that displayed a log
+        // would otherwise end its run and look finished.
+        const msg = displayCaption(shownCall);
+        return {
+          content: msg, text: msg, sections: null, reasoning: reasoning || null,
+          steps: step + 1, exhausted: false, completed: false, transcript,
+          toolCalls: log.slice(),
+          // Read by _scheduleDrillResume: this turn ended because the agent
+          // SHOWED something, not because the work finished. The value is the
+          // tool name, because a show_file is the drill's final step.
+          displayShown: shownCall.tool,
+        };
       }
 
       if (completedSummary !== null) {
@@ -3678,7 +3900,7 @@ function budgetBlockFor(agent, endpoint, apiKey) {
  *  global override. */
 /** Input-token budget for one request, given the model window and output ask. */
 const inputBudgetFor = agent => contextInputBudget(
-  contextLimitFor(agent?.model),
+  contextLimitForAgent(agent),
   settingFor(agent, 'maxTokens') ?? 4096,
 );
 
