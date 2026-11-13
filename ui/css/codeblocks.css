@@ -242,6 +242,9 @@
 /* A failed call is counted in the header as well as inside its own box: during
    a drill the operator needs the tally at a glance. */
 .tool-calls-head.has-failures { color: var(--accent-red); }
+/* A drill pass that went through every step with no failed attempt. Green
+   only when the tool records prove it; the header text says "clean". */
+.tool-calls-head.drill-clean { color: var(--accent-green, #00ff88); }
 
 .tool-call-body {
   padding: 8px 10px 9px;

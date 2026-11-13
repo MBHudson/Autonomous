@@ -7,13 +7,13 @@
 // MESSAGE.JS — Message renderer
 // ============================================
 
-import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho, toolValueText, renderLimitFor, toolCallSummary } from '../utils.js?v=433';
-import { renderMarkdown } from '../markdown.js?v=433';
-import { CodeBlock, splitFences } from './codeBlock.js?v=433';
-import { createAvatar } from './avatar.js?v=433';
-import { store } from '../store.js?v=433';
-import { persistence } from '../persistence.js?v=433';
-import { audio, AudioController } from '../audio.js?v=433';
+import { esc, formatTime, copyToClipboard, asText, reasoningOpenByDefault, isReasoningEcho, toolValueText, renderLimitFor, toolCallSummary } from '../utils.js?v=434';
+import { renderMarkdown } from '../markdown.js?v=434';
+import { CodeBlock, splitFences } from './codeBlock.js?v=434';
+import { createAvatar } from './avatar.js?v=434';
+import { store } from '../store.js?v=434';
+import { persistence } from '../persistence.js?v=434';
+import { audio, AudioController } from '../audio.js?v=434';
 
 
 
@@ -162,10 +162,27 @@ export function renderToolCalls(calls, opts = {}) {
   // operator's question during a drill is "how many times did that fail?", and
   // the answer must not require opening six disclosures to count red lines.
   const { total, failed, retries } = toolCallSummary(calls);
+  // Training only: the pass this turn belongs to, graded from the run's tool
+  // records (see drillVerdict). "clean" is a claim about evidence, not about
+  // the agent's own todo list.
+  const drill = opts && opts.drill;
+  const drillText = drill
+    ? ` \u00b7 drill ${drill.step}/${drill.totalSteps}`
+      + (drill.complete ? (drill.clean ? ' clean' : ` \u00b7 ${drill.failures} failed`) : '')
+    : '';
   head.textContent = `${total} tool call${total === 1 ? '' : 's'}`
     + (failed ? ` \u00b7 ${failed} failed` : '')
-    + (retries ? ` \u00b7 ${retries} retr${retries === 1 ? 'y' : 'ies'}` : '');
+    + (retries ? ` \u00b7 ${retries} retr${retries === 1 ? 'y' : 'ies'}` : '')
+    + drillText;
+  if (drill) {
+    head.title = drill.clean
+      ? 'Training drill: this pass went through every step with no failed attempts'
+      : `Training drill: ${drill.step} of ${drill.totalSteps} steps in this pass`
+        + (drill.failures ? `, ${drill.failures} failed attempt${drill.failures === 1 ? '' : 's'}` : '')
+        + (drill.pending ? ' — an approval is waiting' : '');
+  }
   if (failed) head.classList.add('has-failures');
+  if (drill && drill.clean) head.classList.add('drill-clean');
   box.appendChild(head);
   calls.forEach(call => box.appendChild(renderToolCall(call, opts)));
   return box;
@@ -321,7 +338,7 @@ export class MessageRenderer {
       body.appendChild(this._renderReasoning(reasoningText));
     }
 
-    const toolCalls = renderToolCalls(msg.toolCalls);
+    const toolCalls = renderToolCalls(msg.toolCalls, { drill: msg.drill });
     if (toolCalls) body.appendChild(toolCalls);
 
     // Attached images.

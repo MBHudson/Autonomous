@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=433';
+import { store } from './store.js?v=434';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -69,6 +69,144 @@ export const TRAINING_TASKS = [
   { tool: 'todo_write', label: 'Mark every drill step completed, and put your two-line summary (which tools passed, retries) in the last item.' },
   { tool: 'show_file', label: 'Show training/training.txt to me with show_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
 ];
+
+/** Terms used by the checks below, tolerant of how a model spells an argument. */
+const argText = (call) => {
+  try { return JSON.stringify((call && call.arg) ?? '').toLowerCase(); }
+  catch { return String((call && call.arg) || '').toLowerCase(); }
+};
+const resultText = (call) => String((call && call.result) || '').toLowerCase();
+const namesTrainingFile = (call) => /training\/training\.txt/.test(argText(call));
+const showsTraining = (call) => /training/.test(resultText(call));
+
+/**
+ * What each step can be CHECKED on, beyond "the call returned ok".
+ *
+ * Index-aligned with TRAINING_TASKS. `null` means the step has no checkable
+ * artefact (think, todo_write, now): a successful call is all the evidence
+ * there can be. Every other entry looks at the arguments and/or the result, so
+ * a model cannot "pass" the ranged read with a full read, or the write with an
+ * empty file, and still be called clean.
+ */
+export const DRILL_CHECKS = [
+  null,                                                                     // 1 think
+  null,                                                                     // 2 todo_write
+  (c) => showsTraining(c),                                                  // 3 echo
+  null,                                                                     // 4 now
+  (c) => namesTrainingFile(c) && /"content"\s*:\s*"training/.test(argText(c)), // 5 write_file
+  (c) => namesTrainingFile(c) && showsTraining(c),                          // 6 read back
+  (c) => /1-1|"range"/.test(argText(c)),                                    // 7 ranged read
+  (c) => namesTrainingFile(c) && /drill 2 passed/.test(argText(c)),         // 8 append
+  (c) => namesTrainingFile(c) && /drill 2 passed/.test(argText(c)),         // 9 exact replace
+  (c) => showsTraining(c),                                                  // 10 list_dir
+  (c) => showsTraining(c),                                                  // 11 glob_files
+  (c) => showsTraining(c),                                                  // 12 grep_code
+  (c) => showsTraining(c),                                                  // 13 show_find
+  (c) => showsTraining(c),                                                  // 14 exec
+  (c) => showsTraining(c),                                                  // 15 show_command
+  null,                                                                     // 16 todo_write
+  (c) => namesTrainingFile(c) && showsTraining(c),                          // 17 show_file
+];
+
+/**
+ * Grade a drill pass from the tool records alone.
+ *
+ * The point is not to ask the model whether it succeeded -- its todo list is a
+ * claim, not evidence. The app saw every call it made: which tool, with what
+ * arguments, and whether the result was ok, an error, skipped or waiting on an
+ * approval. This walks those records against TRAINING_TASKS in order and
+ * answers two questions:
+ *
+ *   complete -- did a full pass of every step run?
+ *   clean    -- did it do so with no failed attempt at any step?
+ *
+ * Retries are counted the way the transcript header counts them (the same
+ * tool + the same arguments sent again after an error), but `failures` also
+ * counts a CORRECTED attempt, which is why `clean` is failures === 0 rather
+ * than retries === 0: a step fixed with different arguments is not a clean
+ * step, even though it is not a literal repeat.
+ *
+ * A pass boundary is a `think` after the pass has every step. Records that are
+ * still running, skipped because a display tool ended the turn, or waiting on
+ * an approval never prove a step passed -- and a skipped call is not a
+ * failure either.
+ */
+export function drillVerdict(calls) {
+  const total = TRAINING_TASKS.length;
+  const list = Array.isArray(calls) ? calls.filter(c => c && c.tool) : [];
+  const blank = () => ({ step: 0, failures: 0, retries: 0, pending: false, failedAt: null });
+  let cur = blank();
+  let passes = 0;
+  let last = null;
+  let lastKey = '';
+  let lastStatus = '';
+
+  for (const call of list) {
+    const tool = String(call.tool);
+    const status = String(call.status || '');
+
+    // A finished pass: only the drill's first step opens the next one.
+    if (cur.step >= total) {
+      if (tool !== TRAINING_TASKS[0].tool) continue;
+      passes++;
+      last = cur;
+      cur = blank();
+    }
+
+    const want = TRAINING_TASKS[cur.step];
+    const check = DRILL_CHECKS[cur.step];
+    const key = `${tool}|${argText(call)}`;
+    const retry = lastKey === key && lastStatus === 'error';
+    lastKey = key;
+    lastStatus = status;
+
+    // Not this step (a late retry of the previous one, a stray call, or an
+    // argument the step cannot accept). It never advances the drill.
+    //
+    // A check only judges a call that SUCCEEDED: a pending approval, an error
+    // and a still-running call have produced no artefact to inspect, so they
+    // must be treated as attempts of this step (and counted as such), not as
+    // "some other step" and silently ignored.
+    const checkOk = !check || status !== 'ok' || check(call);
+    if (tool !== want.tool || !checkOk) {
+      if (status === 'error') {
+        cur.failures++;
+        if (cur.failedAt === null) cur.failedAt = cur.step + 1;
+        if (retry) cur.retries++;
+      }
+      continue;
+    }
+
+    if (status === 'pending') { cur.pending = true; continue; }
+    if (status === 'error') {
+      cur.failures++;
+      if (cur.failedAt === null) cur.failedAt = cur.step + 1;
+      if (retry) cur.retries++;
+      continue;
+    }
+    // running / skipped / unknown: the step may yet happen, but it has not.
+    if (status !== 'ok') continue;
+    cur.step++;
+  }
+
+  const complete = cur.step >= total;
+  if (complete) { passes++; last = cur; }
+  // While a new pass is in progress the judgement is still the finished one.
+  const judged = complete ? cur : last;
+  return {
+    totalSteps: total,
+    step: Math.min(cur.step, total),
+    complete,
+    // "Clean" is a claim about a FINISHED pass only. A pass in progress, or a
+    // log with no calls, is never clean however few failures it has so far.
+    clean: !!judged && judged.failures === 0 && !judged.pending,
+    passes,
+    failures: judged ? judged.failures : 0,
+    retries: judged ? judged.retries : 0,
+    pending: cur.pending,
+    failedAt: judged ? judged.failedAt : null,
+  };
+}
 
 /** True while the operator has training mode armed. */
 export function isTrainingActive() {

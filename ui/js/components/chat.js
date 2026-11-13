@@ -7,8 +7,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=433';
-import { K as STORAGE_K } from '../storage.js?v=433';
+import { store } from '../store.js?v=434';
+import { K as STORAGE_K } from '../storage.js?v=434';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -17,29 +17,29 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=433';
-import { persistence } from '../persistence.js?v=433';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=433';
-import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=433';
-import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=433';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=433';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=433';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=433';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=433';
-import { usageFor } from '../rateGovernor.js?v=433';
-import { trace } from '../trace.js?v=433';
-import { offerRebind } from './rebindOffer.js?v=433';
-import { latency } from '../latency.js?v=433';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=433';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=433';
-import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill } from '../training.js?v=433';
-import { SlashCommands } from '../slashCommands.js?v=433';
-import { parseRoute, routingHelp } from '../routing.js?v=433';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=433';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=433';
-import { MessageRenderer, renderToolCalls } from './message.js?v=433';
-import { createAvatar } from './avatar.js?v=433';
-import * as comms from '../commsLog.js?v=433';
+import { api, errText } from '../api.js?v=434';
+import { persistence } from '../persistence.js?v=434';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=434';
+import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=434';
+import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=434';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=434';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=434';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=434';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=434';
+import { usageFor } from '../rateGovernor.js?v=434';
+import { trace } from '../trace.js?v=434';
+import { offerRebind } from './rebindOffer.js?v=434';
+import { latency } from '../latency.js?v=434';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=434';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=434';
+import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill, drillVerdict } from '../training.js?v=434';
+import { SlashCommands } from '../slashCommands.js?v=434';
+import { parseRoute, routingHelp } from '../routing.js?v=434';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=434';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=434';
+import { MessageRenderer, renderToolCalls } from './message.js?v=434';
+import { createAvatar } from './avatar.js?v=434';
+import * as comms from '../commsLog.js?v=434';
 
 /**
  * How long an agent may keep working on a single task.
@@ -1148,6 +1148,7 @@ _commitAgentReply(agent, result, live) {
     if (this._turnResponded.has(agent.id)) return;
     this._turnResponded.add(agent.id);
     if (result.status === 'fulfilled' && result.value) {
+      const calls = result.value.toolCalls || (live && live.toolCalls) || null;
       const agentMsg = {
         role: 'agent',
         // Raw content (fences intact): the renderer splits prose from code
@@ -1165,7 +1166,10 @@ _commitAgentReply(agent, result, live) {
         reasoning: result.value.reasoning
           || (live && asText(live.turnProse).trim())
           || null,
-        toolCalls: result.value.toolCalls || (live && live.toolCalls) || null,
+        toolCalls: calls,
+        // Training only: how the run's tool records grade this pass. Rendered
+        // by the tool box header and never sent to a provider.
+        drill: this._noteDrill(agent, calls) || undefined,
         timestamp: Date.now()
       };
       // The answer, in the same log the questions live in, so a turn reads end
@@ -1212,6 +1216,48 @@ _commitAgentReply(agent, result, live) {
       store.emit('agent:status', { agentId: agent.id, status: 'idle' });
     }
 }
+
+  /**
+   * Keep one rolling tool log per agent for the current training run and
+   * return the pass verdict for the transcript.
+   *
+   * A drill pass spans several turns (a display step ends the turn by design),
+   * so a per-turn log cannot answer "did it pass everything". The log is reset
+   * when Start is pressed again (a new startedAt), because a fresh run must not
+   * inherit last run's failures.
+   *
+   * A completed pass emits one toast: clean, or how many failed attempts it
+   * took. Nothing here trusts the agent's todo list.
+   */
+  _noteDrill(agent, calls) {
+    if (!Array.isArray(calls) || !calls.length) return null;
+    if (!isTrainingActive()) return null;
+    const tm = store.get('settings.trainingMode') || {};
+    if (this._drillRun !== tm.startedAt) {
+      this._drillRun = tm.startedAt;
+      this._drillLog = {};
+      this._drillPasses = {};
+    }
+    this._drillLog = this._drillLog || {};
+    // Bounded: a long loop must not keep every result string forever. 400 calls
+    // is many passes' worth of room for the verdict's current-pass window.
+    const history = (this._drillLog[agent.id] || []).concat(calls).slice(-400);
+    this._drillLog[agent.id] = history;
+    const verdict = drillVerdict(history);
+    const seen = Number((this._drillPasses || {})[agent.id] || 0);
+    if (verdict.passes > seen) {
+      this._drillPasses = this._drillPasses || {};
+      this._drillPasses[agent.id] = verdict.passes;
+      const total = verdict.totalSteps;
+      store.emit('toast', {
+        message: verdict.clean
+          ? `${agent.name}: drill pass clean — ${total}/${total} steps, no failed attempts`
+          : `${agent.name}: drill pass complete — ${total}/${total} steps, ${verdict.failures} failed attempt${verdict.failures === 1 ? '' : 's'}`,
+        type: verdict.clean ? 'success' : 'info',
+      });
+    }
+    return verdict;
+  }
 
 _makeLiveNode(agent) {
     if (!this._liveNodes) this._liveNodes = new Map();
