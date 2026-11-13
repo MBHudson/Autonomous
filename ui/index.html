@@ -9,23 +9,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/svg+xml" href="ui/favicon.svg?v=434">
+  <link rel="icon" type="image/svg+xml" href="ui/favicon.svg?v=435">
   <title>Router Studio // Multi-Agent Interface</title>
-  <link rel="stylesheet" href="ui/css/base.css?v=434">
-  <link rel="stylesheet" href="ui/css/layout.css?v=434">
-  <link rel="stylesheet" href="ui/css/chat.css?v=434">
-  <link rel="stylesheet" href="ui/css/topology.css?v=434">
-  <link rel="stylesheet" href="ui/css/modals.css?v=434">
-  <link rel="stylesheet" href="ui/css/components.css?v=434">
-  <link rel="stylesheet" href="ui/css/codeblocks.css?v=434">
+  <link rel="stylesheet" href="ui/css/base.css?v=435">
+  <link rel="stylesheet" href="ui/css/layout.css?v=435">
+  <link rel="stylesheet" href="ui/css/chat.css?v=435">
+  <link rel="stylesheet" href="ui/css/topology.css?v=435">
+  <link rel="stylesheet" href="ui/css/modals.css?v=435">
+  <link rel="stylesheet" href="ui/css/components.css?v=435">
+  <link rel="stylesheet" href="ui/css/codeblocks.css?v=435">
 
   <!-- Preload critical modules -->
-  <link rel="modulepreload" href="ui/js/app.js?v=434">
-  <link rel="modulepreload" href="ui/js/store.js?v=434">
-  <link rel="modulepreload" href="ui/js/api.js?v=434">
-  <link rel="modulepreload" href="ui/js/components/chat.js?v=434">
-  <link rel="modulepreload" href="ui/js/components/sidebar.js?v=434">
-  <link rel="modulepreload" href="ui/js/components/topology.js?v=434">
+  <link rel="modulepreload" href="ui/js/app.js?v=435">
+  <link rel="modulepreload" href="ui/js/store.js?v=435">
+  <link rel="modulepreload" href="ui/js/api.js?v=435">
+  <link rel="modulepreload" href="ui/js/components/chat.js?v=435">
+  <link rel="modulepreload" href="ui/js/components/sidebar.js?v=435">
+  <link rel="modulepreload" href="ui/js/components/topology.js?v=435">
 </head>
 <body data-theme="dark">
   <!-- Loading screen (shown before any JS runs) -->
@@ -93,6 +93,11 @@
           <path d="M8 2v8M8 10L4.5 6.5M8 10l3.5-3.5M2.5 12.5h11"/>
         </svg>
       </button>
+      <!-- Live training-drill progress. Training mode only; hidden otherwise. -->
+      <div class="drill-strip" id="drillStrip" hidden>
+        <span class="drill-strip-title">drill</span>
+        <div class="drill-strip-rows" id="drillStripRows"></div>
+      </div>
       <div class="chat-messages" id="chatMessages">
         <div class="empty" id="emptyState">
           <div class="empty-icon">&#9670;</div>
@@ -254,6 +259,6 @@
   <div class="toast-container" id="toasts"></div>
 
   <!-- Scripts -->
-  <script type="module" src="ui/js/app.js?v=434"></script>
+  <script type="module" src="ui/js/app.js?v=435"></script>
 </body>
 </html>

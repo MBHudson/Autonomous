@@ -23,7 +23,7 @@ if (!version) {
   console.error('Cannot read APP_VERSION from ui/js/store.js.');
   process.exit(1);
 }
-const { TRAINING_TASKS, DRILL_CHECKS, drillVerdict } =
+const { TRAINING_TASKS, DRILL_CHECKS, drillVerdict, drillVerdictText } =
   await import(`../../ui/js/training.js?v=${version}`);
 
 let pass = 0, fail = 0;
@@ -169,6 +169,21 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   eq(v.clean, false, 'no calls is not clean');
   eq(drillVerdict(null).step, 0, 'a missing log is handled');
 }
+
+// --- the one-line form the strip and the dialog both render ------------------
+eq(drillVerdictText(drillVerdict(cleanPass())), '17/17 \u00b7 clean \u00b7 1 pass',
+  'a clean pass reads step count, clean and passes');
+{
+  const v = drillVerdict(cleanPass().slice(0, 5));
+  eq(drillVerdictText(v), '5/17', 'a partial pass reads only its progress');
+}
+{
+  const calls = cleanPass().slice(0, 5);
+  calls.push(call('read_file', { path: 'training/typo.txt' }, 'error', 'error: no such file'));
+  eq(drillVerdictText(drillVerdict(calls)), '5/17 \u00b7 1 failed at step 6',
+    'a failure names the step it happened on');
+}
+eq(drillVerdictText(null), '', 'no verdict renders nothing');
 
 console.log('-'.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);

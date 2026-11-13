@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=434';
+import { store } from './store.js?v=435';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -201,11 +201,34 @@ export function drillVerdict(calls) {
     // log with no calls, is never clean however few failures it has so far.
     clean: !!judged && judged.failures === 0 && !judged.pending,
     passes,
-    failures: judged ? judged.failures : 0,
-    retries: judged ? judged.retries : 0,
+    // Failure counts describe the pass being watched: while another pass runs,
+    // that is the one whose failures the operator needs to see live.
+    failures: cur.failures,
+    retries: cur.retries,
     pending: cur.pending,
-    failedAt: judged ? judged.failedAt : null,
+    failedAt: cur.failedAt,
   };
+}
+
+/**
+ * One line for a verdict, shared by the live strip and the Training dialog so
+ * the two can never describe the same run differently.
+ *
+ * Complete passes are described by their outcome; an unfinished one shows how
+ * far it got and what is blocking it. "clean" only ever appears on a finished
+ * pass (see drillVerdict).
+ */
+export function drillVerdictText(verdict) {
+  if (!verdict) return '';
+  const bits = [`${verdict.step}/${verdict.totalSteps}`];
+  if (verdict.complete) {
+    bits.push(verdict.clean ? 'clean' : `${verdict.failures} failed`);
+  } else if (verdict.failures) {
+    bits.push(`${verdict.failures} failed${verdict.failedAt ? ` at step ${verdict.failedAt}` : ''}`);
+  }
+  if (verdict.pending) bits.push('approval');
+  if (verdict.passes) bits.push(`${verdict.passes} pass${verdict.passes === 1 ? '' : 'es'}`);
+  return bits.join(' \u00b7 ');
 }
 
 /** True while the operator has training mode armed. */

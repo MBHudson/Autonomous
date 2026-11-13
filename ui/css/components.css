@@ -1991,6 +1991,54 @@ body.agent-reordering .agent-editor:hover {
 }
 .message-notice-text { opacity: 0.9; }
 
+/* ---- Live training-drill strip ----
+   Sits above the transcript only while training mode is armed. It reads the
+   verdicts chat publishes per tool call, so the numbers move with the work
+   instead of waiting for a turn to finish. */
+.drill-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 5px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.drill-strip[hidden] { display: none; }
+.drill-strip-title {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-cyan, #22d3ee);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 4px;
+  opacity: 0.8;
+}
+.drill-strip-rows { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.drill-row { display: inline-flex; gap: 6px; align-items: baseline; white-space: nowrap; }
+.drill-row b { color: var(--text-primary); font-weight: 600; }
+.drill-row .drill-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.drill-row .drill-clean { color: var(--accent-green, #00ff88); }
+.drill-row .drill-bad { color: var(--accent-red, #ff4757); }
+
+/* The same rows inside the Training dialog, above the footer hint. */
+.drill-dialog-status {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drill-dialog-status .drill-row { justify-content: space-between; }
+
 /* ---- Always-on ("AUTO") messages ----
    An autonomous turn posts through the same path as a reply you asked for.
    Without a visible marker the agent looks like it answered twice. */

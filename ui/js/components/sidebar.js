@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=434';
-import { K } from '../storage.js?v=434';
-import { persistence } from '../persistence.js?v=434';
-import { api } from '../api.js?v=434';
-import { isNoTokenError } from '../apiError.js?v=434';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=434';
-import { errText } from '../api.js?v=434';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=434';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=434';
-import { snapshot } from '../rateGovernor.js?v=434';
-import { trainingStepList, trainingKickoffFor } from '../training.js?v=434';
-import { resetBrowserEnabled } from '../toolManifest.js?v=434';
-import { perf } from '../perf.js?v=434';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=434';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=434';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=434';
+import { store } from '../store.js?v=435';
+import { K } from '../storage.js?v=435';
+import { persistence } from '../persistence.js?v=435';
+import { api } from '../api.js?v=435';
+import { isNoTokenError } from '../apiError.js?v=435';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=435';
+import { errText } from '../api.js?v=435';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=435';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=435';
+import { snapshot } from '../rateGovernor.js?v=435';
+import { trainingStepList, trainingKickoffFor, drillVerdictText } from '../training.js?v=435';
+import { resetBrowserEnabled } from '../toolManifest.js?v=435';
+import { perf } from '../perf.js?v=435';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=435';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=435';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=435';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -773,6 +773,18 @@ export class Sidebar {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     const steps = trainingStepList().map(s => `<li>${esc(s)}</li>`).join('');
+    // The same verdicts the live strip shows, so the dialog is a snapshot of
+    // the run rather than a second, differently-computed opinion.
+    const verdictRows = Object.values(store.get('trainingVerdicts') || {});
+    const statusBlock = armed && verdictRows.length
+      ? `<div class="drill-dialog-status">
+           <span class="drill-strip-title">run so far</span>
+           ${verdictRows.map(v => `<div class="drill-row">
+             <b>${esc(v.name || 'Agent')}</b>
+             <span class="${v.complete && v.clean ? 'drill-clean' : (v.failures ? 'drill-bad' : 'drill-count')}">${esc(drillVerdictText(v))}</span>
+           </div>`).join('')}
+         </div>`
+      : '';
     overlay.innerHTML = `
       <div class="modal">
         <div class="modal-header">
@@ -781,6 +793,7 @@ export class Sidebar {
         </div>
         <div class="modal-body">
           <div class="form-hint" style="margin-bottom:8px">A paced tool drill for every active agent. While armed:</div>
+          ${statusBlock}
           <ul class="training-points">
             <li>All active agents are throttled to ~50% of their normal request rate.</li>
             <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else while the mode is on.</li>
@@ -825,6 +838,9 @@ export class Sidebar {
     // drillResumes/drillFails are counters now, not a budget: the loop is
     // unbounded and Start only resets what the dialog reports.
     store.set('settings.trainingMode', { active: true, startedAt: Date.now(), drillResumes: 0, drillFails: 0 });
+    // A new run starts with a blank scoreboard: last run's verdicts describe
+    // different calls and would sit in the strip as if they were current.
+    store.set('trainingVerdicts', {});
     persistence.set('settings', store.get('settings'));
     store.emit('toast', {
       message: 'Training mode ON — continuous drill at ~50% rate (Stop to end)',
