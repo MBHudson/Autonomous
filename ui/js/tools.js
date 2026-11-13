@@ -65,8 +65,22 @@ export const TOOL_REGISTRY = {
   echo: {
     label: 'echo',
     arg: 'text',
-    describe: 'Repeat text back unchanged',
-    run: arg => String(arg == null ? '' : arg).slice(0, 2000),
+    describe: 'Repeat text back unchanged (takes the text as a bare string)',
+    // A model in a JSON dialect sometimes wraps the scalar even though this
+    // tool's argument is a bare string. `String(object)` is "[object Object]"
+    // -- a successful call whose output says nothing about the input, which the
+    // model cannot recover from; it just retries. Unwrap the usual keys, and
+    // JSON-stringify anything else so an echo at least reflects what arrived.
+    run: (arg) => {
+      let text = arg;
+      if (text && typeof text === 'object') {
+        const keys = ['text', 'message', 'value', 'content'];
+        const found = keys.map(k => text[k])
+          .find(v => typeof v === 'string' || typeof v === 'number');
+        text = found !== undefined ? found : JSON.stringify(text);
+      }
+      return String(text == null ? '' : text).slice(0, 2000);
+    },
   },
   read_note: {
     label: 'read_note',
@@ -2559,6 +2573,10 @@ export const TOOL_ALIASES = {
 // absent on purpose: their argument is a structured object ({path, range}), and
 // collapsing it to a bare string would throw away the range.
 const ARG_KEY_ALIASES = {
+  // echo's scalar is text, and a JSON-dialect caller often wraps it as
+  // {"text":"..."}; collapsing it here matches what nativeToolArgs already
+  // does for function-calling models, so both paths reach echo as a string.
+  echo: ['text', 'message', 'value'],
   read_file: ['path', 'file_path', 'filepath', 'file', 'filename', 'target_file'],
   list_dir: ['path', 'dir', 'directory', 'folder', 'file_path'],
   glob_files: ['pattern', 'glob', 'query'],

@@ -50,7 +50,7 @@ export const TRAINING_FILE = 'training/training.txt';
 export const TRAINING_TASKS = [
   { tool: 'think', label: 'Think one sentence about the drill before touching anything.' },
   { tool: 'todo_write', label: 'Write the drill steps below as your todo list, first one in_progress.' },
-  { tool: 'echo', label: 'Echo the word "training" back.' },
+  { tool: 'echo', label: 'Echo the word "training" back — echo takes a bare string: {"tool":"echo","arg":"training"}, not an object like {"arg":{"text":"training"}}.' },
   { tool: 'now', label: 'Report the current date and time.' },
   { tool: 'write_file', label: 'Create training/training.txt containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
   { tool: 'read_file', label: 'Read training/training.txt back and confirm it says "training".' },

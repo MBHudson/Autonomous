@@ -25,6 +25,8 @@ if (!version) {
 }
 const { TRAINING_TASKS, DRILL_CHECKS, drillVerdict, drillVerdictText } =
   await import(`../../ui/js/training.js?v=${version}`);
+const { parseToolCalls, TOOL_REGISTRY } =
+  await import(`../../ui/js/tools.js?v=${version}`);
 
 let pass = 0, fail = 0;
 const errors = [];
@@ -83,6 +85,26 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   eq(v.passes, 2, 'both passes completed');
   eq(v.cleanPasses, 1, 'only the pass without failures is clean');
   eq(drillVerdict(cleanPass().concat(cleanPass())).cleanPasses, 2, 'two clean passes count as two');
+}
+
+// The "2/17 · 12 failed at step 3" report: a JSON-dialect echo wrapped its
+// scalar as {"text":"training"}, reached the tool as an object, and returned
+// "[object Object]" -- a successful call that could never satisfy the check.
+// The parsed call must reach echo as a bare string, and that record must pass
+// step 3 without a failure.
+{
+  const parsed = parseToolCalls('{"tool":"echo","arg":{"text":"training"}}')[0];
+  const result = TOOL_REGISTRY.echo.run(parsed.arg);
+  eq(parsed.arg, 'training', 'an object-wrapped echo is unwrapped before it runs');
+  eq(result, 'training', 'echo returns the word, not [object Object]');
+  const calls = [
+    call('think', { note: 'start' }, 'ok', 'thinking'),
+    call('todo_write', { todos: [] }, 'ok', 'updated'),
+    { ...parsed, status: 'ok', result, ms: 1 },
+  ];
+  const v = drillVerdict(calls);
+  eq(v.step, 3, 'the reported echo call now passes step 3');
+  eq(v.failures, 0, 'and is no longer counted as a failed attempt');
 }
 
 // An identical call repeated after an error is both a failure and a retry.

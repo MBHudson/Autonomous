@@ -79,6 +79,17 @@ eq(write.arg.path, 'a.txt', 'file_path is renamed to path');
 eq(write.arg.content, 'hi', 'content survives');
 eq(write.arg.file_path, undefined, 'the foreign key does not linger');
 
+// echo's scalar can arrive object-wrapped in a JSON dialect. Both paths must
+// reach the tool as the bare string it takes, or the result is
+// "[object Object]" and a training step can never pass.
+eq(call('{"tool":"echo","arg":{"text":"training"}}'),
+  { tool: 'echo', arg: 'training' },
+  'an object-wrapped echo collapses to the bare text');
+eq(TOOL_REGISTRY.echo.run({ text: 'training' }), 'training',
+  'echo unwraps text even when the alias step did not run');
+eq(TOOL_REGISTRY.echo.run({ strange: 'x' }), '{"strange":"x"}',
+  'an unknown object is stringified, never [object Object]');
+
 // Already-ours calls must pass through byte for byte.
 eq(call('{"tool":"read_file","arg":"docs/notes.md"}'),
   { tool: 'read_file', arg: 'docs/notes.md' },
