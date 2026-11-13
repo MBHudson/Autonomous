@@ -1859,6 +1859,10 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 ![The tool-call box counting four calls, two failed and one retry, each failure expanded with the sandbox hint, then a show_file result painted into the transcript](screenshots/display-tools.png)
 
+![A show_command reply ends the turn, a muted drill marker records the app continuing the drill, then the next step begins on its own](screenshots/drill-resume.gif)
+
+*The drill after a display step: the command's output **is** the reply and ends the turn, the muted `drill` marker records that the **app** continued the drill — not you — and the next step starts on its own. `show_file` is the last step, so it ends the drill instead of resuming it.*
+
 
 ---
 

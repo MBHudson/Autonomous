@@ -1961,7 +1961,10 @@ body.agent-reordering .agent-editor:hover {
 /* ---- App-authored notice ("drill") ----
    A training-drill resume continues a turn without the operator speaking.
    A thin marker keeps the turn visible without impersonating them. */
-.message-notice {
+/* Two classes on purpose: codeblocks.css loads after this file and gives
+   .message a two-column grid (avatar + body). At one class it out-ordered
+   this rule and the marker laid out as a grid, one word per line. */
+.message.message-notice {
   display: flex;
   align-items: center;
   gap: 8px;
