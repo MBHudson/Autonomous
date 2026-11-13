@@ -7,16 +7,16 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=432';
-import { persistence } from '../persistence.js?v=432';
-import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=432';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=432';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=432';
-import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow, DISPLAY_TOOLS } from '../tools.js?v=432';
-import { sandboxRootFor } from '../agentConfig.js?v=432';
-import { audio } from '../audio.js?v=432';
-import { api } from '../api.js?v=432';
-import * as memory from '../memory.js?v=432';
+import { store } from '../store.js?v=433';
+import { persistence } from '../persistence.js?v=433';
+import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=433';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=433';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=433';
+import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow, DISPLAY_TOOLS } from '../tools.js?v=433';
+import { sandboxRootFor } from '../agentConfig.js?v=433';
+import { audio } from '../audio.js?v=433';
+import { api } from '../api.js?v=433';
+import * as memory from '../memory.js?v=433';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
@@ -255,12 +255,17 @@ export class AgentEditor {
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">Model (type custom or pick suggested)</label>
+              <div class="form-label-row">
+                <span class="form-label">Model (type custom or pick suggested)</span>
+                <button class="btn btn-ghost btn-sm" id="agentFetchModels" type="button"
+                  title="Read this provider's live model catalog and refresh the suggestions">Fetch available models</button>
+              </div>
               <input type="text" class="form-input" id="agentModel" list="agentModelList"
                 value="${agent ? esc(agent.model || '') : ''}" placeholder="e.g. openai/gpt-4o-mini">
               <datalist id="agentModelList">
                 ${this._getModelOptions(agent?.provider || activeProviders[0]?.id, agent?.model)}
               </datalist>
+              <div class="form-hint" id="agentFetchHint">Reads this provider's live catalog and replaces the suggestions in the box. Your typed model is never changed.</div>
             </div>
           </div>
           <div class="form-group">
@@ -404,6 +409,9 @@ export class AgentEditor {
       this._updateModelDropdown(e.target.value);
     });
 
+    // Fetch this provider's live catalog without leaving the agent card.
+    document.getElementById('agentFetchModels').addEventListener('click', () => this._fetchModels());
+
     // Memory panel: show/hide, and re-render on every change.
     const memToggle = document.getElementById('agentMemory');
     const memPanel = document.getElementById('agentMemoryPanel');
@@ -529,6 +537,53 @@ export class AgentEditor {
     const list = document.getElementById('agentModelList');
     if (list) {
       list.innerHTML = this._getModelOptions(providerId, null);
+    }
+  }
+
+  /**
+   * Read the provider's live model catalog from inside the agent card.
+   *
+   * The provider card can already do this; doing it here saves a trip to
+   * Config -> Providers just to look up a model name. The models live on the
+   * PROVIDER, so that record is what gets updated (and persisted); the box's
+   * datalist is rebuilt from it afterwards. Whatever the operator typed stays
+   * exactly where it is -- this only changes the suggestions.
+   */
+  async _fetchModels() {
+    const btn = document.getElementById('agentFetchModels');
+    const hint = document.getElementById('agentFetchHint');
+    const providerId = document.getElementById('agentProvider')?.value || '';
+    const providers = store.get('providers') || [];
+    const provider = providers.find(p => p.id === providerId);
+    // An endpoint override on this agent is the one it will actually call, so
+    // prefer it; otherwise fall back to the provider's.
+    const endpoint = (document.getElementById('agentEndpoint')?.value || '').trim()
+      || (provider?.endpoint || '').trim();
+    if (!endpoint) {
+      store.emit('toast', { message: 'No endpoint for this provider — add one in Config → Providers', type: 'error' });
+      return;
+    }
+    const apiKey = (document.getElementById('agentKeyOverride')?.value || '').trim()
+      || provider?.apiKey || '';
+    const original = btn ? btn.textContent : 'Fetch available models';
+    if (btn) { btn.disabled = true; btn.textContent = 'Fetching…'; }
+    if (hint) hint.textContent = 'Contacting ' + endpoint + '…';
+    try {
+      const data = await api.request('POST', '/catalog', { endpoint, api_key: apiKey });
+      if (!data || data.error || !Array.isArray(data.models) || data.models.length === 0) {
+        throw new Error(data?.error || 'No models returned');
+      }
+      const next = providers.map(p => (p.id === providerId ? { ...p, models: data.models } : p));
+      store.set('providers', next);
+      try { persistence.set('providers', next); } catch { /* best effort */ }
+      this._updateModelDropdown(providerId);
+      if (hint) hint.textContent = `Loaded ${data.count} models from ${data.catalog_url} — they are in the suggestions now.`;
+      store.emit('toast', { message: `Fetched ${data.count} models`, type: 'success' });
+    } catch (err) {
+      if (hint) hint.textContent = `Fetch failed: ${err.message} — the model list was left unchanged`;
+      store.emit('toast', { message: `Model fetch failed: ${err.message}`, type: 'error' });
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = original; }
     }
   }
 

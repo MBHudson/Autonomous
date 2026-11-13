@@ -7,8 +7,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=432';
-import { K as STORAGE_K } from '../storage.js?v=432';
+import { store } from '../store.js?v=433';
+import { K as STORAGE_K } from '../storage.js?v=433';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -17,29 +17,29 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=432';
-import { persistence } from '../persistence.js?v=432';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=432';
-import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=432';
-import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=432';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=432';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=432';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=432';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=432';
-import { usageFor } from '../rateGovernor.js?v=432';
-import { trace } from '../trace.js?v=432';
-import { offerRebind } from './rebindOffer.js?v=432';
-import { latency } from '../latency.js?v=432';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=432';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=432';
-import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill } from '../training.js?v=432';
-import { SlashCommands } from '../slashCommands.js?v=432';
-import { parseRoute, routingHelp } from '../routing.js?v=432';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=432';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=432';
-import { MessageRenderer, renderToolCalls } from './message.js?v=432';
-import { createAvatar } from './avatar.js?v=432';
-import * as comms from '../commsLog.js?v=432';
+import { api, errText } from '../api.js?v=433';
+import { persistence } from '../persistence.js?v=433';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=433';
+import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=433';
+import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=433';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=433';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=433';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=433';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=433';
+import { usageFor } from '../rateGovernor.js?v=433';
+import { trace } from '../trace.js?v=433';
+import { offerRebind } from './rebindOffer.js?v=433';
+import { latency } from '../latency.js?v=433';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=433';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=433';
+import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill } from '../training.js?v=433';
+import { SlashCommands } from '../slashCommands.js?v=433';
+import { parseRoute, routingHelp } from '../routing.js?v=433';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=433';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=433';
+import { MessageRenderer, renderToolCalls } from './message.js?v=433';
+import { createAvatar } from './avatar.js?v=433';
+import * as comms from '../commsLog.js?v=433';
 
 /**
  * How long an agent may keep working on a single task.
@@ -602,6 +602,11 @@ export class Chat {
     // behaves like every other, but it is NOT a message from the operator: it
     // renders as a marker and is saved with no user input.
     const trainingResume = !!(opts && opts.trainingResume);
+    // A silent resume still dispatches a real prompt (the model must see it as
+    // the operator speaking) but draws nothing in the transcript.
+    const silent = !!(opts && opts.silent);
+    // A fresh turn clears a one-shot STOP: the next Continue may resume again.
+    this._drillStopRequested = false;
     const input = document.getElementById('inputField');
     // A run is already in flight: this is a steering message, not a new turn
     // and emphatically not a STOP. It joins the running agents' conversation
@@ -691,7 +696,7 @@ export class Chat {
       // null when the message was a plain broadcast.
       addressed: route.addressed };
     if (trainingResume) userMsg.tag = 'drill';
-    this._addMessage(userMsg);
+    if (!silent) this._addMessage(userMsg);
 
     // Say it BEFORE the reply. A model that could not write still reports the
     // file as written, so a warning attached to its answer is the one place it
@@ -834,7 +839,7 @@ export class Chat {
       this._removeTyping(typingId);
 
       // Persist the whole turn as one dialog (the only shape the backend keeps)
-      this._saveDialog(text, uniqueAgents, results, trainingResume);
+      this._saveDialog(text, uniqueAgents, results, trainingResume, silent);
 
       // Training mode: a display step is a completed step, not the end of the
       // drill. Scheduling the next turn here is what lets show_find and
@@ -845,6 +850,8 @@ export class Chat {
       const errorMsg = { role: 'agent', content: 'Error: ' + err.message, agentId: null, timestamp: Date.now() };
       this._addMessage(errorMsg);
       this._saveMessageToBackend(errorMsg);
+      // A turn that threw is still a turn that ended: keep the drill alive.
+      this._scheduleDrillResume([]);
     } finally {
       store.emit('session:idle', { sessionId: this.currentSessionId });
       this.aborter = null;
@@ -868,47 +875,54 @@ export class Chat {
   }
 
   /**
-   * While training is armed, a turn that ended by SHOWING output (show_file /
-   * show_find / show_command / show_url) continues the drill on the next turn.
+   * Training mode is a closed loop: every turn that ends is followed by a
+   * silent "Continue", no matter how it ended.
    *
-   * A display call is the reply and ends the turn by design, which used to end
-   * the DRILL with it: every step after a show_* never ran, so those tools could
-   * only ever be taught as the final step. The resume turn is short -- the drill
-   * itself is already in the system prompt -- and it is skipped when the operator
-   * has started typing, because a draft in the composer wins over the drill.
+   * The drill used to resume only after a display step, with a six-resume
+   * budget and a special case for show_file. That made the mode unattended-
+   * hostile: a model that stopped after two free steps stalled the drill, and
+   * the operator had to cycle Start again or leave Always-On running to fake a
+   * loop. Now a finished drill starts another pass, and the only ways out are
+   * switching training off, pressing STOP, typing a draft, or deactivating
+   * every agent.
    *
-   * Bounded: settings.trainingMode.drillResumes counts resumes and Start resets
-   * it. Without that, an agent that keeps showing the same file would loop.
+   * The turn is dispatched 250ms later, after the finally block has cleared
+   * aborter/busy -- otherwise sendMessage() would read it as a steer for the
+   * turn that just finished. A provider that keeps rejecting is retried with
+   * backoff rather than in a hot loop.
    */
   _scheduleDrillResume(results) {
     if (!isTrainingActive()) return;
-    if (!Array.isArray(results) || !results.length) return;
-    const shown = results.find(r => r && r.status === 'fulfilled' && r.value && r.value.displayShown);
-    if (!shown) return;
-    const tool = shown.value.displayShown;
+    if (this._drillStopRequested) { this._drillStopRequested = false; return; }
     const tm = store.get('settings.trainingMode') || {};
-    if (String(tool) === 'show_file') return;   // the drill's final step
-    if (!shouldResumeDrill(tool, tm)) {
-      store.emit('toast', {
-        message: `Training drill paused after ${Number(tm.drillResumes || 0)} display steps — press Start to continue it`,
-        type: 'info',
-      });
-      return;
-    }
-    store.set('settings.trainingMode', { ...tm, active: true, drillResumes: Number(tm.drillResumes || 0) + 1 });
+    if (!shouldResumeDrill(tm)) return;
+    // Nothing to continue with: an empty fleet would otherwise draw the same
+    // "no active agents" line every quarter second.
+    if (!(store.get('agents') || []).some(a => a && a.active)) return;
+
+    const failed = Array.isArray(results) && results.length > 0
+      && results.every(r => !r || r.status !== 'fulfilled');
+    const fails = failed ? Number(tm.drillFails || 0) + 1 : 0;
+    store.set('settings.trainingMode', {
+      ...tm, active: true,
+      drillResumes: Number(tm.drillResumes || 0) + 1,
+      drillFails: fails,
+    });
     try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
-    // After the finally block has cleared aborter/busy: sendMessage() would
-    // otherwise read this as a steer for the turn that just finished.
-    setTimeout(() => {
+    // 2s, 4s, 8s ... capped at 30s while every agent is failing.
+    const delay = failed ? Math.min(30000, 2000 * (2 ** Math.max(0, fails - 1))) : 250;
+    clearTimeout(this._drillResumeTimer);
+    this._drillResumeTimer = setTimeout(() => {
+      this._drillResumeTimer = null;
       // aborter is set if the operator sent something in the meantime: their
       // turn wins over the drill, and sendMessage() would read this as a steer.
       if (!isTrainingActive() || this.aborter) return;
       const input = document.getElementById('inputField');
       if (!input || input.value.trim()) return;
       input.value = trainingResumeFor();
-      this.sendMessage({ trainingResume: true })
+      this.sendMessage({ trainingResume: true, silent: true })
         .catch(err => console.warn('[training] drill resume failed:', err));
-    }, 250);
+    }, delay);
   }
 
   /** User pressed STOP (or send while busy): cancel in-flight provider calls. */
@@ -951,6 +965,9 @@ export class Chat {
 
   stop() {
     if (this.aborter) {
+      // STOP means this turn, not the mode. Without the flag the auto-resume
+      // would answer an explicit Stop a quarter-second later.
+      this._drillStopRequested = true;
       this.aborter.abort();
       store.emit('toast', { message: 'Stopped', type: 'info' });
     }
@@ -1043,7 +1060,7 @@ export class Chat {
   }
 
   /** Persist one full turn (user prompt + all agent responses) as a dialog. */
-  async _saveDialog(userText, agents, results, synthetic = false) {
+  async _saveDialog(userText, agents, results, synthetic = false, silent = false) {
     if (!this.currentSessionId) return;
     // Create the record BEFORE the server round-trip, so a failed or slow
     // update can never leave this turn unrecorded.
@@ -1075,6 +1092,9 @@ export class Chat {
           timestamp: Math.floor(Date.now() / 1000),
           user_input: synthetic ? '' : userText,
           ...(synthetic ? { synthetic: true } : {}),
+          // A silent Continue is not replayed as a marker either; the session
+          // keeps the agent's turns and drops the invisible prompt.
+          ...(silent ? { silent: true } : {}),
           responses,
         },
       });

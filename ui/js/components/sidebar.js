@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=432';
-import { K } from '../storage.js?v=432';
-import { persistence } from '../persistence.js?v=432';
-import { api } from '../api.js?v=432';
-import { isNoTokenError } from '../apiError.js?v=432';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=432';
-import { errText } from '../api.js?v=432';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=432';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=432';
-import { snapshot } from '../rateGovernor.js?v=432';
-import { trainingStepList, trainingKickoffFor } from '../training.js?v=432';
-import { resetBrowserEnabled } from '../toolManifest.js?v=432';
-import { perf } from '../perf.js?v=432';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=432';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=432';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=432';
+import { store } from '../store.js?v=433';
+import { K } from '../storage.js?v=433';
+import { persistence } from '../persistence.js?v=433';
+import { api } from '../api.js?v=433';
+import { isNoTokenError } from '../apiError.js?v=433';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=433';
+import { errText } from '../api.js?v=433';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=433';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=433';
+import { snapshot } from '../rateGovernor.js?v=433';
+import { trainingStepList, trainingKickoffFor } from '../training.js?v=433';
+import { resetBrowserEnabled } from '../toolManifest.js?v=433';
+import { perf } from '../perf.js?v=433';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=433';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=433';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=433';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -448,18 +448,21 @@ export class Sidebar {
   _convertDialogsToMessages(dialogs) {
     const messages = [];
     dialogs.forEach(dialog => {
-      messages.push({
-        id: `msg_${dialog.timestamp}_user`,
-        // A drill resume was stored with no user input: it is the app
-        // continuing a turn, so restore the marker instead of an empty "You"
-        // bubble.
-        role: dialog.synthetic ? 'notice' : 'user',
-        content: dialog.synthetic
-          ? (dialog.user_input || 'Training drill continued with the next step.')
-          : dialog.user_input,
-        ...(dialog.synthetic ? { tag: 'drill' } : {}),
-        timestamp: dialog.timestamp * 1000,
-      });
+      if (!dialog.silent) {
+        messages.push({
+          id: `msg_${dialog.timestamp}_user`,
+          // A drill resume was stored with no user input: it is the app
+          // continuing a turn, so restore the marker instead of an empty "You"
+          // bubble. A SILENT Continue is not restored at all -- the live
+          // transcript hides it, so the replay must too.
+          role: dialog.synthetic ? 'notice' : 'user',
+          content: dialog.synthetic
+            ? (dialog.user_input || 'Training drill continued with the next step.')
+            : dialog.user_input,
+          ...(dialog.synthetic ? { tag: 'drill' } : {}),
+          timestamp: dialog.timestamp * 1000,
+        });
+      }
       if (dialog.responses) {
         dialog.responses.forEach((resp, i) => {
           messages.push({
@@ -780,12 +783,12 @@ export class Sidebar {
           <div class="form-hint" style="margin-bottom:8px">A paced tool drill for every active agent. While armed:</div>
           <ul class="training-points">
             <li>All active agents are throttled to ~50% of their normal request rate.</li>
-            <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else until it is done.</li>
-            <li>A <code>show_*</code> step ends the turn by design; the drill resumes itself with the next step, so display tools are practiced mid-drill rather than only at the end.</li>
+            <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else while the mode is on.</li>
+            <li><strong>It never stops by itself.</strong> Every finished turn — a <code>show_*</code> step, a short reply, even the last step of the drill — is followed automatically by <code>Continue</code>, so agents cannot end the loop early. Display tools are therefore practiced mid-drill, not only at the end.</li>
             <li>A failed step must be retried until it passes, never skipped; each pass is logged to the todo list.</li>
           </ul>
           <ol class="training-steps">${steps}</ol>
-          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. Start sends the drill into chat straight away, so every attempt, the map and the metrics show exactly as usual. End the drill with Stop.</div>
+          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. Start sends the drill into chat straight away, so every attempt, the map and the metrics show exactly as usual. The loop keeps going — and starts another pass once the drill is complete — until you press Stop or switch training off.</div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="trainingCancel">Cancel</button>
@@ -819,12 +822,12 @@ export class Sidebar {
       });
       return;
     }
-    // drillResumes: fresh budget for the auto-resume that keeps the drill alive
-    // after a show_* step ends a turn.
-    store.set('settings.trainingMode', { active: true, startedAt: Date.now(), drillResumes: 0 });
+    // drillResumes/drillFails are counters now, not a budget: the loop is
+    // unbounded and Start only resets what the dialog reports.
+    store.set('settings.trainingMode', { active: true, startedAt: Date.now(), drillResumes: 0, drillFails: 0 });
     persistence.set('settings', store.get('settings'));
     store.emit('toast', {
-      message: 'Training mode ON — agents at ~50% rate, drill only (training/ folder)',
+      message: 'Training mode ON — continuous drill at ~50% rate (Stop to end)',
       type: 'success',
     });
     store.emit('training:changed', { active: true });
@@ -852,7 +855,7 @@ export class Sidebar {
   /** Stand the fleet back down. The todo record keeps what the drill taught. */
   _stopTraining(close) {
     const tm = store.get('settings.trainingMode') || {};
-    store.set('settings.trainingMode', { active: false, startedAt: tm.startedAt || 0, drillResumes: 0 });
+    store.set('settings.trainingMode', { active: false, startedAt: tm.startedAt || 0, drillResumes: 0, drillFails: 0 });
     persistence.set('settings', store.get('settings'));
     store.emit('toast', { message: 'Training mode off — full rate restored', type: 'info' });
     store.emit('training:changed', { active: false });

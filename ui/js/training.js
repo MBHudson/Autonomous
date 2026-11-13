@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=432';
+import { store } from './store.js?v=433';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -28,14 +28,18 @@ export const TRAINING_DIR = 'training';
 export const TRAINING_FILE = 'training/training.txt';
 
 /**
- * How many times one drill may be auto-resumed after a display step.
+ * Training mode is a closed loop: while it is armed, EVERY finished turn is
+ * followed by "Continue", with no budget and no exception for the last step.
  *
- * A show_* call IS the reply and ends the turn, so without a resume the drill
- * would stop at the first display step. A budget (rather than "resume always")
- * keeps a model that keeps showing the same file from looping the turn forever.
- * Start resets it.
+ * The old six-resume budget existed to stop a model looping on one display
+ * step, but it made the mode useless for unattended practice: a model that
+ * stopped after two free steps stalled the drill and the operator had to cycle
+ * Start (or leave Always-On running to fake the loop). A finished drill now
+ * simply starts another pass.
+ *
+ * Every exit is a human action, on purpose: switch training off, press STOP
+ * (that turn only), type a draft into the composer, or deactivate every agent.
  */
-export const TRAINING_RESUME_LIMIT = 6;
 
 /**
  * The drill, simplest-first. One tool per step so a failure names exactly
@@ -63,7 +67,7 @@ export const TRAINING_TASKS = [
   { tool: 'exec', label: 'Run ["echo","training"] and confirm the output. (Asks approval — wait for it.)' },
   { tool: 'show_command', label: 'Show me a command: use show_command for ["echo","training"] and let its output be your reply. (Asks approval — this is the display twin of exec: it ends the turn, and the drill resumes.)' },
   { tool: 'todo_write', label: 'Mark every drill step completed, and put your two-line summary (which tools passed, retries) in the last item.' },
-  { tool: 'show_file', label: 'Show training/training.txt to me with show_file — the file on screen IS the drill report. This ends the turn and the drill, so do not write the contents out again.' },
+  { tool: 'show_file', label: 'Show training/training.txt to me with show_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
 ];
 
 /** True while the operator has training mode armed. */
@@ -90,35 +94,34 @@ export function trainingStepList() {
  */
 export function trainingKickoffFor() {
   const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${t.label}`).join('\n');
-  return `Training mode is ON — work this drill now, step by step, inside the "training" sandbox folder. Nothing else until it is done.\n`
+  return `Training mode is ON — work this drill now, step by step, inside the "training" sandbox folder. Nothing else while it is on.\n`
     + `Steps:\n${steps}\n`
-    + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; paths stay relative to the sandbox (training/training.txt), never the project folder above it; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the drill.`;
+    + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; paths stay relative to the sandbox (training/training.txt), never the project folder above it; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the PASS — the mode then sends Continue again, so begin a fresh pass instead of waiting.`;
 }
 
 /**
- * Whether a finished training turn should continue the drill.
+ * Whether a finished training turn should be continued.
  *
- * Two rules, both learned the hard way: `show_file` is the drill's LAST step, so
- * showing the finished file is the end rather than a step to continue from; and
- * the mode carries a resume budget so a model that keeps showing the same thing
- * cannot loop the turn forever.
+ * "Every turn" is the point: a display step, a plain text reply, a budget
+ * exhaustion and a completed drill all get the same treatment. The drill block
+ * in the system prompt says what to do with the Continue that follows.
  *
  * Pure (no store access) so the decision is testable without a chat instance.
  */
-export function shouldResumeDrill(shownTool, mode) {
-  if (!shownTool) return false;
-  if (String(shownTool) === 'show_file') return false;
-  return Number((mode || {}).drillResumes || 0) < TRAINING_RESUME_LIMIT;
+export function shouldResumeDrill(mode) {
+  return !!(mode && mode.active);
 }
 
 /**
- * The text a resumed drill turn is dispatched with, after a display step ended
- * the previous turn. Deliberately short: the drill itself is already in the
- * system prompt, and the todo list says which step is next.
+ * The text a continued drill turn is dispatched with.
+ *
+ * Exactly "Continue" and nothing else: it is sent as a real prompt (so the
+ * model treats it as the operator speaking) but rendered nowhere, and the
+ * drill itself is already in the system prompt. A longer instruction repeated
+ * every few seconds is context the model pays for on every turn.
  */
 export function trainingResumeFor() {
-  return 'Training drill — continue with the NEXT step your todo list does not show completed. '
-    + 'Do not repeat a completed step, do not restart the drill, and do not re-show output you already showed.';
+  return 'Continue';
 }
 
 /**
@@ -129,7 +132,7 @@ export function trainingResumeFor() {
 export function trainingBlockFor() {
   if (!isTrainingActive()) return '';
   const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${t.label}`).join('\n');
-  return `[TRAINING MODE — paced drill, ~50% request rate. Nothing else matters until the drill is done.]\n`
+  return `[TRAINING MODE — paced drill, ~50% request rate. Nothing else matters until training mode is switched off.]\n`
     + `Work ONLY these steps, in order, inside the "training" sandbox folder. Do not answer other questions, do not touch other files, do not start other work — if asked anything else, finish the current drill step first and say the drill comes first.\n`
     + `Steps:\n${steps}\n`
     + `Rules:\n`
@@ -139,6 +142,6 @@ export function trainingBlockFor() {
     + `- Paths are relative to the sandbox: training/training.txt. Never the project folder above it, and never an absolute C:\\... path.\n`
     + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
     + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec.\n`
-    + `- A display step ending the turn is NOT the drill ending: this mode resumes the drill with the next uncompleted step. Do not restart from step 1 and do not repeat a step your todo list marks completed.\n`
+    + `- This mode never lets the drill stop. When a turn ends — a display step, a short reply, even the final show_file — you are sent "Continue" automatically. Treat Continue as the next instruction: pick up the first step your todo list does not show completed, and when every step is complete, start a fresh pass at step 1. Never say the drill is finished, never ask whether to continue, never wait for the operator.\n`
     + `- After each passed step, update your todo_write list so what worked is written down. Put the two-line summary (which tools passed, how many retries each took) in the final todo item: the last step shows the file and ends the turn.`;
 }
