@@ -72,6 +72,17 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   eq(v.failures, 0, 'no failed attempts');
   eq(v.retries, 0, 'no retries');
   eq(v.pending, false, 'nothing waiting on an approval');
+  eq(v.cleanPasses, 1, 'a clean pass counts toward the stopping rule');
+}
+
+// Clean passes are counted separately from completed ones.
+{
+  const dirty = cleanPass();
+  dirty.splice(2, 0, call('echo', { text: 'training' }, 'error', 'error: relay refused'));
+  const v = drillVerdict(dirty.concat(cleanPass()));
+  eq(v.passes, 2, 'both passes completed');
+  eq(v.cleanPasses, 1, 'only the pass without failures is clean');
+  eq(drillVerdict(cleanPass().concat(cleanPass())).cleanPasses, 2, 'two clean passes count as two');
 }
 
 // An identical call repeated after an error is both a failure and a retry.

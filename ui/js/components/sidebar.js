@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=439';
-import { K } from '../storage.js?v=439';
-import { persistence } from '../persistence.js?v=439';
-import { api } from '../api.js?v=439';
-import { isNoTokenError } from '../apiError.js?v=439';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=439';
-import { errText } from '../api.js?v=439';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=439';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=439';
-import { snapshot } from '../rateGovernor.js?v=439';
-import { trainingStepList, trainingKickoffFor, drillVerdictText } from '../training.js?v=439';
-import { resetBrowserEnabled } from '../toolManifest.js?v=439';
-import { perf } from '../perf.js?v=439';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=439';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=439';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=439';
+import { store } from '../store.js?v=440';
+import { K } from '../storage.js?v=440';
+import { persistence } from '../persistence.js?v=440';
+import { api } from '../api.js?v=440';
+import { isNoTokenError } from '../apiError.js?v=440';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=440';
+import { errText } from '../api.js?v=440';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=440';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=440';
+import { snapshot } from '../rateGovernor.js?v=440';
+import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget } from '../training.js?v=440';
+import { resetBrowserEnabled } from '../toolManifest.js?v=440';
+import { perf } from '../perf.js?v=440';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=440';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=440';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=440';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -73,6 +73,9 @@ export class Sidebar {
     store.on('governor:changed', () => {
       if (this.activeTab === 'config') this._renderGovStatus();
     });
+    // A run can be told to end itself after N clean passes. The verdict fires
+    // on every settled call, so this is the same number the strip shows.
+    store.on('training:verdict', () => this._maybeStopOnCleanPass());
 
     // The scheduler announces when an agent starts and stops a tick; the badge
     // is only useful as a stop button while there is something to stop.
@@ -773,6 +776,7 @@ export class Sidebar {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     const steps = trainingStepList().map(s => `<li>${esc(s)}</li>`).join('');
+    const cleanTarget = Math.max(0, Math.floor(Number(tm.cleanPassTarget) || 0));
     // The same verdicts the live strip shows, so the dialog is a snapshot of
     // the run rather than a second, differently-computed opinion.
     const verdictRows = Object.values(store.get('trainingVerdicts') || {});
@@ -793,15 +797,20 @@ export class Sidebar {
         </div>
         <div class="modal-body">
           <div class="form-hint" style="margin-bottom:8px">A paced tool drill for every active agent. While armed:</div>
-          ${statusBlock}
+                     ${statusBlock}
+          <div class="form-hint" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <label for="trainingCleanTarget">Stop after</label>
+            <input type="number" class="form-input" id="trainingCleanTarget" min="0" max="99" step="1" value="${cleanTarget}" style="width:72px">
+            <span>clean pass${cleanTarget === 1 ? '' : 'es'} — 0 never stops on its own; with several agents, the first to get there ends the run.</span>
+          </div>
           <ul class="training-points">
             <li>All active agents are throttled to ~50% of their normal request rate.</li>
             <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else while the mode is on.</li>
-            <li><strong>It never stops by itself.</strong> Every finished turn — a <code>show_*</code> step, a short reply, even the last step of the drill — is followed automatically by <code>Continue</code>, so agents cannot end the loop early. Display tools are therefore practiced mid-drill, not only at the end.</li>
+            <li><strong>It only stops when you say so.</strong> Every finished turn — a <code>show_*</code> step, a short reply, even the last step of the drill — is followed automatically by <code>Continue</code>, so agents cannot end the loop early; the clean-pass limit below is the one exception, and 0 leaves it off. Display tools are therefore practiced mid-drill, not only at the end.</li>
             <li>A failed step must be retried until it passes, never skipped; each pass is logged to the todo list.</li>
           </ul>
           <ol class="training-steps">${steps}</ol>
-          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. Start sends the drill into chat straight away, so every attempt, the map and the metrics show exactly as usual. The loop keeps going — and starts another pass once the drill is complete — until you press Stop or switch training off.</div>
+          <div class="form-hint">Model weights never change — “remember” means the todo record plus the run transcript, so the next turn reuses what worked. Start sends the drill into chat straight away, so every attempt, the map and the metrics show exactly as usual. The loop keeps going — and starts another pass once the drill is complete — until you press Stop, switch training off, or the clean-pass limit is reached.</div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="trainingCancel">Cancel</button>
@@ -817,6 +826,18 @@ export class Sidebar {
       if (armed) this._stopTraining(close);
       else this._startTraining(close);
     });
+    // Saved as it is edited, so the limit can be changed mid-run without
+    // restarting the drill (Start resets the count, not the setting).
+    overlay.querySelector('#trainingCleanTarget').addEventListener('change', (e) => {
+      const n = Math.max(0, Math.min(99, Math.floor(Number(e.target.value) || 0)));
+      e.target.value = String(n);
+      const cur = store.get('settings.trainingMode') || {};
+      store.set('settings.trainingMode', { ...cur, cleanPassTarget: n });
+      try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
+      // Setting the limit to a number the run has ALREADY reached should end it
+      // now, not wait for a verdict that may never come.
+      this._maybeStopOnCleanPass();
+    });
   }
 
   /**
@@ -827,6 +848,7 @@ export class Sidebar {
    * typed message — a fresh turn when idle, a steer when already working.
    */
   _startTraining(close) {
+    const tm = store.get('settings.trainingMode') || {};
     const actives = (store.get('agents') || []).filter(a => a && a.active);
     if (!actives.length) {
       store.emit('toast', {
@@ -836,8 +858,13 @@ export class Sidebar {
       return;
     }
     // drillResumes/drillFails are counters now, not a budget: the loop is
-    // unbounded and Start only resets what the dialog reports.
-    store.set('settings.trainingMode', { active: true, startedAt: Date.now(), drillResumes: 0, drillFails: 0 });
+    // unbounded and Start only resets what the dialog reports. The clean-pass
+    // target is a setting, not a counter, so it survives the restart.
+    const targetEl = document.getElementById('trainingCleanTarget');
+    const cleanPassTarget = targetEl
+      ? Math.max(0, Math.min(99, Math.floor(Number(targetEl.value) || 0)))
+      : Math.max(0, Math.floor(Number(tm.cleanPassTarget) || 0));
+    store.set('settings.trainingMode', { ...tm, active: true, startedAt: Date.now(), drillResumes: 0, drillFails: 0, cleanPassTarget });
     // A new run starts with a blank scoreboard: last run's verdicts describe
     // different calls and would sit in the strip as if they were current.
     store.set('trainingVerdicts', {});
@@ -868,14 +895,27 @@ export class Sidebar {
     }
   }
 
-  /** Stand the fleet back down. The todo record keeps what the drill taught. */
-  _stopTraining(close) {
+  /**
+   * End the run once an agent has the number of clean passes the operator
+   * asked for. Called on every verdict; a run with the default 0 never stops.
+   */
+  _maybeStopOnCleanPass() {
     const tm = store.get('settings.trainingMode') || {};
-    store.set('settings.trainingMode', { active: false, startedAt: tm.startedAt || 0, drillResumes: 0, drillFails: 0 });
+    if (!tm.active) return;
+    const hit = reachedCleanTarget(tm, store.get('trainingVerdicts') || {});
+    if (!hit) return;
+    const target = Math.max(0, Math.floor(Number(tm.cleanPassTarget) || 0));
+    this._stopTraining(null, `${hit.name || 'Agent'}: ${target} clean pass${target === 1 ? '' : 'es'} reached — training stopped`);
+  }
+
+  /** Stand the fleet back down. The todo record keeps what the drill taught. */
+  _stopTraining(close, note = '') {
+    const tm = store.get('settings.trainingMode') || {};
+    store.set('settings.trainingMode', { ...tm, active: false, drillResumes: 0, drillFails: 0 });
     persistence.set('settings', store.get('settings'));
-    store.emit('toast', { message: 'Training mode off — full rate restored', type: 'info' });
+    store.emit('toast', { message: note || 'Training mode off — full rate restored', type: note ? 'success' : 'info' });
     store.emit('training:changed', { active: false });
-    close();
+    if (typeof close === 'function') close();
     this.renderAgents();
   }
 

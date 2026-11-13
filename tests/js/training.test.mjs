@@ -28,7 +28,7 @@ if (!version) {
 const {
   TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_TASKS,
   isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
-  shouldResumeDrill,
+  shouldResumeDrill, reachedCleanTarget,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const trainingModule = await import(`../../ui/js/training.js?v=${version}`);
 const { store } = await import(`../../ui/js/store.js?v=${version}`);
@@ -113,6 +113,15 @@ ok(resumed.includes('step 16') && resumed.includes('todo_write'),
 ok(/do not restart/i.test(resumed), 'the resume forbids restarting the pass');
 const restarted = trainingResumeFor({ a: { name: 'Scout', step: 17, totalSteps: 17, complete: true } });
 ok(restarted.includes('fresh pass'), 'a completed pass resumes into a fresh one');
+
+// --- the clean-pass stopping rule -------------------------------------------
+eq(reachedCleanTarget({ cleanPassTarget: 0 }, { a: { cleanPasses: 5 } }), null,
+  '0 never stops on its own');
+const targetHit = reachedCleanTarget({ cleanPassTarget: 2 },
+  { a: { name: 'Scout', cleanPasses: 1 }, b: { name: 'Coder', cleanPasses: 2 } });
+ok(!!targetHit && targetHit.name === 'Coder', 'the first agent at the target ends the run');
+eq(reachedCleanTarget({ cleanPassTarget: 2 }, { a: { cleanPasses: 1 } }), null,
+  'below the target keeps running');
 
 // --- the resume decision (chat.js asks this after EVERY finished turn) -------
 eq(shouldResumeDrill({ active: true }), true, 'an armed mode continues every turn');

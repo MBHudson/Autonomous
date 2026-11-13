@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=439';
+import { store } from './store.js?v=440';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -143,6 +143,7 @@ export function drillVerdict(calls) {
   const blank = () => ({ step: 0, failures: 0, retries: 0, pending: false, failedAt: null, offStep: 0, offTool: '' });
   let cur = blank();
   let passes = 0;
+  let cleanPasses = 0;
   let last = null;
   let lastKey = '';
   let lastStatus = '';
@@ -155,6 +156,7 @@ export function drillVerdict(calls) {
     if (cur.step >= total) {
       if (tool !== TRAINING_TASKS[0].tool) continue;
       passes++;
+      if (cur.failures === 0 && !cur.pending) cleanPasses++;
       last = cur;
       cur = blank();
     }
@@ -211,7 +213,11 @@ export function drillVerdict(calls) {
   }
 
   const complete = cur.step >= total;
-  if (complete) { passes++; last = cur; }
+  if (complete) {
+    passes++;
+    if (cur.failures === 0 && !cur.pending) cleanPasses++;
+    last = cur;
+  }
   // While a new pass is in progress the judgement is still the finished one.
   const judged = complete ? cur : last;
   return {
@@ -222,6 +228,10 @@ export function drillVerdict(calls) {
     // log with no calls, is never clean however few failures it has so far.
     clean: !!judged && judged.failures === 0 && !judged.pending,
     passes,
+    // Clean passes in this run: the number the "stop after N clean passes"
+    // option counts, and the same judgement `clean` makes — a finished pass
+    // with zero failed attempts.
+    cleanPasses,
     // Failure counts describe the pass being watched: while another pass runs,
     // that is the one whose failures the operator needs to see live.
     failures: cur.failures,
@@ -235,6 +245,23 @@ export function drillVerdict(calls) {
     offTool: cur.offTool,
     nextTool: complete ? '' : (TRAINING_TASKS[cur.step]?.tool || ''),
   };
+}
+
+/**
+ * The verdict that reached this run's clean-pass target, or null.
+ *
+ * `cleanPassTarget` 0 (the default) means never stop on its own. With several
+ * agents, the FIRST to reach the target ends the run for all of them: waiting
+ * for every agent would let one bad model keep a fleet billing forever, which
+ * is the opposite of what a stopping rule is for.
+ */
+export function reachedCleanTarget(mode, verdicts) {
+  const target = Math.max(0, Math.floor(Number(mode && mode.cleanPassTarget) || 0));
+  if (!target) return null;
+  for (const v of Object.values(verdicts || {})) {
+    if (v && Number(v.cleanPasses || 0) >= target) return v;
+  }
+  return null;
 }
 
 /**
