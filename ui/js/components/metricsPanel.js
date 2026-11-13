@@ -7,9 +7,9 @@
 // METRICSPANEL.JS — Per-session usage metrics modal
 // ============================================
 
-import { store } from '../store.js?v=431';
-import { api } from '../api.js?v=431';
-import { esc, agentCode } from '../utils.js?v=431';
+import { store } from '../store.js?v=432';
+import { api } from '../api.js?v=432';
+import { esc, agentCode } from '../utils.js?v=432';
 
 function fmt(n) {
   n = Math.round(n || 0);

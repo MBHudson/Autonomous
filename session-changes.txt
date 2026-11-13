@@ -1,5 +1,5 @@
 SESSION CHANGES
-Release: VERSION 450 -> 451, APP_VERSION (cache-buster) 430 -> 431
+Release: VERSION 450 -> 451, APP_VERSION (cache-buster) 430 -> 432
 Files: ui/**, index.html, ui/index.html, src/Sandbox.php, src/Harness.php,
        src/ModelManager.php, api/index.php, tests/**, tools/**
 Suites: PHP 33/33 files, SDK sandbox harness 146 assertions,
@@ -111,7 +111,7 @@ Suites: PHP 33/33 files, SDK sandbox harness 146 assertions,
   updated from 12 steps to 17.
 - CHANGELOG: v451 entry.
 - VERSION 450 -> 451.
-- APP_VERSION 430 -> 431 in ui/js/store.js, every ?v= module import under
+- APP_VERSION 430 -> 432 in ui/js/store.js, every ?v= module import under
   ui/**, index.html and ui/index.html (and the one test that imports with a
   literal ?v=), so an already-open tab cannot mix old and new modules.
 
