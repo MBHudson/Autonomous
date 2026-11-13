@@ -7,8 +7,8 @@
 // CHAT.JS — Chat panel controller
 // ============================================
 
-import { store } from '../store.js?v=442';
-import { K as STORAGE_K } from '../storage.js?v=442';
+import { store } from '../store.js?v=443';
+import { K as STORAGE_K } from '../storage.js?v=443';
 
 const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
 
@@ -17,29 +17,29 @@ const CURRENT_SESSION_KEY = STORAGE_K.CURRENT_SESSION;
  * purpose: steering is a human override, not a licence to run unbounded.
  */
 const MAX_STEER_STEPS = 8;
-import { api, errText } from '../api.js?v=442';
-import { persistence } from '../persistence.js?v=442';
-import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=442';
-import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=442';
-import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=442';
-import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=442';
-import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=442';
-import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=442';
-import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=442';
-import { usageFor } from '../rateGovernor.js?v=442';
-import { trace } from '../trace.js?v=442';
-import { offerRebind } from './rebindOffer.js?v=442';
-import { latency } from '../latency.js?v=442';
-import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=442';
-import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=442';
-import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill, drillVerdict, drillVerdictText, drillStripTitle } from '../training.js?v=442';
-import { SlashCommands } from '../slashCommands.js?v=442';
-import { parseRoute, routingHelp } from '../routing.js?v=442';
-import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=442';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=442';
-import { MessageRenderer, renderToolCalls } from './message.js?v=442';
-import { createAvatar } from './avatar.js?v=442';
-import * as comms from '../commsLog.js?v=442';
+import { api, errText } from '../api.js?v=443';
+import { persistence } from '../persistence.js?v=443';
+import { DEFAULT_HISTORY_TURNS, agentCode, asText, historyCharBudget, compactMessages, contextInputBudget, compactText, isNearBottom, scrollFollowWanted, reasoningOpenByDefault, isPlaceholderReply, finishedWithoutAnswer, claimsCompletedToolWork, fileToolWarning, FILE_TOOL_WARNING_PREFIX, withoutFileToolWarnings, isFileToolWarning, looksLikeToolReply, narratesToolUse, shouldFallBackFromNative, isContextOverflow, contextLimitFromError, estimateTokens } from '../utils.js?v=443';
+import { settingFor, alwaysAppendFor, sandboxRootFor, contextLimitForAgent, endpointForAgent } from '../agentConfig.js?v=443';
+import { toolProtocolFor, detectFamily, harnessOverride, rememberDialect, rememberContextLimit, learnedDialect } from '../toolProtocol.js?v=443';
+import { toolInstructions, parseToolCalls, stripToolCall, runTool, deniedToolNames, MAX_TOOL_STEPS, bindAgentComms, defaultTools, ALWAYS_ON_TOOLS, BROWSER_TOOLS, TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow, isDisplayTool, displayCaption, MAX_DISPLAY_CHARS, resolveToolName, aliasToolArgs } from '../tools.js?v=443';
+import { nativeToolDefs, nativeToolChoice, nativeToolArgs, NATIVE_FAMILIES } from '../nativeTools.js?v=443';
+import { buildToolInstructions, getEnvFacts, nextDialect, browserEnabled } from '../toolManifest.js?v=443';
+import { poolEnabled, pickKey, noteResult } from '../apiPool.js?v=443';
+import { usageFor } from '../rateGovernor.js?v=443';
+import { trace } from '../trace.js?v=443';
+import { offerRebind } from './rebindOffer.js?v=443';
+import { latency } from '../latency.js?v=443';
+import { buildContent, mergeContent, stripImages, acceptAttr } from '../attachments.js?v=443';
+import { blockFor as memoryBlockFor, MEMORY_TOOLS } from '../memory.js?v=443';
+import { trainingBlockFor, isTrainingActive, trainingResumeFor, shouldResumeDrill, drillVerdict, drillVerdictText, drillStripTitle, trainingFileFor } from '../training.js?v=443';
+import { SlashCommands } from '../slashCommands.js?v=443';
+import { parseRoute, routingHelp } from '../routing.js?v=443';
+import { substituteCurlTemplate, parseCurl, bearerFromHeaders, bodyHasSystemMessage, findLeftoverVars, parseJsonLenient, hasTemplateVars } from '../curlParser.js?v=443';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=443';
+import { MessageRenderer, renderToolCalls } from './message.js?v=443';
+import { createAvatar } from './avatar.js?v=443';
+import * as comms from '../commsLog.js?v=443';
 
 /**
  * How long an agent may keep working on a single task.
@@ -960,11 +960,17 @@ export class Chat {
    * message lands in the conversation the agent is building rather than
    * replacing it.
    */
-  _drainSteer(working) {
+  _drainSteer(working, agent = null) {
     if (!this._steerQueue || !this._steerQueue.length) return 0;
     const queued = this._steerQueue.splice(0, this._steerQueue.length);
+    // A turn that was already in flight when training was armed was built
+    // BEFORE its system prompt could carry the per-agent drill file. Repeat the
+    // path here so the kickoff is still self-contained for that turn.
+    const reminder = isTrainingActive() && agent
+      ? `\n\n[Training drill file for you: ${trainingFileFor(agent)}. Use ONLY this file for the drill steps.]`
+      : '';
     for (const q of queued) {
-      working.push({ role: 'user', content: q });
+      working.push({ role: 'user', content: q + reminder });
     }
     return queued.length;
   }
@@ -1240,7 +1246,7 @@ _commitAgentReply(agent, result, live) {
     if (!isTrainingActive()) return null;
     const history = this._drillHistoryFor(agent.id, calls);
     this._drillLog[agent.id] = history;
-    return this._publishDrill(agent, drillVerdict(history));
+    return this._publishDrill(agent, drillVerdict(history, trainingFileFor(agent)));
   }
 
   /**
@@ -1294,7 +1300,7 @@ _commitAgentReply(agent, result, live) {
   /** Recompute mid-turn so the strip moves as each call settles. */
   _publishDrillLive(agent, log) {
     if (!isTrainingActive()) return null;
-    return this._publishDrill(agent, drillVerdict(this._drillHistoryFor(agent.id, log)));
+    return this._publishDrill(agent, drillVerdict(this._drillHistoryFor(agent.id, log), trainingFileFor(agent)));
   }
 
   /**
@@ -1902,7 +1908,7 @@ _makeLiveNode(agent) {
       let convo = messages();
       let res = null;
       for (let pass = 0; pass <= MAX_STEER_STEPS; pass++) {
-        if (pass > 0 && !this._drainSteer(convo)) break;
+        if (pass > 0 && !this._drainSteer(convo, agent)) break;
         convo = compactMessages(convo, inputBudget);
         // Same retry policy as the tool path. This branch used to call the
         // relay directly, so one rate-limit refusal killed an agent that had
@@ -2096,7 +2102,7 @@ _makeLiveNode(agent) {
       // the array is already serialised, and appending before the next call is
       // what makes it read as an interruption rather than a fresh task.
       if (step > 0) {
-        const steered = this._drainSteer(working);
+        const steered = this._drainSteer(working, agent);
         if (steered) {
           store.emit('toast', {
             message: `${agent.name}: ${steered} steering message(s) applied`,
@@ -4111,7 +4117,7 @@ const refreshTodoBlock = (messages, agentId) => {
 };
 
 const systemPromptFor = agent => {
-  const training = trainingBlockFor();
+  const training = trainingBlockFor(agent);
   const pre = globalPrePromptFor();
   const own = agent.systemPrompt || '';
   // Prepend (default) keeps the agent's own prompt and puts the override in

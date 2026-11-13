@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=442';
+import { store } from './store.js?v=443';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -26,6 +26,27 @@ export const TRAINING_THROTTLE = 0.5;
  *  resolved under the agent's writable root, never outside it. */
 export const TRAINING_DIR = 'training';
 export const TRAINING_FILE = 'training/training.txt';
+/** Placeholder in the step labels, filled with the caller's own drill file. */
+export const TRAINING_FILE_TOKEN = '{file}';
+
+/**
+ * The drill file for one agent.
+ *
+ * Every active agent trains in the SAME sandbox, so one shared training.txt
+ * let two passes collide: agent B's completed output was what agent A's step 7
+ * read, A's step 8 then added a second "drill 2 passed" line, and A's step 9
+ * could not match uniquely ("old string appears 2 times"). A file per agent
+ * makes the drill's own state private to the pass that produced it.
+ */
+export function trainingFileFor(agent) {
+  const raw = String((agent && (agent.id || agent.code || agent.name)) || 'agent');
+  const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(-48) || 'agent';
+  return `${TRAINING_DIR}/training-${slug}.txt`;
+}
+
+/** Generic wording for surfaces that describe the drill to the operator. */
+const fileForSteps = (agent) => agent ? trainingFileFor(agent) : 'training/training-<agent>.txt';
+const fillFile = (text, agent) => String(text).split(TRAINING_FILE_TOKEN).join(fileForSteps(agent));
 
 /**
  * Training mode is a closed loop: while it is armed, EVERY finished turn is
@@ -52,10 +73,10 @@ export const TRAINING_TASKS = [
   { tool: 'todo_write', label: 'Write the drill steps below as your todo list, first one in_progress.' },
   { tool: 'echo', label: 'Echo the word "training" back — echo takes a bare string: {"tool":"echo","arg":"training"}, not an object like {"arg":{"text":"training"}}.' },
   { tool: 'now', label: 'Report the current date and time.' },
-  { tool: 'write_file', label: 'Create training/training.txt containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
-  { tool: 'read_file', label: 'Read training/training.txt back and confirm it says "training".' },
-  { tool: 'read_file', label: 'Read only line 1: call read_file with "training/training.txt 1-1". A range keeps a big file out of your context instead of pulling all of it in.' },
-  { tool: 'edit_file', label: 'In training/training.txt, replace the exact text "training" with "training\\ndrill 2 passed" — old_string is the text you match, new_string is what replaces it; edit_file is search-and-replace, never an append. (Asks approval — wait for it.)' },
+  { tool: 'write_file', label: 'Create {file} containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
+  { tool: 'read_file', label: 'Read {file} back and confirm it says "training".' },
+  { tool: 'read_file', label: 'Read only line 1: call read_file with "{file} 1-1". A range keeps a big file out of your context instead of pulling all of it in.' },
+  { tool: 'edit_file', label: 'In {file}, replace the exact text "training" with "training\\ndrill 2 passed" — old_string is the text you match, new_string is what replaces it; edit_file is search-and-replace, never an append. (Asks approval — wait for it.)' },
   { tool: 'edit_file', label: 'Replace the exact line "drill 2 passed" with "drill 2 passed (exact match)". (Asks approval — old_string/new_string edits only touch the text you name.)' },
   { tool: 'list_dir', label: 'List the training folder.' },
   { tool: 'glob_files', label: 'Find files matching "training/*".' },
@@ -67,7 +88,7 @@ export const TRAINING_TASKS = [
   { tool: 'exec', label: 'Run ["echo","training"] and confirm the output. (Asks approval — wait for it.)' },
   { tool: 'show_command', label: 'Show me a command: use show_command for ["echo","training"] and let its output be your reply. (Asks approval — this is the display twin of exec: it ends the turn, and the drill resumes.)' },
   { tool: 'todo_write', label: 'Mark every drill step completed, and put your two-line summary (which tools passed, retries) in the last item.' },
-  { tool: 'show_file', label: 'Show training/training.txt to me with show_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
+  { tool: 'show_file', label: 'Show {file} to me with show_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
 ];
 
 /** Terms used by the checks below, tolerant of how a model spells an argument. */
@@ -76,7 +97,7 @@ const argText = (call) => {
   catch { return String((call && call.arg) || '').toLowerCase(); }
 };
 const resultText = (call) => String((call && call.result) || '').toLowerCase();
-const namesTrainingFile = (call) => /training\/training\.txt/.test(argText(call));
+const namesTrainingFile = (call, file) => argText(call).includes(String(file || TRAINING_FILE).toLowerCase());
 /** The edit_file arguments as sent, before the case-folding argText() applies. */
 const editArg = (call) => (call && call.arg && typeof call.arg === 'object' && !Array.isArray(call.arg)) ? call.arg : {};
 const showsTraining = (call) => /training/.test(resultText(call));
@@ -95,13 +116,13 @@ export const DRILL_CHECKS = [
   null,                                                                     // 2 todo_write
   (c) => showsTraining(c),                                                  // 3 echo
   null,                                                                     // 4 now
-  (c) => namesTrainingFile(c) && /"content"\s*:\s*"training/.test(argText(c)), // 5 write_file
-  (c) => namesTrainingFile(c) && showsTraining(c),                          // 6 read back
-  (c) => /1-1|"range"/.test(argText(c)),                                    // 7 ranged read
-  (c) => namesTrainingFile(c)
+  (c, file) => namesTrainingFile(c, file) && /"content"\s*:\s*"training/.test(argText(c)), // 5 write_file
+  (c, file) => namesTrainingFile(c, file) && showsTraining(c),                // 6 read back
+  (c, file) => namesTrainingFile(c, file) && /1-1|"range"/.test(argText(c)),  // 7 ranged read
+  (c, file) => namesTrainingFile(c, file)
     && String(editArg(c).old_string ?? '') === 'training'
     && /training\r?\ndrill 2 passed/.test(String(editArg(c).new_string ?? '')), // 8 anchored append
-  (c) => namesTrainingFile(c)
+  (c, file) => namesTrainingFile(c, file)
     && String(editArg(c).old_string ?? '') === 'drill 2 passed'
     && /drill 2 passed \(exact match\)/.test(String(editArg(c).new_string ?? '')), // 9 exact replace
   (c) => showsTraining(c),                                                  // 10 list_dir
@@ -111,7 +132,7 @@ export const DRILL_CHECKS = [
   (c) => showsTraining(c),                                                  // 14 exec
   (c) => showsTraining(c),                                                  // 15 show_command
   null,                                                                     // 16 todo_write
-  (c) => namesTrainingFile(c) && showsTraining(c),                          // 17 show_file
+  (c, file) => namesTrainingFile(c, file) && showsTraining(c),                // 17 show_file
 ];
 
 /**
@@ -137,7 +158,7 @@ export const DRILL_CHECKS = [
  * an approval never prove a step passed -- and a skipped call is not a
  * failure either.
  */
-export function drillVerdict(calls) {
+export function drillVerdict(calls, file = TRAINING_FILE) {
   const total = TRAINING_TASKS.length;
   const list = Array.isArray(calls) ? calls.filter(c => c && c.tool) : [];
   const blank = () => ({ step: 0, failures: 0, retries: 0, pending: false, failedAt: null, offStep: 0, offTool: '' });
@@ -170,7 +191,7 @@ export function drillVerdict(calls) {
 
     // A check only judges a call that SUCCEEDED: a pending approval, an error
     // and a still-running call have produced no artefact to inspect.
-    const checkOk = !check || status !== 'ok' || check(call);
+    const checkOk = !check || status !== 'ok' || check(call, file);
 
     // Another tool never advances the drill, and it is not an attempt at this
     // step either. It is still recorded: a run of calls for other steps is what
@@ -307,8 +328,8 @@ export function isTrainingActive() {
 }
 
 /** Short numbered recap for the popup dialog. */
-export function trainingStepList() {
-  return TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool} — ${t.label}`);
+export function trainingStepList(agent = null) {
+  return TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool} — ${fillFile(t.label, agent)}`);
 }
 
 /**
@@ -320,10 +341,10 @@ export function trainingStepList() {
  * turn path, so messages, topology, metrics and trace all behave as usual.
  */
 export function trainingKickoffFor() {
-  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${t.label}`).join('\n');
+  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${fillFile(t.label)}`).join('\n');
   return `Training mode is ON — work this drill now, step by step, inside the "training" sandbox folder. Nothing else while it is on.\n`
     + `Steps:\n${steps}\n`
-    + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; paths stay relative to the sandbox (training/training.txt), never the project folder above it; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the PASS — the mode then sends Continue again, so begin a fresh pass instead of waiting.`;
+    + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; every agent has its OWN file in the training folder — use the exact path in your TRAINING MODE block, which the app also repeats when this kickoff reaches a turn already in flight — never another agent's file, and never the project folder above the sandbox; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the PASS — the mode then sends Continue again, so begin a fresh pass instead of waiting.`;
 }
 
 /**
@@ -378,9 +399,10 @@ export function trainingResumeFor(verdicts = null) {
  * training is armed. Three jobs: INSTRUCT (the drill), PROBE (stay on it),
  * and REMEMBER (record each pass so the next turn reuses what worked).
  */
-export function trainingBlockFor() {
+export function trainingBlockFor(agent = null) {
   if (!isTrainingActive()) return '';
-  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${t.label}`).join('\n');
+  const file = fileForSteps(agent);
+  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${fillFile(t.label, agent)}`).join('\n');
   return `[TRAINING MODE — paced drill, ~50% request rate. Nothing else matters until training mode is switched off.]\n`
     + `Work ONLY these steps, in order, inside the "training" sandbox folder. Do not answer other questions, do not touch other files, do not start other work — if asked anything else, finish the current drill step first and say the drill comes first.\n`
     + `Steps:\n${steps}\n`
@@ -389,7 +411,7 @@ export function trainingBlockFor() {
     + `- If a tool call errors, is denied, or returns the wrong thing, read the error message and TRY AGAIN with fixed arguments. Keep retrying the SAME step — never skip a failed step, never move on until it returns ok.\n`
     + `- An error that says "Did you mean ..." or "not a file" is telling you the ARGUMENT is wrong: change it. Sending the identical call again fails identically.\n`
     + `- edit_file is exact search-and-replace, never an append: old_string is the text you match, new_string replaces it. To add a line, anchor on the neighbouring text (old_string "training" → new_string "training\\ndrill 2 passed"). An empty or ambiguous old_string is refused, so a bare append can never pass.\n`
-    + `- Paths are relative to the sandbox: training/training.txt. Never the project folder above it, and never an absolute C:\\... path.\n`
+    + `- Paths are relative to the sandbox: ${file}. Never the project folder above it, and never an absolute C:\\... path. Every agent has its OWN drill file — do not read or edit another agent's.\n`
     + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
     + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec.\n`
     + `- The Continue message names the step the app recorded for you. Resume at that step; do not start another pass while steps remain — the app saw every call you made, so an early restart shows up as off-step calls.\n`

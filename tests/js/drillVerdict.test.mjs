@@ -77,6 +77,21 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   eq(v.cleanPasses, 1, 'a clean pass counts toward the stopping rule');
 }
 
+// A pass is graded against the file its own agent was told to use. Two agents
+// drill in parallel in one sandbox; the shared-file version let agent B's
+// completed output satisfy agent A's read, then A's second edit produced two
+// "drill 2 passed" lines and the next one could not match uniquely.
+{
+  const own = 'training/training-agent-a.txt';
+  const pass = cleanPass().map(c => ({ ...c, arg: JSON.parse(JSON.stringify(c.arg).replaceAll('training/training.txt', own)) }));
+  const v = drillVerdict(pass, own);
+  eq(v.complete, true, 'a pass against the agent\'s own file reads complete');
+  eq(v.clean, true, 'a pass against the agent\'s own file reads clean');
+  const other = drillVerdict(pass);
+  ok(other.step < TRAINING_TASKS.length, 'the same calls do not pass against another agent\'s file');
+  ok(other.failures > 0, 'the wrong file counts as a failed attempt, not a pass');
+}
+
 // Clean passes are counted separately from completed ones.
 {
   const dirty = cleanPass();

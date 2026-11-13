@@ -26,8 +26,8 @@ if (!version) {
   process.exit(1);
 }
 const {
-  TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_TASKS,
-  isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
+  TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_FILE_TOKEN, TRAINING_TASKS,
+  trainingFileFor, isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
   shouldResumeDrill, reachedCleanTarget, drillStripTitle,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const trainingModule = await import(`../../ui/js/training.js?v=${version}`);
@@ -56,7 +56,7 @@ eq(TRAINING_TASKS[TRAINING_TASKS.length - 1].tool, 'show_file',
   'drill ends by showing its result, not by describing it');
 eq(TRAINING_TASKS[TRAINING_TASKS.length - 2].tool, 'todo_write',
   'completion is recorded immediately before the final show');
-ok(TRAINING_TASKS.some(t => t.label.includes(TRAINING_FILE)), 'drill creates training.txt');
+ok(TRAINING_TASKS.some(t => t.label.includes(TRAINING_FILE_TOKEN)), 'drill creates the agent\'s own training file');
 ok(TRAINING_TASKS.filter(t => t.tool === 'edit_file').length >= 2,
   'drill edits twice with exact old_string/new_string replaces');
 const appendStep = TRAINING_TASKS.find(t => t.tool === 'edit_file'
@@ -74,7 +74,10 @@ ok(showSteps.some(t => t.tool === 'show_find'), 'show_find is practiced');
 ok(showSteps.some(t => t.tool === 'show_command'), 'show_command is practiced');
 ok(!('TRAINING_RESUME_LIMIT' in trainingModule),
   'no resume budget is exported: the loop is closed and unbounded');
-ok(TRAINING_DIR === 'training' && TRAINING_FILE === 'training/training.txt', 'drill folder/file constants');
+ok(TRAINING_DIR === 'training' && TRAINING_FILE === 'training/training.txt', 'drill folder/default file constants');
+eq(trainingFileFor({ id: 'agent_abc123' }), 'training/training-agent-abc123.txt', 'an agent gets a file named after its id');
+ok(trainingFileFor({ id: 'agent_a' }) !== trainingFileFor({ id: 'agent_b' }),
+  'two agents never share one drill file');
 eq(trainingStepList().length, TRAINING_TASKS.length, 'step list covers every task');
 ok(trainingStepList()[0].startsWith('1. think'), 'step list is numbered from 1');
 
@@ -86,11 +89,17 @@ eq(trainingBlockFor(), '', 'no prompt block while off');
 // Armed: one retry-until-pass block heading the prompt.
 store.set('settings.trainingMode', { active: true, startedAt: 1 });
 eq(isTrainingActive(), true, 'armed flag reads back');
-const block = trainingBlockFor();
+const drillFile = trainingFileFor({ id: 'agent_test' });
+const block = trainingBlockFor({ id: 'agent_test' });
 ok(block.includes('TRAINING MODE'), 'block names the mode');
 ok(block.includes('TRY AGAIN'), 'block orders retries on failure');
 ok(block.includes('never skip'), 'block forbids skipping failed steps');
-ok(block.includes(TRAINING_FILE), 'block names the drill file');
+ok(block.includes(drillFile), 'block names this agent\'s drill file');
+ok(block.includes('OWN drill file'), 'block forbids touching another agent\'s file');
+ok(trainingBlockFor({ id: 'agent_other' }).includes(trainingFileFor({ id: 'agent_other' })),
+  'each agent\'s block names its own file');
+ok(trainingStepList().some(s => s.includes('training/training-<agent>.txt')),
+  'the operator-facing step list stays generic across agents');
 for (const t of TRAINING_TASKS) ok(block.includes(t.tool), `block lists ${t.tool}`);
 // The display family is taught by name even though only one is practiced, and
 // the error-reading rule names the recoveries the sandbox returns.

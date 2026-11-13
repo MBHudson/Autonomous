@@ -17,7 +17,7 @@
 // and agent-to-agent traffic blend from the sender's color to the receiver's.
 
 import * as THREE from 'three';
-import { glowTexture } from './nodes.js?v=442';
+import { glowTexture } from './nodes.js?v=443';
 
 const SEGMENTS = 56;
 const RADIAL = 6;

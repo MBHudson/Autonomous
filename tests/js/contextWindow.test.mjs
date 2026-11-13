@@ -14,13 +14,18 @@
 // An 8k LM Studio session serving a 131k model is the case that matters: the
 // name says 131k, the runner says 8k, and the operator can say either.
 
+import { readFileSync } from 'node:fs';
 import {
   contextLimitForAgent, settingFor, setSetting, endpointForAgent,
 } from '../../ui/js/agentConfig.js';
 import { rememberContextLimit } from '../../ui/js/harness.js';
-// The ?v= matters: agentConfig imports store.js?v=442, and ESM would otherwise
-// hand this file a SECOND store instance that the code under test never sees.
-import { store } from '../../ui/js/store.js?v=442';
+// The ?v= matters: agentConfig imports a versioned store.js, and ESM would
+// otherwise hand this file a SECOND store instance the code under test never
+// sees. Read it from store.js so the cache-buster cannot split them again.
+const version = /APP_VERSION\s*=\s*(\d+)/.exec(
+  readFileSync(new URL('../../ui/js/store.js', import.meta.url), 'utf8'),
+)?.[1];
+const { store } = await import(`../../ui/js/store.js?v=${version}`);
 
 let pass = 0, fail = 0;
 const errors = [];
