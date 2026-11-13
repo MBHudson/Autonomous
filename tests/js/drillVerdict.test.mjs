@@ -138,6 +138,31 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   eq(drillVerdict(wrongWrite).step, 4, 'writing the wrong content does not pass the write step');
 }
 
+// A model that lost its place shows as off-step, not as a silent stall.
+{
+  const calls = cleanPass().slice(0, 15);
+  calls.push(call('think', { note: 'restart' }, 'ok', 'thinking'));
+  const v = drillVerdict(calls);
+  eq(v.step, 15, 'an off-step call does not advance the pass');
+  eq(v.offStep, 1, 'the off-step call is counted');
+  eq(v.offTool, 'think', 'the off-step tool is named');
+  eq(v.nextTool, 'todo_write', 'the expected tool is reported');
+  ok(drillVerdictText(v).includes('waiting for todo_write'), 'the stall is named in the strip text');
+  const back = drillVerdict(calls.concat([call('todo_write', { todos: [] }, 'ok', 'updated')]));
+  eq(back.step, 16, 'the step still passes once it is attempted');
+  eq(back.offStep, 0, 'progress clears the off-step signal');
+}
+
+// The right tool with the wrong arguments is a failed attempt, not silence.
+{
+  const calls = cleanPass().slice(0, 6);
+  calls.push(call('read_file', { path: 'training/training.txt' }, 'ok', '1  training'));
+  const v = drillVerdict(calls);
+  eq(v.failures, 1, 'a wrong-argument attempt is a failure');
+  eq(v.failedAt, 7, 'it names the step it happened on');
+  eq(v.step, 6, 'it does not advance');
+}
+
 // A pass in progress is not a second completed pass, and the judgement still
 // describes the finished one.
 {

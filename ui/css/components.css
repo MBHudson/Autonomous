@@ -2025,6 +2025,7 @@ body.agent-reordering .agent-editor:hover {
 .drill-row .drill-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .drill-row .drill-clean { color: var(--accent-green, #00ff88); }
 .drill-row .drill-bad { color: var(--accent-red, #ff4757); }
+.drill-row .drill-warn { color: var(--accent-amber, #e0a83a); }
 
 /* The same rows inside the Training dialog, above the footer hint. */
 .drill-dialog-status {

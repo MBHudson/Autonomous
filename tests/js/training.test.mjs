@@ -106,7 +106,13 @@ ok(block.includes('relative to the sandbox'), 'block states the path rule');
 
 // The continued turn is a bare "Continue": the drill is already in the prompt,
 // and a paragraph repeated every few seconds is context paid for every turn.
-eq(trainingResumeFor(), 'Continue', 'the continued turn is exactly Continue');
+eq(trainingResumeFor(), 'Continue', 'with nothing recorded, the continued turn is exactly Continue');
+const resumed = trainingResumeFor({ a: { name: 'Scout', step: 15, totalSteps: 17, complete: false } });
+ok(resumed.includes('step 16') && resumed.includes('todo_write'),
+  'the resume names the recorded next step');
+ok(/do not restart/i.test(resumed), 'the resume forbids restarting the pass');
+const restarted = trainingResumeFor({ a: { name: 'Scout', step: 17, totalSteps: 17, complete: true } });
+ok(restarted.includes('fresh pass'), 'a completed pass resumes into a fresh one');
 
 // --- the resume decision (chat.js asks this after EVERY finished turn) -------
 eq(shouldResumeDrill({ active: true }), true, 'an armed mode continues every turn');

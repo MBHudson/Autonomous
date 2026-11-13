@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=437';
+import { store } from './store.js?v=438';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -140,7 +140,7 @@ export const DRILL_CHECKS = [
 export function drillVerdict(calls) {
   const total = TRAINING_TASKS.length;
   const list = Array.isArray(calls) ? calls.filter(c => c && c.tool) : [];
-  const blank = () => ({ step: 0, failures: 0, retries: 0, pending: false, failedAt: null });
+  const blank = () => ({ step: 0, failures: 0, retries: 0, pending: false, failedAt: null, offStep: 0, offTool: '' });
   let cur = blank();
   let passes = 0;
   let last = null;
@@ -166,22 +166,37 @@ export function drillVerdict(calls) {
     lastKey = key;
     lastStatus = status;
 
-    // Not this step (a late retry of the previous one, a stray call, or an
-    // argument the step cannot accept). It never advances the drill.
-    //
     // A check only judges a call that SUCCEEDED: a pending approval, an error
-    // and a still-running call have produced no artefact to inspect, so they
-    // must be treated as attempts of this step (and counted as such), not as
-    // "some other step" and silently ignored.
+    // and a still-running call have produced no artefact to inspect.
     const checkOk = !check || status !== 'ok' || check(call);
-    if (tool !== want.tool || !checkOk) {
-      if (status === 'error') {
-        cur.failures++;
-        if (cur.failedAt === null) cur.failedAt = cur.step + 1;
-        if (retry) cur.retries++;
+
+    // Another tool never advances the drill, and it is not an attempt at this
+    // step either. It is still recorded: a run of calls for other steps is what
+    // a model that lost its place looks like, and the strip used to sit on the
+    // same number with no explanation while one restarted the drill.
+    if (tool !== want.tool) {
+      if (status !== 'skipped' && status !== 'running') {
+        cur.offStep++;
+        cur.offTool = tool;
       }
       continue;
     }
+
+    // The right tool with arguments this step cannot accept IS an attempt at
+    // it -- a full read is not the ranged read. This used to be ignored, so a
+    // model could repeat a wrong call and still be graded clean.
+    if (!checkOk) {
+      cur.failures++;
+      if (cur.failedAt === null) cur.failedAt = cur.step + 1;
+      if (status === 'error' && retry) cur.retries++;
+      cur.offStep = 0;
+      cur.offTool = '';
+      continue;
+    }
+
+    // A real attempt at the step clears the "lost" signal.
+    cur.offStep = 0;
+    cur.offTool = '';
 
     if (status === 'pending') { cur.pending = true; continue; }
     if (status === 'error') {
@@ -213,6 +228,12 @@ export function drillVerdict(calls) {
     retries: cur.retries,
     pending: cur.pending,
     failedAt: cur.failedAt,
+    // Calls since the last step progress that were for another tool. Not a
+    // failure (the step was never attempted), but the visible sign of a model
+    // that lost its place.
+    offStep: cur.offStep,
+    offTool: cur.offTool,
+    nextTool: complete ? '' : (TRAINING_TASKS[cur.step]?.tool || ''),
   };
 }
 
@@ -231,6 +252,8 @@ export function drillVerdictText(verdict) {
     bits.push(verdict.clean ? 'clean' : `${verdict.failures} failed`);
   } else if (verdict.failures) {
     bits.push(`${verdict.failures} failed${verdict.failedAt ? ` at step ${verdict.failedAt}` : ''}`);
+  } else if (verdict.offStep) {
+    bits.push(`waiting for ${verdict.nextTool || 'the next step'} (last call: ${verdict.offTool})`);
   }
   if (verdict.pending) bits.push('approval');
   if (verdict.passes) bits.push(`${verdict.passes} pass${verdict.passes === 1 ? '' : 'es'}`);
@@ -282,13 +305,35 @@ export function shouldResumeDrill(mode) {
 /**
  * The text a continued drill turn is dispatched with.
  *
- * Exactly "Continue" and nothing else: it is sent as a real prompt (so the
- * model treats it as the operator speaking) but rendered nowhere, and the
- * drill itself is already in the system prompt. A longer instruction repeated
- * every few seconds is context the model pays for on every turn.
+ * Plain "Continue" when there is nothing recorded yet. Once calls exist, the
+ * message carries the position the APP saw for each agent. A resumed turn was
+ * rebuilt from a short message window and its own todo list, and a model that
+ * lost track restarted the whole pass: the calls for steps 1-15 then arrived
+ * while the verdict waited at 16, which read as a silent stall. Naming the
+ * next step costs one line and makes the restart impossible to do innocently.
+ *
+ * Still sent silently and rendered nowhere, so the operator sees only the
+ * drill -- the model sees the position its own past calls produced.
  */
-export function trainingResumeFor() {
-  return 'Continue';
+export function trainingResumeFor(verdicts = null) {
+  const list = verdicts && typeof verdicts === 'object' ? Object.values(verdicts) : [];
+  const lines = [];
+  for (const v of list) {
+    if (!v || !Number.isFinite(Number(v.step))) continue;
+    const step = Math.max(0, Number(v.step));
+    const total = Number(v.totalSteps) || TRAINING_TASKS.length;
+    const name = String(v.name || 'agent');
+    if (v.complete) {
+      lines.push(`${name}: pass complete (${step}/${total}) — start a fresh pass at step 1.`);
+      continue;
+    }
+    const next = TRAINING_TASKS[step];
+    lines.push(`${name}: ${step}/${total} steps passed — next is step ${step + 1}`
+      + `${next ? ` (${next.tool})` : ''}; do not restart.`);
+  }
+  if (!lines.length) return 'Continue';
+  return 'Continue. The app recorded your drill position from the calls it saw — resume there, never restart the pass early:\n'
+    + lines.join('\n');
 }
 
 /**
@@ -310,6 +355,7 @@ export function trainingBlockFor() {
     + `- Paths are relative to the sandbox: training/training.txt. Never the project folder above it, and never an absolute C:\\... path.\n`
     + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
     + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec.\n`
+    + `- The Continue message names the step the app recorded for you. Resume at that step; do not start another pass while steps remain — the app saw every call you made, so an early restart shows up as off-step calls.\n`
     + `- This mode never lets the drill stop. When a turn ends — a display step, a short reply, even the final show_file — you are sent "Continue" automatically. Treat Continue as the next instruction: pick up the first step your todo list does not show completed, and when every step is complete, start a fresh pass at step 1. Never say the drill is finished, never ask whether to continue, never wait for the operator.\n`
     + `- After each passed step, update your todo_write list so what worked is written down. Put the two-line summary (which tools passed, how many retries each took) in the final todo item: the last step shows the file and ends the turn.`;
 }

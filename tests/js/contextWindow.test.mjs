@@ -18,9 +18,9 @@ import {
   contextLimitForAgent, settingFor, setSetting, endpointForAgent,
 } from '../../ui/js/agentConfig.js';
 import { rememberContextLimit } from '../../ui/js/harness.js';
-// The ?v= matters: agentConfig imports store.js?v=437, and ESM would otherwise
+// The ?v= matters: agentConfig imports store.js?v=438, and ESM would otherwise
 // hand this file a SECOND store instance that the code under test never sees.
-import { store } from '../../ui/js/store.js?v=437';
+import { store } from '../../ui/js/store.js?v=438';
 
 let pass = 0, fail = 0;
 const errors = [];
