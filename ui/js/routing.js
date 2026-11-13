@@ -28,7 +28,7 @@
 // falling back to "everyone" -- quietly answering with four agents when you
 // addressed one is worse than telling you the code was wrong.
 
-import { agentCode } from './utils.js?v=441';
+import { agentCode } from './utils.js?v=442';
 
 /** Roles that address the whole group regardless of their spelling. */
 const ALL_WORDS = new Set(['all', 'every', 'everyone', 'any']);

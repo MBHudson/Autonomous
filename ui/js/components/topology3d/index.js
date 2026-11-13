@@ -20,17 +20,17 @@
 // + arrowheads, HTML name/ping labels, and a click-to-open metrics card.
 
 import * as THREE from 'three';
-import { TopologyGraph } from '../topology.js?v=441';
-import { store } from '../../store.js?v=441';
-import { k, K } from '../../storage.js?v=441';
-import { latency } from '../../latency.js?v=441';
-import { SceneCore, webglAvailable } from './scene.js?v=441';
-import { ForceLayout } from './layout.js?v=441';
-import { NodeView, Nebula } from './nodes.js?v=441';
-import { Beam } from './beams.js?v=441';
-import { LabelLayer } from './labels.js?v=441';
-import { PopupCard } from './popup.js?v=441';
-import { AskDock } from './ask.js?v=441';
+import { TopologyGraph } from '../topology.js?v=442';
+import { store } from '../../store.js?v=442';
+import { k, K } from '../../storage.js?v=442';
+import { latency } from '../../latency.js?v=442';
+import { SceneCore, webglAvailable } from './scene.js?v=442';
+import { ForceLayout } from './layout.js?v=442';
+import { NodeView, Nebula } from './nodes.js?v=442';
+import { Beam } from './beams.js?v=442';
+import { LabelLayer } from './labels.js?v=442';
+import { PopupCard } from './popup.js?v=442';
+import { AskDock } from './ask.js?v=442';
 
 const MODE_KEY = k('topoMode');
 const HISTORY_MAX = 80;
