@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=440';
-import { K } from '../storage.js?v=440';
-import { persistence } from '../persistence.js?v=440';
-import { api } from '../api.js?v=440';
-import { isNoTokenError } from '../apiError.js?v=440';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=440';
-import { errText } from '../api.js?v=440';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=440';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=440';
-import { snapshot } from '../rateGovernor.js?v=440';
-import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget } from '../training.js?v=440';
-import { resetBrowserEnabled } from '../toolManifest.js?v=440';
-import { perf } from '../perf.js?v=440';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=440';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=440';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=440';
+import { store } from '../store.js?v=441';
+import { K } from '../storage.js?v=441';
+import { persistence } from '../persistence.js?v=441';
+import { api } from '../api.js?v=441';
+import { isNoTokenError } from '../apiError.js?v=441';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=441';
+import { errText } from '../api.js?v=441';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=441';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=441';
+import { snapshot } from '../rateGovernor.js?v=441';
+import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget } from '../training.js?v=441';
+import { resetBrowserEnabled } from '../toolManifest.js?v=441';
+import { perf } from '../perf.js?v=441';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=441';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=441';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=441';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -834,8 +834,10 @@ export class Sidebar {
       const cur = store.get('settings.trainingMode') || {};
       store.set('settings.trainingMode', { ...cur, cleanPassTarget: n });
       try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
-      // Setting the limit to a number the run has ALREADY reached should end it
-      // now, not wait for a verdict that may never come.
+      // Repaint the strip header ("drill · stop at 2 clean passes") and stop
+      // now if the run has already reached the number, rather than waiting for
+      // a verdict that may never come.
+      store.emit('training:changed', { active: !!cur.active });
       this._maybeStopOnCleanPass();
     });
   }

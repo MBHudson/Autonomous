@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=440';
+import { store } from './store.js?v=441';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -262,6 +262,16 @@ export function reachedCleanTarget(mode, verdicts) {
     if (v && Number(v.cleanPasses || 0) >= target) return v;
   }
   return null;
+}
+
+/**
+ * The strip's leading label. States the stopping rule only when one is set, so
+ * the normal header stays one word and a run that will end itself says so.
+ */
+export function drillStripTitle(mode) {
+  const n = Math.max(0, Math.floor(Number(mode && mode.cleanPassTarget) || 0));
+  if (!n) return 'drill';
+  return `drill \u00b7 stop at ${n} clean pass${n === 1 ? '' : 'es'}`;
 }
 
 /**

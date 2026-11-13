@@ -28,7 +28,7 @@ if (!version) {
 const {
   TRAINING_THROTTLE, TRAINING_DIR, TRAINING_FILE, TRAINING_TASKS,
   isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
-  shouldResumeDrill, reachedCleanTarget,
+  shouldResumeDrill, reachedCleanTarget, drillStripTitle,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const trainingModule = await import(`../../ui/js/training.js?v=${version}`);
 const { store } = await import(`../../ui/js/store.js?v=${version}`);
@@ -122,6 +122,12 @@ const targetHit = reachedCleanTarget({ cleanPassTarget: 2 },
 ok(!!targetHit && targetHit.name === 'Coder', 'the first agent at the target ends the run');
 eq(reachedCleanTarget({ cleanPassTarget: 2 }, { a: { cleanPasses: 1 } }), null,
   'below the target keeps running');
+
+// The strip says the rule only when there is one.
+eq(drillStripTitle({}), 'drill', 'no target keeps the one-word header');
+eq(drillStripTitle({ cleanPassTarget: 0 }), 'drill', 'target 0 keeps the one-word header');
+eq(drillStripTitle({ cleanPassTarget: 1 }), 'drill \u00b7 stop at 1 clean pass', 'one pass is singular');
+eq(drillStripTitle({ cleanPassTarget: 3 }), 'drill \u00b7 stop at 3 clean passes', 'the header names the target');
 
 // --- the resume decision (chat.js asks this after EVERY finished turn) -------
 eq(shouldResumeDrill({ active: true }), true, 'an armed mode continues every turn');

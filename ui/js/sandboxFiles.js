@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { store } from './store.js?v=440';
-import { persistence } from './persistence.js?v=440';
-import { api } from './api.js?v=440';
-import { esc, escAttr } from './utils.js?v=440';
-import { renderMarkdown } from './markdown.js?v=440';
-import { sandboxRootFor } from './agentConfig.js?v=440';
+import { store } from './store.js?v=441';
+import { persistence } from './persistence.js?v=441';
+import { api } from './api.js?v=441';
+import { esc, escAttr } from './utils.js?v=441';
+import { renderMarkdown } from './markdown.js?v=441';
+import { sandboxRootFor } from './agentConfig.js?v=441';
 
 const TEXT_EXT = new Set([
   'txt', 'md', 'markdown', 'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
