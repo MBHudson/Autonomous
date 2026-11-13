@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=436';
+import { store } from './store.js?v=437';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -77,6 +77,8 @@ const argText = (call) => {
 };
 const resultText = (call) => String((call && call.result) || '').toLowerCase();
 const namesTrainingFile = (call) => /training\/training\.txt/.test(argText(call));
+/** The edit_file arguments as sent, before the case-folding argText() applies. */
+const editArg = (call) => (call && call.arg && typeof call.arg === 'object' && !Array.isArray(call.arg)) ? call.arg : {};
 const showsTraining = (call) => /training/.test(resultText(call));
 
 /**
@@ -96,9 +98,12 @@ export const DRILL_CHECKS = [
   (c) => namesTrainingFile(c) && /"content"\s*:\s*"training/.test(argText(c)), // 5 write_file
   (c) => namesTrainingFile(c) && showsTraining(c),                          // 6 read back
   (c) => /1-1|"range"/.test(argText(c)),                                    // 7 ranged read
-  (c) => namesTrainingFile(c) && /old_string/.test(argText(c))
-    && /new_string/.test(argText(c)) && /drill 2 passed/.test(argText(c)),  // 8 anchored append
-  (c) => namesTrainingFile(c) && /drill 2 passed/.test(argText(c)),         // 9 exact replace
+  (c) => namesTrainingFile(c)
+    && String(editArg(c).old_string ?? '') === 'training'
+    && /training\r?\ndrill 2 passed/.test(String(editArg(c).new_string ?? '')), // 8 anchored append
+  (c) => namesTrainingFile(c)
+    && String(editArg(c).old_string ?? '') === 'drill 2 passed'
+    && /drill 2 passed \(exact match\)/.test(String(editArg(c).new_string ?? '')), // 9 exact replace
   (c) => showsTraining(c),                                                  // 10 list_dir
   (c) => showsTraining(c),                                                  // 11 glob_files
   (c) => showsTraining(c),                                                  // 12 grep_code
