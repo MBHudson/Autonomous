@@ -39,6 +39,7 @@ eq(resolveToolName('Read'), 'read_file', 'Read is read_file');
 eq(resolveToolName('Grep'), 'grep_code', 'Grep is grep_code');
 eq(resolveToolName('LS'), 'list_dir', 'LS is list_dir');
 eq(resolveToolName('Write'), 'write_file', 'Write is write_file');
+eq(resolveToolName('Edit'), 'edit_file', 'Edit is edit_file, never write_file');
 eq(resolveToolName('webfetch'), 'fetch_url', 'webfetch is fetch_url');
 eq(resolveToolName('functions.grep'), 'grep_code', 'a prefixed foreign name still resolves');
 eq(resolveToolName('read_file'), 'read_file', 'our own name is left alone');
@@ -111,6 +112,21 @@ eq(call('{"tool":"read_file","arg":{"file_path":"a.txt"}}').arg, 'a.txt',
   'a single path key collapses to the scalar read_file takes');
 eq(call('{"tool":"read_file","arg":{"path":"a.txt","offset":10}}').arg,
   { path: 'a.txt', offset: 10 }, 'extra keys keep the object intact');
+eq(call('{"tool":"read_file","arg":{"file_path":"a.txt","range":"1-1"}}'),
+  { tool: 'read_file', arg: { path: 'a.txt', range: '1-1' } },
+  'file_path plus range keeps both fields');
+const edit = call('{"tool":"Edit","arg":{"file_path":"a.txt","old_string":"a","new_string":"b"}}');
+eq(edit, { tool: 'edit_file', arg: { path: 'a.txt', old_string: 'a', new_string: 'b' } },
+  'Edit folds file_path onto edit_file path');
+eq(call('{"tool":"edit_file","arg":{"file_path":"a.txt","old_str":"a","new_str":"b"}}').arg,
+  { path: 'a.txt', old_string: 'a', new_string: 'b' },
+  'edit_file accepts the old_str/new_str spelling');
+eq(aliasToolArgs('read_file', '{"path":"a.txt","range":"1-1"}'),
+  { path: 'a.txt', range: '1-1' },
+  'a stringified read argument is parsed before normalization');
+eq(aliasToolArgs('edit_file', '{"file_path":"a.txt","old_string":"a","new_string":"b"}'),
+  { path: 'a.txt', old_string: 'a', new_string: 'b' },
+  'a stringified edit argument is parsed before normalization');
 
 // --- the transcript still gets cleaned ---------------------------------------
 // Aliasing must not break span matching: the same call is parsed for run AND for

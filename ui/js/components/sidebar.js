@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=446';
-import { K } from '../storage.js?v=446';
-import { persistence } from '../persistence.js?v=446';
-import { api } from '../api.js?v=446';
-import { isNoTokenError } from '../apiError.js?v=446';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=446';
-import { errText } from '../api.js?v=446';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=446';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=446';
-import { snapshot } from '../rateGovernor.js?v=446';
-import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty } from '../training.js?v=446';
-import { resetBrowserEnabled } from '../toolManifest.js?v=446';
-import { perf } from '../perf.js?v=446';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=446';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=446';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=446';
+import { store } from '../store.js?v=449';
+import { K } from '../storage.js?v=449';
+import { persistence } from '../persistence.js?v=449';
+import { api } from '../api.js?v=449';
+import { isNoTokenError } from '../apiError.js?v=449';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=449';
+import { errText } from '../api.js?v=449';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=449';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=449';
+import { snapshot } from '../rateGovernor.js?v=449';
+import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty } from '../training.js?v=449';
+import { resetBrowserEnabled } from '../toolManifest.js?v=449';
+import { perf } from '../perf.js?v=449';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=449';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=449';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=449';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open

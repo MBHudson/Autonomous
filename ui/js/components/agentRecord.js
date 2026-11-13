@@ -21,11 +21,11 @@
 // card and by the same button on the 2D metrics modal. The renderers are the
 // trace panel's, so there is one implementation of each row and three doors.
 
-import { store } from '../store.js?v=446';
-import { esc } from '../utils.js?v=446';
-import { api } from '../api.js?v=446';
-import * as comms from '../commsLog.js?v=446';
-import { commsHtml, execHtml } from './tracePanel.js?v=446';
+import { store } from '../store.js?v=449';
+import { esc } from '../utils.js?v=449';
+import { api } from '../api.js?v=449';
+import * as comms from '../commsLog.js?v=449';
+import { commsHtml, execHtml } from './tracePanel.js?v=449';
 
 export class AgentRecord {
   constructor() {

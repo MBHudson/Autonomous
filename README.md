@@ -133,10 +133,10 @@ There is no binary to install — a release is the source folder, and "updating"
 
 | | What it is | Get it |
 |---|---|---|
-| **v450** — current | A fresh download boots without `storage/config.json`, and on a copy whose `storage/` is not writable it says which folder instead of handing the app a `null` config. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v450) |
-| **v449** | Updating no longer refuses to start on a hosted copy because it cannot write `.github/workflows/`. Repository metadata is skipped now; app files update as before. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v449) |
-| **v448** | The fix for **Config → Limits & Budgets → Longest single wait (seconds)** resetting itself to 0, plus the UI cache-buster that carries it to a browser which already loaded the old page. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v448) |
-| **v447** | Training mode (the twelve-step drill), the harness that learns a model's tool dialect, tunnels from Config, and the fixes that came out of testing them. This is the release carrying the **30-second drill video**. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v447) |
+| **v460** — current | Read/edit calls keep foreign path and range arguments; Hard drill steps name the exact tools; native ranged reads work. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v460) |
+| **v459** | Easy/Hard drill selector and a fresh session per Start. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v459) |
+| **v458** | Two agents drill side by side in their own files. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v458) |
+| **v457** | Per-agent training files so parallel passes cannot collide. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v457) |
 
 Running an older copy? **Config → Updates → INSTALL UPDATE…** updates in place and keeps `storage/`.
 Every release, including the open-testing builds before these two, is listed on
@@ -1853,8 +1853,8 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 **Newest first.** Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section above, where it stays as reference. The most recent release sits at the top.
 
-### 🎚️ v459 — Easy or Hard, and every Start begins clean
-*Training mode's popup now has an **Easy / Hard** selector: Easy is the original 12-step sequence from `53b05a9`, including the old “Append a second line” step 7; Hard is the current 17-step drill with the ranged read, anchored edits and display tools. Both keep per-agent files and the Continue loop, and the choice is persisted (`settings.trainingMode.difficulty`, default Hard), locked while a run is active, and used by the step list, prompt block, kickoff, verdict and strip (`easy drill`), so a 12-step run reads `12/12`. Every Start now opens a fresh `Training drill — <date/time>` session, aborting an in-flight turn directly and switching before the kickoff, with a fallback if session creation fails. Live comparison with `nemotron-lightning`: Easy 12/12 clean in ~62s; Hard 17/17 clean in ~176s after four Continue resumes and visible uncertainty at step 16, zero failed tool calls in both. Both wrote the same 37-byte drill file. JS 41 files / 1,214 assertions, PHP 33/33, docs 14/14. `VERSION` 458 → 459, `APP_VERSION` 445 → 446.*
+### 🧰 v460 — read/edit calls keep their arguments, and the drill names its tools
+*Foreign `read_file`/`show_file` calls now accept `file_path`, `filepath`, `filename`, `target_file` and `file`, preserve `range`, and translate `offset`/`limit`; `Edit` maps to `edit_file`, never `write_file`, and `edit_file` accepts `file_path` with `old_str`/`new_str`. Native `read_file` carries a separate `range` again, including when the arguments arrive as a JSON string. Hard drill steps now name the exact read and edit tools, so `show_file`, `write_file` and `str_replace_editor` can no longer quietly take a step; Easy keeps its original wording. Two live Hard passes finished 17/17 clean with 0 retries, and a native ranged read returned line 1. JS 41 files / 1,229 assertions, PHP 33/33, docs 14/14. `VERSION` 459 → 460, `APP_VERSION` 448 → 449.*
 
 ![The tool-call box counting four calls, two failed and one retry, each failure expanded with the sandbox hint, then a show_file result painted into the transcript](screenshots/display-tools.png)
 

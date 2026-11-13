@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=446';
+import { store } from './store.js?v=449';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -74,10 +74,10 @@ export const TRAINING_TASKS = [
   { tool: 'echo', label: 'Echo the word "training" back — echo takes a bare string: {"tool":"echo","arg":"training"}, not an object like {"arg":{"text":"training"}}.' },
   { tool: 'now', label: 'Report the current date and time.' },
   { tool: 'write_file', label: 'Create {file} containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
-  { tool: 'read_file', label: 'Read {file} back and confirm it says "training".' },
-  { tool: 'read_file', label: 'Read only line 1 of {file}: call read_file with that path plus " 1-1" in the range. A range keeps a big file out of your context instead of pulling all of it in.' },
-  { tool: 'edit_file', label: 'In {file}, replace the exact text "training" with "training\\ndrill 2 passed" — old_string is the text you match, new_string is what replaces it; edit_file is search-and-replace, never an append. (Asks approval — wait for it.)' },
-  { tool: 'edit_file', label: 'Replace the exact line "drill 2 passed" with "drill 2 passed (exact match)". (Asks approval — old_string/new_string edits only touch the text you name.)' },
+  { tool: 'read_file', label: 'Read {file} back with read_file — not show_file — and confirm it says "training".' },
+  { tool: 'read_file', label: 'Read only line 1 of {file}: call read_file with the path and a trailing " 1-1" — not show_file. A range keeps a big file out of your context instead of pulling all of it in.' },
+  { tool: 'edit_file', label: 'In {file}, use edit_file — not write_file and not str_replace_editor — to replace the exact text "training" with "training\\ndrill 2 passed". old_string is the text you match, new_string is what replaces it; edit_file is search-and-replace, never an append. (Asks approval — wait for it.)' },
+  { tool: 'edit_file', label: 'Use edit_file again — not write_file and not str_replace_editor — to replace the exact line "drill 2 passed" with "drill 2 passed (exact match)". (Asks approval — old_string/new_string edits only touch the text you name.)' },
   { tool: 'list_dir', label: 'List the training folder.' },
   { tool: 'glob_files', label: 'Find files matching "training/*".' },
   { tool: 'grep_code', label: 'Search the training folder for the word "training".' },
@@ -88,7 +88,7 @@ export const TRAINING_TASKS = [
   { tool: 'exec', label: 'Run ["echo","training"] and confirm the output. (Asks approval — wait for it.)' },
   { tool: 'show_command', label: 'Show me a command: use show_command for ["echo","training"] and let its output be your reply. (Asks approval — this is the display twin of exec: it ends the turn, and the drill resumes.)' },
   { tool: 'todo_write', label: 'Mark every drill step completed, and put your two-line summary (which tools passed, retries) in the last item.' },
-  { tool: 'show_file', label: 'Show {file} to me with show_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
+  { tool: 'show_file', label: 'Show {file} to me with show_file — not read_file — the file on screen IS the drill report. This ends the turn; the mode then sends Continue for a fresh pass, so do not write the contents out again.' },
 ];
 
 /**
@@ -519,7 +519,7 @@ export function trainingBlockFor(agent = null) {
     + `- THIS RUN uses the file above. Any earlier training transcript that mentions training/training.txt is an OLD run: ignore its paths and copy nothing from it.\n`
     + positionRule
     + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
-    + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec.\n`
+    + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec. The read steps are read_file, never show_file; the edit steps are edit_file, never write_file or str_replace_editor.\n`
     + `- The Continue message names the step the app recorded for you. Resume at that step; do not start another pass while steps remain — the app saw every call you made, so an early restart shows up as off-step calls.\n`
     + `- This mode never lets the drill stop. When a turn ends — a display step, a short reply, even the final show_file — you are sent "Continue" automatically. Treat Continue as the next instruction: pick up the first step your todo list does not show completed, and when every step is complete, start a fresh pass at step 1. Never say the drill is finished, never ask whether to continue, never wait for the operator.\n`
     + `- After each passed step, update your todo_write list so what worked is written down. Put the two-line summary (which tools passed, how many retries each took) in the final todo item: the last step shows the file and ends the turn.`;

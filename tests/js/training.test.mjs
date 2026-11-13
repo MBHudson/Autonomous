@@ -65,6 +65,13 @@ ok(!!appendStep && /old_string/.test(appendStep.label) && /new_string/.test(appe
   'the add-a-line step teaches an anchored old_string/new_string replace, not a bare append');
 ok(TRAINING_TASKS.some(t => t.tool === 'read_file' && /1-1/.test(t.label)),
   'drill teaches a ranged read so a big file is not pulled in whole');
+ok(TRAINING_TASKS.filter(t => t.tool === 'read_file').every(t => /not show_file/.test(t.label)),
+  'read steps say read_file, not show_file');
+ok(TRAINING_TASKS.filter(t => t.tool === 'edit_file').every(t =>
+  /not write_file/.test(t.label) && /str_replace_editor/.test(t.label)),
+  'edit steps rule out write_file and str_replace_editor');
+ok(/not read_file/.test(TRAINING_TASKS[TRAINING_TASKS.length - 1].label),
+  'the final show_file step rules out read_file');
 // A display step ends the turn, and training mode resumes the drill -- so the
 // family can be practiced mid-drill, not only as the last step.
 const showSteps = TRAINING_TASKS.filter(t => t.tool.startsWith('show_'));

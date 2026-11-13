@@ -36,6 +36,9 @@ const api = {
       if (params.path === 'missing.txt') throw new Error('read_file: not a file: C:/sandbox/missing.txt');
       return { path: 'C:/sandbox/a.txt', bytes: 2, truncated: false, content: 'hi' };
     }
+    if (action === 'str_replace') {
+      return { path: 'C:/sandbox/a.txt', replaced: 1 };
+    }
     if (action === 'list') {
       if (params.path === 'folder') {
         return {
@@ -93,6 +96,17 @@ await TOOL_REGISTRY.read_file.run('a.txt 2-4', null, {});
 ok(calls.at(-1)[1].range === '2-4', 'the "path 2-4" spelling sends the range');
 await TOOL_REGISTRY.read_file.run({ path: 'a.txt', range: '2-4' }, null, {});
 ok(calls.at(-1)[1].range === '2-4', 'the {"path","range"} spelling sends it too');
+await TOOL_REGISTRY.read_file.run({ file_path: 'a.txt', range: '2-4' }, null, {});
+ok(calls.at(-1)[1].path === 'a.txt' && calls.at(-1)[1].range === '2-4',
+  'file_path and range both survive the read');
+await TOOL_REGISTRY.read_file.run({ path: 'a.txt', offset: 10, limit: 2 }, null, {});
+ok(calls.at(-1)[1].range === '10-11', 'offset and limit become a range');
+
+// --- an Edit-shaped call reaches str_replace with a path --------------------
+await TOOL_REGISTRY.edit_file.run({ file_path: 'a.txt', old_str: 'a', new_str: 'b' }, null, {});
+ok(calls.at(-1)[0] === 'str_replace' && calls.at(-1)[1].path === 'a.txt'
+  && calls.at(-1)[1].old === 'a' && calls.at(-1)[1].new === 'b',
+  'edit_file accepts file_path and old_str/new_str');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log(errors.join('\n')); process.exit(1); }

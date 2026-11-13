@@ -27,6 +27,7 @@ console.log('Native tool tests');
 console.log('-'.repeat(60));
 
 eq(TOOL_SCHEMAS.echo.properties.text.type, 'string', 'echo schema has text');
+ok(TOOL_SCHEMAS.read_file.properties.range, 'read_file schema offers a range field');
 eq(TOOL_SCHEMAS.exec.properties.argv.type, 'array', 'exec schema has argv array');
 eq(TOOL_SCHEMAS.todo_write.properties.todos.type, 'array', 'todo_write schema has todos');
 
@@ -53,6 +54,12 @@ eq(nativeToolChoice('google'), null, 'google choice is configured separately');
 
 eq(nativeToolArgs('echo', { text: 'hi' }), { arg: 'hi', note: undefined }, 'echo unwraps text');
 eq(nativeToolArgs('read_file', { path: 'a.js' }), { arg: 'a.js', note: undefined }, 'read_file unwraps path');
+eq(nativeToolArgs('read_file', { path: 'a.js', range: '1-1' }),
+  { arg: { path: 'a.js', range: '1-1' }, note: undefined },
+  'read_file keeps a separate range');
+eq(nativeToolArgs('read_file', '{"path":"a.js","range":"1-1"}').arg,
+  { path: 'a.js', range: '1-1' },
+  'read_file parses a stringified native argument');
 eq(nativeToolArgs('write_file', { path: 'a.js', content: 'x' }).arg.path, 'a.js', 'write_file keeps object');
 eq(nativeToolArgs('declare_goal_complete', { summary: 'done' }),
   { arg: undefined, note: 'done' }, 'goal summary becomes the note');

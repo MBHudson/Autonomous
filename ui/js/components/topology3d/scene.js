@@ -13,7 +13,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { perf, perfFrame, perfAttachGL, gpuBegin, gpuEnd, gpuPoll } from '../../perf.js?v=446';
+import { perf, perfFrame, perfAttachGL, gpuBegin, gpuEnd, gpuPoll } from '../../perf.js?v=449';
 
 /** True when this browser can give us a WebGL context at all. */
 export function webglAvailable() {

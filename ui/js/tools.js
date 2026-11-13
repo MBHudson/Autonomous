@@ -31,11 +31,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=446';
-import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=446';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=446';
-import { settingFor } from './agentConfig.js?v=446';
-import { trace } from './trace.js?v=446';
+import { store } from './store.js?v=449';
+import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=449';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=449';
+import { settingFor } from './agentConfig.js?v=449';
+import { trace } from './trace.js?v=449';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -1164,7 +1164,8 @@ export function pathText(v) {
   if (typeof v === 'string' || typeof v === 'number') return String(v);
   let cur = v;
   for (let i = 0; i < 2 && cur && typeof cur === 'object' && !Array.isArray(cur); i++) {
-    cur = cur.path ?? cur.arg ?? cur.pattern;
+    cur = cur.path ?? cur.file_path ?? cur.filepath ?? cur.filename
+    ?? cur.target_file ?? cur.file ?? cur.arg ?? cur.pattern;
     if (typeof cur === 'string' || typeof cur === 'number') return String(cur);
   }
   return null;
@@ -1204,8 +1205,16 @@ export function bindSandboxTools(api) {
     // JSON object with "range". The object form used to be dropped, so a model
     // asking for one line got the whole file and never knew why.
     const obj = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
-    const range = m ? `${m[2]}-${m[3]}`
+    let range = m ? `${m[2]}-${m[3]}`
       : (obj.range !== undefined && obj.range !== null && obj.range !== '' ? String(obj.range) : undefined);
+    // Foreign Read calls name the window with offset/limit. Translate that
+    // shape here instead of dropping it: offset is a 1-based line number and
+    // limit is a line count, matching the sandbox's "start-end" range.
+    if (range === undefined && (obj.offset !== undefined || obj.limit !== undefined)) {
+      const start = Math.max(1, Math.floor(Number(obj.offset)) || 1);
+      const count = Math.floor(Number(obj.limit));
+      range = Number.isFinite(count) && count > 0 ? `${start}-${start + count - 1}` : `${start}-`;
+    }
     let res;
     try {
       res = await api.sandbox('read', {
@@ -1326,12 +1335,12 @@ export function bindSandboxTools(api) {
   // Cursor/Aider edit dialect: path + old_string + new_string.
   TOOL_REGISTRY.edit_file.run = async (arg, _note, ctx) => {
     const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : {};
-    const path = pathText(a.path);
-    const old = String(a.old_string ?? a.old_str ?? '');
+    const path = pathText(a);
+    const old = String(a.old_string ?? a.old_str ?? a.old_text ?? '');
     if (!path) return 'error: edit_file needs "path" as a plain string, e.g. {"path":"training/training.txt","old_string":"...","new_string":"..."} — retry the step with that shape';
     if (!old) return 'error: edit_file needs "old_string"';
     const res = await api.sandbox('str_replace', {
-      path, old, new: String(a.new_string ?? a.new_str ?? ''), replace_all: !!a.replace_all, root: scopeOf(ctx),
+      path, old, new: String(a.new_string ?? a.new_str ?? a.new_text ?? ''), replace_all: !!a.replace_all, root: scopeOf(ctx),
     });
     return `edited ${res.path} (${res.replaced} replacement${res.replaced === 1 ? '' : 's'})`;
   };
@@ -2557,7 +2566,11 @@ export const TOOL_ALIASES = {
   glob: 'glob_files', find_files: 'glob_files', file_search: 'glob_files',
   // Web
   fetch: 'fetch_url', webfetch: 'fetch_url', web_fetch: 'fetch_url', open_url: 'fetch_url',
-  // Writers. edit_file is deliberately absent: it is a REAL tool (exact
+  // Editors. Claude calls exact search-and-replace `Edit`; that is our
+  // edit_file, never write_file. Mapping it to write_file would turn a bad
+  // old_string into a whole-file overwrite instead of a loud failure.
+  edit: 'edit_file',
+  // Writers. edit_file is deliberately absent here: it is a REAL tool (exact
   // search-and-replace), so an entry here could never take effect — registered
   // names win. Mapping it to write_file would also be dangerous: a misspelled
   // or empty old_string would become a whole-file overwrite instead of the
@@ -2585,6 +2598,70 @@ const ARG_KEY_ALIASES = {
   show_url: ['url', 'href', 'link'],
   web_search: ['query', 'q', 'search'],
 };
+
+const FILE_PATH_KEYS = ['path', 'file_path', 'filepath', 'file', 'filename', 'target_file'];
+
+/** Native/relay arguments sometimes arrive as a JSON string, not an object. */
+function parseArgObject(arg) {
+  if (typeof arg !== 'string') return arg;
+  const text = arg.trim();
+  if (!text.startsWith('{')) return arg;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : arg;
+  } catch { return arg; }
+}
+
+/** One object with the foreign path spellings folded onto our `path`. */
+function fileArgWithPath(arg) {
+  if (!arg || typeof arg !== 'object' || Array.isArray(arg)) return null;
+  const path = pathText(arg);
+  if (path == null) return null;
+  const out = { path };
+  for (const [key, value] of Object.entries(arg)) {
+    if (key === 'path' || FILE_PATH_KEYS.includes(key)) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+/** read_file/show_file: keep range, offset and limit; collapse a lone path. */
+function normaliseReadArg(arg) {
+  const out = fileArgWithPath(parseArgObject(arg));
+  if (!out) return arg;
+  if (Array.isArray(out.range) && out.range.length === 2) {
+    out.range = `${out.range[0]}-${out.range[1]}`;
+  }
+  if (Array.isArray(out.view_range) && out.view_range.length === 2) {
+    if (out.range === undefined || out.range === null || out.range === '') {
+      out.range = `${out.view_range[0]}-${out.view_range[1]}`;
+    }
+    delete out.view_range;
+  }
+  const hasRange = out.range !== undefined && out.range !== null && out.range !== '';
+  const hasWindow = out.offset !== undefined || out.limit !== undefined;
+  return !hasRange && !hasWindow && Object.keys(out).length === 1 ? out.path : out;
+}
+
+/** Edit: fold file_path and the old/new spellings onto edit_file's names. */
+function normaliseEditArg(arg) {
+  arg = parseArgObject(arg);
+  if (!arg || typeof arg !== 'object' || Array.isArray(arg)) return arg;
+  const out = {};
+  const path = pathText(arg);
+  if (path != null) out.path = path;
+  const old = arg.old_string ?? arg.old_str ?? arg.old_text;
+  if (old !== undefined) out.old_string = old;
+  const next = arg.new_string ?? arg.new_str ?? arg.new_text;
+  if (next !== undefined) out.new_string = next;
+  for (const [key, value] of Object.entries(arg)) {
+    if (FILE_PATH_KEYS.includes(key) || key === 'path') continue;
+    if (key === 'old_string' || key === 'old_str' || key === 'old_text') continue;
+    if (key === 'new_string' || key === 'new_str' || key === 'new_text') continue;
+    out[key] = value;
+  }
+  return out;
+}
 
 /**
  * Split a shell command line into argv, or null when it needs a real shell.
@@ -2670,6 +2747,8 @@ export function aliasToolArgs(tool, arg) {
     for (const k of ['file_path', 'filepath', 'filename', 'file_text', 'contents', 'body']) delete out[k];
     return out;
   }
+  if (tool === 'read_file' || tool === 'show_file') return normaliseReadArg(arg);
+  if (tool === 'edit_file') return normaliseEditArg(arg);
   const keys = ARG_KEY_ALIASES[tool];
   if (!keys) return arg;
   if (typeof arg === 'string' || typeof arg === 'number') return arg;

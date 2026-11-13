@@ -75,7 +75,10 @@ export const TOOL_SCHEMAS = {
   exec_kill: obj({ handle: str('Handle returned by exec_start') }, ['handle']),
   web_search: obj({ query: str('Search query') }, ['query']),
   fetch_url: obj({ url: str('Page URL') }, ['url']),
-  read_file: obj({ path: str('Path, optionally "path 20-80" for a line range') }, ['path']),
+  read_file: obj({
+    path: str('Path, optionally "path 20-80" for a line range'),
+    range: str('Optional line range, e.g. "1-1" (same as appending it to path)'),
+  }, ['path']),
   list_dir: obj({ path: str('Directory (omit for the sandbox root)') }),
   glob_files: obj({ pattern: str('Glob pattern, e.g. ui/js/**/*.js') }, ['pattern']),
   grep_code: obj({ pattern: str('Regular expression') }, ['pattern']),
@@ -232,7 +235,6 @@ const SCALAR_ARGS = {
   adopt: 'id',
   web_search: 'query',
   fetch_url: 'url',
-  read_file: 'path',
   list_dir: 'path',
   glob_files: 'pattern',
   grep_code: 'pattern',
@@ -256,6 +258,18 @@ export function nativeToolArgs(name, args) {
   a = (a && typeof a === 'object' && !Array.isArray(a)) ? a : {};
   if (name === 'declare_goal_complete') {
     return { arg: undefined, note: String(a.summary ?? '') };
+  }
+  // read_file is the one scalar tool whose range is a second field. Native
+  // models commonly send {path, range}; unwrapping only path silently read the
+  // whole file, so the ranged drill step could never pass.
+  if (name === 'read_file') {
+    const path = a.path ?? a.file_path ?? a.filepath ?? a.arg;
+    if (path === undefined) return { arg: a };
+    const out = { path };
+    if (a.range !== undefined && a.range !== null && a.range !== '') out.range = String(a.range);
+    if (a.offset !== undefined) out.offset = a.offset;
+    if (a.limit !== undefined) out.limit = a.limit;
+    return { arg: Object.keys(out).length === 1 ? path : out };
   }
   const key = SCALAR_ARGS[name];
   if (key) {
