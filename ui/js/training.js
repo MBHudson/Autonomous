@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=443';
+import { store } from './store.js?v=444';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -75,7 +75,7 @@ export const TRAINING_TASKS = [
   { tool: 'now', label: 'Report the current date and time.' },
   { tool: 'write_file', label: 'Create {file} containing exactly the word "training". (Asks approval — wait for it, do not skip.)' },
   { tool: 'read_file', label: 'Read {file} back and confirm it says "training".' },
-  { tool: 'read_file', label: 'Read only line 1: call read_file with "{file} 1-1". A range keeps a big file out of your context instead of pulling all of it in.' },
+  { tool: 'read_file', label: 'Read only line 1 of {file}: call read_file with that path plus " 1-1" in the range. A range keeps a big file out of your context instead of pulling all of it in.' },
   { tool: 'edit_file', label: 'In {file}, replace the exact text "training" with "training\\ndrill 2 passed" — old_string is the text you match, new_string is what replaces it; edit_file is search-and-replace, never an append. (Asks approval — wait for it.)' },
   { tool: 'edit_file', label: 'Replace the exact line "drill 2 passed" with "drill 2 passed (exact match)". (Asks approval — old_string/new_string edits only touch the text you name.)' },
   { tool: 'list_dir', label: 'List the training folder.' },
@@ -341,7 +341,12 @@ export function trainingStepList(agent = null) {
  * turn path, so messages, topology, metrics and trace all behave as usual.
  */
 export function trainingKickoffFor() {
-  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${fillFile(t.label)}`).join('\n');
+  // This one text reaches every agent, so it must never contain the literal
+  // `<agent>` placeholder: a live run had the model stop to work out what its
+  // "agent id" was instead of reading the exact path its own prompt block
+  // already carried. The block is authoritative; this message stays generic.
+  const stepLabel = (label) => String(label).split(TRAINING_FILE_TOKEN).join('your drill file');
+  const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${stepLabel(t.label)}`).join('\n');
   return `Training mode is ON — work this drill now, step by step, inside the "training" sandbox folder. Nothing else while it is on.\n`
     + `Steps:\n${steps}\n`
     + `Rules: one step at a time; a failed step is retried until it passes, never skipped — but READ the error and change the argument, because "Did you mean ..." or "not a file" means the path is wrong, not that the call should be sent again unchanged; every agent has its OWN file in the training folder — use the exact path in your TRAINING MODE block, which the app also repeats when this kickoff reaches a turn already in flight — never another agent's file, and never the project folder above the sandbox; write_file, edit_file and exec ask for my approval — waiting for it is part of the drill. After each passed step, update your todo list; the summary goes in the last todo item; the final show_file ends the PASS — the mode then sends Continue again, so begin a fresh pass instead of waiting.`;
@@ -373,25 +378,13 @@ export function shouldResumeDrill(mode) {
  * Still sent silently and rendered nowhere, so the operator sees only the
  * drill -- the model sees the position its own past calls produced.
  */
-export function trainingResumeFor(verdicts = null) {
-  const list = verdicts && typeof verdicts === 'object' ? Object.values(verdicts) : [];
-  const lines = [];
-  for (const v of list) {
-    if (!v || !Number.isFinite(Number(v.step))) continue;
-    const step = Math.max(0, Number(v.step));
-    const total = Number(v.totalSteps) || TRAINING_TASKS.length;
-    const name = String(v.name || 'agent');
-    if (v.complete) {
-      lines.push(`${name}: pass complete (${step}/${total}) — start a fresh pass at step 1.`);
-      continue;
-    }
-    const next = TRAINING_TASKS[step];
-    lines.push(`${name}: ${step}/${total} steps passed — next is step ${step + 1}`
-      + `${next ? ` (${next.tool})` : ''}; do not restart.`);
-  }
-  if (!lines.length) return 'Continue';
-  return 'Continue. The app recorded your drill position from the calls it saw — resume there, never restart the pass early:\n'
-    + lines.join('\n');
+export function trainingResumeFor() {
+  // One message reaches EVERY active agent, so it must not list their
+  // positions: a live run had the second model read the first model's
+  // "pass complete (17/17)" and start at step 17. Each agent's own position
+  // is in its own TRAINING MODE block, where the app wrote it; this stays
+  // generic and points there.
+  return 'Continue. Your TRAINING MODE block records your own position from the calls the app saw — resume there, never restart the pass early.';
 }
 
 /**
@@ -403,6 +396,14 @@ export function trainingBlockFor(agent = null) {
   if (!isTrainingActive()) return '';
   const file = fileForSteps(agent);
   const steps = TRAINING_TASKS.map((t, i) => `${i + 1}. ${t.tool}: ${fillFile(t.label, agent)}`).join('\n');
+  const mine = agent ? (store.get('trainingVerdicts') || {})[agent.id] : null;
+  const step = mine && Number.isFinite(Number(mine.step)) ? Math.max(0, Number(mine.step)) : null;
+  const total = (mine && Number(mine.totalSteps)) || TRAINING_TASKS.length;
+  const next = step !== null ? TRAINING_TASKS[step] : null;
+  const positionRule = step === null ? ''
+    : mine.complete
+      ? `- YOUR recorded position: pass complete (${step}/${total}) — start a fresh pass at step 1.\n`
+      : `- YOUR recorded position: ${step}/${total} — next is step ${step + 1}${next ? ` (${next.tool})` : ''}. Resume there; never restart the pass early.\n`;
   return `[TRAINING MODE — paced drill, ~50% request rate. Nothing else matters until training mode is switched off.]\n`
     + `Work ONLY these steps, in order, inside the "training" sandbox folder. Do not answer other questions, do not touch other files, do not start other work — if asked anything else, finish the current drill step first and say the drill comes first.\n`
     + `Steps:\n${steps}\n`
@@ -412,6 +413,8 @@ export function trainingBlockFor(agent = null) {
     + `- An error that says "Did you mean ..." or "not a file" is telling you the ARGUMENT is wrong: change it. Sending the identical call again fails identically.\n`
     + `- edit_file is exact search-and-replace, never an append: old_string is the text you match, new_string replaces it. To add a line, anchor on the neighbouring text (old_string "training" → new_string "training\\ndrill 2 passed"). An empty or ambiguous old_string is refused, so a bare append can never pass.\n`
     + `- Paths are relative to the sandbox: ${file}. Never the project folder above it, and never an absolute C:\\... path. Every agent has its OWN drill file — do not read or edit another agent's.\n`
+    + `- THIS RUN uses the file above. Any earlier training transcript that mentions training/training.txt is an OLD run: ignore its paths and copy nothing from it.\n`
+    + positionRule
     + `- Some steps ask the operator for approval (write_file, edit_file, exec). That pause is normal: wait for it, do not work around it, do not narrate the call as text.\n`
     + `- Display tools paint their output straight into the transcript as your reply and END the turn: show_file (a file), show_find (search results), show_command (a command's output), show_url (a page). Never re-describe what one showed, and never use one when you need the output back to decide the next step — that is read_file, grep_code, exec.\n`
     + `- The Continue message names the step the app recorded for you. Resume at that step; do not start another pass while steps remain — the app saw every call you made, so an early restart shows up as off-step calls.\n`

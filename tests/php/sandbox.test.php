@@ -263,6 +263,34 @@ throws(function () use ($drillFile) {
     Sandbox::strReplace($drillFile, '', "bare append\n");
 }, 'drill edit: an empty old_string is refused', 'empty');
 
+// 9c. Two agents' passes in parallel, each in its own file. The reported
+// collision comes from one shared file: A's step 9 leaves
+// "drill 2 passed (exact match)", then B's step 8 adds ANOTHER
+// "drill 2 passed" line, so B's step 9 matches twice and can never land.
+$fileA = $writeDir . '/training/training-agent-a.txt';
+$fileB = $writeDir . '/training/training-agent-b.txt';
+$final = "training\ndrill 2 passed (exact match)";
+foreach ([$fileA, $fileB] as $f) {
+    Sandbox::writeFile($f, 'training');
+    Sandbox::strReplace($f, 'training', "training\ndrill 2 passed");
+    Sandbox::strReplace($f, 'drill 2 passed', 'drill 2 passed (exact match)');
+}
+ok(file_get_contents($fileA) === $final, 'agent A\'s own file completes both edits');
+ok(file_get_contents($fileB) === $final, 'agent B\'s own file completes both edits');
+
+// The old shared file, replayed in the order the transcript showed: both
+// agents append, one rename lands, and the other agent's rename is refused.
+$shared = $writeDir . '/training/training.txt';
+Sandbox::writeFile($shared, 'training');
+Sandbox::strReplace($shared, 'training', "training\ndrill 2 passed");
+Sandbox::strReplace($shared, 'drill 2 passed', 'drill 2 passed (exact match)');
+Sandbox::strReplace($shared, 'training', "training\ndrill 2 passed");
+throws(function () use ($shared) {
+    Sandbox::strReplace($shared, 'drill 2 passed', 'drill 2 passed (exact match)');
+}, 'shared drill file: the second exact replace is ambiguous', 'appears 2 times');
+ok(file_get_contents($shared) === "training\ndrill 2 passed\ndrill 2 passed (exact match)",
+    'shared drill file: the reported three-line, 52-byte collision is reproduced');
+
 // 10. list_dir on subdir
 $lsSub = Sandbox::listDir('sub', 200, $writeDir);
 ok(count($lsSub['entries']) > 0, 'list subdirectory');

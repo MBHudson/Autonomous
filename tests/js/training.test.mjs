@@ -113,15 +113,27 @@ ok(block.includes('Continue'), 'block names the Continue message the app sends')
 ok(block.includes('Did you mean'), 'block tells the agent to fix the argument an error names');
 ok(block.includes('relative to the sandbox'), 'block states the path rule');
 
-// The continued turn is a bare "Continue": the drill is already in the prompt,
-// and a paragraph repeated every few seconds is context paid for every turn.
-eq(trainingResumeFor(), 'Continue', 'with nothing recorded, the continued turn is exactly Continue');
-const resumed = trainingResumeFor({ a: { name: 'Scout', step: 15, totalSteps: 17, complete: false } });
-ok(resumed.includes('step 16') && resumed.includes('todo_write'),
-  'the resume names the recorded next step');
-ok(/do not restart/i.test(resumed), 'the resume forbids restarting the pass');
-const restarted = trainingResumeFor({ a: { name: 'Scout', step: 17, totalSteps: 17, complete: true } });
-ok(restarted.includes('fresh pass'), 'a completed pass resumes into a fresh one');
+// The recorded position is per agent, in that agent's own block. One shared
+// "Continue" used to list every agent's position, and a live run had a second
+// model read another agent's "pass complete" and start at step 17.
+store.set('trainingVerdicts', {
+  agent_test: { step: 15, totalSteps: 17, complete: false, name: 'Scout' },
+  agent_other: { step: 3, totalSteps: 17, complete: false, name: 'Coder' },
+});
+const positioned = trainingBlockFor({ id: 'agent_test' });
+ok(positioned.includes('15/17') && positioned.includes('step 16') && positioned.includes('todo_write'),
+  'the block names this agent\'s recorded next step');
+ok(positioned.includes('never restart the pass early'), 'the block forbids restarting early');
+ok(!positioned.includes('3/17'), 'the block never carries another agent\'s position');
+store.set('trainingVerdicts', { agent_test: { step: 17, totalSteps: 17, complete: true } });
+ok(trainingBlockFor({ id: 'agent_test' }).includes('fresh pass'),
+  'a completed pass resumes into a fresh one');
+store.set('trainingVerdicts', {});
+
+// The continued turn is generic: every agent reads its own position above.
+eq(trainingResumeFor(),
+  'Continue. Your TRAINING MODE block records your own position from the calls the app saw — resume there, never restart the pass early.',
+  'the shared Continue points at the per-agent block instead of listing positions');
 
 // --- the clean-pass stopping rule -------------------------------------------
 eq(reachedCleanTarget({ cleanPassTarget: 0 }, { a: { cleanPasses: 5 } }), null,
@@ -153,6 +165,8 @@ const kickoff = trainingKickoffFor();
 ok(typeof kickoff === 'string' && kickoff.length > 200, 'kickoff is a full instruction');
 ok(kickoff.includes('Training mode is ON'), 'kickoff announces the mode');
 ok(kickoff.includes(TRAINING_DIR), 'kickoff names the drill folder');
+ok(!kickoff.includes('<agent>'), 'kickoff never asks a model to resolve the agent placeholder');
+ok(kickoff.includes('your drill file'), 'kickoff points at the agent\'s own file, named exactly in the prompt block');
 ok(kickoff.includes('retried until it passes'), 'kickoff carries the retry rule');
 ok(kickoff.includes('approval'), 'kickoff warns about approval pauses');
 for (const t of TRAINING_TASKS) ok(kickoff.includes(t.tool), `kickoff lists ${t.tool}`);

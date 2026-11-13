@@ -92,6 +92,23 @@ eq(DRILL_CHECKS.length, TRAINING_TASKS.length, 'every drill step has a check slo
   ok(other.failures > 0, 'the wrong file counts as a failed attempt, not a pass');
 }
 
+// Two agents drilling in one run: each agent's own calls are graded against
+// its own file, so both passes complete clean. The old shared file is what
+// let one pass's output corrupt the other's (pinned against real bytes in
+// tests/php/sandbox.test.php 9c).
+{
+  const a = 'training/training-agent-a.txt';
+  const b = 'training/training-agent-b.txt';
+  const mapped = (file) => cleanPass().map(c => ({
+    ...c,
+    arg: JSON.parse(JSON.stringify(c.arg).replaceAll('training/training.txt', file)),
+  }));
+  eq(drillVerdict(mapped(a), a).clean, true,
+    'two agents: agent A\'s pass reads clean against its own file');
+  eq(drillVerdict(mapped(b), b).clean, true,
+    'two agents: agent B\'s pass reads clean against its own file');
+}
+
 // Clean passes are counted separately from completed ones.
 {
   const dirty = cleanPass();
