@@ -242,6 +242,20 @@ $ROOT = __DIR__;
 $uri = parse_url(isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/', PHP_URL_PATH);
 if (!is_string($uri) || $uri === '') { $uri = '/'; }
 
+// Apache mounts this tree at /router; php -S serves it at the origin root.
+// Accept the Apache mount here too, so the URL the Windows launcher opens --
+// and any bookmark made from it -- keeps working under either server. Only
+// this documented prefix is stripped; a general leading segment would turn
+// unrelated paths into app paths.
+$mountedAtRouter = false;
+if ($uri === '/router') {
+    $uri = '/';
+    $mountedAtRouter = true;
+} elseif (strpos($uri, '/router/') === 0) {
+    $uri = substr($uri, strlen('/router'));
+    $mountedAtRouter = true;
+}
+
 // 1. Never serve these, ever. Compared case-insensitively: on Windows and
 //    macOS the disk is case-insensitive, so /STORAGE/state.json would have
 //    resolved to the real file and slipped through a case-sensitive check.
@@ -285,7 +299,14 @@ if (substr($lowerUri, -4) === '.php' && $uri !== '/api/index.php') {
 }
 
 // 2. API front controller (mirrors api/.htaccess).
+//
+// api/index.php derives its endpoint from SCRIPT_NAME. Under the Apache mount
+// that is /router/api/index.php and the original /router/api/... REQUEST_URI
+// matches it; under php -S at the root it is /api/index.php. Describe the
+// current mount explicitly so both shapes resolve the same endpoint instead
+// of falling through to the API's "Endpoint not found".
 if ($uri === '/api' || strpos($uri, '/api/') === 0) {
+    $_SERVER['SCRIPT_NAME'] = ($mountedAtRouter ? '/router' : '') . '/api/index.php';
     require $ROOT . '/api/index.php';
     return true;
 }

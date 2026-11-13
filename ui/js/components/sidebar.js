@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=449';
-import { K } from '../storage.js?v=449';
-import { persistence } from '../persistence.js?v=449';
-import { api } from '../api.js?v=449';
-import { isNoTokenError } from '../apiError.js?v=449';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=449';
-import { errText } from '../api.js?v=449';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=449';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=449';
-import { snapshot } from '../rateGovernor.js?v=449';
-import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty } from '../training.js?v=449';
-import { resetBrowserEnabled } from '../toolManifest.js?v=449';
-import { perf } from '../perf.js?v=449';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=449';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=449';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=449';
+import { store } from '../store.js?v=457';
+import { K } from '../storage.js?v=457';
+import { persistence } from '../persistence.js?v=457';
+import { api } from '../api.js?v=457';
+import { isNoTokenError } from '../apiError.js?v=457';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=457';
+import { errText } from '../api.js?v=457';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=457';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=457';
+import { snapshot } from '../rateGovernor.js?v=457';
+import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty, trainingDifficultyLabel, trainingDifficultyHint, trainingTasksFor, normalizeCustomSteps, CUSTOM_STEP_MAX, showsEveryPass } from '../training.js?v=457';
+import { resetBrowserEnabled } from '../toolManifest.js?v=457';
+import { perf } from '../perf.js?v=457';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=457';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=457';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=457';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -76,6 +76,17 @@ export class Sidebar {
     // A run can be told to end itself after N clean passes. The verdict fires
     // on every settled call, so this is the same number the strip shows.
     store.on('training:verdict', () => this._maybeStopOnCleanPass());
+    // The other half of that contract: a completed pass gets its own report
+    // while the run keeps going. If the clean-pass target fired first, training
+    // is already inactive and the final report owns the screen.
+    store.on('training:pass', () => {
+      if (!showsEveryPass(store.get('settings.trainingMode'))) return;
+      this._showTrainingSummary('', { passComplete: true });
+    });
+    // The same report can be requested when a run ends from elsewhere (the
+    // clean-pass target or a future completion path). The sidebar owns what it
+    // shows; the caller only supplies the reason.
+    store.on('training:summary', ({ note = '' } = {}) => this._showTrainingSummary(note));
 
     // The scheduler announces when an agent starts and stops a tick; the badge
     // is only useful as a stop button while there is something to stop.
@@ -503,7 +514,7 @@ export class Sidebar {
         </div>
       </span>
       <span class="preprompt-wrap">
-        <button class="agent-menu-btn training-btn${trainingActive ? ' armed' : ''}" id="trainingBtn" title="Training mode${trainingActive ? ' (ON — drill only, agents at ~50% rate)' : ' (off)'}"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 3.5v9M10 3.5v9M2.5 6v4M13.5 6v4M4.5 4.8v6.4M11.5 4.8v6.4M6 8h4"/></svg></button>
+        <button class="agent-menu-btn training-btn${trainingActive ? ' armed' : ''}" id="trainingBtn" title="Training mode${trainingActive ? ' (ON — drill only, agents at ~50% rate)' : ' (off)'}"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 3.5v9M10 3.5v9M2.5 6v4M13.5 6v4M4.5 4.8v6.4M11.5 4.8v6.4M6 8h4"/></svg></button>
       </span>
       <button class="btn btn-primary btn-sm" id="addAgentBtn">+ ADD</button>
     </div>`;
@@ -774,14 +785,31 @@ export class Sidebar {
     const tm = store.get('settings.trainingMode') || { active: false, startedAt: 0 };
     const armed = !!tm.active;
     const difficulty = trainingDifficulty(tm);
+    const customSteps = normalizeCustomSteps(tm.customSteps);
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
-    const stepRows = (d) => trainingStepList(null, d).map(s => `<li>${esc(s)}</li>`).join('');
+    const stepRows = (d) => {
+      const rows = trainingStepList(null, d, customSteps).map(s => `<li>${esc(s)}</li>`).join('');
+      return rows || '<li>No custom steps saved yet — use the builder below.</li>';
+    };
     const steps = stepRows(difficulty);
-    const difficultyCopy = (d) => d === 'easy'
-      ? 'Easy runs the original 12-step sequence, including its old append step. Per-agent files and the Continue loop still apply.'
-      : 'Hard runs the current 17-step drill with the ranged read, anchored edits and display tools.';
+    const difficulties = [
+      ['easy', 'Easy'],
+      ['hard', 'Hard'],
+      ['advanced', 'Advanced'],
+      ['frontier', 'Frontier'],
+      ['browser', 'Browser'],
+      ['custom', 'Custom'],
+    ];
+    const difficultyButtons = difficulties.map(([id, label]) => {
+      const count = trainingTasksFor(id, customSteps).length;
+      return `<button type="button" class="btn btn-sm ${difficulty === id ? 'btn-primary' : 'btn-secondary'}" id="training-${id}" data-difficulty="${id}"${armed ? ' disabled' : ''}>${label} · ${count ? `${count} steps` : 'build'}</button>`;
+    }).join('');
     const difficultyNote = armed ? ' Stop training to switch.' : '';
+    const showEveryPass = !!tm.showEveryPass;
+    const customHint = difficulty === 'custom' && !customSteps.length
+      ? ' No custom steps saved yet — open the builder below.'
+      : '';
     const cleanTarget = Math.max(0, Math.floor(Number(tm.cleanPassTarget) || 0));
     // The same verdicts the live strip shows, so the dialog is a snapshot of
     // the run rather than a second, differently-computed opinion.
@@ -803,20 +831,23 @@ export class Sidebar {
         </div>
         <div class="modal-body">
           <div class="form-hint" style="margin-bottom:8px">A paced tool drill for every active agent. While armed:</div>
-          <div style="display:flex;gap:6px;margin-bottom:6px" role="group" aria-label="Drill difficulty">
-            <button type="button" class="btn btn-sm ${difficulty === 'easy' ? 'btn-primary' : 'btn-secondary'}" id="trainingEasy"${armed ? ' disabled' : ''} style="flex:1">Easy · 12 steps</button>
-            <button type="button" class="btn btn-sm ${difficulty === 'hard' ? 'btn-primary' : 'btn-secondary'}" id="trainingHard"${armed ? ' disabled' : ''} style="flex:1">Hard · 17 steps</button>
-          </div>
-          <div class="form-hint" id="trainingDifficultyHint" style="margin-bottom:10px">${esc(difficultyCopy(difficulty) + difficultyNote)}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px" role="group" aria-label="Drill difficulty">${difficultyButtons}</div>
+          <div class="form-hint" id="trainingDifficultyHint" style="margin-bottom:6px">${esc(trainingDifficultyHint(difficulty) + customHint + difficultyNote)}</div>
+          ${armed ? '' : '<button type="button" class="btn btn-ghost btn-sm" id="trainingCustomEdit" style="align-self:flex-start;margin-bottom:10px">Build / edit custom drill…</button>'}
                      ${statusBlock}
           <div class="form-hint" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <label for="trainingCleanTarget">Stop after</label>
             <input type="number" class="form-input" id="trainingCleanTarget" min="0" max="99" step="1" value="${cleanTarget}" style="width:72px">
             <span>clean pass${cleanTarget === 1 ? '' : 'es'} — 0 never stops on its own; with several agents, the first to get there ends the run.</span>
           </div>
+          <label class="training-show-passes">
+            <input type="checkbox" id="trainingShowEveryPass" ${showEveryPass ? 'checked' : ''}>
+            <span>Show every pass</span>
+          </label>
+          <div class="form-hint" style="margin-top:-2px;margin-bottom:10px">Off shows only the final results; on adds a report after every completed pass.</div>
           <ul class="training-points">
             <li>All active agents are throttled to ~50% of their normal request rate.</li>
-            <li>They work ONLY the drill below, in order, inside the <code>training/</code> sandbox folder — nothing else while the mode is on.</li>
+            <li>They work ONLY the drill below, in order — inside the <code>training/</code> sandbox for the file drills, on the real desktop for Frontier, in the built-in browser for Browser, or wherever a custom step directs — nothing else while the mode is on.</li>
             <li><strong>It only stops when you say so.</strong> Every finished turn — a display step, a short reply, even the last step of the drill — is followed automatically by <code>Continue</code>, so agents cannot end the loop early; the clean-pass limit below is the one exception, and 0 leaves it off.</li>
             <li>A failed step must be retried until it passes, never skipped; each pass is logged to the todo list.</li>
           </ul>
@@ -837,16 +868,18 @@ export class Sidebar {
         const cur = store.get('settings.trainingMode') || {};
         store.set('settings.trainingMode', { ...cur, difficulty: next });
         try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
-        const easy = next === 'easy';
-        const easyBtn = overlay.querySelector('#trainingEasy');
-        const hardBtn = overlay.querySelector('#trainingHard');
-        easyBtn.className = `btn btn-sm ${easy ? 'btn-primary' : 'btn-secondary'}`;
-        hardBtn.className = `btn btn-sm ${easy ? 'btn-secondary' : 'btn-primary'}`;
+        overlay.querySelectorAll('[data-difficulty]').forEach(btn => {
+          btn.className = `btn btn-sm ${btn.dataset.difficulty === next ? 'btn-primary' : 'btn-secondary'}`;
+        });
         overlay.querySelector('#trainingSteps').innerHTML = stepRows(next);
-        overlay.querySelector('#trainingDifficultyHint').textContent = difficultyCopy(next);
+        const noSteps = next === 'custom' && !customSteps.length
+          ? ' No custom steps saved yet — open the builder below.'
+          : '';
+        overlay.querySelector('#trainingDifficultyHint').textContent = trainingDifficultyHint(next) + noSteps;
       };
-      overlay.querySelector('#trainingEasy').addEventListener('click', () => setDifficulty('easy'));
-      overlay.querySelector('#trainingHard').addEventListener('click', () => setDifficulty('hard'));
+      overlay.querySelectorAll('[data-difficulty]').forEach(btn => {
+        btn.addEventListener('click', () => setDifficulty(btn.dataset.difficulty));
+      });
     }
     overlay.querySelector('#trainingClose').addEventListener('click', close);
     overlay.querySelector('#trainingCancel').addEventListener('click', close);
@@ -854,6 +887,25 @@ export class Sidebar {
     overlay.querySelector('#trainingGo').addEventListener('click', () => {
       if (armed) this._stopTraining(close);
       else this._startTraining(close);
+    });
+    const customEdit = overlay.querySelector('#trainingCustomEdit');
+    if (customEdit) {
+      customEdit.addEventListener('click', () => {
+        // Replace the setup dialog rather than stacking two of them: Save
+        // reopens this dialog with the new table and Custom selected.
+        close();
+        this._openCustomDrillBuilder(() => this._openTrainingDialog());
+      });
+    }
+    overlay.querySelector('#trainingShowEveryPass').addEventListener('change', (e) => {
+      const cur = store.get('settings.trainingMode') || {};
+      store.set('settings.trainingMode', { ...cur, showEveryPass: !!e.target.checked });
+      try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
+      // Unchecking mid-run hides the report that may already be open; final
+      // reports are unaffected and still appear when the run ends.
+      if (!e.target.checked) {
+        document.querySelectorAll('.training-summary-overlay').forEach(el => el.remove());
+      }
     });
     // Saved as it is edited, so the limit can be changed mid-run without
     // restarting the drill (Start resets the count, not the setting).
@@ -869,6 +921,155 @@ export class Sidebar {
       store.emit('training:changed', { active: !!cur.active });
       this._maybeStopOnCleanPass();
     });
+  }
+
+  /**
+   * Build the saved custom drill. Each row is one tool call the agent must
+   * make, in order; the instruction is what it should do with that call. The
+   * optional "must include" phrase is the only content the app can check
+   * without asking the model to grade itself.
+   */
+  _openCustomDrillBuilder(onSaved = null) {
+    const tm = store.get('settings.trainingMode') || {};
+    const saved = normalizeCustomSteps(tm.customSteps);
+    const tools = Object.keys(TOOL_REGISTRY).sort();
+    const known = new Set(tools);
+    const initial = saved.length ? saved : [{ tool: '', instruction: '', expect: '' }];
+    const rowHtml = (step = {}) => `
+      <div class="training-builder-row" data-custom-step>
+        <div class="training-builder-grip" draggable="true" title="Drag to reorder" aria-label="Drag to reorder step">&#8942;&#8942;</div>
+        <div class="training-builder-fields">
+          <div class="training-builder-line">
+            <input class="form-input training-builder-tool" list="trainingToolNames" value="${escAttr(step.tool || '')}" placeholder="tool, e.g. read_file" spellcheck="false">
+            <input class="form-input training-builder-expect" value="${escAttr(step.expect || '')}" placeholder="must include (optional)">
+          </div>
+          <textarea class="form-textarea training-builder-instruction" rows="2" placeholder="What should the agent do with this call?">${esc(step.instruction || '')}</textarea>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm training-builder-remove" data-remove-step title="Remove step" aria-label="Remove step">−</button>
+      </div>`;
+    const toolOptions = tools.map(t => `<option value="${escAttr(t)}"></option>`).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay training-builder-overlay';
+    overlay.innerHTML = `
+      <div class="modal training-builder-modal">
+        <div class="modal-header">
+          <span class="modal-title">Custom drill builder</span>
+          <button class="modal-close" id="trainingBuilderClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-hint" style="margin-bottom:8px">One row = one call the agent must make, in order. Step 1 is where every pass starts. Use any built-in tool or a tool saved in Brain Lab.</div>
+          <div class="form-hint" style="margin-bottom:10px;color:var(--text-secondary)">The app can verify that the tool returned ok. “Must include” is optional: if set, the call's arguments or result must contain that phrase. Free-form wording cannot be graded automatically.</div>
+          <div id="trainingCustomRows">${initial.map(rowHtml).join('')}</div>
+          <button type="button" class="btn btn-ghost btn-sm training-builder-add" id="trainingCustomAdd">+ add step</button>
+          <div class="form-hint training-builder-status" id="trainingCustomStatus"></div>
+          <datalist id="trainingToolNames">${toolOptions}</datalist>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="trainingCustomCancel">Cancel</button>
+          <button class="btn btn-primary" id="trainingCustomSave">Save drill</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const rowsEl = overlay.querySelector('#trainingCustomRows');
+    const statusEl = overlay.querySelector('#trainingCustomStatus');
+    const addEl = overlay.querySelector('#trainingCustomAdd');
+    const close = () => overlay.remove();
+    const updateAddState = () => {
+      const full = rowsEl.children.length >= CUSTOM_STEP_MAX;
+      addEl.disabled = full;
+      addEl.textContent = full ? `step limit (${CUSTOM_STEP_MAX})` : '+ add step';
+    };
+    const addRow = (step = {}) => {
+      if (rowsEl.children.length >= CUSTOM_STEP_MAX) return;
+      rowsEl.insertAdjacentHTML('beforeend', rowHtml(step));
+      updateAddState();
+      const added = rowsEl.lastElementChild;
+      added?.querySelector('.training-builder-tool')?.focus();
+    };
+    addEl.addEventListener('click', () => addRow());
+    rowsEl.addEventListener('click', (e) => {
+      const remove = e.target.closest('[data-remove-step]');
+      if (!remove) return;
+      remove.closest('[data-custom-step]')?.remove();
+      if (!rowsEl.children.length) addRow();
+      updateAddState();
+    });
+    // Drag the row by its grip. The grip is the only draggable node, so text
+    // selection and typing in the inputs keep their normal behaviour.
+    let dragRow = null;
+    const clearDropMarks = () => {
+      rowsEl.querySelectorAll('.training-builder-over').forEach(el => el.classList.remove('training-builder-over'));
+    };
+    rowsEl.addEventListener('dragstart', (e) => {
+      const grip = e.target.closest('.training-builder-grip');
+      if (!grip) return;
+      dragRow = grip.closest('[data-custom-step]');
+      if (!dragRow) return;
+      dragRow.classList.add('training-builder-dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        // Firefox needs data set before a drag starts; the value is unused.
+        e.dataTransfer.setData('text/plain', 'training-step');
+        try { e.dataTransfer.setDragImage(dragRow, 18, 18); } catch { /* drag image is optional */ }
+      }
+    });
+    rowsEl.addEventListener('dragover', (e) => {
+      if (!dragRow) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      const over = e.target.closest('[data-custom-step]');
+      if (!over || over === dragRow) return;
+      clearDropMarks();
+      over.classList.add('training-builder-over');
+      const rect = over.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      rowsEl.insertBefore(dragRow, after ? over.nextSibling : over);
+    });
+    rowsEl.addEventListener('drop', (e) => {
+      if (!dragRow) return;
+      e.preventDefault();
+      clearDropMarks();
+    });
+    rowsEl.addEventListener('dragend', () => {
+      dragRow?.classList.remove('training-builder-dragging');
+      dragRow = null;
+      clearDropMarks();
+    });
+    overlay.querySelector('#trainingBuilderClose').addEventListener('click', close);
+    overlay.querySelector('#trainingCustomCancel').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#trainingCustomSave').addEventListener('click', () => {
+      const raw = [...rowsEl.querySelectorAll('[data-custom-step]')].map(row => ({
+        tool: row.querySelector('.training-builder-tool')?.value || '',
+        instruction: row.querySelector('.training-builder-instruction')?.value || '',
+        expect: row.querySelector('.training-builder-expect')?.value || '',
+      }));
+      if (raw.some(step => !step.tool.trim() || !step.instruction.trim())) {
+        statusEl.textContent = 'Every step needs a tool and an instruction.';
+        return;
+      }
+      const steps = normalizeCustomSteps(raw);
+      if (!steps.length) {
+        statusEl.textContent = 'Add at least one step before saving.';
+        return;
+      }
+      const unknown = steps.find(step => !known.has(step.tool));
+      if (unknown) {
+        statusEl.textContent = `“${unknown.tool}” is not a registered tool. Pick one from the list or save it in Brain Lab first.`;
+        return;
+      }
+      const cur = store.get('settings.trainingMode') || {};
+      store.set('settings.trainingMode', { ...cur, customSteps: steps, difficulty: 'custom' });
+      try { persistence.set('settings', store.get('settings')); } catch { /* best effort */ }
+      store.emit('toast', {
+        message: `Custom drill saved — ${steps.length} step${steps.length === 1 ? '' : 's'}, Custom selected`,
+        type: 'success',
+      });
+      close();
+      if (typeof onSaved === 'function') onSaved(steps);
+      else this._openTrainingDialog();
+    });
+    updateAddState();
   }
 
   /**
@@ -926,6 +1127,42 @@ export class Sidebar {
       });
       return;
     }
+    const tasks = trainingTasksFor(difficulty, tm.customSteps);
+    if (!tasks.length) {
+      store.emit('toast', {
+        message: 'Custom drill has no steps — open Build / edit custom drill and save at least one step',
+        type: 'error',
+      });
+      return;
+    }
+    // Browser is an opt-in server capability. Check it before opening a fresh
+    // session, otherwise the drill retries browser_open forever on a machine
+    // where Browser Labs is off or Chrome/Edge is missing.
+    if (difficulty === 'browser') {
+      try {
+        const browser = await api.browserStatus();
+        if (!browser || !browser.enabled) {
+          store.emit('toast', {
+            message: 'Browser drill needs Config → Labs → Browser switched on first',
+            type: 'error',
+          });
+          return;
+        }
+        if (!browser.available) {
+          store.emit('toast', {
+            message: 'Browser drill needs Chrome or Edge installed on this machine',
+            type: 'error',
+          });
+          return;
+        }
+      } catch (err) {
+        store.emit('toast', {
+          message: `Browser drill unavailable: ${errText(err)}`,
+          type: 'error',
+        });
+        return;
+      }
+    }
     // Before arming: the kickoff must be the first message in a clean session.
     const fresh = await this._openTrainingSession();
     // drillResumes/drillFails are counters now, not a budget: the loop is
@@ -940,7 +1177,7 @@ export class Sidebar {
     // different calls and would sit in the strip as if they were current.
     store.set('trainingVerdicts', {});
     persistence.set('settings', store.get('settings'));
-    const modeLabel = difficulty === 'easy' ? 'Easy · 12 steps' : 'Hard · 17 steps';
+    const modeLabel = `${trainingDifficultyLabel(difficulty)} · ${tasks.length} steps`;
     store.emit('toast', {
       message: fresh
         ? `Training mode ON — ${modeLabel}, fresh session (${fresh.title.replace('Training drill — ', '')}), ~50% rate (Stop to end)`
@@ -986,7 +1223,7 @@ export class Sidebar {
   }
 
   /** Stand the fleet back down. The todo record keeps what the drill taught. */
-  _stopTraining(close, note = '') {
+  _stopTraining(close, note = '', { summary = true } = {}) {
     const tm = store.get('settings.trainingMode') || {};
     store.set('settings.trainingMode', { ...tm, active: false, drillResumes: 0, drillFails: 0 });
     persistence.set('settings', store.get('settings'));
@@ -994,6 +1231,79 @@ export class Sidebar {
     store.emit('training:changed', { active: false });
     if (typeof close === 'function') close();
     this.renderAgents();
+    if (summary) this._showTrainingSummary(note);
+  }
+
+  /**
+   * The end-of-run report. The live strip answers "how far is this pass?",
+   * but an operator who has just stopped a run wants the whole run: passes,
+   * clean passes, failed attempts and which step each failure happened on.
+   *
+   * Only completed passes are counted. A run stopped before its first pass
+   * finished gets no modal rather than a screen of zeroes.
+   */
+  _showTrainingSummary(note = '', { passComplete = false } = {}) {
+    // A new pass should replace the previous report rather than stack a second
+    // modal on top of it; the final report does the same when training stops.
+    document.querySelectorAll('.training-summary-overlay').forEach(el => el.remove());
+    const verdicts = Object.values(store.get('trainingVerdicts') || {})
+      .filter(v => v && Number(v.passes) > 0)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    if (!verdicts.length) return;
+
+    const mode = store.get('settings.trainingMode') || {};
+    const livePass = !!passComplete && !!mode.active;
+    const label = trainingDifficultyLabel(trainingDifficulty(mode));
+    const targetReached = /clean pass/i.test(note);
+    const rows = verdicts.map(v => {
+      const passes = Number(v.passes) || 0;
+      const clean = Number(v.cleanPasses) || 0;
+      const fails = Number(v.failuresTotal ?? v.failures) || 0;
+      const counts = Object.entries(v.failureCounts || {})
+        .map(([step, n]) => ({ step: Number(step), n: Number(n) }))
+        .filter(x => x.step > 0 && x.n > 0)
+        .sort((a, b) => a.step - b.step || b.n - a.n)
+        .map(x => `${x.n}× step ${x.step}`);
+      const breakdown = counts.length ? counts.join(' · ')
+        : (fails ? `${fails} failed attempt${fails === 1 ? '' : 's'}` : 'no failed attempts');
+      return `<div class="training-summary-row">
+        <div class="training-summary-name">${esc(v.name || 'Agent')}</div>
+        <div class="training-summary-title">${livePass ? 'Training Pass Complete' : 'Training Complete'} (${esc(label)})</div>
+        <div class="training-summary-line">${passes} pass${passes === 1 ? '' : 'es'} · ${fails} failed attempt${fails === 1 ? '' : 's'}${clean ? ` · ${clean} clean` : ''}</div>
+        <div class="training-summary-breakdown">${esc(breakdown)}</div>
+      </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay training-summary-overlay';
+    overlay.innerHTML = `
+      <div class="modal training-summary-modal">
+        <div class="modal-header">
+          <span class="modal-title">${livePass ? 'Training Pass Complete' : 'Training Complete'}</span>
+          <button class="modal-close" id="trainingSummaryClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-hint" style="margin-bottom:10px">${livePass
+            ? 'A pass crossed the line. Training is still running — this report refreshes after every pass.'
+            : (targetReached ? 'The clean-pass target was reached.' : 'The run was stopped. Here is what the app recorded across the run.')}</div>
+          ${rows}
+        </div>
+        <div class="modal-footer">
+          ${livePass ? '<button class="btn btn-ghost" id="trainingSummaryStop">Stop training</button>' : ''}
+          <button class="btn btn-primary" id="trainingSummaryDone">${livePass ? 'Keep training' : 'Done'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('#trainingSummaryClose').addEventListener('click', close);
+    overlay.querySelector('#trainingSummaryDone').addEventListener('click', close);
+    overlay.querySelector('#trainingSummaryStop')?.addEventListener('click', () => {
+      // The report already shows this run's final numbers; do not open a second
+      // modal immediately behind it.
+      close();
+      this._stopTraining(null, '', { summary: false });
+    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   }
 
   /**
@@ -1337,7 +1647,7 @@ export class Sidebar {
   }
 
   /**
-   * Drag-to-reorder for the agent list.
+   * Drag-to-reorder for one card stack.
    *
    * Pointer events rather than HTML5 drag-and-drop, because HTML5 DnD does not
    * fire on touch at all and this list is usable on a phone. The dragged row is
@@ -1349,22 +1659,32 @@ export class Sidebar {
    * the rest of the row free to scroll normally; dragging by the header also
    * works for the mouse.
    */
-  _attachAgentDragSort() {
-    const rows = Array.from(this.bodyEl.querySelectorAll('.agent-editor'));
+  _attachCardDragSort(selector, handles, commit) {
+    const rows = Array.from(this.bodyEl.querySelectorAll(selector));
     rows.forEach(row => {
-      const grip = row.querySelector('.agent-grip');
-      const header = row.querySelector('.agent-editor-header');
-      [grip, header].filter(Boolean).forEach(handle => {
+      handles.map(h => row.querySelector(h)).filter(Boolean).forEach(handle => {
         handle.addEventListener('pointerdown', (e) => {
           // Buttons and menus keep their own behaviour.
           if (e.target.closest('button, .agent-menu, input, select, textarea')) return;
-          this._startAgentDrag(e, row);
+          this._startCardDrag(e, row, selector, commit);
         });
       });
     });
   }
 
-  _startAgentDrag(e, row) {
+  /** Keep the existing agent-stack behaviour and wording at the call site. */
+  _attachAgentDragSort() {
+    this._attachCardDragSort('.agent-editor', ['.agent-grip', '.agent-editor-header'],
+      order => this._commitAgentOrder(order));
+  }
+
+  /** The Providers stack uses the same pointer machinery as the Agents stack. */
+  _attachProviderDragSort() {
+    this._attachCardDragSort('.provider-card', ['.provider-grip', '.provider-card-header'],
+      order => this._commitProviderOrder(order));
+  }
+
+  _startCardDrag(e, row, selector, commit) {
     if (this._drag) return; // one drag at a time
     const pointerId = e.pointerId;
     const startY = e.clientY;
@@ -1376,23 +1696,23 @@ export class Sidebar {
     // Element references, not ids: restoring a cancelled drag should not depend
     // on CSS.escape or on building an attribute selector from an id.
     const originalOrder = Array.from(
-      this.bodyEl.querySelectorAll('.agent-editor')
+      this.bodyEl.querySelectorAll(selector)
     );
 
-    const state = { row, pointerId, startY, grabOffset, active: false, originalOrder };
+    const state = { row, selector, commit, pointerId, startY, grabOffset, active: false, originalOrder };
     this._drag = state;
 
     // Deliberately no setPointerCapture: with capture active the browser
     // retargets the follow-up click to the capturing element, so a click on the
     // agent's name would never reach the copy handler. Tracking on window
     // already keeps working outside the element.
-    const move = (ev) => this._onAgentDragMove(ev, state, threshold);
+    const move = (ev) => this._onCardDragMove(ev, state, threshold);
     const up = (ev) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', cancel);
       window.removeEventListener('keydown', onKey, true);
-      this._finishAgentDrag(state, ev.type === 'pointercancel');
+      this._finishCardDrag(state, ev.type === 'pointercancel');
     };
     const cancel = () => up({ type: 'pointercancel' });
     const onKey = (ev) => {
@@ -1408,7 +1728,7 @@ export class Sidebar {
     if (isTouch) e.preventDefault();
   }
 
-  _onAgentDragMove(e, state, threshold) {
+  _onCardDragMove(e, state, threshold) {
     if (e.pointerId !== state.pointerId) return;
     const dy = e.clientY - state.startY;
     if (!state.active) {
@@ -1421,7 +1741,7 @@ export class Sidebar {
 
     const row = state.row;
     const siblings = Array.from(
-      this.bodyEl.querySelectorAll('.agent-editor')
+      this.bodyEl.querySelectorAll(state.selector)
     ).filter(r => r !== row);
 
     // Drop into whichever neighbour the pointer is above the midpoint of.
@@ -1443,7 +1763,7 @@ export class Sidebar {
     row.style.transform = `translateY(${e.clientY - state.grabOffset - base}px)`;
   }
 
-  _finishAgentDrag(state, cancelled) {
+  _finishCardDrag(state, cancelled) {
     this._drag = null;
     const row = state.row;
     document.body.classList.remove('agent-reordering');
@@ -1451,9 +1771,9 @@ export class Sidebar {
     row.style.transform = '';
 
     const currentOrder = Array.from(
-      this.bodyEl.querySelectorAll('.agent-editor')
-    ).map(r => r.dataset.agentId);
-    const originalIds = state.originalOrder.map(r => r.dataset.agentId);
+      this.bodyEl.querySelectorAll(state.selector)
+    ).map(r => r.dataset.agentId || r.dataset.providerId);
+    const originalIds = state.originalOrder.map(r => r.dataset.agentId || r.dataset.providerId);
     const unchanged = currentOrder.every((id, i) => id === originalIds[i]);
 
     if (cancelled || unchanged) {
@@ -1465,7 +1785,7 @@ export class Sidebar {
       // plain press on the agent's name would land on a detached node.
       return;
     }
-    this._commitAgentOrder(currentOrder);
+    state.commit(currentOrder);
   }
 
   /** Persist a new agent order and let the rest of the app react. */
@@ -1479,6 +1799,18 @@ export class Sidebar {
 
     persistence.set('agents', reordered);
     store.emit('agents:changed', { reordered: true });
+    this.render();
+  }
+
+  /** Persist a provider order and redraw the stack in its new order. */
+  _commitProviderOrder(order) {
+    const providers = [...(store.get('providers') || [])];
+    const byId = new Map(providers.map(p => [p.id, p]));
+    const reordered = order.map(id => byId.get(id)).filter(Boolean);
+    providers.forEach(p => { if (!order.includes(p.id)) reordered.push(p); });
+
+    persistence.set('providers', reordered);
+    store.emit('providers:changed', { reordered: true });
     this.render();
   }
 
@@ -1542,6 +1874,7 @@ export class Sidebar {
     providers.forEach(provider => {
       html += `<div class="provider-card" data-provider-id="${esc(provider.id)}">
         <div class="provider-card-header">
+          <div class="provider-grip agent-grip" title="Drag to reorder" aria-label="Drag to reorder ${esc(provider.name)}">&#8942;&#8942;</div>
           <div class="provider-name">${esc(provider.name)}</div>
           <div class="provider-card-actions">
             <div class="provider-status ${provider.active ? '' : 'inactive'}" style="pointer-events:none">${provider.active ? 'ACTIVE' : 'INACTIVE'}</div>
@@ -1559,6 +1892,7 @@ export class Sidebar {
     });
 
     this.bodyEl.innerHTML = html;
+    this._attachProviderDragSort();
 
     // Add click handlers for menu buttons
     this.bodyEl.querySelectorAll('[data-provider-menu]').forEach(btn => {

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browser drill</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #e8f3ff;
+    --muted: #8da3b8;
+    --edge: #223447;
+    --panel: #0b121c;
+    --cyan: #00e5ff;
+    --green: #36f1a2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(0, 229, 255, .14), transparent 34rem),
+      radial-gradient(circle at 82% 88%, rgba(54, 241, 162, .09), transparent 30rem),
+      #05090f;
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main {
+    width: min(100%, 620px);
+    padding: clamp(28px, 6vw, 56px);
+    border: 1px solid var(--edge);
+    border-radius: 20px;
+    background: linear-gradient(145deg, rgba(17, 29, 43, .94), rgba(8, 14, 22, .96));
+    box-shadow: 0 30px 90px rgba(0, 0, 0, .58);
+  }
+  .eyebrow {
+    margin: 0 0 18px;
+    color: var(--cyan);
+    font: 700 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(34px, 7vw, 50px);
+    line-height: 1.04;
+    letter-spacing: -.04em;
+  }
+  .lede {
+    max-width: 44ch;
+    margin: 16px 0 28px;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+  form { display: grid; gap: 10px; }
+  label {
+    color: var(--muted);
+    font: 700 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  input {
+    width: 100%;
+    min-height: 52px;
+    padding: 0 16px;
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    background: #070c13;
+    color: var(--ink);
+    font: inherit;
+    font-size: 18px;
+    outline: none;
+  }
+  input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0, 229, 255, .16);
+  }
+  button {
+    min-height: 52px;
+    margin-top: 6px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--cyan);
+    color: #001017;
+    cursor: pointer;
+    font: 800 16px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: .01em;
+  }
+  button:hover { filter: brightness(1.08); }
+  #drill-result {
+    min-height: 52px;
+    margin: 24px 0 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--edge);
+    color: var(--green);
+    font: 700 20px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  .footnote {
+    margin: 18px 0 0;
+    color: #5f7488;
+    font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Loop Studio / local practice page</p>
+  <h1>Browser drill</h1>
+  <p class="lede">One field, one button, one visible result. This page is served locally and never leaves the machine.</p>
+  <form id="drill-form">
+    <label for="drill-name">Your name</label>
+    <input id="drill-name" name="name" autocomplete="off" spellcheck="false" placeholder="training">
+    <button id="drill-submit" type="submit">Say hello</button>
+  </form>
+  <p id="drill-result" role="status" aria-live="polite">Waiting for a name.</p>
+  <p class="footnote">No network requests. Safe to replay.</p>
+</main>
+<script>
+  const form = document.getElementById('drill-form');
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = document.getElementById('drill-name');
+    const name = input.value.trim() || 'training';
+    document.getElementById('drill-result').textContent = `Hello, ${name}.`;
+  });
+</script>
+</body>
+</html>

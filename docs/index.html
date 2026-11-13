@@ -407,19 +407,35 @@
       </div>
       <div class="fail">
         <div class="f">You can't tell whether any of it works<em>“it seems to work”</em></div>
-        <p class="fix">Training mode below: a <b>12-step drill</b> worked in order and retried until
-        each step passes — never skipped. It is scored by retries, and the call that actually executed
+        <p class="fix">Training mode below: fixed <b>6- to 17-step drills</b> worked in order and retried
+        until each step passes — never skipped. It is scored by retries, and the call that actually executed
         is what gets remembered.</p>
       </div>
     </div>
 
     <h3 class="mini">Training mode — brute force, until it is clean</h3>
     <p class="para">Arm it and every active agent is locked to one drill, paced to half its normal
-    request rate. Twelve steps in one sandbox folder, simplest first, in order — and a step that fails
-    is <b>retried until it passes</b>. No skipping, no reordering, no moving on because the error
+    request rate. Easy is twelve steps in one sandbox folder, simplest first, in order — and a step that
+    fails is <b>retried until it passes</b>. No skipping, no reordering, no moving on because the error
     looked close enough. The approval prompts on the writing steps are part of the drill: waiting for
     one is a step, not an interruption.</p>
-    <p class="para">Each pass goes into the agent's own todo list, and the call that actually executed
+    <p class="para">Two shorter drills leave the sandbox: <b>Frontier</b> is six real-desktop steps — find
+    Notepad, open it, type “Hello!” — and <b>Browser</b> is nine steps against the local drill page:
+    open it, read the heading, type “training”, click <b>Say hello</b>, wait, then read “Hello, training”
+    back. Browser needs Config → Labs → Browser switched on and Chrome or Edge installed.</p>
+    <figure>
+      <div class="shot"><picture>
+          <img src="screenshots/Notepad-Training.gif" width="880" height="495" alt="Notepad opened on the desktop, Hello! typed in, then the text zoomed up large.">
+        </picture></div>
+      <figcaption>The six-step Frontier drill: Notepad opens, “Hello!” is typed on screen, then the text zooms up.</figcaption>
+    </figure>
+    <figure>
+      <div class="shot"><picture>
+          <img src="screenshots/Browser-Training.gif" width="880" height="495" alt="The Browser drill page: training typed into the name field, then Hello, training after Say hello.">
+        </picture></div>
+      <figcaption>The nine-step Browser drill on the shipped local page: type “training”, click <b>Say hello</b>, and read the result back.</figcaption>
+    </figure>
+    <p class="para">Each Easy pass goes into the agent's own todo list, and the call that actually executed
     is what gets remembered: the <b>winning syntax</b> is stored against that provider and model and
     offered first the next time that model is asked for a tool. The score to chase is <b>12 calls,
     0 retries</b> — the first run rarely gets there, the second usually does.</p>

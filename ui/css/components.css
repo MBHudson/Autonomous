@@ -127,6 +127,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+  cursor: grab;
 }
 
 .provider-name {
@@ -134,6 +135,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
+  flex: 1;
+  min-width: 0;
 }
 
 .provider-status {
@@ -360,7 +363,8 @@
 }
 
 /* The card being moved: lifted, tilted, and out of the layout's way visually. */
-.agent-editor.agent-dragging {
+.agent-editor.agent-dragging,
+.provider-card.agent-dragging {
   z-index: 20;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
   border-color: var(--accent-cyan);
@@ -376,7 +380,8 @@ body.agent-reordering {
   cursor: grabbing;
 }
 
-body.agent-reordering .agent-editor:hover {
+body.agent-reordering .agent-editor:hover,
+body.agent-reordering .provider-card:hover {
   border-color: var(--border);
   background: var(--bg-primary);
 }
@@ -2266,7 +2271,7 @@ body.agent-reordering .agent-editor:hover {
    Same treatment as the pre-prompt button: quiet until armed, then the same
    cyan glow/pulse. The dumbbell is an inline SVG stroked with currentColor,
    so it follows every skin without its own palette. */
-.agent-menu-btn.training-btn svg { display: block; }
+.agent-menu-btn.training-btn svg { display: block; width: 14px; height: 14px; }
 
 .agent-menu-btn.training-btn.armed {
   color: var(--accent-cyan);
@@ -2301,3 +2306,108 @@ body.agent-reordering .agent-editor:hover {
 }
 
 .training-steps li { margin-bottom: 2px; }
+
+/* End-of-run report. One row per agent, with the run-wide failure tally
+   broken down by the step that produced it. */
+.training-summary-modal { max-width: 620px; }
+.training-summary-row {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.training-summary-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.training-summary-title {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.training-summary-line {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.training-summary-breakdown {
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Custom drill builder: rows stay compact enough that a 10-step drill fits
+   without turning the dialog into a spreadsheet. */
+.training-builder-modal { max-width: 760px; }
+.training-builder-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  padding: 8px;
+  margin-bottom: 6px;
+}
+.training-builder-grip {
+  flex: none;
+  width: 16px;
+  padding-top: 3px;
+  color: var(--text-secondary);
+  cursor: grab;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -3px;
+  user-select: none;
+}
+.training-builder-grip:active { cursor: grabbing; }
+.training-builder-row.training-builder-dragging { opacity: 0.45; }
+.training-builder-row.training-builder-over { border-color: var(--accent-cyan); }
+.training-builder-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.training-builder-line { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.training-builder-tool { font-family: var(--font-mono); }
+.training-builder-instruction { min-height: 52px; }
+.training-builder-remove {
+  flex: none;
+  min-width: 28px;
+  padding: 2px 6px;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--text-secondary);
+}
+.training-builder-remove:hover { color: var(--accent-red); border-color: var(--accent-red); }
+.training-builder-add {
+  width: 100%;
+  border-style: dashed;
+  color: var(--text-secondary);
+}
+.training-builder-add:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+.training-builder-status {
+  min-height: 16px;
+  margin-top: 4px;
+  color: var(--accent-red);
+}
+
+.training-show-passes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+.training-show-passes input { accent-color: var(--accent-cyan); }
+
+@media (max-width: 560px) {
+  .training-builder-line { grid-template-columns: 1fr; }
+}

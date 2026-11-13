@@ -13,7 +13,7 @@
 Point it at a 7B on your laptop or a frontier API. Every request runs the same loop: it tries the
 tool dialect that model answers, catches the near miss, retries in the next format, and keeps the
 call that actually executed — then leads with that one next time. Training mode is that loop driven
-to a clean score: twelve or seventeen steps, matching calls, 0 retries.
+to a clean score: fixed drills from six steps to seventeen, or one you write yourself, matching calls, 0 retries.
 
 One folder of PHP and static files — drop it on the host you already pay for, double-click, and a
 team of agents is running.
@@ -72,7 +72,7 @@ Six failures every operator hits in the first evening, and the code path that an
 | **It loops and burns the budget** | A hard step ceiling and a wall-clock deadline per turn, bounded steering, an acyclic `ask_agent` chain (A→B→A is refused), and duplicate-call suppression. When a ceiling is reached the transcript names it: *"You used all N tool calls on this task."* A runaway hits a wall, not your wallet. |
 | **The conversation falls out of the window** | Budgeted against the model's **real** window, then compacted: old tool exchanges keep their head and tail, the newest turns survive, oversized results are cut. A 128k model is not replayed as if it had 6k. |
 | **It forgets by the next session** | Private notes plus a deliberately small shared collective, with `adopt` so a shared fact can become its own. Injected as **recollection, not instructions** — the agent reads what it learned instead of being told what to do. |
-| **You can't tell whether any of it works** | A **12- or 17-step drill** in one sandbox folder, worked in order and **retried until every step passes** — never skipped. The call that actually executed is what gets remembered as the winning syntax, and the score to chase is a full pass, 0 retries. |
+| **You can't tell whether any of it works** | Fixed **6-, 8-, 9-, 12- and 17-step drills** — Frontier on the desktop, Browser in the built-in browser, the rest in one sandbox folder — or your own steps, worked in order and **retried until every step passes** — never skipped. The call that actually executed is what gets remembered as the winning syntax, and the score to chase is a full pass, 0 retries. |
 
 If a model is capable and still useless, it is usually one of those six — and each one has a
 code path here rather than a paragraph of advice.
@@ -401,8 +401,8 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🔑 | **API pool** | Rotate a provider's extra keys after N requests; rest them on a 429 |
 | 🌐 | **Built-in browser** | A real Chrome/Edge you and the agents drive — watch, click, type, log in |
 | ♾️ | **Always-On loop** | Standing goals, auto re-prompted on a cadence — caps, hold/release, one master kill switch |
-| 🏋️ | **Training mode** | A paced tool drill for every active agent — ~50% request rate, **Easy (original 12 steps) or Hard (current 17)** in the popup, each Start in a fresh session, each agent in its own `training/` file, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
-| 📖 | **Harness & training guide** | Auto-fit, manual pins and the 12- or 17-step drill in one place — [Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode) |
+| 🏋️ | **Training mode** | A paced tool drill for every active agent — ~50% request rate, **Easy 12, Hard 17, Advanced 8, Frontier 6, Browser 9**, or **Custom** in the popup, each Start in a fresh session, sandbox drills in each agent's own `training/` file, retry-until-pass with todo logging — armed from a dumbbell in the Agents header — Start posts the drill into chat so the whole run stays visible |
+| 📖 | **Harness & training guide** | Auto-fit, manual pins and the six- to seventeen-step drills in one place — [Auto Forming Harnesses, Dialects & Training Mode](#-auto-forming-harnesses-dialects--training-mode) |
 | ❝ | **Global pre-prompt** | One instruction for every agent — **prepend** (default) or **replace**, toggled live |
 | 🧠 | **Context assembler** | History & tool output budgeted to each model's *real* window, with live compaction |
 | 🧭 | **Apps notch** | One thumb-tab to the Labs, the routing chart and the built-in browser |
@@ -1280,7 +1280,7 @@ Free, quantised models that used to burn **6–8 calls** guessing now get it rig
 Every agent meets every provider through the same door 🚪: the **harness** decides *how* to call it and *which tool dialect* to teach it — automatically, on every request. When you'd rather choose yourself, two dropdowns in 🧠 Brain Lab pin either one per agent. And 🏋️ **Training mode** is where the fleet proves it can use the tools at all: one paced drill, every active agent, all at once. This section is the full manual for all three — the auto-fit, the manual pins, and the drill. 📖
 
 <details>
-<summary>Detection order, manual pins and the 12- or 17-step drill</summary>
+<summary>Detection order, manual pins and the six- to seventeen-step drills</summary>
 
 ### 🤖🔌 How the auto-fit works
 
@@ -1316,11 +1316,42 @@ The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains th
 
 - ⚡ **Speed up custom forming harnesses and learning dialect via a brute force training method.** This method is especially successful on models above the 1.5b parameters mark (1.4-1.9gb) but not typically any lower. Run the agent through the 1st time, takes around 2-4 minutes with varying degrees of success. Run that same agent a 2nd time, and it's more common to see a 100% success rate (a full pass, 0 retries) than anything lower. The system remembers only successful calls and makes sure to use the winning syntax from that point forward. 🏆
 - 🐢 **~50% request rate** — every active agent is throttled to half pace (`TRAINING_THROTTLE = 0.5` in `ui/js/training.js`), so the drill exercises patience as well as tools. ⏳
-- 🔒 **One drill, nothing else** — the popup picks **Easy (the original 12)** or **Hard (the current 17)**; the system prompt locks to that step list in `training/`, each agent in its own `training/training-<agent id>.txt` so two passes can never share or corrupt one file, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → a ranged read (line 1 only) → `edit_file` 🩹 append and exact replace, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `show_find` 📺, `exec` ⌨️, `show_command` 📺, a `todo_write` ✅, and a final `show_file` 📺. **It never stops on its own:** every finished turn — a display step, a short reply, even the last step — is followed automatically by a silent `Continue`, so the drill keeps running until you switch training off or press Stop, and a completed drill starts another pass. The header grades the pass for you — `drill 12/17`, or `12/12` in Easy — green and `clean` when a pass had no failed attempts — computed from the tool records, never from the agent's todo list. A live strip above the transcript shows every active agent's pass, failures and clean passes as each call lands, and the Training dialog opens with the same scoreboard for the current run. Approval-gated steps (write/edit/exec/show_command) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
+- 🔒 **One drill, nothing else** — the popup picks **Easy (12)**, **Hard (17)**, **Advanced (8)**, **Frontier (6, real desktop)**, **Browser (9, built-in browser)** or **Custom**; the system prompt locks to that step list, each agent in its own `training/training-<agent id>.txt` (Browser reads its shipped local page instead) so two passes can never share or corrupt one file, simplest first, worked in order: `think` 🤔, `todo_write` 📝, `echo` 🔊, `now` 🕒, `write_file` ✍️ → `read_file` 📖 → a ranged read (line 1 only) → `edit_file` 🩹 append and exact replace, `list_dir` 📁, `glob_files` 🔍, `grep_code` 🧵, `show_find` 📺, `exec` ⌨️, `show_command` 📺, a `todo_write` ✅, and a final `show_file` 📺. (That sequence is Easy/Hard; Advanced, Frontier and Browser have their own shorter lists — Browser's is just below.) **It never stops on its own:** every finished turn — a display step, a short reply, even the last step — is followed automatically by a silent `Continue`, so the drill keeps running until you switch training off or press Stop, and a completed drill starts another pass. The header grades the pass for you — `drill 12/17`, or `12/12` in Easy — green and `clean` when a pass had no failed attempts — computed from the tool records, never from the agent's todo list. A live strip above the transcript shows every active agent's pass, failures and clean passes as each call lands, and the Training dialog opens with the same scoreboard for the current run. Approval-gated steps (write/edit/exec/show_command, plus browser_type in Browser) come after the free ones — waiting on your Approve button ✅ is part of the lesson, not something to route around.
 - 🔁 **Retry until it passes** — a failed step is never skipped; the error comes back with the shape to retry with, so a miss becomes practice instead of a skip. Each pass is logged with `todo_write`. ✅
 - ▶️ **Start dispatches the drill** — Start opens a fresh `Training drill — <date/time>` session, then posts it into chat as a turn (or steers it into a running one if the old turn would not stop), so messages 🗨️, map 🗺️, metrics 📊 and trace 🔎 all move exactly as usual. With no active agents it says so instead of arming. 🤫
 - 🧠 **Nothing mystical is stored** — model weights never change; *"remember what worked"* means the todo record (kept per agent), the run transcript, and the dialect memo: a tool-call dialect is only remembered after its calls execute ok, and native-API turns never write it. Stop on the same button ends it with a recap: which tools passed, how many retries each took. 📋
-- 🧱 **The jail still applies** — the drill resolves under the agent's writable root, never outside it. 🔒
+- 🧱 **The jail still applies** — the sandbox drills resolve under the agent's writable root, never outside it. Frontier uses only configured desktop programs; Browser opens only the shipped local page. 🔒
+
+### ⌨️ Frontier drill — 6 steps on the real desktop
+
+Frontier is the short desktop demo: it finds configured Notepad, opens it, types `Hello!`, and leaves the window open so the typed text is the result. `window_open` and `window_type` ask for approval; Auto Approve skips the pause.
+
+<p><img src="screenshots/Notepad-Training.gif" width="880" alt="Notepad opened on the desktop, Hello! typed in, then the text zoomed up large."></p>
+
+1. `think` — one sentence about the desktop demo.
+2. `todo_write` — the six steps, first one in progress.
+3. `window_list` — find the configured `notepad` program.
+4. `window_open` — open Notepad on the real desktop.
+5. `window_type` — type exactly `Hello!` into Notepad.
+6. `todo_write` — complete the six-step pass; the window stays open.
+
+### 🌐 Browser drill — 9 steps, one local page
+
+Browser mode is the one drill that touches neither the sandbox nor the desktop. It drives the built-in browser through a page that ships with the app (`ui/drill/browser.html`), so a pass is deterministic, works offline, and cannot be changed by a public site mid-run:
+
+<p><img src="screenshots/Browser-Training.gif" width="880" alt="The Browser drill page: training typed into the name field, then Hello, training after Say hello."></p>
+
+1. `think` — one sentence about the drill.
+2. `todo_write` — the nine steps, first one in progress.
+3. `browser_open` — the local `browser.html` page.
+4. `browser_read` — confirm the heading says **Browser drill**.
+5. `browser_type` — exactly `training` into `#drill-name` (asks approval unless Auto Approve is on).
+6. `browser_click` — `#drill-submit`, the **Say hello** button.
+7. `browser_wait` — 300 ms for the page to settle.
+8. `browser_read` — confirm **Hello, training**.
+9. `todo_write` — complete the nine-step pass.
+
+The final read is the check, not the click: the page only says **Hello, training** after both the text and the button landed. Start preflights the mode — Config → Labs → Browser must be on and Chrome or Edge must be installed, otherwise it explains what is missing instead of arming a drill that cannot finish. The normal launchers are fine (Apache on Windows, the PHP worker pool on Linux/macOS); a bare `php -S` with one worker can deadlock while the browser waits for the local page. Browser is separate from Frontier so a browser or Labs problem can never hold up the Notepad drill.
 
 Happy drilling! 💪🚀
 
