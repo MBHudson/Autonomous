@@ -831,7 +831,7 @@ function handleBrowser($method, $segments, $body) {
         }
         switch ($action) {
             case 'launch':
-                $headless = array_key_exists('headless', $body) ? (bool)$body['headless'] : true;
+                $headless = array_key_exists('headless', $body) ? (bool)$body['headless'] : false;
                 echo json_encode(['success' => true] + Browser::launch($headless));
                 return;
             case 'stop':

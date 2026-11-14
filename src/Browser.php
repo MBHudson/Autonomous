@@ -168,7 +168,7 @@ class Browser
     }
 
     /** Launch (if not already up) and return status with the port. */
-    public static function launch($headless = true)
+    public static function launch($headless = false)
     {
         $exe = self::findExe();
         if ($exe === '') {
@@ -176,7 +176,25 @@ class Browser
         }
         $state = self::state();
         if ($state && self::livePort((int)$state['port'])) {
-            return self::status();
+            // An already-running browser in the other mode cannot be changed
+            // in place: this profile is launched once with or without
+            // --headless. Restart it when the caller asks for a window the
+            // operator can actually watch.
+            if ((bool)($state['headless'] ?? true) === (bool)$headless) {
+                return self::status();
+            }
+            $oldPort = (int)$state['port'];
+            self::stop();
+            // Browser.close is asynchronous. Starting the new mode before the
+            // old process has let go of the profile can make the new instance
+            // hand off to the dying one: a window appears, but its debug port
+            // disappears with the old process. Wait for the old port to close
+            // (then reap whatever is left) before starting the new mode.
+            $deadline = microtime(true) + 5;
+            while ($oldPort && microtime(true) < $deadline && self::livePort($oldPort)) {
+                usleep(150000);
+            }
+            self::reap();
         }
 
         // Nothing of ours is answering on the saved port, so any chrome/edge

@@ -7,22 +7,22 @@
 // SIDEBAR.JS — Sidebar tabs controller
 // ============================================
 
-import { store } from '../store.js?v=457';
-import { K } from '../storage.js?v=457';
-import { persistence } from '../persistence.js?v=457';
-import { api } from '../api.js?v=457';
-import { isNoTokenError } from '../apiError.js?v=457';
-import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=457';
-import { errText } from '../api.js?v=457';
-import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=457';
-import { refreshAgentClocks, initClocks } from '../agentClock.js?v=457';
-import { snapshot } from '../rateGovernor.js?v=457';
-import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty, trainingDifficultyLabel, trainingDifficultyHint, trainingTasksFor, normalizeCustomSteps, CUSTOM_STEP_MAX, showsEveryPass } from '../training.js?v=457';
-import { resetBrowserEnabled } from '../toolManifest.js?v=457';
-import { perf } from '../perf.js?v=457';
-import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=457';
-import { localEndpoints, hostOf } from '../localEndpoints.js?v=457';
-import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=457';
+import { store } from '../store.js?v=458';
+import { K } from '../storage.js?v=458';
+import { persistence } from '../persistence.js?v=458';
+import { api } from '../api.js?v=458';
+import { isNoTokenError } from '../apiError.js?v=458';
+import { esc, escAttr, timeAgo, agentCode, copyToClipboard, downloadFile, DEFAULT_HISTORY_TURNS } from '../utils.js?v=458';
+import { errText } from '../api.js?v=458';
+import { TOOL_REGISTRY, sandboxBindingReport, bindSandboxNow } from '../tools.js?v=458';
+import { refreshAgentClocks, initClocks } from '../agentClock.js?v=458';
+import { snapshot } from '../rateGovernor.js?v=458';
+import { trainingStepList, trainingKickoffFor, drillVerdictText, reachedCleanTarget, trainingDifficulty, trainingDifficultyLabel, trainingDifficultyHint, trainingTasksFor, normalizeCustomSteps, CUSTOM_STEP_MAX, showsEveryPass } from '../training.js?v=458';
+import { resetBrowserEnabled } from '../toolManifest.js?v=458';
+import { perf } from '../perf.js?v=458';
+import { normalizeIface, IFACE_EVENT } from '../ifaceMode.js?v=458';
+import { localEndpoints, hostOf } from '../localEndpoints.js?v=458';
+import { BACKUP_SECTIONS, sanitizeBackupName, defaultBackupName, summarizeBackup, backupTokenDiffers } from '../backupSections.js?v=458';
 
 // Config section open/closed state. Session-only on purpose: a fresh load
 // always starts with every section collapsed, and the ones you open stay open
@@ -817,9 +817,9 @@ export class Sidebar {
     const statusBlock = armed && verdictRows.length
       ? `<div class="drill-dialog-status">
            <span class="drill-strip-title">run so far</span>
-           ${verdictRows.map(v => `<div class="drill-row">
+           ${verdictRows.map(v => `<div class="drill-row${v.retryHint ? ' drill-row-retry' : ''}">
              <b>${esc(v.name || 'Agent')}</b>
-             <span class="${v.complete && v.clean ? 'drill-clean' : (v.failures ? 'drill-bad' : 'drill-count')}">${esc(drillVerdictText(v))}</span>
+             <span class="${v.complete && v.clean ? 'drill-clean' : (v.failures ? 'drill-bad' : 'drill-count')}${v.retryHint ? ' drill-retry' : ''}">${esc(drillVerdictText(v))}</span>
            </div>`).join('')}
          </div>`
       : '';

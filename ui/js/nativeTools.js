@@ -123,7 +123,10 @@ export const TOOL_SCHEMAS = {
     tool: str('Tool name'),
     arguments: anyObj('Arguments for that tool'),
   }, ['server', 'tool']),
-  browser_open: obj({ url: str('URL to open, e.g. https://example.com') }, ['url']),
+  browser_open: obj({
+    url: str('URL to open, e.g. https://example.com'),
+    headless: bool('Run without a visible window (default false)'),
+  }, ['url']),
   browser_click: obj({
     selector: str('CSS selector to click (if not using x/y)'),
     x: num('Viewport x to click'),

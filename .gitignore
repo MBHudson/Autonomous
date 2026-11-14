@@ -82,3 +82,8 @@ storage/tunnels.json
 # Screen recordings are release assets or uploads, not repo history.
 # Training-Mode.mp4 alone is 43 MB; git history keeps it forever.
 *.mp4
+# The 6 MB head-to-head teaser is small enough to ship with the README.
+!screenshots/Head-to-Head-Browser.mp4
+# The Pages copies must live under docs/ to be served by GitHub Pages.
+!docs/screenshots/Head-to-Head-Browser.mp4
+!docs/screenshots/Head-to-Head-Browser-Vertical.mp4

@@ -16,10 +16,10 @@
 // only sends commands and paints the screenshots. It is off unless Config →
 // Labs → Browser is on, which the server enforces with a 403.
 
-import { store } from '../store.js?v=457';
-import { api } from '../api.js?v=457';
-import { esc } from '../utils.js?v=457';
-import { k } from '../storage.js?v=457';
+import { store } from '../store.js?v=458';
+import { api } from '../api.js?v=458';
+import { esc } from '../utils.js?v=458';
+import { k } from '../storage.js?v=458';
 
 /** Live auto-refresh is a sticky preference, not a per-visit toggle. */
 const LIVE_KEY = k('browserLive');
@@ -54,7 +54,7 @@ export class BrowserView {
         <button class="bs-btn primary" id="bsGo">Go</button>
         <button class="bs-btn" id="bsLive" title="Refresh the view automatically">Live</button>
         <label class="bs-check" title="Headless has no window; untick to watch a real window">
-          <input type="checkbox" id="bsHeadless" checked> headless
+          <input type="checkbox" id="bsHeadless"> headless
         </label>
         <button class="bs-btn" id="bsStartStop">Launch</button>
         <span class="bs-status" id="bsStatus"></span>
@@ -134,6 +134,11 @@ export class BrowserView {
     if (!s.enabled) { st.textContent = 'Off — turn on in Config → Labs → Browser.'; return; }
     if (!s.available) { st.textContent = 'No Chrome or Edge found on this machine.'; return; }
     st.textContent = s.running ? `running on :${s.port}` : 'not running';
+    // The checkbox follows the browser that is actually running, so a
+    // headless instance opened by an agent is not silently restarted visible
+    // on the next Launch, and a visible one stays visible.
+    const headlessBox = this.el.querySelector('#bsHeadless');
+    if (headlessBox && s.running) headlessBox.checked = !!s.headless;
     startStop.textContent = s.running ? 'Stop' : 'Launch';
     startStop.disabled = false;
   }

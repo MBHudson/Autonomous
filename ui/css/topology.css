@@ -645,7 +645,9 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
   max-height: calc(100% - 20px);
   display: flex;
   flex-direction: column;
-  background: rgba(7, 11, 19, 0.86);
+  /* Node cards sit over the brightest part of the map. Keep them solid:
+     a translucent panel lets the floating floor read through the metrics. */
+  background: #070b13;
   backdrop-filter: blur(12px) saturate(1.3);
   -webkit-backdrop-filter: blur(12px) saturate(1.3);
   border: 1px solid color-mix(in srgb, var(--c, #00e5ff) 35%, transparent);
@@ -902,7 +904,7 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(7, 11, 19, 0.94);
+  background: #070b13;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(10px) saturate(1.2);
 }
@@ -971,7 +973,8 @@ body.topo-expanded-open .notif-dropdown { z-index: 850; }
   overflow: hidden;
   border: 1px solid var(--c, var(--accent-cyan));
   border-radius: 12px;
-  background: rgba(7, 11, 19, 0.62);
+  /* This is a reading surface over the map, not a glass overlay. */
+  background: #070b13;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(10px) saturate(1.2);
 }

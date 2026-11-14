@@ -2031,6 +2031,8 @@ body.agent-reordering .provider-card:hover {
 .drill-row .drill-clean { color: var(--accent-green, #00ff88); }
 .drill-row .drill-bad { color: var(--accent-red, #ff4757); }
 .drill-row .drill-warn { color: var(--accent-amber, #e0a83a); }
+.drill-row .drill-retry { color: var(--accent-amber, #e0a83a); font-weight: 600; white-space: normal; }
+.drill-row.drill-row-retry { white-space: normal; flex-wrap: wrap; max-width: 100%; }
 
 /* The same rows inside the Training dialog, above the footer hint. */
 .drill-dialog-status {

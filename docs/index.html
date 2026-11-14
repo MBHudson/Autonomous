@@ -76,6 +76,11 @@
   .shot{border:1px solid var(--line-strong); border-radius:12px; overflow:hidden; background:var(--panel);
     box-shadow:0 30px 80px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,229,255,.06)}
   .shot img{width:100%}
+  .poster-tall{display:none}
+  @media (max-width:640px){
+    .poster-wide{display:none}
+    .poster-tall{display:block}
+  }
   figcaption{color:var(--dim); font-size:12.5px; margin-top:9px}
 
   section{padding:clamp(34px,6vw,52px) 0; border-top:1px solid var(--line); scroll-margin-top:12px}
@@ -420,14 +425,14 @@
     looked close enough. The approval prompts on the writing steps are part of the drill: waiting for
     one is a step, not an interruption.</p>
     <p class="para">Two shorter drills leave the sandbox: <b>Frontier</b> is six real-desktop steps — find
-    Notepad, open it, type “Hello!” — and <b>Browser</b> is nine steps against the local drill page:
+    Notepad, open it, type “Hello!”, and read the window back to prove it landed — and <b>Browser</b> is nine steps against the local drill page:
     open it, read the heading, type “training”, click <b>Say hello</b>, wait, then read “Hello, training”
     back. Browser needs Config → Labs → Browser switched on and Chrome or Edge installed.</p>
     <figure>
       <div class="shot"><picture>
           <img src="screenshots/Notepad-Training.gif" width="880" height="495" alt="Notepad opened on the desktop, Hello! typed in, then the text zoomed up large.">
         </picture></div>
-      <figcaption>The six-step Frontier drill: Notepad opens, “Hello!” is typed on screen, then the text zooms up.</figcaption>
+      <figcaption>The six-step Frontier drill: Notepad opens, “Hello!” is typed on screen, then the window is read back to confirm the text and the text zooms up.</figcaption>
     </figure>
     <figure>
       <div class="shot"><picture>
@@ -459,6 +464,24 @@
       succeed. It lifts models above roughly 1.5B parameters; below that the drill keeps failing, and
       that is a straight answer too.
     </p>
+
+    <h3 class="mini">Head-to-head — same drill, two models</h3>
+    <p class="para">One first run each, same app, same local page. <b>Qwen3.5-4B</b> and
+    <b>Nemotron-3-Ultra-550B</b> both finished the Browser drill with <b>1 clean pass and 0 failed
+    attempts</b>; Qwen reached its clean-pass card first. The clip is the full first-pass race at
+    4× speed, with a short hold on the final state.</p>
+    <figure>
+      <div class="shot"><a class="poster-wide" href="screenshots/Head-to-Head-Browser.mp4" aria-label="Play the 25-second head-to-head teaser"><picture>
+          <img src="screenshots/Head-to-Head-Browser-poster.jpg" width="880" height="405" loading="lazy" alt="Qwen3.5-4B and Nemotron-3-Ultra-550B running the Browser drill side by side; both finish clean, with Qwen's completion card appearing first.">
+        </picture></a><a class="poster-tall" href="screenshots/Head-to-Head-Browser-Vertical.mp4" aria-label="Play the 16-second vertical head-to-head teaser">
+          <img src="screenshots/Head-to-Head-Browser-Vertical-poster.jpg" width="1080" height="1920" loading="lazy" alt="Vertical teaser: Qwen3.5-4B above Nemotron-3-Ultra-550B, both finishing the Browser drill clean.">
+        </a></div>
+      <figcaption>Click the poster for the teaser. Both completed clean; Qwen finished first.</figcaption>
+    </figure>
+    <p class="after" style="margin-top:10px">Phone format: <a href="screenshots/Head-to-Head-Browser-Vertical.mp4" download>16-second vertical cut</a> · 1080×1920 · no audio.</p>
+    <p class="para" style="margin-top:16px">One first-run demo, not a general model benchmark.
+    Model size, quantization, hardware, prompt and harness version can change the result. Both models
+    still had to finish the same nine steps, in order, with no skipped failures.</p>
   </div>
 </section>
 

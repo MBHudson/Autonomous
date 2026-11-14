@@ -133,7 +133,8 @@ There is no binary to install — a release is the source folder, and "updating"
 
 | | What it is | Get it |
 |---|---|---|
-| **v460** — current | Read/edit calls keep foreign path and range arguments; Hard drill steps name the exact tools; native ranged reads work. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v460) |
+| **v461** — current | Browser opens a visible window by default; headless is opt-in; `window_type` verifies the typed text on screen. | [Releases](https://github.com/autonomous-loop-studio/Autonomous/releases) |
+| **v460** | Read/edit calls keep foreign path and range arguments; Hard drill steps name the exact tools; native ranged reads work. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v460) |
 | **v459** | Easy/Hard drill selector and a fresh session per Start. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v459) |
 | **v458** | Two agents drill side by side in their own files. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v458) |
 | **v457** | Per-agent training files so parallel passes cannot collide. | [Release](https://github.com/autonomous-loop-studio/Autonomous/releases/tag/v457) |
@@ -413,7 +414,7 @@ The same checks ship as a script, so CI or an operator never has to paste them: 
 | 🌐 | **Proxy** | Hundreds of live HTTP proxies — **elite** and **anonymous** only — with ping, uptime and favourites; one click routes outbound traffic through it — every endpoint on your own network goes direct |
 | 🔄 | **Self-updates, one click** | A load-time check that names what shipped, asked again within the hour and offered on every load until installed, a verified download that shows the diff, and an installer that keeps a rollback copy first — your settings are never in scope |
 | 🖥️ | **Agent-opened programs** | An agent may **name** a program on your list and it opens **detached**, so the window outlives the reply — closed gracefully, always by the binary and never by name, and audited as *started* |
-| ⌨️ | **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
+| ⌨️ | **Typing into programs** | `window_type` brings an open window forward and types into it live — 2000 characters per call, special keys literal, newlines as ENTER, and a send that fails loudly if the window never came forward. It reads the window back through Windows UI Automation and says whether the text actually landed. It finds Windows 11's packaged Notepad, waits for a slow starter, and keeps its own Ask / Allow / Deny switch |
 | 🕵️ | **Masked reads** | The config routes answer `********` instead of your access token, keys and friend tokens — and the write path restores the real value |
 | 🏠 | **Local-only mode** | Until a token is set, only requests from this machine are answered — anything else gets **403** — and a reverse proxy is judged by the client it forwards, not by its own loopback address |
 | 📱 | **Mobile-first** | Built for the phone in your pocket: the composer rides above the open keyboard, URL-bar wiggles are ignored, and an **Allow** choice finally sticks |
@@ -505,7 +506,7 @@ A **real Chrome or Edge**, right inside the console — 🚫 no packages, 🚫 n
 <summary>Click, type and read, logins, gates and the block list</summary>
 
 - 🖱️ **Click, type, read** — click anywhere on the screenshot, type into the field you need, press **Enter**, and pull the page's visible text.
-- 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app.
+- 🤖 **Agents use the same page** — `browser_open` / `browser_click` / `browser_type` / `browser_read` / `browser_wait` drive it too, so a model can genuinely operate a web app. `browser_open` shows a visible window by default; pass `"headless":true` only when nobody needs to watch.
 - 🔐 **Logins stick** — the profile is persistent: log in **once** (headless, or in a window you can take over 🫳) and both you and the agents reuse the session.
 - 🛡️ **Off by default and gated** — Config → Labs → *Browser* switches it on; **http/https only**, cloud-metadata addresses refused, and every route is token-gated.
 - 🚫 **A domain / URL / IP block list** — a right-rail box on the Browser screen. One pattern per line, `*` wildcard: `*.gov`, `*word*`, a bare host/IP (`10.0.0.1`), or a URL path (`site.com/a/b/`). Enforced **server-side on every navigation** — yours *and* the agents' — and **re-checked after a click or type** in case a link reaches a banned host.
@@ -790,9 +791,11 @@ timeout while the whole turn waited on it.
   in several bursts, which is also what it looks like. Special keys arrive literally (`+`, `%` and friends are
   escaped, newlines become ENTER), the keystrokes are *never* written to the trace (it records that typing
   happened, not what was typed), and approval is its own switch — **Typing into programs** beside Opening and
-  Closing. Windows only: it is the system's own keystroke injector, and POSIX has no single equivalent, so
-  anywhere else refuses plainly. And the old rule still holds — the operator names the program, the model only
-  supplies the keys.
+  Closing. After the send it reads the program's own text control back through Windows UI Automation, so the
+  result says whether the text really landed — the Frontier drill requires that read-back, not just a call with
+  the right arguments. Windows only: it is the system's own keystroke injector, and POSIX has no single
+  equivalent, so anywhere else refuses plainly. And the old rule still holds — the operator names the program,
+  the model only supplies the keys.
 - 📦 **A Store copy is still the same program.** On Windows 11 a program like Notepad *runs* from a
   WindowsApps path nobody configured, while the list holds the alias stub that launched it — so the match
   crosses that one boundary by file name, and only there, because neither side is a place a second copy
@@ -1324,7 +1327,7 @@ The 🏋️ **dumbbell in the Agents-tab header** arms it; its popup explains th
 
 ### ⌨️ Frontier drill — 6 steps on the real desktop
 
-Frontier is the short desktop demo: it finds configured Notepad, opens it, types `Hello!`, and leaves the window open so the typed text is the result. `window_open` and `window_type` ask for approval; Auto Approve skips the pause.
+Frontier is the short desktop demo: it finds configured Notepad, opens it, types `Hello!`, reads the text back from the window to confirm it is there, and leaves the window open. `window_open` and `window_type` ask for approval; Auto Approve skips the pause. If that read-back comes back unverified, the live training strip says **Retry window_type** instead of leaving a bare failure count.
 
 <p><img src="screenshots/Notepad-Training.gif" width="880" alt="Notepad opened on the desktop, Hello! typed in, then the text zoomed up large."></p>
 
@@ -1332,7 +1335,7 @@ Frontier is the short desktop demo: it finds configured Notepad, opens it, types
 2. `todo_write` — the six steps, first one in progress.
 3. `window_list` — find the configured `notepad` program.
 4. `window_open` — open Notepad on the real desktop.
-5. `window_type` — type exactly `Hello!` into Notepad.
+5. `window_type` — type exactly `Hello!` into Notepad and confirm the window was read back with the text present.
 6. `todo_write` — complete the six-step pass; the window stays open.
 
 ### 🌐 Browser drill — 9 steps, one local page
@@ -1343,7 +1346,7 @@ Browser mode is the one drill that touches neither the sandbox nor the desktop. 
 
 1. `think` — one sentence about the drill.
 2. `todo_write` — the nine steps, first one in progress.
-3. `browser_open` — the local `browser.html` page.
+3. `browser_open` — the local `browser.html` page in a **visible window** (`"headless":false`). A headless open cannot pass this step.
 4. `browser_read` — confirm the heading says **Browser drill**.
 5. `browser_type` — exactly `training` into `#drill-name` (asks approval unless Auto Approve is on).
 6. `browser_click` — `#drill-submit`, the **Say hello** button.
@@ -1352,6 +1355,20 @@ Browser mode is the one drill that touches neither the sandbox nor the desktop. 
 9. `todo_write` — complete the nine-step pass.
 
 The final read is the check, not the click: the page only says **Hello, training** after both the text and the button landed. Start preflights the mode — Config → Labs → Browser must be on and Chrome or Edge must be installed, otherwise it explains what is missing instead of arming a drill that cannot finish. The normal launchers are fine (Apache on Windows, the PHP worker pool on Linux/macOS); a bare `php -S` with one worker can deadlock while the browser waits for the local page. Browser is separate from Frontier so a browser or Labs problem can never hold up the Notepad drill.
+
+### 🏁 Head-to-head — a 4B and a frontier model on the same drill
+
+One first run each, same app, same local page. **Qwen3.5-4B** and **Nemotron-3-Ultra-550B** both finished the Browser drill with **1 clean pass and 0 failed attempts**; Qwen reached its clean-pass card first. The clip is the full first-pass race at 4× speed, with a short hold on the final state.
+
+<p><a href="screenshots/Head-to-Head-Browser.mp4"><img src="screenshots/Head-to-Head-Browser-poster.jpg" width="880" alt="Qwen3.5-4B and Nemotron-3-Ultra-550B running the Browser drill side by side; both finish clean, with Qwen's completion card appearing first."></a></p>
+
+*Click the poster for the 25-second teaser. Both completed clean; Qwen finished first.*
+
+<p><a href="docs/screenshots/Head-to-Head-Browser-Vertical.mp4"><img src="docs/screenshots/Head-to-Head-Browser-Vertical-poster.jpg" width="280" alt="Vertical social poster: Qwen3.5-4B above Nemotron-3-Ultra-550B, both finishing the Browser drill clean."></a></p>
+
+*Phone / social cut: 16 seconds, 1080×1920. Click the vertical poster to open it.*
+
+This is one first-run demo, not a general model benchmark. Model size, quantization, hardware, prompt and harness version can all change the result. The point is narrower: a local model that would otherwise spin on a protocol miss can finish a bounded procedure when the harness repairs the call, retries the step, and remembers the syntax that actually executed.
 
 Happy drilling! 💪🚀
 
@@ -1884,15 +1901,8 @@ Failures come back as `{"error": "..."}` with HTTP 400 and a message meant for t
 
 **Newest first.** Each entry names what shipped in that release; everything older has been folded into the ✨ **What's inside** feature list and the 🔐 **Security** section above, where it stays as reference. The most recent release sits at the top.
 
-### 🧰 v460 — read/edit calls keep their arguments, and the drill names its tools
-*Foreign `read_file`/`show_file` calls now accept `file_path`, `filepath`, `filename`, `target_file` and `file`, preserve `range`, and translate `offset`/`limit`; `Edit` maps to `edit_file`, never `write_file`, and `edit_file` accepts `file_path` with `old_str`/`new_str`. Native `read_file` carries a separate `range` again, including when the arguments arrive as a JSON string. Hard drill steps now name the exact read and edit tools, so `show_file`, `write_file` and `str_replace_editor` can no longer quietly take a step; Easy keeps its original wording. Two live Hard passes finished 17/17 clean with 0 retries, and a native ranged read returned line 1. JS 41 files / 1,229 assertions, PHP 33/33, docs 14/14. `VERSION` 459 → 460, `APP_VERSION` 448 → 449.*
-
-![The tool-call box counting four calls, two failed and one retry, each failure expanded with the sandbox hint, then a show_file result painted into the transcript](screenshots/display-tools.png)
-
-![A show_command reply ends the turn, a muted drill marker records the app continuing the drill, then the next step begins on its own](screenshots/drill-resume.gif)
-
-*The drill after a display step: the command's output **is** the reply and ends the turn, the app sends itself a silent `Continue`, and the next step starts on its own. Nothing is drawn for the Continue — the transcript only shows the work. `show_file` ends a pass, and the mode begins another one rather than stopping.*
-
+### 🌐 v461 — the Browser drill opens a window you can actually watch
+*`browser_open` now shows a visible Chrome/Edge window by default; `"headless":true` is the opt-in exception. The Browser drill’s step 3 refuses a headless result and tells the model to retry with `"headless":false`; the Browser screen’s checkbox follows the running mode, and switching to visible restarts a headless instance cleanly. `window_open` brings the named program to the front, and `window_type` reads the window back through Windows UI Automation so its result says whether the text actually landed; the Frontier drill requires that read-back. Verified live with NEMOTRON-3-ULTRA: Browser 9/9, one clean pass, zero failed attempts, in an unobstructed Edge window. The head-to-head teaser now sits in the README and the Pages site. JS 42 files / 1,360 assertions, PHP 33/33 (3 skipped), docs 14/14. `VERSION` 460 → 461, `APP_VERSION` 457 → 458.*
 
 ---
 
@@ -1935,8 +1945,3 @@ Contributions are accepted under the same license with a
 [DCO](CONTRIBUTING.md) sign-off (`git commit -s`).
 
 Made by M. Bryce Hudson
-
-
-
-
-

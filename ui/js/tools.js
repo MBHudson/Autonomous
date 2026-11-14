@@ -31,11 +31,11 @@
 //
 // Nothing here runs arbitrary code or shells out.
 
-import { store } from './store.js?v=457';
-import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=457';
-import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=457';
-import { settingFor } from './agentConfig.js?v=457';
-import { trace } from './trace.js?v=457';
+import { store } from './store.js?v=458';
+import { asText, compactText, DISPLAY_TOOL_NAMES, MAX_DISPLAY_CHARS } from './utils.js?v=458';
+import { askApproval, sessionApproved, rememberApproval } from './approveDialog.js?v=458';
+import { settingFor } from './agentConfig.js?v=458';
+import { trace } from './trace.js?v=458';
 
 const NOTES_KEY = 'router_notes';
 const CUSTOM_TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,39}$/;
@@ -445,9 +445,9 @@ export const TOOL_REGISTRY = {
   // agent can log in (with the operator watching) and then act.
   browser_open: {
     label: 'browser_open',
-    arg: '{"url":"https://…"}',
-    describe: 'Drive the built-in browser — a REAL Chrome/Edge the operator can watch. Open a URL to start; '
-      + 'no Playwright/Selenium/extension needed. Call this first.',
+    arg: '{"url":"https://…","headless":false}',
+    describe: 'Drive the built-in browser — a REAL Chrome/Edge the operator can watch. Opens a visible '
+      + 'window by default; set "headless":true only when no window is wanted. No Playwright/Selenium/extension needed. Call this first.',
     run: () => 'browser tools are not bound yet',
   },
   browser_click: {
@@ -505,7 +505,7 @@ export const TOOL_REGISTRY = {
   window_type: {
     label: 'window_type',
     arg: '{"name":"notepad","text":"hello"}',
-    describe: 'Type text into a running configured program\u2019s window, live on screen (asks you first). The program must already be open — window_open it first. Keep each call short; "enter":true presses Enter after.',
+    describe: 'Type text into a running configured program\u2019s window, live on screen (asks you first). The program must already be open — window_open it first. Keep each call short; "enter":true presses Enter after. The result says whether the window was read back and actually contains the text.',
     needsApproval: true,
     run: () => 'program tools are not bound yet',
   },
@@ -1456,12 +1456,18 @@ export function bindSandboxTools(api) {
     const a = (arg && typeof arg === 'object' && !Array.isArray(arg)) ? arg : { url: typeof arg === 'string' ? arg : '' };
     const url = String(a.url || a.href || '').trim();
     if (!url) return 'error: browser_open needs a "url"';
-    const st = await api.browserStatus();
+    // Visible is the default because this tool exists to be watched. A model
+    // that really wants a background browser must ask for it explicitly.
+    const wantHeadless = a.headless === true || String(a.headless).toLowerCase() === 'true';
+    let st = await api.browserStatus();
     if (!st.enabled) return 'error: the browser is switched off (Config → Labs → Browser)';
     if (!st.available) return 'error: no Chrome or Edge is installed on this machine';
-    if (!st.running) await api.browserLaunch(true);
+    if (!st.running || !!st.headless !== wantHeadless) {
+      st = await api.browserLaunch(wantHeadless);
+    }
     const info = await api.browserNavigate(url);
-    return `Opened ${info.url || url}${info.title ? ` — ${info.title}` : ''}`;
+    const mode = st.headless ? 'headless — no window to watch' : 'visible window';
+    return `Opened ${info.url || url}${info.title ? ` — ${info.title}` : ''} (${mode})`;
   };
 
   TOOL_REGISTRY.browser_click.run = async (arg) => {
@@ -1720,7 +1726,10 @@ export function bindSandboxTools(api) {
     const text = String(o.text ?? o.message ?? (typeof arg === 'string' ? '' : _note) ?? '');
     if (!text) return 'error: window_type needs "text" to type';
     const res = await programCall('type', { name, text, enter: !!o.enter, agent: ctx && ctx.agentId });
-    return `typed ${res.typed} character(s) into "${res.name}" (pid ${res.pid}) — ${res.note}`;
+    const verification = res.verified
+      ? ' Read back from the window: the typed text is there.'
+      : ' The window text could not be read back, so this typing is unverified.';
+    return `typed ${res.typed} character(s) into "${res.name}" (pid ${res.pid}) — ${res.note}${verification}`;
   };
 
   TOOL_REGISTRY.window_close.run = async (arg, _note, ctx) => {
@@ -2062,9 +2071,9 @@ export function toolInstructions(enabledTools, sandboxRoot, protocol = 'json') {
       + 'starting an app — the window outlives your reply, nothing blocks waiting for it, and it is '
       + 'recorded.'
       + (names.includes('window_type')
-        ? ' window_type types into an already-open program\u2019s window, live on screen — window_open it '
-          + 'first, keep each burst short, and never invent it: if it is not in your tool list it does '
-          + 'not exist for you.'
+        ? ' window_type types into an already-open program\u2019s window, live on screen, and reads the '
+          + 'window back so the result says whether the text really landed — window_open it first, keep '
+          + 'each burst short, and never invent it: if it is not in your tool list it does not exist for you.'
         : '')
       + ' It is not the built-in browser (browser_*), which drives a web page instead.'
     );

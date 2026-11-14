@@ -17,7 +17,7 @@
 // todo_write, and the drill that last worked stays in the run transcript and
 // the todo list. The operator ends the drill with Stop on the same button.
 
-import { store } from './store.js?v=457';
+import { store } from './store.js?v=458';
 
 /** Fraction of the normal request rate agents get while training. */
 export const TRAINING_THROTTLE = 0.5;
@@ -182,7 +182,7 @@ export const TRAINING_TASKS_FRONTIER = [
   { tool: 'todo_write', label: 'Write the Frontier steps as your todo list, first one in_progress.' },
   { tool: 'window_list', label: 'Call window_list and find the configured program named “notepad”. Do not open anything yet.' },
   { tool: 'window_open', label: 'Open Notepad on the real desktop with window_open: {"name":"notepad"}. (Asks approval — the window is the demo, so leave it open.)' },
-  { tool: 'window_type', label: 'Type exactly “Hello!” into Notepad with window_type: {"name":"notepad","text":"Hello!"}. (Asks approval — what appears on screen is the result.)' },
+  { tool: 'window_type', label: 'Type exactly “Hello!” into Notepad with window_type: {"name":"notepad","text":"Hello!"}. (Asks approval — the result must say the window was read back and contains the typed text; if it says unverified, retry.)' },
   { tool: 'todo_write', label: 'Mark every step completed and put one line in the last item: Notepad is open and “Hello!” was typed on screen. This completes the 6-step Frontier pass.' },
 ];
 
@@ -198,7 +198,7 @@ export const TRAINING_TASKS_FRONTIER = [
 export const TRAINING_TASKS_BROWSER = [
   { tool: 'think', label: 'Think one sentence about the browser drill before touching anything.' },
   { tool: 'todo_write', label: 'Write the Browser steps as your todo list, first one in_progress.' },
-  { tool: 'browser_open', label: 'Open the local Browser drill page with browser_open: {browser}. Wait for it to load.' },
+  { tool: 'browser_open', label: 'Open the local Browser drill page in a visible window with browser_open: {"url":"{browser}","headless":false}. Wait for it to load.' },
   { tool: 'browser_read', label: 'Read the page with browser_read and confirm it says “Browser drill”.' },
   { tool: 'browser_type', label: 'Type exactly “training” into the name field with browser_type: {"selector":"#drill-name","text":"training"}. (Asks approval — wait for it.)' },
   { tool: 'browser_click', label: 'Click the “Say hello” button with browser_click: {"selector":"#drill-submit"}.' },
@@ -294,7 +294,9 @@ export const DRILL_CHECKS_FRONTIER = [
   null,                                                                     // 2 todo_write
   (c) => /notepad/i.test(resultText(c)),                                    // 3 window_list
   (c) => /notepad/i.test(argText(c)),                                       // 4 window_open
-  (c) => /notepad/i.test(argText(c)) && /"text"\s*:\s*"hello!"/.test(argText(c)), // 5 window_type
+  (c) => /notepad/i.test(argText(c))
+    && /"text"\s*:\s*"hello!"/.test(argText(c))
+    && /read back from the window.*the typed text is there/i.test(resultText(c)), // 5 window_type
   null,                                                                     // 6 todo_write
 ];
 
@@ -302,7 +304,8 @@ export const DRILL_CHECKS_FRONTIER = [
 export const DRILL_CHECKS_BROWSER = [
   null,                                                                     // 1 think
   null,                                                                     // 2 todo_write
-  (c) => /drill\/browser\.html/i.test(argText(c)),                          // 3 browser_open
+  (c) => /drill\/browser\.html/i.test(argText(c))
+    && /visible window/i.test(resultText(c)),                              // 3 browser_open (visible)
   (c) => /browser drill/i.test(resultText(c)),                              // 4 browser_read heading
   (c) => /#drill-name/i.test(argText(c)) && /"text"\s*:\s*"training"/.test(argText(c)), // 5 browser_type
   (c) => /#drill-submit/i.test(argText(c)),                                 // 6 browser_click
@@ -371,11 +374,11 @@ const DIFFICULTY_INFO = {
   },
   frontier: {
     label: 'Frontier',
-    hint: 'Frontier runs a 6-step real-desktop demo: window_list finds Notepad, window_open opens it, and window_type types “Hello!” on screen. Leave the window open to watch it.',
+    hint: 'Frontier runs a 6-step real-desktop demo: window_list finds Notepad, window_open opens it, and window_type types “Hello!” and reads the window back to prove it landed. Leave the window open to watch it.',
   },
   browser: {
     label: 'Browser',
-    hint: 'Browser runs a 9-step local-page demo: open the page, read it, type “training”, click “Say hello”, wait, then read “Hello, training” back. Needs Config → Labs → Browser and Chrome or Edge.',
+    hint: 'Browser runs a 9-step local-page demo in a visible window: open the page, read it, type “training”, click “Say hello”, wait, then read “Hello, training” back. Needs Config → Labs → Browser and Chrome or Edge.',
   },
   custom: {
     label: 'Custom',
@@ -447,10 +450,13 @@ export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard', c
     return {
       totalSteps: 0, step: 0, complete: false, clean: false, passes: 0, cleanPasses: 0,
       failures: 0, failuresTotal: 0, failureCounts: {}, retries: 0, pending: false,
-      failedAt: null, offStep: 0, offTool: '', nextTool: '', empty: true,
+      failedAt: null, offStep: 0, offTool: '', nextTool: '', retryHint: '', empty: true,
     };
   }
-  const blank = () => ({ step: 0, failures: 0, failureCounts: {}, retries: 0, pending: false, failedAt: null, offStep: 0, offTool: '' });
+  const blank = () => ({
+    step: 0, failures: 0, failureCounts: {}, retries: 0, pending: false,
+    failedAt: null, offStep: 0, offTool: '', lastFailure: null,
+  });
   let cur = blank();
   let passes = 0;
   let cleanPasses = 0;
@@ -468,11 +474,12 @@ export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard', c
     }
     completedFailures += pass.failures;
   };
-  const countFailure = () => {
+  const countFailure = (failedResult = '') => {
     const stepNo = cur.step + 1;
     cur.failures++;
     cur.failureCounts[stepNo] = (cur.failureCounts[stepNo] || 0) + 1;
     if (cur.failedAt === null) cur.failedAt = stepNo;
+    cur.lastFailure = { step: stepNo, result: String(failedResult || '') };
   };
 
   for (const call of list) {
@@ -516,7 +523,7 @@ export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard', c
     // it -- a full read is not the ranged read. This used to be ignored, so a
     // model could repeat a wrong call and still be graded clean.
     if (!checkOk) {
-      countFailure();
+      countFailure(resultText(call));
       if (status === 'error' && retry) cur.retries++;
       cur.offStep = 0;
       cur.offTool = '';
@@ -529,7 +536,7 @@ export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard', c
 
     if (status === 'pending') { cur.pending = true; continue; }
     if (status === 'error') {
-      countFailure();
+      countFailure(resultText(call));
       if (retry) cur.retries++;
       continue;
     }
@@ -553,6 +560,22 @@ export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard', c
   }
   // While a new pass is in progress the judgement is still the finished one.
   const judged = complete ? cur : last;
+  // The Frontier typing step is the one place where a successful-looking call
+  // can still be a failure: the app now reads the window back, and if that
+  // read-back says unverified, the operator needs the next action in the strip,
+  // not just a red "1 failed at step 5".
+  const nextTask = complete ? null : tasks[cur.step];
+  const retryHint = (!complete && difficulty === 'frontier'
+    && nextTask && nextTask.tool === 'window_type'
+    && cur.lastFailure && cur.lastFailure.step === cur.step + 1
+    && /unverified|could not be read back/i.test(cur.lastFailure.result))
+    ? 'Retry window_type: the window text was not read back, so the typed text is unconfirmed.'
+    : (!complete && difficulty === 'browser'
+      && nextTask && nextTask.tool === 'browser_open'
+      && cur.lastFailure && cur.lastFailure.step === cur.step + 1
+      && /headless/.test(cur.lastFailure.result))
+      ? 'Retry browser_open with "headless":false: this drill needs a visible window.'
+      : '';
   return {
     totalSteps: total,
     step: Math.min(cur.step, total),
@@ -581,6 +604,7 @@ export function drillVerdict(calls, file = TRAINING_FILE, difficulty = 'hard', c
     offStep: cur.offStep,
     offTool: cur.offTool,
     nextTool: complete ? '' : (tasks[cur.step]?.tool || ''),
+    retryHint,
   };
 }
 
@@ -635,6 +659,7 @@ export function drillVerdictText(verdict) {
     bits.push(`waiting for ${verdict.nextTool || 'the next step'} (last call: ${verdict.offTool})`);
   }
   if (verdict.pending) bits.push('approval');
+  if (verdict.retryHint) bits.push(verdict.retryHint);
   if (verdict.passes) bits.push(`${verdict.passes} pass${verdict.passes === 1 ? '' : 'es'}`);
   return bits.join(' \u00b7 ');
 }
@@ -690,7 +715,7 @@ export function trainingKickoffFor(difficulty = null) {
   const fileRule = diff === 'frontier'
     ? 'window_list first, and use only the program names it shows; window_open the program before window_type; leave Notepad open after typing; never touch another window'
     : diff === 'browser'
-      ? 'open only the local browser drill page named above; use #drill-name for the field and #drill-submit for the button; do not navigate to any other site'
+      ? 'open only the local browser drill page named above in a visible window (headless:false); use #drill-name for the field and #drill-submit for the button; do not navigate to any other site'
       : custom
         ? 'use the exact tool each step names, including any custom tool saved in Brain Lab, and follow the instruction as written'
         : 'every agent has its OWN file in the training folder — use the exact path in your TRAINING MODE block, which the app also repeats when this kickoff reaches a turn already in flight — never another agent\'s file, and never the project folder above the sandbox';
@@ -818,7 +843,7 @@ export function trainingBlockFor(agent = null) {
       + retry
       + `- This is the REAL desktop, not the sandbox: window_list first, and use only the program names it shows. Never invent a path, executable or window name.\n`
       + `- window_open starts one configured program by name; the window outlives your reply. Call window_list again if you are unsure whether it is already running.\n`
-      + `- window_type types into the newest window of that program, live on screen. Type exactly "Hello!" into Notepad, keep the burst short, and leave the window open afterwards — the visible text is the demo.\n`
+      + `- window_type types into the newest window of that program, live on screen, then reads the window back. Type exactly "Hello!" into Notepad, keep the burst short, and leave the window open afterwards — the result must say the typed text is there; if it says unverified, retry the step.\n`
       + positionRule
       + `- window_open and window_type ask the operator for approval. That pause is normal: wait for it, do not work around it, and do not narrate the call as text.\n`
       + continueRule

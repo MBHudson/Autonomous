@@ -31,7 +31,7 @@ const {
   DRILL_CHECKS_FRONTIER, DRILL_CHECKS_BROWSER, TRAINING_BROWSER_TOKEN,
   trainingFileFor, isTrainingActive, trainingStepList, trainingBlockFor, trainingKickoffFor, trainingResumeFor,
   shouldResumeDrill, reachedCleanTarget, drillStripTitle, trainingDifficulty, trainingTasksFor, trainingChecksFor, showsEveryPass,
-  trainingDifficultyLabel, trainingDifficultyHint, drillVerdict, normalizeCustomSteps, CUSTOM_STEP_MAX,
+  trainingDifficultyLabel, trainingDifficultyHint, drillVerdict, drillVerdictText, normalizeCustomSteps, CUSTOM_STEP_MAX,
 } = await import(`../../ui/js/training.js?v=${version}`);
 const trainingModule = await import(`../../ui/js/training.js?v=${version}`);
 const { store } = await import(`../../ui/js/store.js?v=${version}`);
@@ -164,10 +164,13 @@ eq(trainingChecksFor('browser'), DRILL_CHECKS_BROWSER, 'browser selects its own 
 eq(trainingDifficulty({ difficulty: 'browser' }), 'browser', 'browser difficulty reads back');
 eq(trainingDifficultyLabel('browser'), 'Browser', 'browser has a display name');
 ok(trainingDifficultyHint('browser').includes('local-page'), 'browser hint names its local page');
+ok(trainingDifficultyHint('browser').includes('visible window'), 'browser hint requires a visible window');
 ok(trainingDifficultyHint('browser').includes('Labs → Browser'), 'browser hint states the Labs prerequisite');
 eq(trainingStepList(null, 'browser').length, 9, 'the dialog can list the browser steps');
 ok(trainingStepList(null, 'browser')[2].includes('browser.html'),
   'the browser step list resolves the local page URL');
+ok(trainingStepList(null, 'browser')[2].includes('headless'),
+  'the browser step list asks for a visible window');
 
 // Disarmed by default: the prompt block injects nothing.
 store.set('settings.trainingMode', { active: false, startedAt: 0 });
@@ -228,7 +231,7 @@ const frontierCalls = [
   { tool: 'todo_write', arg: { todos: [] }, status: 'ok' },
   { tool: 'window_list', arg: {}, status: 'ok', result: 'Desktop programs: notepad - C:/Windows/System32/notepad.exe | running' },
   { tool: 'window_open', arg: { name: 'notepad' }, status: 'ok' },
-  { tool: 'window_type', arg: { name: 'notepad', text: 'Hello!' }, status: 'ok' },
+  { tool: 'window_type', arg: { name: 'notepad', text: 'Hello!' }, status: 'ok', result: 'typed 6 character(s) into "notepad" (pid 9040) — Typed 6 character(s) into the newest window. Read back from the window: the typed text is there.' },
   { tool: 'todo_write', arg: { todos: [] }, status: 'ok' },
 ];
 const frontierVerdict = drillVerdict(frontierCalls, TRAINING_FILE, 'frontier');
@@ -236,10 +239,25 @@ ok(frontierVerdict.complete && frontierVerdict.clean,
   'a complete frontier pass grades clean');
 eq(frontierVerdict.totalSteps, 6, 'frontier verdict uses the 6-step table');
 
+// Arguments alone are not enough: the typing result must say the window was
+// read back and contained the text.
+const unverifiedFrontierCalls = frontierCalls.map(call => call.tool === 'window_type'
+  ? { ...call, result: 'typed 6 character(s) into "notepad" — The window text could not be read back, so this typing is unverified.' }
+  : call);
+const unverifiedFrontierVerdict = drillVerdict(unverifiedFrontierCalls, TRAINING_FILE, 'frontier');
+ok(!unverifiedFrontierVerdict.complete && !unverifiedFrontierVerdict.clean,
+  'frontier rejects a typed call that was not verified on screen');
+eq(unverifiedFrontierVerdict.failures, 1, 'the unverified typing counts as a failed step');
+eq(unverifiedFrontierVerdict.step, 4, 'the unverified typing does not advance the drill');
+ok(unverifiedFrontierVerdict.retryHint.includes('Retry window_type'),
+  'an unverified frontier typing gets a retry hint');
+ok(drillVerdictText(unverifiedFrontierVerdict).includes('Retry window_type'),
+  'the retry hint is shown in the strip text');
+
 const browserCalls = [
   { tool: 'think', arg: 'plan', status: 'ok' },
   { tool: 'todo_write', arg: { todos: [] }, status: 'ok' },
-  { tool: 'browser_open', arg: { url: 'http://127.0.0.1:8080/router/ui/drill/browser.html' }, status: 'ok', result: 'Opened http://127.0.0.1:8080/router/ui/drill/browser.html — Browser drill' },
+  { tool: 'browser_open', arg: { url: 'http://127.0.0.1:8080/router/ui/drill/browser.html', headless: false }, status: 'ok', result: 'Opened http://127.0.0.1:8080/router/ui/drill/browser.html — Browser drill (visible window)' },
   { tool: 'browser_read', arg: {}, status: 'ok', result: 'Browser drill\nYour name\nSay hello\nWaiting for a name.' },
   { tool: 'browser_type', arg: { selector: '#drill-name', text: 'training' }, status: 'ok', result: 'Typed 8 character(s)' },
   { tool: 'browser_click', arg: { selector: '#drill-submit' }, status: 'ok', result: 'Clicked #drill-submit' },
@@ -252,6 +270,20 @@ ok(browserVerdict.complete && browserVerdict.clean,
   'a complete browser pass grades clean');
 eq(browserVerdict.totalSteps, 9, 'browser verdict uses the 9-step table');
 
+// The exact failure the operator hit with Nemo: every call returned ok, but
+// the browser was headless, so nothing was ever visible. Step 3 must not
+// advance, and the strip must tell the model how to retry.
+const headlessBrowserCalls = browserCalls.map(call => call.tool === 'browser_open'
+  ? { ...call, arg: { url: 'http://127.0.0.1:8080/router/ui/drill/browser.html', headless: true }, result: 'Opened http://127.0.0.1:8080/router/ui/drill/browser.html — Browser drill (headless — no window to watch)' }
+  : call);
+const headlessVerdict = drillVerdict(headlessBrowserCalls, TRAINING_FILE, 'browser');
+ok(!headlessVerdict.complete && !headlessVerdict.clean,
+  'browser rejects a headless drill even when every call returned ok');
+eq(headlessVerdict.failures, 1, 'the headless open counts as a failed step');
+eq(headlessVerdict.step, 2, 'the headless open does not advance the drill');
+ok(headlessVerdict.retryHint.includes('Retry browser_open'),
+  'a headless browser open gets a retry hint');
+
 // The completion summary needs the whole run, not just the live pass: a
 // corrected step 5 in pass one, then a clean pass two.
 const failedFrontierPass = [
@@ -260,7 +292,7 @@ const failedFrontierPass = [
   { tool: 'window_list', arg: {}, status: 'ok', result: 'notepad | running' },
   { tool: 'window_open', arg: { name: 'notepad' }, status: 'ok' },
   { tool: 'window_type', arg: { name: 'notepad', text: 'Hello!' }, status: 'error', result: 'nothing to type into' },
-  { tool: 'window_type', arg: { name: 'notepad', text: 'Hello!' }, status: 'ok' },
+  { tool: 'window_type', arg: { name: 'notepad', text: 'Hello!' }, status: 'ok', result: 'typed 6 character(s) into "notepad" (pid 9040) — Typed 6 character(s) into the newest window. Read back from the window: the typed text is there.' },
   { tool: 'todo_write', arg: { todos: [] }, status: 'ok' },
 ];
 const runVerdict = drillVerdict(failedFrontierPass.concat(frontierCalls), TRAINING_FILE, 'frontier');

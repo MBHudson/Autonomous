@@ -299,6 +299,17 @@ class Programs {
         $table = self::processTable();
         $running = self::pidsFor($exe, $table);
 
+        // Opening a program is not much use if it appears behind the console
+        // window. Windows also refuses a background process's first attempt to
+        // change the foreground, so sendKeys() retries and forces the window
+        // forward. This is best effort and never makes a successful launch
+        // fail -- the process is already running.
+        $focused = false;
+        if (self::platform() === 'windows' && $running) {
+            $focus = self::sendKeys($running, '', false, true, 5);
+            $focused = !empty($focus['ok']);
+        }
+
         return [
             'ok' => true,
             'name' => $app['name'],
@@ -313,7 +324,8 @@ class Programs {
                         . 'cannot be confirmed here.'
                     : ($running
                         ? 'Its process is running now.'
-                        : 'It may take a moment to appear -- check with window_list before opening it again.')),
+                        : 'It may take a moment to appear -- check with window_list before opening it again.'))
+                . ($focused ? ' Brought it to the front.' : ''),
         ];
     }
 
@@ -543,13 +555,20 @@ class Programs {
                 'agent' => (string)($opts['agent'] ?? ''),
             ]);
         if (empty($res['ok'])) { throw new \RuntimeException($res['error']); }
+        // Read the window back after the send. This is what turns "the call
+        // returned ok" into "the text is actually in the program", and it is
+        // deliberately best effort: a program with no accessible text control
+        // still accepts typing, it just cannot be verified here.
+        $windowText = self::readWindowText((int)$res['pid']);
+        $verified = self::textLanded($text, $windowText);
         return [
             'ok' => true,
             'name' => $app['name'],
             'typed' => $len,
             'pid' => $res['pid'],
+            'verified' => $verified,
             'note' => 'Typed ' . $len . ' character(s) into the newest window of "' . $app['name']
-                . '" (pid ' . $res['pid'] . '). What you see on screen is what it received.',
+                . '" (pid ' . $res['pid'] . ').',
         ];
     }
 
@@ -565,22 +584,26 @@ class Programs {
      * (+ ^ % ~ ( ) { } [ ]) are escaped inside the script, so they type
      * literally; newlines become ENTER and tabs become TAB.
      *
+     * Focus-only mode leaves the text file absent and exits once the window is
+     * in front. That is what window_open uses, so a launched program does not
+     * disappear behind the app that launched it.
+     *
      * @return array{ok:bool,pid:int,error:string}
      */
-    private static function sendKeys(array $pids, $text, $enter) {
+    private static function sendKeys(array $pids, $text, $enter, $focusOnly = false, $timeout = 30) {
         $tmp = rtrim(sys_get_temp_dir(), '/\\');
         $tag = 'router-type-' . getmypid() . '-' . substr(bin2hex(random_bytes(4)), 0, 8);
         $txtFile = $tmp . DIRECTORY_SEPARATOR . $tag . '.txt';
         $ps1 = $tmp . DIRECTORY_SEPARATOR . $tag . '.ps1';
-        if (@file_put_contents($txtFile, $text) === false) {
+        if (!$focusOnly && @file_put_contents($txtFile, $text) === false) {
             return ['ok' => false, 'pid' => 0, 'error' => 'Could not stage the text to type. Nothing was typed.'];
         }
-        $script = 'param([string]$PidList, [string]$File, [int]$Enter)' . "\n"
+        $script = 'param([string]$PidList, [string]$File, [int]$Enter, [int]$FocusOnly)' . "\n"
             . '$ErrorActionPreference = \'Stop\'' . "\n"
             . 'Add-Type -AssemblyName System.Windows.Forms' . "\n"
-            . '$text = [System.IO.File]::ReadAllText($File, [System.Text.Encoding]::UTF8)' . "\n"
+            . 'if ($FocusOnly -eq 0) { $text = [System.IO.File]::ReadAllText($File, [System.Text.Encoding]::UTF8) }' . "\n"
             . '$ws = New-Object -ComObject WScript.Shell' . "\n"
-            . 'Add-Type -Namespace RouterWin -Name Foreground -MemberDefinition \'[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();\'' . "\n"
+            . 'Add-Type -Namespace RouterWin -Name Foreground -MemberDefinition \'[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd); [DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);\'' . "\n"
             . '$best = $null' . "\n"
             . 'foreach ($raw in ($PidList -split \',\')) {' . "\n"
             . '  $id = 0' . "\n"
@@ -591,9 +614,17 @@ class Programs {
             . '  if (($null -eq $best) -or ($p.StartTime -gt $best.StartTime)) { $best = $p }' . "\n"
             . '}' . "\n"
             . 'if ($null -eq $best) { Write-Output \'NOTYPE it is running but has no window yet\'; exit 3 }' . "\n"
-            . 'if (-not $ws.AppActivate($best.Id)) { Write-Output \'NOTYPE its window would not come forward\'; exit 3 }' . "\n"
-            . 'Start-Sleep -Milliseconds 250' . "\n"
-            . 'if ([RouterWin.Foreground]::GetForegroundWindow() -ne $best.MainWindowHandle) { Write-Output \'NOTYPE another window kept the focus\'; exit 3 }' . "\n"
+            . '$h = [System.IntPtr]$best.MainWindowHandle' . "\n"
+            . '$brought = $false' . "\n"
+            . 'for ($try = 0; $try -lt 4; $try++) {' . "\n"
+            . '  try { if ($ws.AppActivate($best.Id)) { Start-Sleep -Milliseconds 150 } } catch {}' . "\n"
+            . '  if ([RouterWin.Foreground]::GetForegroundWindow() -eq $h) { $brought = $true; break }' . "\n"
+            . '  [RouterWin.Foreground]::ShowWindow($h, 9) | Out-Null' . "\n"
+            . '  [RouterWin.Foreground]::SetForegroundWindow($h) | Out-Null' . "\n"
+            . '  Start-Sleep -Milliseconds 200' . "\n"
+            . '}' . "\n"
+            . 'if (-not $brought) { Write-Output \'NOTYPE another window kept the focus\'; exit 3 }' . "\n"
+            . 'if ($FocusOnly -ne 0) { Write-Output (\'FOCUSED \' + $best.Id); exit 0 }' . "\n"
             . '$esc = $text -replace \'([+^%~()\\[\\]{}])\', \'{$1}\'' . "\n"
             . '$esc = $esc -replace "`r`n", "{ENTER}"' . "\n"
             . '$esc = $esc -replace "`n", "{ENTER}"' . "\n"
@@ -607,11 +638,15 @@ class Programs {
         }
         $pidList = implode(',', array_map('intval', $pids));
         $res = self::run(['powershell', '-NoProfile', '-NonInteractive',
-            '-ExecutionPolicy', 'Bypass', '-File', $ps1, $pidList, $txtFile, $enter ? '1' : '0'], 30);
+            '-ExecutionPolicy', 'Bypass', '-File', $ps1, $pidList, $txtFile, $enter ? '1' : '0',
+            $focusOnly ? '1' : '0'], $timeout);
         @unlink($ps1);
         @unlink($txtFile);
         $out = trim((string)$res['out']);
         if (preg_match('/^TYPED (\d+)/m', $out, $m)) {
+            return ['ok' => true, 'pid' => (int)$m[1], 'error' => ''];
+        }
+        if (preg_match('/^FOCUSED (\d+)/m', $out, $m)) {
             return ['ok' => true, 'pid' => (int)$m[1], 'error' => ''];
         }
         if ($res['timed_out']) {
@@ -628,6 +663,69 @@ class Programs {
         return ['ok' => false, 'pid' => 0,
             'error' => 'The keystrokes were refused'
                 . ($out !== '' ? ': ' . self::clip($out, 160) : ' (no reason given)') . '. Nothing was typed.'];
+    }
+
+    /**
+     * Read the text of the window a typing call reached, when the program
+     * exposes a Document or Edit control through Windows UI Automation.
+     *
+     * The read starts at that exact window handle and only asks text controls
+     * for their own value; it is a verification read, not a screen scrape.
+     * Nothing is logged or returned except the comparison result in type().
+     * A program without an accessible text control returns '' and type()
+     * reports the typing as unverified rather than pretending it failed.
+     */
+    private static function readWindowText($pid) {
+        if (self::platform() !== 'windows' || (int)$pid <= 0) { return ''; }
+        $ps1 = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR
+            . 'router-read-' . getmypid() . '-' . substr(bin2hex(random_bytes(4)), 0, 8) . '.ps1';
+        $script = 'param([int]$TargetPid)' . "\n"
+            . '$ErrorActionPreference = \'Stop\'' . "\n"
+            . 'Add-Type -AssemblyName UIAutomationClient' . "\n"
+            . 'Add-Type -AssemblyName UIAutomationTypes' . "\n"
+            . '$p = Get-Process -Id $TargetPid -ErrorAction Stop' . "\n"
+            . 'if ($p.MainWindowHandle -eq 0) { exit 4 }' . "\n"
+            . '$root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)' . "\n"
+            . 'if ($null -eq $root) { exit 4 }' . "\n"
+            . '$text = $null' . "\n"
+            . 'for ($attempt = 0; $attempt -lt 5; $attempt++) {' . "\n"
+            . '  $all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)' . "\n"
+            . '  foreach ($el in $all) {' . "\n"
+            . '    $ct = $el.Current.ControlType.ProgrammaticName' . "\n"
+            . '    if ($ct -notmatch \'Document|Edit\') { continue }' . "\n"
+            . '    try {' . "\n"
+            . '      $tp = $el.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)' . "\n"
+            . '      $candidate = $tp.DocumentRange.GetText(-1)' . "\n"
+            . '      if ($candidate) { $text = $candidate; break }' . "\n"
+            . '    } catch {}' . "\n"
+            . '    try {' . "\n"
+            . '      $vp = $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)' . "\n"
+            . '      if ($vp.Current.Value) { $text = $vp.Current.Value; break }' . "\n"
+            . '    } catch {}' . "\n"
+            . '  }' . "\n"
+            . '  if ($text) { break }' . "\n"
+            . '  Start-Sleep -Milliseconds 150' . "\n"
+            . '}' . "\n"
+            . 'if (-not $text) { exit 4 }' . "\n"
+            . 'Write-Output ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($text)))' . "\n";
+        if (@file_put_contents($ps1, $script) === false) { return ''; }
+        $res = self::run(['powershell', '-NoProfile', '-NonInteractive',
+            '-ExecutionPolicy', 'Bypass', '-File', $ps1, (string)(int)$pid], 5);
+        @unlink($ps1);
+        if (!empty($res['timed_out'])) { return ''; }
+        $out = trim((string)$res['out']);
+        if ($out === '') { return ''; }
+        $raw = base64_decode(preg_replace('/\s+/', '', $out), true);
+        return is_string($raw) ? $raw : '';
+    }
+
+    /** Whether the text we sent is present in the text read back. */
+    private static function textLanded($typed, $windowText) {
+        if ($windowText === '') { return false; }
+        $normalise = static function ($s) {
+            return str_replace(["\r\n", "\r"], "\n", (string)$s);
+        };
+        return strpos($normalise($windowText), $normalise($typed)) !== false;
     }
 
     // ---------------------------------------------------------------

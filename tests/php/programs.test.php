@@ -260,6 +260,17 @@ if ($platform !== 'windows') {
     }, 'type() refuses off Windows instead of half-working', 'only built for Windows');
 }
 
+// The read-back comparison is what makes the Frontier step meaningful, and it
+// is testable without a window: Notepad reports CRLF, while window_type sends
+// normalized newlines.
+if ($platform === 'windows') {
+    $landed = new ReflectionMethod(Programs::class, 'textLanded');
+    $landed->setAccessible(true);
+    ok($landed->invoke(null, "Hello!", "Hello!\r\n"), 'read-back compares text across CRLF');
+    ok(!$landed->invoke(null, "Hello!", "Goodbye"), 'read-back rejects a missing typed text');
+    ok(!$landed->invoke(null, "Hello!", ''), 'read-back fails closed when nothing was read');
+}
+
 // --- 4c. a Store-packaged copy matches across the alias boundary --------
 // On Windows 11 Notepad RUNS from a WindowsApps path no config could name,
 // while the list holds the alias stub that launched it. pidsFor is private,
@@ -352,6 +363,8 @@ if ($platform !== 'windows') {
             $typed = Programs::type('sleeper', ['text' => 'hi', 'agent' => 'agent_progs_probe']);
             ok(!empty($typed['ok']) && (int)($typed['typed'] ?? -1) === 2,
                 'type() reports the characters typed');
+            ok(array_key_exists('verified', $typed),
+                'type() reports whether the window text was read back');
             ok((int)($typed['pid'] ?? 0) === (int)$launched[0],
                 'type() reached the window this test opened');
         } catch (\Throwable $e) {

@@ -7,16 +7,16 @@
 // AGENTEDITOR.JS — Agent CRUD modal
 // ============================================
 
-import { store } from '../store.js?v=457';
-import { persistence } from '../persistence.js?v=457';
-import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=457';
-import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=457';
-import { parseSnippet, snippetKind } from '../snippetParser.js?v=457';
-import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow, DISPLAY_TOOLS } from '../tools.js?v=457';
-import { sandboxRootFor } from '../agentConfig.js?v=457';
-import { audio } from '../audio.js?v=457';
-import { api } from '../api.js?v=457';
-import * as memory from '../memory.js?v=457';
+import { store } from '../store.js?v=458';
+import { persistence } from '../persistence.js?v=458';
+import { esc, uuid, makeAgentCode, agentCode, asText, agentToolState } from '../utils.js?v=458';
+import { parseCurl, bearerFromHeaders, parseJsonLenient } from '../curlParser.js?v=458';
+import { parseSnippet, snippetKind } from '../snippetParser.js?v=458';
+import { TOOL_REGISTRY, defaultTools, sandboxBindingReport, bindSandboxNow, DISPLAY_TOOLS } from '../tools.js?v=458';
+import { sandboxRootFor } from '../agentConfig.js?v=458';
+import { audio } from '../audio.js?v=458';
+import { api } from '../api.js?v=458';
+import * as memory from '../memory.js?v=458';
 
 /** Toast wording per recognized snippet language. */
 const KIND_LABEL = { curl: 'Curl', python: 'Python', node: 'Node', sdk: 'SDK', json: 'JSON API' };
