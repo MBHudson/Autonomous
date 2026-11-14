@@ -44,10 +44,19 @@ if (PHP_SAPI === 'cli') {
             exit(2);
         }
         $storage = __DIR__ . '/storage';
-        if (!is_dir($storage) || !is_writable($storage)) {
+        if (!is_dir($storage)) {
             fwrite(STDERR, 'storage/ is missing or not writable.' . "\n");
             exit(3);
         }
+        // OneDrive/cloud-backed folders can carry a read-only reparse tag that
+        // makes is_writable() return false even when real writes succeed. Prove
+        // it with a write instead of trusting the attribute.
+        $probe = $storage . '/.write-check-' . getmypid() . '-' . bin2hex(random_bytes(4));
+        if (@file_put_contents($probe, 'ok') === false) {
+            fwrite(STDERR, 'storage/ is missing or not writable.' . "\n");
+            exit(3);
+        }
+        @unlink($probe);
         $cfg = read_config();
         $hasToken = is_array($cfg) && isset($cfg['sandbox']['token'])
             && trim((string)$cfg['sandbox']['token']) !== '';
